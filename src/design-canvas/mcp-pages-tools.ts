@@ -1,6 +1,6 @@
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { type DesignCanvasMcpToolEnv, applyPlan } from './mcp-context'
-import { objectSchema, requireString, isRecord } from '../tools/mcp-arguments'
+import { objectSchema, requireMcpString, isRecord } from '../tools/mcp-arguments'
 import { colorProp, optionalString, optionalNumber, optionalNonNegativeInteger, requireNumber } from './mcp-input'
 
 export const CANVAS_PAGES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
@@ -49,7 +49,7 @@ export const CANVAS_PAGES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       ['source_page_id'],
     ),
     async run(args, env) {
-      const sourcePageId = requireString(args, 'source_page_id')
+      const sourcePageId = requireMcpString(args, 'source_page_id')
       const pageId = env.mintId()
       const result = await applyPlan(env.store, env.mintId, `duplicate page ${sourcePageId}`, [
         { type: 'duplicate_page', sourcePageId, pageId },
@@ -66,7 +66,7 @@ export const CANVAS_PAGES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       ['page_id'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
+      const pageId = requireMcpString(args, 'page_id')
       const result = await applyPlan(env.store, env.mintId, `delete page ${pageId}`, [
         { type: 'delete_page', pageId },
       ])
@@ -100,7 +100,7 @@ export const CANVAS_PAGES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       ['page_id'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
+      const pageId = requireMcpString(args, 'page_id')
       let bleed: { top: number; right: number; bottom: number; left: number } | null | undefined
       if ('bleed' in args) {
         if (args['bleed'] === null) {
@@ -144,7 +144,7 @@ export const CANVAS_PAGES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       ['page_id', 'vertical', 'horizontal'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
+      const pageId = requireMcpString(args, 'page_id')
       if (!Array.isArray(args['vertical'])) throw new Error('vertical must be an array of numbers')
       if (!Array.isArray(args['horizontal'])) throw new Error('horizontal must be an array of numbers')
       const vertical = args['vertical'] as number[]

@@ -38,6 +38,7 @@
  *   `withDurableChatProjection` already states).
  */
 
+import type { ChatMessageValues } from '../chat-store/core'
 import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import type { ChatTurnUsage } from './turn-routes'
 
@@ -56,21 +57,7 @@ export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatT
 
 /** Values written to the assistant row — the intersection of the append and
  *  patch shapes, so one snapshot serves both. */
-export interface AssistantRowValues {
-  content: string
-  parts?: ChatMessagePart[]
-  model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
-  inputTokens?: number | null
-  outputTokens?: number | null
-  reasoningTokens?: number | null
-  cacheReadTokens?: number | null
-  cacheWriteTokens?: number | null
-  costUsd?: number | null
-}
+export interface AssistantRowValues extends ChatMessageValues {}
 
 /** The store capability incremental persistence needs on top of
  *  `appendMessage`. A store without `updateMessage` cannot patch a row, so it

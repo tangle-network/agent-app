@@ -364,6 +364,131 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
     return paused
   }
 
+  const { runStep } = createMissionStepRunner(service, rejectStep, sink, isStepCurrentOrFuture, isFatalStepKind, estimateStepCostUsd)
+
+  const { enforceBudget, enforceStepGate } = createMissionGates(service, sink, estimateStepCostUsd, gates, pauseMission, externalActionCap)
+
+  const runPlan: MissionEngine['runPlan'] = async (missionId, runStepFn, planOptions = {}) => {
+    const mission = await service.getMission(missionId)
+    if (!mission) return { kind: 'not-found' }
+    if (isMissionTerminal(mission.status)) {
+      // Already terminal on entry (a replay after the row finished, or a
+      // resume of an aborted/cancelled run). Re-emit the terminal event so a
+      // client that connected during an outage still converges off this run.
+      // Idempotent at the reducer.
+      safeEmit(sink, terminalMissionEvent(missionId, mission.status))
+      return { kind: 'terminal', status: mission.status }
+    }
+
+    // Resume from the durable cursor. Re-read the mission between steps so a
+    // pause/stop control that lands while a step is running is honored before
+    // the next side effect starts.
+    while (true) {
+      const currentMission = await service.getMission(missionId)
+      if (!currentMission) return { kind: 'not-found' }
+      if (isMissionTerminal(currentMission.status)) {
+        safeEmit(sink, terminalMissionEvent(missionId, currentMission.status))
+        return { kind: 'terminal', status: currentMission.status }
+      }
+      if (isMissionStopRequested(currentMission)) {
+        return {
+          kind: 'halted',
+          status: currentMission.status,
+          reason: currentMission.pauseReason ?? 'Mission stop requested',
+        }
+      }
+      if (currentMission.status !== 'running') {
+        return {
+          kind: 'halted',
+          status: currentMission.status,
+          reason: currentMission.pauseReason,
+        }
+      }
+
+      const index = currentMission.cursor
+      if (index >= currentMission.plan.length) break
+      const step = currentMission.plan[index]
+      if (!step) break
+
+      const haltReason = await planOptions.beforeStep?.(currentMission, step)
+      if (haltReason) {
+        const paused = await pauseMission(missionId, haltReason)
+        if (!paused.succeeded) throw new MissionConcurrencyError(paused.error)
+        return { kind: 'halted', status: paused.value.status, reason: paused.value.pauseReason ?? haltReason }
+      }
+
+      if (step.status !== 'done') {
+        const budget = await enforceBudget(currentMission, step)
+        if (budget.kind === 'halted') {
+          return { kind: 'halted', status: budget.status, reason: budget.reason }
+        }
+        const gate = await enforceStepGate(currentMission, step)
+        if (gate.kind === 'halted') {
+          return { kind: 'halted', status: gate.status, reason: gate.reason }
+        }
+      }
+
+      const outcome = await runStepFn(step, index)
+      if (outcome.kind === 'failed' && outcome.fatal) {
+        // The owner flips the mission row to `failed` on this outcome; emit the
+        // live terminal event here so a watcher sees the failure without
+        // waiting for the next loader poll. Idempotent at the reducer.
+        safeEmit(sink, {
+          type: 'mission.completed',
+          missionId,
+          at: Date.now(),
+          ok: false,
+          summary: `Step ${step.id} failed: ${outcome.error}`,
+        })
+        return { kind: 'failed', failedStepId: step.id, error: outcome.error }
+      }
+      if (outcome.kind === 'failed' && !outcome.fatal) {
+        const advanced = await service.advanceCursor(missionId)
+        if (!advanced.succeeded) throw new MissionConcurrencyError(advanced.error)
+      }
+      if (outcome.kind === 'in_progress') {
+        return {
+          kind: 'in_progress',
+          stepId: step.id,
+          sessionRef: outcome.sessionRef,
+          pollAfterMs: outcome.pollAfterMs,
+          ...(outcome.sublabel === undefined ? {} : { sublabel: outcome.sublabel }),
+        }
+      }
+      // Cursor-skips fall through: another pass already moved past it. The next
+      // loop re-reads the authoritative cursor and plan.
+    }
+
+    const finalMission = await service.getMission(missionId)
+    const planLength = finalMission?.plan.length ?? 0
+    const summary = `Completed ${planLength} step${planLength === 1 ? '' : 's'}`
+    const completed = await service.complete(missionId, { ok: true, summary })
+    if (!completed.succeeded) {
+      // complete() is guarded; a concurrent terminal transition (abort/cancel)
+      // wins the race. Re-read to report the real terminal status rather than
+      // claim a completion that did not land.
+      const after = await service.getMission(missionId)
+      if (after && isMissionTerminal(after.status)) {
+        safeEmit(sink, terminalMissionEvent(missionId, after.status))
+        return { kind: 'terminal', status: after.status }
+      }
+      throw new MissionConcurrencyError(completed.error)
+    }
+    safeEmit(sink, { type: 'mission.completed', missionId, at: Date.now(), ok: true, summary })
+    return { kind: 'completed', summary }
+  }
+
+  return { runStep, runPlan, recordCost, pauseMission }
+}
+
+function createMissionStepRunner(
+  service: MissionEngineOptions['service'],
+  rejectStep: (failure: { error: string; conflict: boolean }) => StepOutcome,
+  sink: MissionEventSink,
+  isStepCurrentOrFuture: (mission: MissionRecord, stepId: string) => boolean,
+  isFatalStepKind: (kind: string) => boolean,
+  estimateStepCostUsd: MissionEngineOptions['estimateStepCostUsd'],
+) {
   const runStep: MissionEngine['runStep'] = async (missionId, stepId, dispatch) => {
     const mission = await service.getMission(missionId)
     if (!mission) throw new MissionConcurrencyError(`Mission ${missionId} not found mid-run`)
@@ -494,15 +619,15 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
       ...(dispatched.sublabel === undefined ? {} : { sublabel: dispatched.sublabel }),
       ...(chargeable
         ? {
-            cost: {
-              deltaUsd,
-              ledgerDelta: {
-                costUsd: deltaUsd,
-                llmCalls: 1,
-                ...(dispatched.cost?.ledgerDelta ?? {}),
-              },
+          cost: {
+            deltaUsd,
+            ledgerDelta: {
+              costUsd: deltaUsd,
+              llmCalls: 1,
+              ...(dispatched.cost?.ledgerDelta ?? {}),
             },
-          }
+          },
+        }
         : {}),
     })
     if (!done.succeeded) return rejectStep(done)
@@ -533,7 +658,17 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
 
     return { kind: 'done', resultRef: dispatched.resultRef, cached: false }
   }
+  return { runStep }
+}
 
+function createMissionGates(
+  service: MissionEngineOptions['service'],
+  sink: MissionEventSink,
+  estimateStepCostUsd: MissionEngineOptions['estimateStepCostUsd'],
+  gates: MissionEngineOptions['gates'],
+  pauseMission: MissionEngine['pauseMission'],
+  externalActionCap: number,
+) {
   async function parkForApproval(
     mission: MissionRecord,
     step: MissionStep,
@@ -659,116 +794,5 @@ export function createMissionEngine(options: MissionEngineOptions): MissionEngin
     }
     return parkForApproval(mission, step, `Approval required for step ${step.id}`)
   }
-
-  const runPlan: MissionEngine['runPlan'] = async (missionId, runStepFn, planOptions = {}) => {
-    const mission = await service.getMission(missionId)
-    if (!mission) return { kind: 'not-found' }
-    if (isMissionTerminal(mission.status)) {
-      // Already terminal on entry (a replay after the row finished, or a
-      // resume of an aborted/cancelled run). Re-emit the terminal event so a
-      // client that connected during an outage still converges off this run.
-      // Idempotent at the reducer.
-      safeEmit(sink, terminalMissionEvent(missionId, mission.status))
-      return { kind: 'terminal', status: mission.status }
-    }
-
-    // Resume from the durable cursor. Re-read the mission between steps so a
-    // pause/stop control that lands while a step is running is honored before
-    // the next side effect starts.
-    while (true) {
-      const currentMission = await service.getMission(missionId)
-      if (!currentMission) return { kind: 'not-found' }
-      if (isMissionTerminal(currentMission.status)) {
-        safeEmit(sink, terminalMissionEvent(missionId, currentMission.status))
-        return { kind: 'terminal', status: currentMission.status }
-      }
-      if (isMissionStopRequested(currentMission)) {
-        return {
-          kind: 'halted',
-          status: currentMission.status,
-          reason: currentMission.pauseReason ?? 'Mission stop requested',
-        }
-      }
-      if (currentMission.status !== 'running') {
-        return {
-          kind: 'halted',
-          status: currentMission.status,
-          reason: currentMission.pauseReason,
-        }
-      }
-
-      const index = currentMission.cursor
-      if (index >= currentMission.plan.length) break
-      const step = currentMission.plan[index]
-      if (!step) break
-
-      const haltReason = await planOptions.beforeStep?.(currentMission, step)
-      if (haltReason) {
-        const paused = await pauseMission(missionId, haltReason)
-        if (!paused.succeeded) throw new MissionConcurrencyError(paused.error)
-        return { kind: 'halted', status: paused.value.status, reason: paused.value.pauseReason ?? haltReason }
-      }
-
-      if (step.status !== 'done') {
-        const budget = await enforceBudget(currentMission, step)
-        if (budget.kind === 'halted') {
-          return { kind: 'halted', status: budget.status, reason: budget.reason }
-        }
-        const gate = await enforceStepGate(currentMission, step)
-        if (gate.kind === 'halted') {
-          return { kind: 'halted', status: gate.status, reason: gate.reason }
-        }
-      }
-
-      const outcome = await runStepFn(step, index)
-      if (outcome.kind === 'failed' && outcome.fatal) {
-        // The owner flips the mission row to `failed` on this outcome; emit the
-        // live terminal event here so a watcher sees the failure without
-        // waiting for the next loader poll. Idempotent at the reducer.
-        safeEmit(sink, {
-          type: 'mission.completed',
-          missionId,
-          at: Date.now(),
-          ok: false,
-          summary: `Step ${step.id} failed: ${outcome.error}`,
-        })
-        return { kind: 'failed', failedStepId: step.id, error: outcome.error }
-      }
-      if (outcome.kind === 'failed' && !outcome.fatal) {
-        const advanced = await service.advanceCursor(missionId)
-        if (!advanced.succeeded) throw new MissionConcurrencyError(advanced.error)
-      }
-      if (outcome.kind === 'in_progress') {
-        return {
-          kind: 'in_progress',
-          stepId: step.id,
-          sessionRef: outcome.sessionRef,
-          pollAfterMs: outcome.pollAfterMs,
-          ...(outcome.sublabel === undefined ? {} : { sublabel: outcome.sublabel }),
-        }
-      }
-      // Cursor-skips fall through: another pass already moved past it. The next
-      // loop re-reads the authoritative cursor and plan.
-    }
-
-    const finalMission = await service.getMission(missionId)
-    const planLength = finalMission?.plan.length ?? 0
-    const summary = `Completed ${planLength} step${planLength === 1 ? '' : 's'}`
-    const completed = await service.complete(missionId, { ok: true, summary })
-    if (!completed.succeeded) {
-      // complete() is guarded; a concurrent terminal transition (abort/cancel)
-      // wins the race. Re-read to report the real terminal status rather than
-      // claim a completion that did not land.
-      const after = await service.getMission(missionId)
-      if (after && isMissionTerminal(after.status)) {
-        safeEmit(sink, terminalMissionEvent(missionId, after.status))
-        return { kind: 'terminal', status: after.status }
-      }
-      throw new MissionConcurrencyError(completed.error)
-    }
-    safeEmit(sink, { type: 'mission.completed', missionId, at: Date.now(), ok: true, summary })
-    return { kind: 'completed', summary }
-  }
-
-  return { runStep, runPlan, recordCost, pauseMission }
+  return { enforceBudget, enforceStepGate }
 }

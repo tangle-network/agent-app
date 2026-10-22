@@ -7,7 +7,7 @@ export class SpendUsageError extends Error {}
 
 const DEFAULT_CONFIG_FILE = 'spend.config.mjs'
 
-export const USAGE = [
+export const SPEND_USAGE = [
   'agent-app-spend-check — reconcile settled sandbox compute against what this product asked for.',
   '',
   'Usage: agent-app-spend-check [--config <file>] [--json] [--as-of <iso>] [--skip <check,check>]',

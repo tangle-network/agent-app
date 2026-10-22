@@ -200,10 +200,10 @@ interface StudioAudioElementLike
 
 ### `StudioComposer`
 
-`function` — The composer card.
+`function`
 
 ```ts
-({ workspaceId, onGenerated, variant, pickReferenceImage, sendTone, className, }: StudioComposerProps) => Element
+(props: StudioComposerProps) => Element
 ```
 
 ### `StudioComposerProps`
@@ -259,7 +259,7 @@ interface StudioGenerationScreenProps
 `function`
 
 ```ts
-({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element
+(props: StudioHistoryScreenProps) => Element
 ```
 
 ### `StudioHistoryScreenProps`

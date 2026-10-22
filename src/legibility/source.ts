@@ -180,6 +180,8 @@ export function scanSource(text: string): ScannedSource {
     return null
   }
 
+  const { readJsxChildren, readJsxTag, openTag } = createJsxReaders(text, stack, openElement, containerOf, elements, segments, blank)
+
   let i = 0
   while (i < text.length) {
     const frame = top()
@@ -324,143 +326,6 @@ export function scanSource(text: string): ScannedSource {
     return name.length > 0 && IDENT_START.test(name[0] as string) ? name : null
   }
 
-  function openTag(at: number): number {
-    let cursor = at + 1
-    let tag = ''
-    if (text[cursor] === '>') {
-      // Fragment `<>`.
-      const element = makeElement('', at)
-      stack.push({ kind: 'jsx-children', depth: 0, element, containerStart: null })
-      element.openEnd = cursor + 1
-      return cursor + 1
-    }
-    while (cursor < text.length && IDENT_PART.test(text[cursor] as string)) {
-      tag += text[cursor] as string
-      cursor++
-    }
-    const element = makeElement(tag, at)
-    stack.push({ kind: 'jsx-tag', depth: 0, element, containerStart: null })
-    return cursor
-  }
-
-  function makeElement(tag: string, at: number): JsxElement {
-    const parent = openElement()
-    const element: JsxElement = {
-      tag,
-      attributes: [],
-      children: [],
-      parent,
-      start: at,
-      openEnd: at,
-      end: at,
-      containerStart: containerOf(),
-    }
-    if (parent) parent.children.push(element)
-    elements.push(element)
-    return element
-  }
-
-  function readJsxTag(at: number, frame: Frame): number {
-    const ch = text[at] as string
-    if (/\s/.test(ch)) return at + 1
-    const element = frame.element
-    if (element === null) {
-      stack.pop()
-      return at + 1
-    }
-    if (ch === '/' && text[at + 1] === '>') {
-      element.openEnd = at + 2
-      element.end = at + 2
-      stack.pop()
-      return at + 2
-    }
-    if (ch === '>') {
-      element.openEnd = at + 1
-      stack.pop()
-      stack.push({ kind: 'jsx-children', depth: 0, element, containerStart: null })
-      return at + 1
-    }
-    if (ch === '{') {
-      // Spread attribute `{...props}` or an expression value.
-      stack.push({ kind: 'code', depth: 0, element, containerStart: at })
-      return at + 1
-    }
-    if (!IDENT_START.test(ch)) return at + 1
-
-    let cursor = at
-    let name = ''
-    while (cursor < text.length && IDENT_PART.test(text[cursor] as string)) {
-      name += text[cursor] as string
-      cursor++
-    }
-    let probe = cursor
-    while (probe < text.length && /\s/.test(text[probe] as string)) probe++
-    if (text[probe] !== '=') {
-      element.attributes.push({ name, start: at, value: null, expression: false })
-      return cursor
-    }
-    probe++
-    while (probe < text.length && /\s/.test(text[probe] as string)) probe++
-    const valueChar = text[probe]
-    if (valueChar === '"' || valueChar === "'") {
-      const end = readQuoted(text, probe, valueChar)
-      const value = text.slice(probe + 1, end - 1)
-      element.attributes.push({ name, start: at, value, expression: false })
-      segments.push({
-        kind: 'jsx-attribute',
-        start: probe + 1,
-        end: end - 1,
-        value,
-        attribute: name,
-        tag: element.tag,
-      })
-      blank(probe + 1, end - 1)
-      return end
-    }
-    element.attributes.push({ name, start: at, value: null, expression: true })
-    return probe
-  }
-
-  function readJsxChildren(at: number, frame: Frame): number {
-    let cursor = at
-    while (cursor < text.length) {
-      const ch = text[cursor] as string
-      if (ch === '{') {
-        pushJsxText(at, cursor, frame.element)
-        stack.push({ kind: 'code', depth: 0, element: frame.element, containerStart: cursor })
-        return cursor + 1
-      }
-      if (ch === '<') {
-        pushJsxText(at, cursor, frame.element)
-        if (text[cursor + 1] === '/') {
-          const close = indexOrEnd(text, '>', cursor)
-          const element = frame.element
-          if (element) element.end = Math.min(close + 1, text.length)
-          stack.pop()
-          return Math.min(close + 1, text.length)
-        }
-        return openTag(cursor)
-      }
-      cursor++
-    }
-    pushJsxText(at, cursor, frame.element)
-    stack.pop()
-    return cursor
-  }
-
-  function pushJsxText(from: number, to: number, owner: JsxElement | null): void {
-    if (to <= from) return
-    const value = text.slice(from, to)
-    if (value.trim().length === 0) return
-    segments.push({
-      kind: 'jsx-text',
-      start: from,
-      end: to,
-      value,
-      ...(owner === null ? {} : { tag: owner.tag }),
-    })
-    blank(from, to)
-  }
 }
 
 /** Offset just past the closing quote of the literal starting at `at`. */
@@ -622,4 +487,153 @@ export function enclosingBlock(masked: string, offset: number): { start: number;
     }
   }
   return { start, end: masked.length }
+}
+
+function createJsxReaders(
+  text: string,
+  stack: Frame[],
+  openElement: () => JsxElement | null,
+  containerOf: () => number | null,
+  elements: JsxElement[],
+  segments: SourceSegment[],
+  blank: (from: number, to: number) => void,
+) {
+  function openTag(at: number): number {
+    let cursor = at + 1
+    let tag = ''
+    if (text[cursor] === '>') {
+      // Fragment `<>`.
+      const element = makeElement('', at)
+      stack.push({ kind: 'jsx-children', depth: 0, element, containerStart: null })
+      element.openEnd = cursor + 1
+      return cursor + 1
+    }
+    while (cursor < text.length && IDENT_PART.test(text[cursor] as string)) {
+      tag += text[cursor] as string
+      cursor++
+    }
+    const element = makeElement(tag, at)
+    stack.push({ kind: 'jsx-tag', depth: 0, element, containerStart: null })
+    return cursor
+  }
+
+  function makeElement(tag: string, at: number): JsxElement {
+    const parent = openElement()
+    const element: JsxElement = {
+      tag,
+      attributes: [],
+      children: [],
+      parent,
+      start: at,
+      openEnd: at,
+      end: at,
+      containerStart: containerOf(),
+    }
+    if (parent) parent.children.push(element)
+    elements.push(element)
+    return element
+  }
+
+  function readJsxTag(at: number, frame: Frame): number {
+    const ch = text[at] as string
+    if (/\s/.test(ch)) return at + 1
+    const element = frame.element
+    if (element === null) {
+      stack.pop()
+      return at + 1
+    }
+    if (ch === '/' && text[at + 1] === '>') {
+      element.openEnd = at + 2
+      element.end = at + 2
+      stack.pop()
+      return at + 2
+    }
+    if (ch === '>') {
+      element.openEnd = at + 1
+      stack.pop()
+      stack.push({ kind: 'jsx-children', depth: 0, element, containerStart: null })
+      return at + 1
+    }
+    if (ch === '{') {
+      // Spread attribute `{...props}` or an expression value.
+      stack.push({ kind: 'code', depth: 0, element, containerStart: at })
+      return at + 1
+    }
+    if (!IDENT_START.test(ch)) return at + 1
+
+    let cursor = at
+    let name = ''
+    while (cursor < text.length && IDENT_PART.test(text[cursor] as string)) {
+      name += text[cursor] as string
+      cursor++
+    }
+    let probe = cursor
+    while (probe < text.length && /\s/.test(text[probe] as string)) probe++
+    if (text[probe] !== '=') {
+      element.attributes.push({ name, start: at, value: null, expression: false })
+      return cursor
+    }
+    probe++
+    while (probe < text.length && /\s/.test(text[probe] as string)) probe++
+    const valueChar = text[probe]
+    if (valueChar === '"' || valueChar === "'") {
+      const end = readQuoted(text, probe, valueChar)
+      const value = text.slice(probe + 1, end - 1)
+      element.attributes.push({ name, start: at, value, expression: false })
+      segments.push({
+        kind: 'jsx-attribute',
+        start: probe + 1,
+        end: end - 1,
+        value,
+        attribute: name,
+        tag: element.tag,
+      })
+      blank(probe + 1, end - 1)
+      return end
+    }
+    element.attributes.push({ name, start: at, value: null, expression: true })
+    return probe
+  }
+
+  function readJsxChildren(at: number, frame: Frame): number {
+    let cursor = at
+    while (cursor < text.length) {
+      const ch = text[cursor] as string
+      if (ch === '{') {
+        pushJsxText(at, cursor, frame.element)
+        stack.push({ kind: 'code', depth: 0, element: frame.element, containerStart: cursor })
+        return cursor + 1
+      }
+      if (ch === '<') {
+        pushJsxText(at, cursor, frame.element)
+        if (text[cursor + 1] === '/') {
+          const close = indexOrEnd(text, '>', cursor)
+          const element = frame.element
+          if (element) element.end = Math.min(close + 1, text.length)
+          stack.pop()
+          return Math.min(close + 1, text.length)
+        }
+        return openTag(cursor)
+      }
+      cursor++
+    }
+    pushJsxText(at, cursor, frame.element)
+    stack.pop()
+    return cursor
+  }
+
+  function pushJsxText(from: number, to: number, owner: JsxElement | null): void {
+    if (to <= from) return
+    const value = text.slice(from, to)
+    if (value.trim().length === 0) return
+    segments.push({
+      kind: 'jsx-text',
+      start: from,
+      end: to,
+      value,
+      ...(owner === null ? {} : { tag: owner.tag }),
+    })
+    blank(from, to)
+  }
+  return { readJsxChildren, readJsxTag, openTag }
 }

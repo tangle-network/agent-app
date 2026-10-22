@@ -52,7 +52,6 @@ export {
   createSlackBotAlertSink,
   createThrottledAlertSink,
   createWebhookAlertSink,
-  type FetchLike,
   type TurnHealthAlert,
   turnAlert,
 } from './sink.js'

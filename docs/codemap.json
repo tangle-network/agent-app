@@ -153,12 +153,6 @@
       "error": null,
       "exports": [
         {
-          "name": "addProfileKnowledgeDocument",
-          "kind": "function",
-          "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; content: string; act…",
-          "doc": null
-        },
-        {
           "name": "admitProfileTurn",
           "kind": "function",
           "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; observedManagedPlanD…",
@@ -171,22 +165,10 @@
           "doc": "The per-turn text overlay is validated without admitting tools, model, MCP or resources."
         },
         {
-          "name": "createDrizzleSelfMountStorage",
-          "kind": "function",
-          "signature": "(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: \"scop…",
-          "doc": "A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column)."
-        },
-        {
           "name": "createInMemorySelfMountStorage",
           "kind": "function",
           "signature": "() => SelfMountStorage",
           "doc": "Non-durable default for tests and single-instance products."
-        },
-        {
-          "name": "createKVSelfMountStorage",
-          "kind": "function",
-          "signature": "(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…",
-          "doc": "A KV-backed SelfMountStorage (Cloudflare KV, any namespace)."
         },
         {
           "name": "createMountProfileChangeTool",
@@ -261,12 +243,6 @@
           "doc": "The one-call product wiring: catalog + storage + baseline + cap."
         },
         {
-          "name": "PROFILE_CHANGE_POLICY",
-          "kind": "const",
-          "signature": "{ readonly textEdit: { readonly admission: \"automatic\"; readonly conversation: \"same\"; readonly destructive: false; };…",
-          "doc": "The decision table used by every write path; products may narrow access, never widen it."
-        },
-        {
           "name": "PROFILE_MEMORY_PREFIX",
           "kind": "const",
           "signature": "\"/memories/workspace/\"",
@@ -333,12 +309,6 @@
           "doc": null
         },
         {
-          "name": "ProfileKnowledgeDocument",
-          "kind": "interface",
-          "signature": "interface ProfileKnowledgeDocument",
-          "doc": null
-        },
-        {
           "name": "ProfileKnowledgeEvent",
           "kind": "interface",
           "signature": "interface ProfileKnowledgeEvent",
@@ -375,21 +345,9 @@
           "doc": null
         },
         {
-          "name": "profileSwitchInputHashFromContentHash",
-          "kind": "function",
-          "signature": "(contentHash: string, identityContext?: string | undefined) => string",
-          "doc": "A source identity joins the command hash without entering the receipt row."
-        },
-        {
           "name": "ProfileSwitchReceipt",
           "kind": "interface",
           "signature": "interface ProfileSwitchReceipt",
-          "doc": null
-        },
-        {
-          "name": "profileTextChange",
-          "kind": "function",
-          "signature": "(revision: ProfileRevision, changes: { name?: string | undefined; description?: string | null | undefined; systemPrompt…",
           "doc": null
         },
         {
@@ -417,12 +375,6 @@
           "doc": null
         },
         {
-          "name": "projectKnowledgeDocuments",
-          "kind": "function",
-          "signature": "(events: readonly ProfileKnowledgeEvent[]) => ProfileKnowledgeDocument[]",
-          "doc": null
-        },
-        {
           "name": "promoteRevision",
           "kind": "function",
           "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; revisionId: string; actorRole: \"member\"…",
@@ -447,18 +399,6 @@
           "doc": "Read what admitting a message needs: its prior pin and the binding together, then a pinned revision."
         },
         {
-          "name": "removeProfileKnowledgeDocument",
-          "kind": "function",
-          "signature": "(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; actorRole: \"member\"…",
-          "doc": null
-        },
-        {
-          "name": "rollbackProfileBinding",
-          "kind": "function",
-          "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; conversationId?: string | undefined;…",
-          "doc": "One-step rollback moves this member/channel to its previous immutable revision."
-        },
-        {
           "name": "SelfMountSkillEntry",
           "kind": "interface",
           "signature": "interface SelfMountSkillEntry",
@@ -469,12 +409,6 @@
           "kind": "interface",
           "signature": "interface SelfMountStorage",
           "doc": "Durable mounted-skill state, keyed by the product's scope."
-        },
-        {
-          "name": "selfMountTable",
-          "kind": "function",
-          "signature": "(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…",
-          "doc": "Create (or use) the standard self-mount table in a drizzle/D1 database."
         },
         {
           "name": "serializeProfileRevisionDiff",
@@ -573,46 +507,6 @@
           "kind": "function",
           "signature": "() => { revisions: SQLiteTableWithColumns<{ name: \"agent_profile_revision\"; schema: undefined; columns: { id: SQLiteCol…",
           "doc": null
-        }
-      ]
-    },
-    {
-      "id": "./agent-profiles/reaper",
-      "source": "src/agent-profiles/reaper.ts",
-      "dependsOn": [
-        "tools"
-      ],
-      "error": null,
-      "exports": [
-        {
-          "name": "MIN_PROFILE_REAP_GRACE_MS",
-          "kind": "const",
-          "signature": "number",
-          "doc": "Separate cleanup policy."
-        },
-        {
-          "name": "ProfileReapCandidate",
-          "kind": "interface",
-          "signature": "interface ProfileReapCandidate",
-          "doc": null
-        },
-        {
-          "name": "ProfileReapDecision",
-          "kind": "interface",
-          "signature": "interface ProfileReapDecision",
-          "doc": null
-        },
-        {
-          "name": "ProfileReaperPort",
-          "kind": "interface",
-          "signature": "interface ProfileReaperPort",
-          "doc": null
-        },
-        {
-          "name": "runProfileReaper",
-          "kind": "function",
-          "signature": "(input: { port: ProfileReaperPort; now?: number | undefined; graceMs?: number | undefined; dryRun?: boolean | undefined…",
-          "doc": "Defaults to a logged dry run; a destructive pass requires a prior dry-run receipt."
         }
       ]
     },
@@ -768,12 +662,6 @@
       "error": null,
       "exports": [
         {
-          "name": "checkSlackCredential",
-          "kind": "function",
-          "signature": "(options: SlackCredentialCheckOptions) => Promise<SlackCredentialVerdict>",
-          "doc": "Ask Slack whether the bot token is alive, WITHOUT posting anything."
-        },
-        {
           "name": "postSlackAlert",
           "kind": "function",
           "signature": "(options: SlackAlertOptions) => Promise<SlackAlertOutcome>",
@@ -796,18 +684,6 @@
           "kind": "type",
           "signature": "type SlackAlertOutcome",
           "doc": "What one `postSlackAlert` call did."
-        },
-        {
-          "name": "SlackCredentialCheckOptions",
-          "kind": "interface",
-          "signature": "interface SlackCredentialCheckOptions",
-          "doc": "Define configuration options for verifying that a Slack bot token is live"
-        },
-        {
-          "name": "SlackCredentialVerdict",
-          "kind": "type",
-          "signature": "type SlackCredentialVerdict",
-          "doc": "What `checkSlackCredential` concluded."
         },
         {
           "name": "SlackFailureReason",
@@ -916,6 +792,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AppAuthAccountsTable",
+          "kind": "type",
+          "signature": "type AppAuthAccountsTable",
+          "doc": "The `account` table, preserving whether this product migrated an issuer column."
+        },
+        {
           "name": "AppAuthColumnMap",
           "kind": "type",
           "signature": "type AppAuthColumnMap",
@@ -954,7 +836,7 @@
         {
           "name": "createAppAuthTables",
           "kind": "function",
-          "signature": "<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>>(options?:…",
+          "signature": "<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>, I extends…",
           "doc": "Build the better-auth `user`, `session`, `account` and `verification` tables."
         },
         {
@@ -1302,12 +1184,6 @@
           "doc": "Define the structure for a hero section in an email with headline, image, and call-to-action fields"
         },
         {
-          "name": "EmailSection",
-          "kind": "type",
-          "signature": "type EmailSection",
-          "doc": "Define a union type representing different sections of an email template"
-        },
-        {
           "name": "EmailTestimonialSection",
           "kind": "interface",
           "signature": "interface EmailTestimonialSection",
@@ -1537,7 +1413,7 @@
         {
           "name": "AssistantPanel",
           "kind": "function",
-          "signature": "({ chat, userId, onClose, layout, context, toggleRef, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIco…",
+          "signature": "(props: AssistantPanelProps) => Element",
           "doc": null
         },
         {
@@ -2195,12 +2071,6 @@
           "doc": "Define options for extracting brand kit data including HTML input, fetch method, timeout, and list limits"
         },
         {
-          "name": "FetchLike",
-          "kind": "type",
-          "signature": "type FetchLike",
-          "doc": "Fetch boundary, injectable so callers (Workers, Node, tests) supply their own fetch and so tests can run fully offline against fixture HTML."
-        },
-        {
           "name": "luminance",
           "kind": "function",
           "signature": "(hex: string) => number",
@@ -2636,6 +2506,7 @@
         "interactions",
         "launch-invariants",
         "model-resolution",
+        "object-store",
         "plans",
         "policy-filters",
         "redact",
@@ -3301,6 +3172,12 @@
           "kind": "interface",
           "signature": "interface CreateSandboxFileIndexRouteOptions",
           "doc": "Define options to authorize and configure sandbox file index route behavior"
+        },
+        {
+          "name": "createStoredChatAttachments",
+          "kind": "function",
+          "signature": "(options: StoredChatAttachmentsOptions) => StoredChatAttachments",
+          "doc": "Bind durable object storage without capturing an uninitialized request binding."
         },
         {
           "name": "createStreamingSniffer",
@@ -4185,6 +4062,18 @@
           "doc": "Start the box at admission when the request asks for execution, so its resume overlaps the turn lock and the profile pin instead of following them."
         },
         {
+          "name": "StoredChatAttachments",
+          "kind": "interface",
+          "signature": "interface StoredChatAttachments",
+          "doc": "Scoped stored bytes behind the existing chat attachment reader and writer ports."
+        },
+        {
+          "name": "StoredChatAttachmentsOptions",
+          "kind": "interface",
+          "signature": "interface StoredChatAttachmentsOptions",
+          "doc": "A product supplies its private object store after its request bindings are ready."
+        },
+        {
           "name": "storeSupportsDraftPersistence",
           "kind": "function",
           "signature": "(store: AssistantDraftStore) => boolean",
@@ -4529,6 +4418,12 @@
           "kind": "type",
           "signature": "type ChatMessageRow",
           "doc": "Resolve the selected structure of a chat message row from the messages table"
+        },
+        {
+          "name": "ChatMessageValues",
+          "kind": "type",
+          "signature": "type ChatMessageValues",
+          "doc": "Stored message body, model attribution and usage shared by append and patch adapters."
         },
         {
           "name": "ChatNoticePart",
@@ -5699,7 +5594,8 @@
       "dependsOn": [
         "brand",
         "design-canvas",
-        "theme"
+        "theme",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -5836,6 +5732,12 @@
           "doc": null
         },
         {
+          "name": "CanvasSnapResult",
+          "kind": "interface",
+          "signature": "interface CanvasSnapResult",
+          "doc": "Define the result of a snap operation including coordinates and active snap lines"
+        },
+        {
           "name": "centeredPosition",
           "kind": "function",
           "signature": "(width: number, height: number, pageWidth: number, pageHeight: number) => { x: number; y: number; }",
@@ -5898,13 +5800,13 @@
         {
           "name": "DesignCanvas",
           "kind": "function",
-          "signature": "({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange, renderAgentPanel,…",
+          "signature": "(props: DesignCanvasFullProps) => Element",
           "doc": null
         },
         {
           "name": "DesignCanvasChromeLazy",
           "kind": "function",
-          "signature": "LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…",
+          "signature": "LazyExoticComponent<(props: DesignCanvasFullProps) => Element>",
           "doc": "Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail."
         },
         {
@@ -6382,12 +6284,6 @@
           "doc": "Resolve snapping targets and apply snapping logic to moving elements within the editor scene"
         },
         {
-          "name": "SnapResult",
-          "kind": "interface",
-          "signature": "interface SnapResult",
-          "doc": "Define the result of a snap operation including coordinates and active snap lines"
-        },
-        {
           "name": "SnapTarget",
           "kind": "interface",
           "signature": "interface SnapTarget",
@@ -6450,7 +6346,7 @@
         {
           "name": "WorkspaceView",
           "kind": "function",
-          "signature": "({ canWrite, onApplyOperations, onSelectionChange, className, stack, activePage, onFitRef, onExport, onExportRef, fitOn…",
+          "signature": "(props: WorkspaceViewProps) => Element",
           "doc": null
         },
         {
@@ -6491,7 +6387,8 @@
       "dependsOn": [
         "brand",
         "design-canvas",
-        "theme"
+        "theme",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -6548,6 +6445,12 @@
           "kind": "function",
           "signature": "(src: string, naturalSize: { width: number; height: number; }, page: InsertPageGeometry) => SceneOperation",
           "doc": "Build an `add_element` op placing an image, fitted and centered on the page."
+        },
+        {
+          "name": "CanvasSnapResult",
+          "kind": "interface",
+          "signature": "interface CanvasSnapResult",
+          "doc": "Define the result of a snap operation including coordinates and active snap lines"
         },
         {
           "name": "centeredPosition",
@@ -6910,12 +6813,6 @@
           "doc": "Resolve snapping targets and apply snapping logic to moving elements within the editor scene"
         },
         {
-          "name": "SnapResult",
-          "kind": "interface",
-          "signature": "interface SnapResult",
-          "doc": "Define the result of a snap operation including coordinates and active snap lines"
-        },
-        {
           "name": "SnapTarget",
           "kind": "interface",
           "signature": "interface SnapTarget",
@@ -6965,14 +6862,15 @@
       "dependsOn": [
         "brand",
         "design-canvas",
-        "theme"
+        "theme",
+        "web-react"
       ],
       "error": null,
       "exports": [
         {
           "name": "DesignCanvasChromeLazy",
           "kind": "function",
-          "signature": "LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…",
+          "signature": "LazyExoticComponent<(props: DesignCanvasFullProps) => Element>",
           "doc": "Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail."
         },
         {
@@ -7477,18 +7375,6 @@
       "error": null,
       "exports": [
         {
-          "name": "AskVerdict",
-          "kind": "interface",
-          "signature": "interface AskVerdict",
-          "doc": null
-        },
-        {
-          "name": "assertGateDiscriminates",
-          "kind": "function",
-          "signature": "<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
-          "doc": "`calibrateGate`, but throws instead of reporting."
-        },
-        {
           "name": "calibrateGate",
           "kind": "function",
           "signature": "<TInput>(gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>",
@@ -7567,54 +7453,6 @@
           "doc": "A gate under calibration."
         },
         {
-          "name": "gradeAnswer",
-          "kind": "function",
-          "signature": "(text: string, ask: ParityAsk) => AskVerdict",
-          "doc": null
-        },
-        {
-          "name": "LaneAnswer",
-          "kind": "interface",
-          "signature": "interface LaneAnswer",
-          "doc": "One lane's answer to one ask."
-        },
-        {
-          "name": "measureWithControl",
-          "kind": "function",
-          "signature": "<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…",
-          "doc": "Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first."
-        },
-        {
-          "name": "ParityAsk",
-          "kind": "interface",
-          "signature": "interface ParityAsk",
-          "doc": "Parity eval: the same asks through two or more lanes of one app (for example the Router turn and the sandbox turn), graded the same way, so a lane change is judged by numbers rather than by feel."
-        },
-        {
-          "name": "parityGate",
-          "kind": "function",
-          "signature": "(report: ParityReport, bar: { minCorrectRatio: number; maxFabricated?: number | undefined; maxFailed?: number | undefin…",
-          "doc": "The release bar: every lane at or above `minCorrect` of its asks, with no fabrication and no failed turn."
-        },
-        {
-          "name": "ParityLane",
-          "kind": "type",
-          "signature": "type ParityLane",
-          "doc": null
-        },
-        {
-          "name": "ParityReport",
-          "kind": "interface",
-          "signature": "interface ParityReport",
-          "doc": null
-        },
-        {
-          "name": "ProbeReport",
-          "kind": "interface",
-          "signature": "interface ProbeReport",
-          "doc": null
-        },
-        {
           "name": "producedFromToolEvents",
           "kind": "function",
           "signature": "(events: readonly AppToolProducedEvent[]) => RuntimeEventLike[]",
@@ -7631,12 +7469,6 @@
           "kind": "function",
           "signature": "(input: ScorecardWiringInput) => ScorecardWiringResult",
           "doc": "Append the run to the scorecard, fold the log, diff, and surface a regression flag."
-        },
-        {
-          "name": "runParityEval",
-          "kind": "function",
-          "signature": "(options: { asks: readonly ParityAsk[]; lanes: Record<string, ParityLane>; style?: string | undefined; }) => Promise<Pa…",
-          "doc": "Ask every lane every question, one ask at a time per lane (lanes run in parallel), and grade each answer the same way."
         },
         {
           "name": "RuntimeEventLike",
@@ -7709,7 +7541,7 @@
         {
           "name": "compareOptimizationMethods",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
           "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
         },
         {
@@ -7764,7 +7596,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": "Environment for a bridge child that spawns `claude` CLI subprocesses."
+          "doc": null
         },
         {
           "name": "GepaOptimizationMethodConfig",
@@ -8868,7 +8700,7 @@
         {
           "name": "presentHubAction",
           "kind": "function",
-          "signature": "(item: Pick<HubApprovalItem, \"input\" | \"providerId\" | \"actionPath\" | \"files\" | \"bundle\" | \"preview\">) => HubActionPrese…",
+          "signature": "(item: Pick<HubApprovalItem, \"providerId\" | \"input\" | \"actionPath\" | \"files\" | \"bundle\" | \"preview\">) => HubActionPrese…",
           "doc": "A held call in the owner's words, with the preview its integration renders."
         },
         {
@@ -14937,30 +14769,6 @@
           "doc": null
         },
         {
-          "name": "HUMANIZER_LICENSE",
-          "kind": "const",
-          "signature": "string",
-          "doc": "The upstream MIT license, shipped with the vendored file."
-        },
-        {
-          "name": "HUMANIZER_SKILL_ID",
-          "kind": "const",
-          "signature": "\"humanizer\"",
-          "doc": null
-        },
-        {
-          "name": "HUMANIZER_SOURCE",
-          "kind": "const",
-          "signature": "{ readonly repository: \"https://github.com/blader/humanizer\"; readonly revision: \"225a6f39ac85f76ee48dbad772ea4abe4ed6c…",
-          "doc": null
-        },
-        {
-          "name": "humanizerSkill",
-          "kind": "function",
-          "signature": "() => SkillEntry",
-          "doc": "The vendored skill as a mountable entry, with the upstream license beside it."
-        },
-        {
           "name": "humanProseSkill",
           "kind": "function",
           "signature": "(options?: HumanProseSkillOptions) => SkillEntry",
@@ -15477,12 +15285,6 @@
           "kind": "function",
           "signature": "({ endpoint, fetch: fetchImpl }: ProfileEditorClientOptions) => ProfileEditorClient",
           "doc": "Ports backed by the product route."
-        },
-        {
-          "name": "formatBytes",
-          "kind": "function",
-          "signature": "(bytes: number) => string",
-          "doc": null
         },
         {
           "name": "GitHubCommitRecord",
@@ -16117,7 +15919,7 @@
         {
           "name": "toFoldable",
           "kind": "function",
-          "signature": "(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…",
+          "signature": "(row: { id: string; createdAt: number; path: string; seq: number; dimension: string; period: number; conflict: boolean;…",
           "doc": "Project a stored row onto the slice the pure fold reads."
         },
         {
@@ -19478,6 +19280,18 @@
           "doc": "Describe metadata and properties of a media sequence including dimensions, duration, and status"
         },
         {
+          "name": "sequenceMetaFromRow",
+          "kind": "function",
+          "signature": "(row: SequenceMetaRow) => SequenceMeta",
+          "doc": "Project persisted sequence fields without importing the optional Drizzle peer."
+        },
+        {
+          "name": "SequenceMetaRow",
+          "kind": "type",
+          "signature": "type SequenceMetaRow",
+          "doc": "A persisted sequence's public fields, independent of its database driver."
+        },
+        {
           "name": "SequenceOperation",
           "kind": "type",
           "signature": "type SequenceOperation",
@@ -19687,8 +19501,8 @@
       "id": "./sequences-react",
       "source": "src/sequences-react/index.ts",
       "dependsOn": [
-        "brand",
-        "sequences"
+        "sequences",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -19707,7 +19521,7 @@
         {
           "name": "applySnap",
           "kind": "function",
-          "signature": "(frame: number, points: SnapPoint[], opts: ApplySnapOptions) => SnapResult",
+          "signature": "(frame: number, points: SnapPoint[], opts: ApplySnapOptions) => TimelineSnapResult",
           "doc": "Nearest candidate wins; ties keep the first candidate in `points` order (sorted by frame from `collectSnapPoints`, so the lower frame)."
         },
         {
@@ -19723,18 +19537,6 @@
           "doc": "Structural slice of Web Audio's AudioBuffer so peak math runs on synthetic fixtures in tests and on real decoded buffers in the browser."
         },
         {
-          "name": "BrandMark",
-          "kind": "function",
-          "signature": "({ size, className }: BrandMarkProps) => Element",
-          "doc": null
-        },
-        {
-          "name": "BrandMarkProps",
-          "kind": "interface",
-          "signature": "interface BrandMarkProps",
-          "doc": null
-        },
-        {
           "name": "captionFontPx",
           "kind": "function",
           "signature": "(canvasCssHeight: number) => number",
@@ -19743,13 +19545,13 @@
         {
           "name": "chooseMoveSnap",
           "kind": "function",
-          "signature": "(input: { candidateStartFrame: number; durationFrames: number; startSnap: SnapResult; endSnap: SnapResult; }) => { star…",
+          "signature": "(input: { candidateStartFrame: number; durationFrames: number; startSnap: TimelineSnapResult; endSnap: TimelineSnapResu…",
           "doc": "A move drag snaps whichever clip edge lands closest to a snap point: the start edge directly, or the end edge re-expressed as a start."
         },
         {
           "name": "classifyMediaUrl",
           "kind": "function",
-          "signature": "(url: string) => \"unknown\" | \"image\" | \"video\"",
+          "signature": "(url: string) => \"image\" | \"unknown\" | \"video\"",
           "doc": "Extension-based kind classification; 'unknown' defers to a HEAD content-type probe at draw time."
         },
         {
@@ -20095,12 +19897,6 @@
           "doc": "Define a point in a timeline where snapping occurs based on frame and kind"
         },
         {
-          "name": "SnapResult",
-          "kind": "interface",
-          "signature": "interface SnapResult",
-          "doc": "Describe the result of snapping a point to a frame including success status and snapped point details"
-        },
-        {
           "name": "splitClipCommand",
           "kind": "function",
           "signature": "(input: SplitClipInput) => TimelineCommand",
@@ -20213,6 +20009,12 @@
           "kind": "interface",
           "signature": "interface TimelineSnapPoint",
           "doc": "Snap point with its owning clip when it came from one, so a drag can exclude the dragged clip's own edges."
+        },
+        {
+          "name": "TimelineSnapResult",
+          "kind": "interface",
+          "signature": "interface TimelineSnapResult",
+          "doc": "Describe the result of snapping a point to a frame including success status and snapped point details"
         },
         {
           "name": "TimelineTrackRow",
@@ -20879,7 +20681,7 @@
         {
           "name": "settingFailure",
           "kind": "function",
-          "signature": "(outcome: Pick<MutationRejected, \"error\" | \"message\">) => SettingFailure",
+          "signature": "(outcome: Pick<MutationRejected, \"message\" | \"error\">) => SettingFailure",
           "doc": "The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one."
         },
         {
@@ -21521,12 +21323,6 @@
       "error": null,
       "exports": [
         {
-          "name": "parseArgs",
-          "kind": "function",
-          "signature": "(argv: readonly string[]) => ParsedArgs",
-          "doc": null
-        },
-        {
           "name": "runSignoffCli",
           "kind": "function",
           "signature": "(argv: readonly string[]) => Promise<number>",
@@ -21752,24 +21548,6 @@
           "doc": "Project corpus entries onto SDK file mounts at a relative path under `<anchor>/`."
         },
         {
-          "name": "createInMemoryMarketplaceStore",
-          "kind": "function",
-          "signature": "(entries: readonly MarketplaceSkill[]) => MarketplaceStore",
-          "doc": "Non-durable default for tests and single-instance products."
-        },
-        {
-          "name": "createKVMarketplaceStore",
-          "kind": "function",
-          "signature": "(kv: { get(key: string): Promise<string | null>; }, prefix?: string) => MarketplaceStore",
-          "doc": "A KV-backed read-only MarketplaceStore (Cloudflare KV or any lookalike)."
-        },
-        {
-          "name": "createStaticMarketplaceStore",
-          "kind": "function",
-          "signature": "(entries: readonly MarketplaceSkill[]) => MarketplaceStore",
-          "doc": "Static-list store over a product-pinned catalog (checked into the product repo)."
-        },
-        {
           "name": "GlobModules",
           "kind": "type",
           "signature": "type GlobModules",
@@ -21788,40 +21566,10 @@
           "doc": "Load a markdown corpus, preferring a Vite glob-result map and falling back to a Node fs walk."
         },
         {
-          "name": "marketplaceDiscoveryLine",
-          "kind": "function",
-          "signature": "(shared: readonly MarketplaceSkill[]) => string | null",
-          "doc": "The discovery fragment: one line naming every shared skill a foreign agent can mount, for system prompts and tool descriptions."
-        },
-        {
-          "name": "MarketplaceRow",
-          "kind": "interface",
-          "signature": "interface MarketplaceRow",
-          "doc": "Publish helper for the write side (products/platform own the writer): render validated rows for the standard table (see `./skills/marketplace-drizzle` for the table itself)."
-        },
-        {
-          "name": "marketplaceRowsFor",
-          "kind": "function",
-          "signature": "(entries: readonly MarketplaceSkill[]) => readonly MarketplaceRow[]",
-          "doc": null
-        },
-        {
           "name": "MarketplaceSkill",
           "kind": "interface",
           "signature": "interface MarketplaceSkill",
           "doc": "A shareable skill as the owning product publishes it."
-        },
-        {
-          "name": "MarketplaceStore",
-          "kind": "interface",
-          "signature": "interface MarketplaceStore",
-          "doc": "Read-only view over a shared catalog."
-        },
-        {
-          "name": "MAX_MARKETPLACE_ENTRIES",
-          "kind": "const",
-          "signature": "64",
-          "doc": "Bound on a shared catalog so discovery text stays a prompt-sized line, not a dump."
         },
         {
           "name": "mergeComposedSkills",
@@ -21836,12 +21584,6 @@
           "doc": "Union a product's local catalog with shared marketplace entries."
         },
         {
-          "name": "namespacedSkillId",
-          "kind": "function",
-          "signature": "(entry: { product: string; id: string; }) => string",
-          "doc": "The mounted id for a shared skill: `product:id` (namespaced so a foreign skill can never shadow a local one)."
-        },
-        {
           "name": "parseCorpusSkills",
           "kind": "function",
           "signature": "(corpus: CorpusEntry[]) => SkillEntry[]",
@@ -21852,12 +21594,6 @@
           "kind": "interface",
           "signature": "interface ParsedSkill",
           "doc": "The result of {@link parseSkillFrontmatter}: the parsed fields, the body with the frontmatter block stripped, and the original untouched text."
-        },
-        {
-          "name": "parseNamespacedSkillId",
-          "kind": "function",
-          "signature": "(mountedId: string) => { product: string | null; id: string; }",
-          "doc": "Split a namespaced id back into `{ product, id }`; a bare id resolves to product `null` (a local skill)."
         },
         {
           "name": "parseSkillFrontmatter",
@@ -21936,12 +21672,6 @@
           "kind": "function",
           "signature": "(entries: readonly MarketplaceSkill[]) => readonly MarketplaceSkill[]",
           "doc": "Validate a whole shared catalog: entries well-formed, ids unique, size capped."
-        },
-        {
-          "name": "validateMarketplaceSkill",
-          "kind": "function",
-          "signature": "(entry: MarketplaceSkill) => MarketplaceSkill",
-          "doc": "Validate one marketplace entry — fail loud on a malformed catalog rather than silently mis-mounting it."
         }
       ]
     },
@@ -22040,26 +21770,6 @@
           "kind": "interface",
           "signature": "interface ProfileSkillPlacerConfig",
           "doc": null
-        }
-      ]
-    },
-    {
-      "id": "./skills/marketplace-drizzle",
-      "source": "src/skills/marketplace-drizzle.ts",
-      "dependsOn": [],
-      "error": null,
-      "exports": [
-        {
-          "name": "createDrizzleMarketplaceStore",
-          "kind": "function",
-          "signature": "(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { id: SQLiteColumn<{ name: \"id\"; ta…",
-          "doc": "A drizzle-backed read-only MarketplaceStore over the standard table."
-        },
-        {
-          "name": "marketplaceSkillTable",
-          "kind": "function",
-          "signature": "(tableName?: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { id: SQLiteColumn<{ name: \"…",
-          "doc": "The standard marketplace table: one row per namespaced `product:id`."
         }
       ]
     },
@@ -23438,7 +23148,7 @@
         {
           "name": "relativeTime",
           "kind": "function",
-          "signature": "(date: Date | null) => string",
+          "signature": "(date: string | Date | null) => string",
           "doc": "Resolve a human-readable relative time string from a given date or return an empty string if null"
         },
         {
@@ -23660,8 +23370,8 @@
         {
           "name": "StudioComposer",
           "kind": "function",
-          "signature": "({ workspaceId, onGenerated, variant, pickReferenceImage, sendTone, className, }: StudioComposerProps) => Element",
-          "doc": "The composer card."
+          "signature": "(props: StudioComposerProps) => Element",
+          "doc": null
         },
         {
           "name": "StudioComposerProps",
@@ -23702,7 +23412,7 @@
         {
           "name": "StudioHistoryScreen",
           "kind": "function",
-          "signature": "({ fetchPage, initialPage, onBack, actions, searchDebounceMs, className, }: StudioHistoryScreenProps) => Element",
+          "signature": "(props: StudioHistoryScreenProps) => Element",
           "doc": null
         },
         {
@@ -24222,8 +23932,8 @@
       "id": "./teams-react",
       "source": "src/teams-react/index.ts",
       "dependsOn": [
-        "brand",
-        "teams"
+        "teams",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -24508,9 +24218,9 @@
           "doc": "The product's workspace table, narrowed to the columns the queries read."
         },
         {
-          "name": "MemberSyncSeam",
+          "name": "MemberSyncCallbacks",
           "kind": "interface",
-          "signature": "interface MemberSyncSeam",
+          "signature": "interface MemberSyncCallbacks",
           "doc": "Optional membership-change propagation to an external system (e.g."
         },
         {
@@ -24582,9 +24292,9 @@
           "doc": "Define configuration options for managing team members and workspace access APIs"
         },
         {
-          "name": "MemberSyncSeam",
+          "name": "MemberSyncCallbacks",
           "kind": "interface",
-          "signature": "interface MemberSyncSeam",
+          "signature": "interface MemberSyncCallbacks",
           "doc": "Optional membership-change propagation to an external system (e.g."
         },
         {
@@ -25263,12 +24973,6 @@
           "doc": "Derive a child span context under `parent` — one per step attempt (seed e.g."
         },
         {
-          "name": "composeMissionFlowTrace",
-          "kind": "function",
-          "signature": "(input: { steps: MissionFlowStep[]; activity?: Record<string, StepAgentActivity[]> | undefined; startedAt?: number | un…",
-          "doc": "Compose a mission-wide FlowTrace: one 'pipeline' span per step, the step's delegated runs ('tool' spans, from `activity[stepId]`) beneath it."
-        },
-        {
           "name": "createMissionTraceContext",
           "kind": "function",
           "signature": "(missionId?: string | undefined) => MissionTraceContext",
@@ -25279,12 +24983,6 @@
           "kind": "function",
           "signature": "(activity: StepAgentActivity[], turnStartMs: number, opts?: { nowMs?: number | undefined; } | undefined) => FlowSpan[]",
           "doc": "One 'tool' FlowSpan per delegation, positioned relative to `turnStartMs` (the epoch-ms origin of the trace — usually the step or mission start)."
-        },
-        {
-          "name": "DistributionSummary",
-          "kind": "interface",
-          "signature": "interface DistributionSummary",
-          "doc": "Summarize key statistics of a numerical distribution including count, min, percentiles, and max"
         },
         {
           "name": "FlowSpan",
@@ -25299,34 +24997,10 @@
           "doc": "Describe the structure of a flow trace including spans, timing, tokens, cost, and tool calls"
         },
         {
-          "name": "LoopTraceEventLike",
-          "kind": "interface",
-          "signature": "interface LoopTraceEventLike",
-          "doc": "Structural mirror of agent-runtime's `LoopTraceEvent` — same fields, no import, so journals parsed from JSON feed straight in."
-        },
-        {
-          "name": "loopTraceEventsToFlowSpans",
-          "kind": "function",
-          "signature": "(events: LoopTraceEventLike[]) => FlowSpan[]",
-          "doc": "Reconstruct one delegation's loop → round → iteration tree from its journaled LoopTraceEvents, as FlowSpans relative to `loop.started` (or the first event)."
-        },
-        {
-          "name": "MissionFlowStep",
-          "kind": "interface",
-          "signature": "interface MissionFlowStep",
-          "doc": "Define a step in a mission flow with id, intent, optional status, start time, and duration"
-        },
-        {
           "name": "MissionTraceContext",
           "kind": "interface",
           "signature": "interface MissionTraceContext",
           "doc": "Mission trace context — mint + thread the trace ids that join a mission's step attempts and its delegated agent runs into ONE trace tree."
-        },
-        {
-          "name": "renderHistogram",
-          "kind": "function",
-          "signature": "(values: number[], opts?: { buckets?: number | undefined; width?: number | undefined; unit?: string | undefined; format…",
-          "doc": "ASCII histogram for multi-run samples (eval latencies, costs, scores)."
         },
         {
           "name": "renderWaterfall",
@@ -25345,12 +25019,6 @@
           "kind": "interface",
           "signature": "interface StepSpanContext",
           "doc": "Define context information for a step span including trace, span, and parent span identifiers"
-        },
-        {
-          "name": "summarize",
-          "kind": "function",
-          "signature": "(values: number[]) => DistributionSummary",
-          "doc": "Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max"
         },
         {
           "name": "TimedEvent",
@@ -25464,12 +25132,6 @@
           "kind": "function",
           "signature": "(reason: TurnHealthReason) => string",
           "doc": "One-line human summary of a reason, for an alert body."
-        },
-        {
-          "name": "FetchLike",
-          "kind": "type",
-          "signature": "type FetchLike",
-          "doc": "Minimal structural fetch, so this module has no lib-dom dependency and can be driven by a fake in tests."
         },
         {
           "name": "PersistedTurnRow",
@@ -25984,12 +25646,6 @@
           "doc": null
         },
         {
-          "name": "isTraceId",
-          "kind": "function",
-          "signature": "(value: string) => boolean",
-          "doc": "True when the Router and the Sandbox API keep this id as a `x-tangle-trace-id`."
-        },
-        {
           "name": "nextCallIndex",
           "kind": "function",
           "signature": "(trace: TurnTrace, name: string) => number",
@@ -26118,7 +25774,8 @@
         "crypto",
         "store",
         "teams",
-        "web"
+        "web",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -26210,7 +25867,7 @@
           "name": "VaultPane",
           "kind": "function",
           "signature": "ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>",
-          "doc": "Browse and edit files in the available pane width."
+          "doc": null
         },
         {
           "name": "VaultPaneHandle",
@@ -26269,7 +25926,8 @@
         "crypto",
         "store",
         "teams",
-        "web"
+        "web",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -26360,7 +26018,8 @@
         "crypto",
         "store",
         "teams",
-        "web"
+        "web",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -26391,7 +26050,8 @@
         "crypto",
         "store",
         "teams",
-        "web"
+        "web",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -27493,8 +27153,8 @@
         {
           "name": "AgentProfileEditor",
           "kind": "function",
-          "signature": "({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…",
-          "doc": "Controlled editor for the canonical profile."
+          "signature": "(props: AgentProfileEditorProps) => Element",
+          "doc": null
         },
         {
           "name": "AgentProfileEditorConfig",
@@ -27763,7 +27423,7 @@
         {
           "name": "ChatComposer",
           "kind": "function",
-          "signature": "({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, sendDisabled, placeholder, v…",
+          "signature": "(props: ChatComposerProps) => Element",
           "doc": null
         },
         {
@@ -28867,7 +28527,7 @@
         {
           "name": "InteractionQuestionCard",
           "kind": "function",
-          "signature": "({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, declinable, c…",
+          "signature": "(props: InteractionQuestionCardProps) => Element",
           "doc": null
         },
         {
@@ -29539,8 +29199,8 @@
         {
           "name": "RecordGrid",
           "kind": "function",
-          "signature": "({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…",
-          "doc": "The shared editable record table."
+          "signature": "(props: RecordGridProps) => Element",
+          "doc": null
         },
         {
           "name": "RecordGridBooleanColumn",
@@ -29941,8 +29601,8 @@
         {
           "name": "SessionHistoryPanel",
           "kind": "function",
-          "signature": "({ history, hasAnySessions, query, onQueryChange, sort, onSortChange, hrefForSession, linkComponent: Link, respondingSe…",
-          "doc": "The full session history: search, sort, cursor-paged rows with per-row actions, and the states in between (first-run empty, loading, no matches, error + retry)."
+          "signature": "(props: SessionHistoryPanelProps) => Element",
+          "doc": null
         },
         {
           "name": "SessionHistoryPanelProps",
@@ -30596,8 +30256,8 @@
         {
           "name": "AgentProfileEditor",
           "kind": "function",
-          "signature": "({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…",
-          "doc": "Controlled editor for the canonical profile."
+          "signature": "(props: AgentProfileEditorProps) => Element",
+          "doc": null
         },
         {
           "name": "AgentProfileEditorConfig",
@@ -32013,7 +31673,7 @@
         {
           "name": "createExportEngine",
           "kind": "function",
-          "signature": "(options: ExportEngineOptions) => { archiveKey: (workspaceId: string, id: string) => string; list(workspaceId: string):…",
+          "signature": "(options: ExportEngineOptions) => { progress(job: ExportJob): Omit<ExportProgress, \"downloadUrl\" | \"downloadExpiresAt\">…",
           "doc": null
         },
         {

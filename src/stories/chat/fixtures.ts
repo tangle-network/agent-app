@@ -1,3 +1,4 @@
+import { catalogModels } from '../fixtures/catalog'
 /** Chat story fixtures plus area-specific catalog, follow-up, and derived threads. */
 
 import type { CatalogModel, ChatToolCallInfo, ChatUiMessage } from '../../web-react'
@@ -25,30 +26,7 @@ export {
 // ── Model catalogue (for per-message cost) ───────────────────────────────────
 
 /** The catalogue the thread prices against. Every fixture message runs Opus. */
-export const chatCatalogModels: CatalogModel[] = [
-  {
-    id: 'anthropic/claude-opus-4',
-    name: 'Claude Opus 4',
-    provider: 'anthropic',
-    description: 'Most capable Anthropic model',
-    contextLength: 1_000_000,
-    pricing: { prompt: '0.000015', completion: '0.000075' },
-    supportsTools: true,
-    supportsReasoning: true,
-    featured: true,
-  },
-  {
-    id: 'openai/gpt-5',
-    name: 'GPT-5',
-    provider: 'openai',
-    description: 'OpenAI flagship',
-    contextLength: 400_000,
-    pricing: { prompt: '0.00001', completion: '0.00003' },
-    supportsTools: true,
-    supportsReasoning: true,
-    featured: true,
-  },
-]
+export const chatCatalogModels: CatalogModel[] = structuredClone(catalogModels.slice(0, 2))
 
 // ── Individual tool calls ─────────────────────────────────────────────────────
 

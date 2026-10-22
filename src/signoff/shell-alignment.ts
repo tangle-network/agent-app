@@ -12,7 +12,7 @@
  * (`judgeShellAlignment`) is a pure function so it is unit-tested without a browser.
  */
 
-import { createRequestMeter, meterPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
 
 /** A horizontal divider: the bottom border of a top-anchored row. Coordinates in CSS px. */
 export interface ShellDivider {
@@ -193,16 +193,11 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
   try {
     for (const width of widths) {
       for (const theme of themes) {
-        const context = await browser.newContext({
+        const { context, page } = await createMeteredBrowserPage(browser, {
           viewport: { width, height: width < 768 ? PHONE_HEIGHT : DESKTOP_HEIGHT },
           colorScheme: theme,
           ...(options.storageState ? { storageState: options.storageState } : {}),
-        })
-        if (options.themeScript) {
-          await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(theme)}; ${options.themeScript} })()` })
-        }
-        const page = await context.newPage()
-        await meterPage(page, meter)
+        }, meter, options.themeScript)
         for (const route of options.routes) {
           // An app that polls never reaches network idle, so wait for the shell to
           // render and give in-flight data a short, capped settle.

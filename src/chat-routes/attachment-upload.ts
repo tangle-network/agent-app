@@ -49,6 +49,7 @@ import {
   type WriteAttachmentStreamFn,
 } from './attachment-store'
 import {
+  logAttachmentStorageError,
   inspectAtomicAttachmentWriteResult,
   inspectLegacyAttachmentWriteResult,
 } from './attachment-write-safety'
@@ -92,23 +93,7 @@ export type AtomicAttachmentUploadAuthorization =
  * opaque message below, regardless of the store's failure text. */
 export type AttachmentUploadLogger = Pick<Console, 'error'>
 
-function logAttachmentUploadError(
-  logger: AttachmentUploadLogger,
-  message: string,
-  fields: Record<string, unknown>,
-): void {
-  try {
-    const safeFields = Object.fromEntries(
-      Object.entries(fields).map(([key, value]) => [
-        key,
-        typeof value === 'string' ? redactErrorMessage(value) : value,
-      ]),
-    )
-    logger.error(message, safeFields)
-  } catch {
-    // Logging must not turn a typed storage failure into a thrown response.
-  }
-}
+
 
 interface AttachmentUploadRouteCommonOptions {
   /** Overridable caps. Defaults come from `./attachment-validation`. */
@@ -326,13 +311,13 @@ async function rollbackSuccessfulWrites(
   logger: AttachmentUploadLogger,
 ): Promise<number> {
   let failures = 0
-  for (let index = writes.length - 1; index >= 0; index -= 1) {
+  for (let index = writes.length - 1;index >= 0;index -= 1) {
     const write = writes[index]!
     try {
       await write.receipt.rollback()
     } catch (error) {
       failures += 1
-      logAttachmentUploadError(logger, '[attachment-upload] cleanup failed', {
+      logAttachmentStorageError(logger, '[attachment-upload] cleanup failed', {
         path: write.path,
         ownershipId: write.ownership.id,
         error: redactErrorMessage(error),
@@ -353,7 +338,7 @@ async function abortOwnership(
     await writer.abort(scopeId, ownership)
     return 0
   } catch (error) {
-    logAttachmentUploadError(logger, '[attachment-upload] ambiguous write cleanup failed', {
+    logAttachmentStorageError(logger, '[attachment-upload] ambiguous write cleanup failed', {
       path: ownership.path,
       ownershipId: ownership.id,
       error: redactErrorMessage(error),
@@ -409,6 +394,127 @@ export function createAttachmentUploadRoute(
    * withheld until the whole file passes the type, kind and size gates, so a
    * refused file never reaches the store in full and its write fails.
    */
+  const { streamRawUpload } = createRawUploadStream(sniffMime, allowedSniffedMimes, allowedKinds, limitFor, logger)
+
+  return async function attachmentUpload(request: Request): Promise<Response> {
+    const auth = await options.authorize({ request })
+    if (!auth.ok) return auth.response
+    const atomicWriter = atomic
+      ? (auth as Extract<AtomicAttachmentUploadAuthorization, { ok: true }>).attachmentWriter ?? options.attachmentWriter
+      : undefined
+    const legacyWriter = atomic
+      ? undefined
+      : (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachment ?? options.writeAttachment
+    if (atomic && !atomicWriter) {
+      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE)
+    }
+
+    const files: File[] = []
+    const contentType = request.headers.get('Content-Type')?.toLowerCase() ?? ''
+    if (!contentType.startsWith('multipart/form-data')) {
+      const target = rawUploadTarget(request)
+      if (!target.succeeded) return target.response
+      const { filename, declaredBytes } = target
+      const name = sanitizeAttachmentFileName(filename)
+      if (declaredBytes > largestFileBytes) {
+        return attachmentUploadError(413, 'attachment_too_large', attachmentSizeErrorMessage(name, declaredBytes, largestFileBytes))
+      }
+      if (declaredBytes > maxTotalBytes) {
+        return attachmentUploadError(413, 'attachments_total_too_large', attachmentTotalSizeErrorMessage(declaredBytes, maxTotalBytes))
+      }
+      if (streamWriter && declaredBytes > STREAM_SNIFF_HEAD_BYTES) {
+        const path = pathFor(name)
+        const pathCheck = validatePath(path)
+        if (!pathCheck.succeeded) return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
+        const writer = (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachmentStream ?? streamWriter
+        return streamRawUpload({ request, scopeId: auth.scopeId, writer, filename, name, path, declaredBytes })
+      }
+      // A small raw body takes the batch path below as a one-file batch.
+      const body = await readRawBody(request, declaredBytes)
+      if (!body.succeeded) return body.response
+      files.push(new File([body.value], filename))
+    } else {
+      let formSource: Request | Response = request
+      if (maxFormBytes !== undefined) {
+        // Read at most the cap before parsing, whether or not the client sent
+        // a Content-Length, so an oversized form is refused while small.
+        const bounded = await readBodyUpTo(request, maxFormBytes)
+        if (!bounded.succeeded && !bounded.tooLarge) {
+          return attachmentUploadError(400, 'invalid_upload', 'The upload body ended early')
+        }
+        if (!bounded.succeeded) {
+          return attachmentUploadError(
+            413,
+            'form_upload_too_large',
+            `Form uploads are limited to ${formatBytes(maxFormBytes)}; send a larger file as a raw request body named by the filename query parameter`,
+          )
+        }
+        formSource = new Response(bounded.value, { headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' } })
+      }
+      let form: FormData
+      try {
+        form = await formSource.formData()
+      } catch {
+        return attachmentUploadError(400, 'invalid_upload', 'Expected a multipart/form-data body with file fields')
+      }
+      // Collect every File value regardless of field name — the client may
+      // send one field per file or a single repeated field.
+      form.forEach((value) => {
+        if (value instanceof File) files.push(value)
+      })
+    }
+    if (files.length === 0) {
+      return attachmentUploadError(400, 'invalid_upload', 'No files in the upload body')
+    }
+
+    if (files.length > maxCount) {
+      return attachmentUploadError(
+        400,
+        'attachment_count_exceeded',
+        `Too many files — the ${maxCount}-file limit was exceeded`,
+      )
+    }
+
+    // Advisory only: client-controlled `file.size`, so a dishonest caller can
+    // slip past it — but an honest oversized batch should fail before a
+    // single byte is read. The authoritative aggregate check (against the
+    // sniffed/decoded byte length) runs per-file in phase 1, below.
+    const advisoryTotal = files.reduce((sum, file) => sum + file.size, 0)
+    if (advisoryTotal > maxTotalBytes) {
+      return attachmentUploadError(
+        413,
+        'attachments_total_too_large',
+        attachmentTotalSizeErrorMessage(advisoryTotal, maxTotalBytes),
+      )
+    }
+
+    const preparedBatch = await prepareUploadBatch(files, allowedSniffedMimes, allowedKinds, limitFor, pathFor, atomic, createWriteId, logger, validatePath, maxTotalBytes, sniffMime)
+    if (preparedBatch instanceof Response) return preparedBatch
+    const { prepared } = preparedBatch
+
+    return await commitUploadBatch(prepared, legacyWriter, auth, atomicWriter, atomic, logger)
+  }
+}
+
+interface PreparedWrite {
+  path: string
+  ownershipId?: string
+  name: string
+  bytes: Uint8Array
+  originalName: string
+  size: number
+  mediaType: string
+  kind: ChatAttachmentKind
+}
+
+
+function createRawUploadStream(
+  sniffMime: (name: string) => string,
+  allowedSniffedMimes: ReadonlySet<string>,
+  allowedKinds: ChatAttachmentKind[],
+  limitFor: (sniff: SniffResult) => number,
+  logger: AttachmentUploadLogger,
+) {
   async function streamRawUpload(input: {
     request: Request
     scopeId: string
@@ -520,7 +626,7 @@ export function createAttachmentUploadRoute(
     } catch (error) {
       if (!finalSniff) await reader.cancel().catch(() => undefined)
       if (refusal) return refusal
-      logAttachmentUploadError(logger, '[attachment-upload] stream writer failed', { path, error: redactErrorMessage(error) })
+      logAttachmentStorageError(logger, '[attachment-upload] stream writer failed', { path, error: redactErrorMessage(error) })
       return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, path)
     }
     if (!finalSniff) await reader.cancel().catch(() => undefined)
@@ -529,12 +635,12 @@ export function createAttachmentUploadRoute(
     if (!result || (result.ok && !finalSniff)) {
       // A writer that reports success without reading the file to its end
       // stored something the route never checked.
-      logAttachmentUploadError(logger, '[attachment-upload] stream writer returned without a checked file', { path })
+      logAttachmentStorageError(logger, '[attachment-upload] stream writer returned without a checked file', { path })
       return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, path)
     }
     if (!result.ok) {
       const reason = redactErrorMessage(result.reason)
-      logAttachmentUploadError(logger, '[attachment-upload] stream write rejected', { path, error: reason })
+      logAttachmentStorageError(logger, '[attachment-upload] stream write rejected', { path, error: reason })
       return attachmentUploadError(413, 'attachment_write_failed', reason, path)
     }
     const sniff = finalSniff!
@@ -547,314 +653,172 @@ export function createAttachmentUploadRoute(
     }
     return Response.json({ files: [uploaded] })
   }
+  return { streamRawUpload }
+}
 
-  return async function attachmentUpload(request: Request): Promise<Response> {
-    const auth = await options.authorize({ request })
-    if (!auth.ok) return auth.response
-    const atomicWriter = atomic
-      ? (auth as Extract<AtomicAttachmentUploadAuthorization, { ok: true }>).attachmentWriter ?? options.attachmentWriter
-      : undefined
-    const legacyWriter = atomic
-      ? undefined
-      : (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachment ?? options.writeAttachment
-    if (atomic && !atomicWriter) {
-      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE)
-    }
+async function prepareUploadBatch(
+  files: File[],
+  allowedSniffedMimes: ReadonlySet<string>,
+  allowedKinds: ChatAttachmentKind[],
+  limitFor: (sniff: SniffResult) => number,
+  pathFor: (name: string) => string,
+  atomic: boolean,
+  createWriteId: (() => string) | undefined,
+  logger: AttachmentUploadLogger,
+  validatePath: (path: string) => AttachmentPathCheck,
+  maxTotalBytes: number,
+  sniffMime: (name: string) => string,
+) {
+  // Phase 1: validate every file and prepare its write input WITHOUT
+  // writing anything. A batch fails atomically — any file's validation
+  // error must reject the whole request before an earlier file in the
+  // same batch is persisted.
+  const prepared: PreparedWrite[] = []
+  const seenLogicalPaths = new Set<string>()
+  let totalBytes = 0
 
-    const files: File[] = []
-    const contentType = request.headers.get('Content-Type')?.toLowerCase() ?? ''
-    if (!contentType.startsWith('multipart/form-data')) {
-      const target = rawUploadTarget(request)
-      if (!target.succeeded) return target.response
-      const { filename, declaredBytes } = target
-      const name = sanitizeAttachmentFileName(filename)
-      if (declaredBytes > largestFileBytes) {
-        return attachmentUploadError(413, 'attachment_too_large', attachmentSizeErrorMessage(name, declaredBytes, largestFileBytes))
-      }
-      if (declaredBytes > maxTotalBytes) {
-        return attachmentUploadError(413, 'attachments_total_too_large', attachmentTotalSizeErrorMessage(declaredBytes, maxTotalBytes))
-      }
-      if (streamWriter && declaredBytes > STREAM_SNIFF_HEAD_BYTES) {
-        const path = pathFor(name)
-        const pathCheck = validatePath(path)
-        if (!pathCheck.succeeded) return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
-        const writer = (auth as Extract<AttachmentUploadAuthorization, { ok: true }>).writeAttachmentStream ?? streamWriter
-        return streamRawUpload({ request, scopeId: auth.scopeId, writer, filename, name, path, declaredBytes })
-      }
-      // A small raw body takes the batch path below as a one-file batch.
-      const body = await readRawBody(request, declaredBytes)
-      if (!body.succeeded) return body.response
-      files.push(new File([body.value], filename))
-    } else {
-      let formSource: Request | Response = request
-      if (maxFormBytes !== undefined) {
-        // Read at most the cap before parsing, whether or not the client sent
-        // a Content-Length, so an oversized form is refused while small.
-        const bounded = await readBodyUpTo(request, maxFormBytes)
-        if (!bounded.succeeded && !bounded.tooLarge) {
-          return attachmentUploadError(400, 'invalid_upload', 'The upload body ended early')
-        }
-        if (!bounded.succeeded) {
-          return attachmentUploadError(
-            413,
-            'form_upload_too_large',
-            `Form uploads are limited to ${formatBytes(maxFormBytes)}; send a larger file as a raw request body named by the filename query parameter`,
-          )
-        }
-        formSource = new Response(bounded.value, { headers: { 'Content-Type': request.headers.get('Content-Type') ?? '' } })
-      }
-      let form: FormData
-      try {
-        form = await formSource.formData()
-      } catch {
-        return attachmentUploadError(400, 'invalid_upload', 'Expected a multipart/form-data body with file fields')
-      }
-      // Collect every File value regardless of field name — the client may
-      // send one field per file or a single repeated field.
-      form.forEach((value) => {
-        if (value instanceof File) files.push(value)
-      })
-    }
-    if (files.length === 0) {
-      return attachmentUploadError(400, 'invalid_upload', 'No files in the upload body')
-    }
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const sniff = sniffBinary(bytes)
+    // Attachment paths double as store keys, so the stored name must fit
+    // the store charset; the as-uploaded name survives as `originalName`.
+    const name = sanitizeAttachmentFileName(file.name)
 
-    if (files.length > maxCount) {
+    const typeCheck = checkAttachmentType(name, sniff, allowedSniffedMimes)
+    if (!typeCheck.succeeded) {
       return attachmentUploadError(
-        400,
-        'attachment_count_exceeded',
-        `Too many files — the ${maxCount}-file limit was exceeded`,
+        typeCheck.code === 'attachment_type_mismatch' ? 400 : 415,
+        typeCheck.code,
+        typeCheck.message,
       )
     }
 
-    // Advisory only: client-controlled `file.size`, so a dishonest caller can
-    // slip past it — but an honest oversized batch should fail before a
-    // single byte is read. The authoritative aggregate check (against the
-    // sniffed/decoded byte length) runs per-file in phase 1, below.
-    const advisoryTotal = files.reduce((sum, file) => sum + file.size, 0)
-    if (advisoryTotal > maxTotalBytes) {
+    const kind = attachmentKindForMime(sniff.mime ?? '')
+    if (!allowedKinds.includes(kind)) {
+      return attachmentUploadError(
+        415,
+        'attachment_kind_not_allowed',
+        `${name} is a "${kind}" attachment, which this upload route does not accept`,
+      )
+    }
+
+    const limit = limitFor(sniff)
+    if (bytes.length > limit) {
+      return attachmentUploadError(
+        413,
+        'attachment_too_large',
+        attachmentSizeErrorMessage(name, bytes.length, limit),
+      )
+    }
+
+    const logicalPath = pathFor(name)
+    let ownershipId: string | undefined
+    let path = logicalPath
+    if (atomic) {
+      try {
+        ownershipId = createWriteId!()
+        path = immutableAttachmentPath(logicalPath, ownershipId)
+      } catch (error) {
+        logAttachmentStorageError(logger, '[attachment-upload] could not allocate ownership key', {
+          path: logicalPath,
+          error: redactErrorMessage(error),
+        })
+        return attachmentUploadError(
+          503,
+          'attachment_store_unavailable',
+          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+          logicalPath,
+        )
+      }
+    }
+    const pathCheck = validatePath(path)
+    if (!pathCheck.succeeded) {
+      return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
+    }
+    // Small hardening over gtm: a batch whose sanitized names collide onto
+    // the same store path (e.g. two variously-cased "Report.PDF" uploads)
+    // would otherwise silently overwrite one with the other in phase 2.
+    const duplicatePath = atomic ? logicalPath : path
+    if (seenLogicalPaths.has(duplicatePath)) {
+      return attachmentUploadError(
+        400,
+        'attachment_duplicate_path',
+        `attachments must not repeat a path within one upload: ${duplicatePath}`,
+        path,
+      )
+    }
+    seenLogicalPaths.add(duplicatePath)
+
+    // Authoritative aggregate check, against the actual decoded byte
+    // length rather than the client-reported `file.size` checked above.
+    totalBytes += bytes.length
+    if (totalBytes > maxTotalBytes) {
       return attachmentUploadError(
         413,
         'attachments_total_too_large',
-        attachmentTotalSizeErrorMessage(advisoryTotal, maxTotalBytes),
+        attachmentTotalSizeErrorMessage(totalBytes, maxTotalBytes),
       )
     }
 
-    interface PreparedWrite {
-      path: string
-      ownershipId?: string
-      name: string
-      bytes: Uint8Array
-      originalName: string
-      size: number
-      mediaType: string
-      kind: ChatAttachmentKind
-    }
+    const mediaType = sniff.mime ?? sniffMime(name)
+    prepared.push({ path, ownershipId, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
+  }
+  return { prepared }
+}
 
-    // Phase 1: validate every file and prepare its write input WITHOUT
-    // writing anything. A batch fails atomically — any file's validation
-    // error must reject the whole request before an earlier file in the
-    // same batch is persisted.
-    const prepared: PreparedWrite[] = []
-    const seenLogicalPaths = new Set<string>()
-    let totalBytes = 0
-
-    for (const file of files) {
-      const bytes = new Uint8Array(await file.arrayBuffer())
-      const sniff = sniffBinary(bytes)
-      // Attachment paths double as store keys, so the stored name must fit
-      // the store charset; the as-uploaded name survives as `originalName`.
-      const name = sanitizeAttachmentFileName(file.name)
-
-      const typeCheck = checkAttachmentType(name, sniff, allowedSniffedMimes)
-      if (!typeCheck.succeeded) {
-        return attachmentUploadError(
-          typeCheck.code === 'attachment_type_mismatch' ? 400 : 415,
-          typeCheck.code,
-          typeCheck.message,
-        )
-      }
-
-      const kind = attachmentKindForMime(sniff.mime ?? '')
-      if (!allowedKinds.includes(kind)) {
-        return attachmentUploadError(
-          415,
-          'attachment_kind_not_allowed',
-          `${name} is a "${kind}" attachment, which this upload route does not accept`,
-        )
-      }
-
-      const limit = limitFor(sniff)
-      if (bytes.length > limit) {
-        return attachmentUploadError(
-          413,
-          'attachment_too_large',
-          attachmentSizeErrorMessage(name, bytes.length, limit),
-        )
-      }
-
-      const logicalPath = pathFor(name)
-      let ownershipId: string | undefined
-      let path = logicalPath
-      if (atomic) {
-        try {
-          ownershipId = createWriteId!()
-          path = immutableAttachmentPath(logicalPath, ownershipId)
-        } catch (error) {
-          logAttachmentUploadError(logger, '[attachment-upload] could not allocate ownership key', {
-            path: logicalPath,
-            error: redactErrorMessage(error),
-          })
-          return attachmentUploadError(
-            503,
-            'attachment_store_unavailable',
-            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-            logicalPath,
-          )
-        }
-      }
-      const pathCheck = validatePath(path)
-      if (!pathCheck.succeeded) {
-        return attachmentUploadError(400, 'invalid_attachment_path', pathCheck.error, path)
-      }
-      // Small hardening over gtm: a batch whose sanitized names collide onto
-      // the same store path (e.g. two variously-cased "Report.PDF" uploads)
-      // would otherwise silently overwrite one with the other in phase 2.
-      const duplicatePath = atomic ? logicalPath : path
-      if (seenLogicalPaths.has(duplicatePath)) {
-        return attachmentUploadError(
-          400,
-          'attachment_duplicate_path',
-          `attachments must not repeat a path within one upload: ${duplicatePath}`,
-          path,
-        )
-      }
-      seenLogicalPaths.add(duplicatePath)
-
-      // Authoritative aggregate check, against the actual decoded byte
-      // length rather than the client-reported `file.size` checked above.
-      totalBytes += bytes.length
-      if (totalBytes > maxTotalBytes) {
-        return attachmentUploadError(
-          413,
-          'attachments_total_too_large',
-          attachmentTotalSizeErrorMessage(totalBytes, maxTotalBytes),
-        )
-      }
-
-      const mediaType = sniff.mime ?? sniffMime(name)
-      prepared.push({ path, ownershipId, name, bytes, originalName: file.name, size: bytes.length, mediaType, kind })
-    }
-
-    // Phase 2: every file in the batch passed validation — write them all.
-    const uploaded: ChatAttachmentInput[] = []
-    const successfulWrites: SuccessfulAttachmentWrite[] = []
-    for (const input of prepared) {
-      if (!atomic) {
-        let written: unknown
-        try {
-          written = await legacyWriter!(auth.scopeId, input.path, input.bytes, {
-            mediaType: input.mediaType,
-            name: input.name,
-            originalName: input.originalName,
-            size: input.size,
-          })
-        } catch (error) {
-          logAttachmentUploadError(logger, '[attachment-upload] legacy writer failed', {
-            path: input.path,
-            error: redactErrorMessage(error),
-          })
-          return attachmentUploadError(
-            503,
-            'attachment_store_unavailable',
-            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-            input.path,
-          )
-        }
-        const result = inspectLegacyAttachmentWriteResult(written)
-        if (!result) {
-          logAttachmentUploadError(logger, '[attachment-upload] legacy writer returned an invalid result', {
-            path: input.path,
-          })
-          return attachmentUploadError(
-            503,
-            'attachment_store_unavailable',
-            ATTACHMENT_STORAGE_FAILURE_MESSAGE,
-            input.path,
-          )
-        }
-        if (!result.ok) {
-          const reason = redactErrorMessage(result.reason)
-          logAttachmentUploadError(logger, '[attachment-upload] legacy write rejected', {
-            path: input.path,
-            error: reason,
-          })
-          return attachmentUploadError(413, 'attachment_write_failed', reason, input.path)
-        }
-        uploaded.push({
-          path: input.path,
-          name: input.name,
-          size: input.size,
-          mediaType: input.mediaType,
-          kind: input.kind,
-        })
-        continue
-      }
-
-      const ownershipId = input.ownershipId
-      if (!ownershipId) {
-        return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
-      }
-      const ownership: AttachmentWriteOwnership = Object.freeze({ id: ownershipId, path: input.path })
-      let written: Awaited<ReturnType<AtomicAttachmentWriter['write']>>
+async function commitUploadBatch(
+  prepared: PreparedWrite[],
+  legacyWriter: WriteAttachmentFn | undefined,
+  auth: { ok: true; scopeId: string; writeAttachment?: WriteAttachmentFn; writeAttachmentStream?: WriteAttachmentStreamFn } | { ok: true; scopeId: string; attachmentWriter?: AtomicAttachmentWriter },
+  atomicWriter: AtomicAttachmentWriter | undefined,
+  atomic: boolean,
+  logger: AttachmentUploadLogger,
+) {
+  // Phase 2: every file in the batch passed validation — write them all.
+  const uploaded: ChatAttachmentInput[] = []
+  const successfulWrites: SuccessfulAttachmentWrite[] = []
+  for (const input of prepared) {
+    if (!atomic) {
+      let written: unknown
       try {
-        written = await atomicWriter!.write(auth.scopeId, input.path, input.bytes, {
+        written = await legacyWriter!(auth.scopeId, input.path, input.bytes, {
           mediaType: input.mediaType,
           name: input.name,
           originalName: input.originalName,
           size: input.size,
-          ownership,
         })
       } catch (error) {
-        const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
-          await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
-        logAttachmentUploadError(logger, '[attachment-upload] write failed', {
+        logAttachmentStorageError(logger, '[attachment-upload] legacy writer failed', {
           path: input.path,
-          ownershipId: ownership.id,
-          cleanupFailures,
           error: redactErrorMessage(error),
         })
-        return atomicAttachmentFailure(input.path, cleanupFailures)
+        return attachmentUploadError(
+          503,
+          'attachment_store_unavailable',
+          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+          input.path,
+        )
       }
-      const result = inspectAtomicAttachmentWriteResult(written, ownership)
+      const result = inspectLegacyAttachmentWriteResult(written)
       if (!result) {
-        const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
-          await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
-        logAttachmentUploadError(logger, '[attachment-upload] writer returned a mismatched ownership receipt', {
+        logAttachmentStorageError(logger, '[attachment-upload] legacy writer returned an invalid result', {
           path: input.path,
-          ownershipId: ownership.id,
-          cleanupFailures,
         })
-        return atomicAttachmentFailure(input.path, cleanupFailures)
+        return attachmentUploadError(
+          503,
+          'attachment_store_unavailable',
+          ATTACHMENT_STORAGE_FAILURE_MESSAGE,
+          input.path,
+        )
       }
       if (!result.ok) {
-        const cleanupFailures = (await rollbackSuccessfulWrites([
-          { path: input.path, ownership, receipt: result.receipt },
-        ], auth.scopeId, atomicWriter!, logger)) + await rollbackSuccessfulWrites(
-          successfulWrites,
-          auth.scopeId,
-          atomicWriter!,
-          logger,
-        )
-        logAttachmentUploadError(logger, '[attachment-upload] write rejected', {
+        const reason = redactErrorMessage(result.reason)
+        logAttachmentStorageError(logger, '[attachment-upload] legacy write rejected', {
           path: input.path,
-          ownershipId: ownership.id,
-          cleanupFailures,
-          error: redactErrorMessage(result.reason),
+          error: reason,
         })
-        return atomicAttachmentFailure(input.path, cleanupFailures)
+        return attachmentUploadError(413, 'attachment_write_failed', reason, input.path)
       }
-      successfulWrites.push({ path: input.path, ownership, receipt: result.receipt })
       uploaded.push({
         path: input.path,
         name: input.name,
@@ -862,8 +826,71 @@ export function createAttachmentUploadRoute(
         mediaType: input.mediaType,
         kind: input.kind,
       })
+      continue
     }
 
-    return Response.json({ files: uploaded })
+    const ownershipId = input.ownershipId
+    if (!ownershipId) {
+      return attachmentUploadError(503, 'attachment_store_unavailable', ATTACHMENT_STORAGE_FAILURE_MESSAGE, input.path)
+    }
+    const ownership: AttachmentWriteOwnership = Object.freeze({ id: ownershipId, path: input.path })
+    let written: Awaited<ReturnType<AtomicAttachmentWriter['write']>>
+    try {
+      written = await atomicWriter!.write(auth.scopeId, input.path, input.bytes, {
+        mediaType: input.mediaType,
+        name: input.name,
+        originalName: input.originalName,
+        size: input.size,
+        ownership,
+      })
+    } catch (error) {
+      const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
+        await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
+      logAttachmentStorageError(logger, '[attachment-upload] write failed', {
+        path: input.path,
+        ownershipId: ownership.id,
+        cleanupFailures,
+        error: redactErrorMessage(error),
+      })
+      return atomicAttachmentFailure(input.path, cleanupFailures)
+    }
+    const result = inspectAtomicAttachmentWriteResult(written, ownership)
+    if (!result) {
+      const cleanupFailures = (await abortOwnership(atomicWriter!, auth.scopeId, ownership, logger)) +
+        await rollbackSuccessfulWrites(successfulWrites, auth.scopeId, atomicWriter!, logger)
+      logAttachmentStorageError(logger, '[attachment-upload] writer returned a mismatched ownership receipt', {
+        path: input.path,
+        ownershipId: ownership.id,
+        cleanupFailures,
+      })
+      return atomicAttachmentFailure(input.path, cleanupFailures)
+    }
+    if (!result.ok) {
+      const cleanupFailures = (await rollbackSuccessfulWrites([
+        { path: input.path, ownership, receipt: result.receipt },
+      ], auth.scopeId, atomicWriter!, logger)) + await rollbackSuccessfulWrites(
+        successfulWrites,
+        auth.scopeId,
+        atomicWriter!,
+        logger,
+      )
+      logAttachmentStorageError(logger, '[attachment-upload] write rejected', {
+        path: input.path,
+        ownershipId: ownership.id,
+        cleanupFailures,
+        error: redactErrorMessage(result.reason),
+      })
+      return atomicAttachmentFailure(input.path, cleanupFailures)
+    }
+    successfulWrites.push({ path: input.path, ownership, receipt: result.receipt })
+    uploaded.push({
+      path: input.path,
+      name: input.name,
+      size: input.size,
+      mediaType: input.mediaType,
+      kind: input.kind,
+    })
   }
+
+  return Response.json({ files: uploaded })
 }

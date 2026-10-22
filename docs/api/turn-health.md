@@ -4,7 +4,7 @@
 
 Source: `src/turn-health/index.ts`
 
-32 exports.
+31 exports.
 
 ### `AlertSink`
 
@@ -116,14 +116,6 @@ interface D1LikeForHealth
 
 ```ts
 (reason: TurnHealthReason) => string
-```
-
-### `FetchLike`
-
-`type` — Minimal structural fetch, so this module has no lib-dom dependency and can be driven by a fake in tests.
-
-```ts
-type FetchLike
 ```
 
 ### `PersistedTurnRow`

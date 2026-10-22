@@ -467,7 +467,7 @@ type ModelOptionValue
 `function` — Resolve a human-readable relative time string from a given date or return an empty string if null
 
 ```ts
-(date: Date | null) => string
+(date: string | Date | null) => string
 ```
 
 ### `resolveComposerOptions`

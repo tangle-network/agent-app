@@ -1,6 +1,5 @@
 /**
- * Calibration — prove a gate can FAIL before believing that it PASSED, and
- * prove a probe can SEE before believing the zero it reported.
+ * Calibration — prove a gate can reject a known bad input before trusting its verdict.
  *
  * Every expensive failure this package has shipped was a check that verified
  * its own input instead of the world, and reported green:
@@ -102,65 +101,4 @@ export async function calibrateGate<TInput>(
         : undefined
 
   return { discriminates: reason === undefined, outcomes, failures, ...(reason ? { reason } : {}) }
-}
-
-/**
- * `calibrateGate`, but throws instead of reporting. Use in a test or at wiring
- * time so an uncalibrated gate cannot ship silently.
- */
-export async function assertGateDiscriminates<TInput>(
-  name: string,
-  gate: GateFn<TInput>,
-  cases: readonly CalibrationCase<TInput>[],
-): Promise<CalibrationReport> {
-  const report = await calibrateGate(gate, cases)
-  if (!report.discriminates) throw new Error(`gate "${name}" is not evidence — ${report.reason}`)
-  return report
-}
-
-export interface ProbeReport<TValue> {
-  /** True when the positive control registered something, so a zero is real. */
-  readonly canSee: boolean
-  readonly measured: number
-  readonly control: number
-  readonly value: TValue
-  readonly reason?: string
-}
-
-/**
- * Measure something, but only after proving the instrument can register a
- * non-zero — because an absence is a claim about the measurement first.
- *
- * Six blind probes were mistaken for real zeros in a single day: a SQL `LIKE`
- * over a column the product encrypts (which equally returned 0 for `"text"`
- * across every row — the tell), a `grep` run against worktrees on stale
- * branches, a status-code comparison that never read the response bodies, a
- * live event count taken from a run that was never dispatched, `rg --hidden`
- * silently exiting 2 because `rg` was aliased to `grep`, and an intercepted
- * `git show` returning an empty diff. Each nearly caused a wrong fix.
- *
- * `control` must count something that MUST exist. If it counts zero, the
- * measurement is unusable regardless of what `measure` returned.
- */
-export async function measureWithControl<TValue>(opts: {
-  readonly measure: () => TValue | Promise<TValue>
-  /** Must return a value whose count is non-zero, or the probe is blind. */
-  readonly control: () => TValue | Promise<TValue>
-  readonly count: (value: TValue) => number
-  /** Describes what the control counts, for the failure message. */
-  readonly controlLabel: string
-}): Promise<ProbeReport<TValue>> {
-  const value = await opts.measure()
-  const controlValue = await opts.control()
-  const measured = opts.count(value)
-  const control = opts.count(controlValue)
-  return control > 0
-    ? { canSee: true, measured, control, value }
-    : {
-        canSee: false,
-        measured,
-        control,
-        value,
-        reason: `probe is blind: the positive control (${opts.controlLabel}) counted 0, so the measured ${measured} carries no information`,
-      }
 }

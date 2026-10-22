@@ -16,10 +16,10 @@ readonly AgentProfileEditorSection[]
 
 ### `AgentProfileEditor`
 
-`function` — Controlled editor for the canonical profile.
+`function`
 
 ```ts
-({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…
+(props: AgentProfileEditorProps) => Element
 ```
 
 ### `AgentProfileEditorConfig`

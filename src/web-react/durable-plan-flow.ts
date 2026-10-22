@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
 import type { ChatPlan } from '../plans/index'
 
 /** Represent durable plan decisions as either approved or rejected */
@@ -165,7 +165,9 @@ export interface UseDurablePlanFlowOptions {
   plan: ChatPlan
   client: DurablePlanDecisionClient
   /** Must be idempotent by receipt.receiptId. */
-  attachFollowUp?: (receipt: DurablePlanFollowUpReceipt) => Promise<void> | void
+  attachFollowUp?: (receipt: DurablePlanFollowUpReceipt, plan: ChatPlan, decision: DurablePlanDecision) => Promise<void> | void
+  /** Restore an already-decided plan and bound failed follow-up attachment attempts. */
+  autoRestore?: boolean
   onUpdated?: (plan: ChatPlan) => void
 }
 
@@ -178,6 +180,49 @@ export interface UseDurablePlanFlowResult {
   decide: (decision: DurablePlanDecision, feedback?: string) => Promise<DurablePlanDecisionResult | null>
   restore: () => Promise<DurablePlanDecisionResult | null>
   clearError: () => void
+  effectPending: boolean
+  attachError: string | null
+  retryAttach: () => void
+}
+
+const RESTORE_ATTEMPT_LIMIT = 2
+const ATTACH_ERROR = 'Your decision was saved, but notifying the agent about it failed. Try again.'
+
+interface PlanRestorationState {
+  restored: string | null
+  inFlight: string | null
+  attempts: Map<string, number>
+}
+
+function planDecisionKey(plan: ChatPlan): string {
+  return `${plan.planId}:${plan.revision}:${plan.status}`
+}
+
+function useAutomaticPlanRestore(args: {
+  plan: ChatPlan
+  enabled: boolean
+  restore: UseDurablePlanFlowResult['restore']
+  state: MutableRefObject<PlanRestorationState>
+  retry: number
+  advance: () => void
+  failed: (error: string) => void
+}): void {
+  const { plan, enabled, restore, state, retry, advance, failed } = args
+  useEffect(() => {
+    if (!enabled || (plan.status !== 'approved' && plan.status !== 'rejected')) return
+    const key = planDecisionKey(plan)
+    if (state.current.restored === key || state.current.inFlight === key) return
+    const attempts = state.current.attempts.get(key) ?? 0
+    if (attempts >= RESTORE_ATTEMPT_LIMIT) { failed(ATTACH_ERROR); return }
+    state.current.attempts.set(key, attempts + 1)
+    state.current.inFlight = key
+    void restore().then((result) => {
+      if (state.current.inFlight === key) state.current.inFlight = null
+      if (state.current.restored === key || result?.effectPending) return
+      if ((state.current.attempts.get(key) ?? 0) < RESTORE_ATTEMPT_LIMIT) advance()
+      else failed(ATTACH_ERROR)
+    })
+  }, [plan.planId, plan.revision, plan.status, enabled, restore, state, retry, advance, failed])
 }
 
 /** Shared plan decision controller. It coalesces only concurrent attachment
@@ -190,22 +235,50 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
   const [error, setError] = useState<string | null>(null)
   const attachments = useRef(new Map<string, Promise<void>>())
   const decisionInFlight = useRef(false)
+  const restoration = useRef<PlanRestorationState>({ restored: null, inFlight: null, attempts: new Map() })
+  const [effectPending, setEffectPending] = useState(false)
+  const [attachError, setAttachError] = useState<string | null>(null)
+  const [restoreRetry, setRestoreRetry] = useState(0)
+  const advanceRestore = useCallback(() => setRestoreRetry(value => value + 1), [])
+  useEffect(() => setEffectPending(false), [plan.planId, plan.revision])
 
   useEffect(() => setPlan(options.plan), [options.plan])
 
-  const apply = useCallback(async (result: DurablePlanDecisionResult) => {
+  const apply = useCallback(async (result: DurablePlanDecisionResult, decision?: DurablePlanDecision) => {
     setPlan(result.plan)
     options.onUpdated?.(result.plan)
+    setEffectPending(result.effectPending === true)
     const receipt = result.followUp
-    if (!receipt || !options.attachFollowUp) return
+    if (!receipt) {
+      // A pending effect is settled authority state; Continue explicitly decides again.
+      restoration.current.restored = planDecisionKey(result.plan)
+      return
+    }
+    if (!options.attachFollowUp) return
     let pending = attachments.current.get(receipt.receiptId)
     if (!pending) {
-      pending = Promise.resolve(options.attachFollowUp(receipt))
+      pending = Promise.resolve().then(() => options.attachFollowUp!(receipt, result.plan,
+        decision ?? (result.plan.status === 'rejected' ? 'rejected' : 'approved')))
       attachments.current.set(receipt.receiptId, pending)
-      void pending.finally(() => attachments.current.delete(receipt.receiptId))
+      const release = () => { attachments.current.delete(receipt.receiptId) }
+      void pending.then(release, release)
     }
-    await pending
-  }, [options.attachFollowUp, options.onUpdated])
+    try {
+      await pending
+      restoration.current.restored = planDecisionKey(result.plan)
+      setAttachError(null)
+    } catch (cause) {
+      // The decision is durable; automatic restoration owns the bounded attach retry.
+      if (!options.autoRestore) throw cause
+      const key = planDecisionKey(result.plan)
+      if (restoration.current.restored === key) restoration.current.restored = null
+      if (decision !== undefined) {
+        restoration.current.attempts.set(key, 0)
+        setAttachError(null)
+        advanceRestore()
+      }
+    }
+  }, [options.attachFollowUp, options.onUpdated, options.autoRestore, advanceRestore])
 
   const decide = useCallback(async (decision: DurablePlanDecision, feedback?: string) => {
     if (decisionInFlight.current) return null
@@ -219,7 +292,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
         decision,
         ...(feedback?.trim() ? { feedback: feedback.trim() } : {}),
       })
-      await apply(result)
+      await apply(result, decision)
       return result
     } catch (cause) {
       if (cause instanceof DurablePlanClientError && cause.currentPlan) {
@@ -249,5 +322,14 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     }
   }, [apply, options.client, plan.planId, plan.revision])
 
-  return { plan, deciding, restoring, error, decide, restore, clearError: () => setError(null) }
+  const retryAttach = useCallback(() => {
+    restoration.current.attempts.set(planDecisionKey(plan), 0)
+    setAttachError(null)
+    advanceRestore()
+  }, [plan.planId, plan.revision, plan.status, advanceRestore])
+  useAutomaticPlanRestore({ plan, enabled: options.autoRestore === true && !!options.attachFollowUp && deciding === null,
+    restore, state: restoration, retry: restoreRetry, advance: advanceRestore, failed: setAttachError })
+
+  return { plan, deciding, restoring, error, decide, restore, clearError: () => setError(null),
+    effectPending, attachError, retryAttach }
 }

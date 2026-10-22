@@ -70,7 +70,7 @@ export function turnAlert(input: {
 
 /** Minimal structural fetch, so this module has no lib-dom dependency and can
  *  be driven by a fake in tests. */
-export type FetchLike = (
+type FetchLike = (
   url: string,
   init: { method: string; headers: Record<string, string>; body: string },
 ) => Promise<{ ok: boolean; status: number; text?(): Promise<string> }>
@@ -90,16 +90,11 @@ export function createWebhookAlertSink(options: {
   const fetchImpl = options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike)
   return {
     async deliver(alert) {
-      const icon = alert.severity === 'critical' ? ':rotating_light:' : ':warning:'
-      const lines = [
-        `${icon} *${alert.title}*`,
-        ...alert.details.map((d) => `• ${d}`),
-        `_${new Date(alert.at).toISOString()}_`,
-      ]
+      const text = slackAlertText(alert)
       const response = await fetchImpl(options.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: lines.join('\n') }),
+        body: JSON.stringify({ text: text }),
       })
       if (!response.ok) {
         // A dropped alert is a silent failure of the silent-failure detector.
@@ -134,14 +129,9 @@ export function createSlackBotAlertSink(options: {
   const fetchImpl = options.fetchImpl ?? (globalThis.fetch as unknown as FetchLike)
   return {
     async deliver(alert) {
-      const icon = alert.severity === 'critical' ? ':rotating_light:' : ':warning:'
-      const lines = [
-        `${icon} *${alert.title}*`,
-        ...alert.details.map((d) => `• ${d}`),
-        `_${new Date(alert.at).toISOString()}_`,
-      ]
+      const text = slackAlertText(alert)
       const outcome = await postSlackAlert({
-        token: options.botToken, channel: options.channel, text: lines.join('\n'), attempts: 1,
+        token: options.botToken, channel: options.channel, text: text, attempts: 1,
         // Preserve the public minimal-fetch seam without owning a second Slack
         // request builder or response parser. Real callers use native fetch.
         fetchImpl: options.fetchImpl ? (async (url, init) => {
@@ -249,4 +239,14 @@ export function createGuardedAlertSink(
       }
     },
   }
+}
+
+
+function slackAlertText(alert: TurnHealthAlert): string {
+  const icon = alert.severity === 'critical' ? ':rotating_light:' : ':warning:'
+  return [
+    `${icon} *${alert.title}*`,
+    ...alert.details.map((detail) => `• ${detail}`),
+    `_${new Date(alert.at).toISOString()}_`,
+  ].join('\n')
 }

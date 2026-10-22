@@ -108,27 +108,8 @@ export function AssistantLauncherProvider({
       setOpen(true);
     }
   }, [userId, storedOpen, docked]);
+  const actions = useAssistantVisibilityActions({ setSeed, setOpenedOnLoad, setOpen, persistOpen, open });
 
-  const openAssistant = useCallback(
-    (next?: string) => {
-      // Only replace the seed when one is supplied, so opening with no
-      // argument never clobbers a starter another caller just set.
-      if (next != null) setSeed(next);
-      setOpenedOnLoad(false);
-      setOpen(true);
-      persistOpen(true);
-    },
-    [persistOpen],
-  );
-  const closeAssistant = useCallback(() => {
-    setOpen(false);
-    persistOpen(false);
-  }, [persistOpen]);
-  const toggleAssistant = useCallback(() => {
-    setOpenedOnLoad(false);
-    setOpen(!open);
-    persistOpen(!open);
-  }, [open, persistOpen]);
   const clearSeed = useCallback(() => setSeed(null), []);
   const setPageLabel = useCallback(
     (update: (current: string | null) => string | null) =>
@@ -147,9 +128,7 @@ export function AssistantLauncherProvider({
     () => ({
       open,
       seed,
-      openAssistant,
-      closeAssistant,
-      toggleAssistant,
+      ...actions,
       clearSeed,
       layout,
       openedOnLoad,
@@ -161,9 +140,7 @@ export function AssistantLauncherProvider({
     [
       open,
       seed,
-      openAssistant,
-      closeAssistant,
-      toggleAssistant,
+      actions,
       clearSeed,
       layout,
       openedOnLoad,
@@ -212,4 +189,36 @@ export function useAssistantPageLabel(label: string | null | undefined): void {
     // Clear only our own label: the next page may already have set its own.
     return () => setPageLabel((current) => (current === trimmed ? null : current));
   }, [setPageLabel, trimmed]);
+}
+
+
+function useAssistantVisibilityActions({ setSeed, setOpenedOnLoad, setOpen, persistOpen, open }: {
+  setSeed: (seed: string) => void
+  setOpenedOnLoad: (opened: boolean) => void
+  setOpen: (open: boolean) => void
+  persistOpen: (open: boolean) => void
+  open: boolean
+}) {
+
+  const openAssistant = useCallback(
+    (next?: string) => {
+      // Only replace the seed when one is supplied, so opening with no
+      // argument never clobbers a starter another caller just set.
+      if (next != null) setSeed(next);
+      setOpenedOnLoad(false);
+      setOpen(true);
+      persistOpen(true);
+    },
+    [persistOpen],
+  );
+  const closeAssistant = useCallback(() => {
+    setOpen(false);
+    persistOpen(false);
+  }, [persistOpen]);
+  const toggleAssistant = useCallback(() => {
+    setOpenedOnLoad(false);
+    setOpen(!open);
+    persistOpen(!open);
+  }, [open, persistOpen]);
+  return useMemo(() => ({ openAssistant, closeAssistant, toggleAssistant }), [openAssistant, closeAssistant, toggleAssistant]);
 }

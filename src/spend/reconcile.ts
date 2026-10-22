@@ -544,69 +544,7 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
   }
 
   // ── velocity ───────────────────────────────────────────────────────────────
-  if (runs('velocity') && options.velocity !== false) {
-    const cfg = { ...DEFAULT_VELOCITY, ...(options.velocity ?? {}) }
-    const buckets = new Map<number, { nano: number; references: string[] }>()
-    for (const row of options.rows) {
-      const charge = chargeNanoUsd(row)
-      if (charge === 0) continue
-      // Velocity is decided per ROW, not per box, because a row naming no
-      // sandbox at all still counts toward what this product spent. A sibling's
-      // burst is excluded rather than paged on: a product cannot dispute a
-      // charge it did not incur, and leaving them in makes one product's
-      // incident wake every product on the wallet.
-      if (ownership && ownership.decide({ row, sandboxId: settlementSandboxId(row) }) === 'foreign') {
-        continue
-      }
-      const bucketStart = Math.floor(row.createdAt / cfg.windowMs) * cfg.windowMs
-      const bucket = buckets.get(bucketStart)
-      if (bucket) {
-        bucket.nano += charge
-        bucket.references.push(row.referenceId ?? row.id)
-      } else {
-        buckets.set(bucketStart, { nano: charge, references: [row.referenceId ?? row.id] })
-      }
-    }
-
-    const ordered = [...buckets.entries()].sort((a, b) => a[0] - b[0])
-    for (let i = 0; i < ordered.length; i++) {
-      const entry = ordered[i]
-      if (!entry) continue
-      const [windowStartAt, bucket] = entry
-      if (i < cfg.minTrailingWindows) continue
-      const trailing = ordered.slice(0, i).map(([, prior]) => prior.nano)
-      const trailingMedian = median(trailing)
-      const threshold = Math.max(trailingMedian * cfg.multiple, cfg.minAbsoluteNanoUsd)
-      if (bucket.nano <= threshold) continue
-      const ratio = trailingMedian > 0 ? bucket.nano / trailingMedian : Number.POSITIVE_INFINITY
-
-      findings.push({
-        ...emptyFinding('velocity'),
-        workspaceId,
-        referenceIds: bucket.references,
-        settledNanoUsd: bucket.nano,
-        windowNanoUsd: bucket.nano,
-        trailingMedianNanoUsd: trailingMedian,
-        velocityRatio: ratio,
-        windowStartAt,
-        message:
-          `${usd(bucket.nano)} settled in the window starting ${new Date(windowStartAt).toISOString()} ` +
-          `across ${bucket.references.length} row(s), against a trailing median of ` +
-          `${usd(trailingMedian)} over ${trailing.length} prior window(s) — ` +
-          `${Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : 'no prior spend to compare against'}, ` +
-          `over the ${cfg.multiple}x threshold.` +
-          (ownership
-            ? ` Counted over this product's own rows only (${ownership.label}); the wallet total ` +
-              'for the window is higher when a sibling product settled into it.'
-            : ' Counted over every row on the wallet, which on a shared account includes any ' +
-              'sibling product\'s spend.'),
-        remedy:
-          'A burst of this shape is what a settlement defect looks like from the consumer side: ' +
-          'long-dormant intervals cashed out at once. Check whether these rows carry interval ' +
-          'starts far older than the settlement instant before treating it as real usage.',
-      })
-    }
-  }
+  appendVelocityFindings(runs, options, ownership, findings, workspaceId)
 
   // ── negative-balance ───────────────────────────────────────────────────────
   if (runs('negative-balance') && options.balance) {
@@ -713,5 +651,75 @@ export async function reconcileSpend(options: ReconcileSpendOptions): Promise<Sp
     ownership: ownershipSummary,
     expectation,
     asOf,
+  }
+}
+
+function appendVelocityFindings(
+  runs: (check: SpendCheckId) => boolean,
+  options: ReconcileSpendOptions,
+  ownership: SpendOwnershipRule | null,
+  findings: SpendFinding[],
+  workspaceId: string | null,
+) {
+  if (runs('velocity') && options.velocity !== false) {
+    const cfg = { ...DEFAULT_VELOCITY, ...(options.velocity ?? {}) }
+    const buckets = new Map<number, { nano: number; references: string[] }>()
+    for (const row of options.rows) {
+      const charge = chargeNanoUsd(row)
+      if (charge === 0) continue
+      // Velocity is decided per ROW, not per box, because a row naming no
+      // sandbox at all still counts toward what this product spent. A sibling's
+      // burst is excluded rather than paged on: a product cannot dispute a
+      // charge it did not incur, and leaving them in makes one product's
+      // incident wake every product on the wallet.
+      if (ownership && ownership.decide({ row, sandboxId: settlementSandboxId(row) }) === 'foreign') {
+        continue
+      }
+      const bucketStart = Math.floor(row.createdAt / cfg.windowMs) * cfg.windowMs
+      const bucket = buckets.get(bucketStart)
+      if (bucket) {
+        bucket.nano += charge
+        bucket.references.push(row.referenceId ?? row.id)
+      } else {
+        buckets.set(bucketStart, { nano: charge, references: [row.referenceId ?? row.id] })
+      }
+    }
+
+    const ordered = [...buckets.entries()].sort((a, b) => a[0] - b[0])
+    for (let i = 0;i < ordered.length;i++) {
+      const entry = ordered[i]
+      if (!entry) continue
+      const [windowStartAt, bucket] = entry
+      if (i < cfg.minTrailingWindows) continue
+      const trailing = ordered.slice(0, i).map(([, prior]) => prior.nano)
+      const trailingMedian = median(trailing)
+      const threshold = Math.max(trailingMedian * cfg.multiple, cfg.minAbsoluteNanoUsd)
+      if (bucket.nano <= threshold) continue
+      const ratio = trailingMedian > 0 ? bucket.nano / trailingMedian : Number.POSITIVE_INFINITY
+
+      findings.push({
+        ...emptyFinding('velocity'),
+        workspaceId,
+        referenceIds: bucket.references,
+        settledNanoUsd: bucket.nano,
+        windowNanoUsd: bucket.nano,
+        trailingMedianNanoUsd: trailingMedian,
+        velocityRatio: ratio,
+        windowStartAt,
+        message: `${usd(bucket.nano)} settled in the window starting ${new Date(windowStartAt).toISOString()} ` +
+          `across ${bucket.references.length} row(s), against a trailing median of ` +
+          `${usd(trailingMedian)} over ${trailing.length} prior window(s) — ` +
+          `${Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : 'no prior spend to compare against'}, ` +
+          `over the ${cfg.multiple}x threshold.` +
+          (ownership
+            ? ` Counted over this product's own rows only (${ownership.label}); the wallet total ` +
+            'for the window is higher when a sibling product settled into it.'
+            : ' Counted over every row on the wallet, which on a shared account includes any ' +
+            'sibling product\'s spend.'),
+        remedy: 'A burst of this shape is what a settlement defect looks like from the consumer side: ' +
+          'long-dormant intervals cashed out at once. Check whether these rows carry interval ' +
+          'starts far older than the settlement instant before treating it as real usage.',
+      })
+    }
   }
 }

@@ -1,3 +1,4 @@
+import { sourceDirectoryEntries } from './source-entries'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -226,16 +227,7 @@ function walkSourceTree(
   exclude: readonly string[],
   seen: { manifests: string[]; tarballs: string[] },
 ): void {
-  let entries: import('node:fs').Dirent[]
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name)
-    const rel = relative(repoDir, full).split(sep).join('/')
-    if (exclude.some((prefix) => rel === prefix || rel.startsWith(`${prefix}/`))) continue
+  for (const { entry, full } of sourceDirectoryEntries(dir, repoDir, exclude)) {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue
       walkSourceTree(full, repoDir, exclude, seen)
@@ -243,6 +235,7 @@ function walkSourceTree(
       if (entry.name === 'package.json') seen.manifests.push(full)
       else if (TARBALL.test(entry.name)) seen.tarballs.push(full)
     }
+
   }
 }
 

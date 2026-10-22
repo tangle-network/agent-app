@@ -13,7 +13,7 @@
 
 import { useRef, useState } from 'react'
 import type { ExportTriggerOptions } from '../contracts'
-import { ChevronDownGlyph, ExportGlyph } from './glyphs'
+import { ChevronDownGlyph, CanvasExportGlyph } from './glyphs'
 
 export interface ExportControlProps {
   /** Pre-selected format/scale when the popover opens. Default PNG @ 1x. */
@@ -64,7 +64,7 @@ export function ExportControl({ defaults, onExport, className }: ExportControlPr
         }}
         className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:border-[color-mix(in_srgb,var(--brand-primary)_40%,transparent)]"
       >
-        <ExportGlyph className="h-3.5 w-3.5" />
+        <CanvasExportGlyph className="h-3.5 w-3.5" />
         Export
         <ChevronDownGlyph className="h-3 w-3 text-[var(--text-muted)]" />
       </button>

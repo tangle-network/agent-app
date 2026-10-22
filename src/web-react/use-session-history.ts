@@ -1,3 +1,4 @@
+import { useHistoryControls, loadHistoryPage } from './history-controls'
 /** Cursor-paged session history over the host's fetch port. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { mergeSessionPages, type SessionPage, type SessionSort, type SessionSummary } from '../session-shell/index'
@@ -150,47 +151,17 @@ export function useSessionHistory({
     loadMoreAbortRef.current = controller
     setPhase('loadingMore')
 
-    void (async () => {
-      try {
-        const page = await currentFetch({ q: currentQ, sort: currentSort, cursor, signal: controller.signal })
-        if (seq !== seqRef.current) return
-        setItems((prev) => mergeSessionPages(prev, page.items))
-        setNextCursor(page.nextCursor ?? null)
-        setPhase('idle')
-      } catch {
-        if (controller.signal.aborted || seq !== seqRef.current) return
-        setPhase('error')
-      } finally {
-        if (seq === seqRef.current) loadingMoreRef.current = false
-      }
-    })()
+    void loadHistoryPage(
+      () => currentFetch({ q: currentQ, sort: currentSort, cursor, signal: controller.signal }),
+      page => {
+      setItems((prev) => mergeSessionPages(prev, page.items))
+      setNextCursor(page.nextCursor ?? null)
+      },
+      { controller, seq, seqRef, setPhase, onSettled: () => { loadingMoreRef.current = false } },
+    )
   }, [])
-
-  const retry = useCallback(() => {
-    if (lastOpRef.current === 'more') loadMore()
-    else setReloadKey((key) => key + 1)
-  }, [loadMore])
-
-  const reload = useCallback(() => {
-    setReloadKey((key) => key + 1)
-  }, [])
-
-  useEffect(
-    () => () => {
-      resetAbortRef.current?.abort()
-      loadMoreAbortRef.current?.abort()
-    },
-    [],
+  return useHistoryControls(
+    { items, nextCursor, phase, loadMore },
+    { lastOpRef, setReloadKey, resetAbortRef, loadMoreAbortRef },
   )
-
-  return {
-    items,
-    hasMore: nextCursor !== null,
-    isLoadingFirst: phase === 'loadingFirst',
-    isLoadingMore: phase === 'loadingMore',
-    isError: phase === 'error',
-    loadMore,
-    retry,
-    reload,
-  }
 }

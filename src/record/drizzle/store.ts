@@ -491,126 +491,180 @@ export function createRecordStore(options: CreateRecordStoreOptions): RecordStor
     return recordFail('supersede-race', `${lastError} (gave up after ${attempts} attempts)`)
   }
 
-  async function list(input: ListRecordEntriesInput): Promise<RecordOutcome<RecordEntryRow[]>> {
-    if (input.period !== undefined && !Number.isInteger(input.period)) {
-      return recordFail('invalid-input', `list: period must be an integer, got ${String(input.period)}`)
-    }
-    try {
-      const where = input.period === undefined
-        ? eq(table.scopeId, input.scopeId)
-        : and(eq(table.scopeId, input.scopeId), lte(table.period, input.period))
-      const rows = await db.select().from(table).where(where).orderBy(asc(table.seq))
+  const { list, heads, materialize } = createRecordReads(table, db, storePeriodScope)
 
-      const visible = rows.filter((row) => {
-        if (input.period !== undefined
-          && !recordEntryVisibleInPeriod(storePeriodScope(row.path), row.period, input.period)) return false
-        if (input.reviewState !== undefined) {
-          if (row.reviewState !== input.reviewState) return false
-        } else if (!input.includeRejected && row.reviewState === 'rejected') {
-          return false
-        }
-        if (!input.includeSuperseded && row.supersededById !== null) return false
-        return true
-      })
-      return recordOk(visible)
-    } catch (error) {
-      return recordFail('storage-failed', `list: ${errorMessage(error)}`)
+  const { validateWrite, insertValues } = createRecordWriteInputs(policy, requireRef, requireQuote, extraColumnNames, tableName, affirmable)
+
+  return { atomicStrategy: strategy, write, review, list, heads, materialize }
+}
+
+/** Project a stored row onto the slice the pure fold reads. */
+export function toFoldable(row: RecordEntryRow): FoldableRecordEntry {
+  return {
+    id: row.id,
+    seq: row.seq,
+    dimension: row.dimension,
+    period: row.period,
+    path: row.path,
+    itemKey: row.itemKey,
+    valueJson: row.valueJson,
+    affirmedEmpty: row.affirmedEmpty,
+  }
+}
+
+function canonicalize(
+  canonicalizer: ((path: string, raw: string) => RecordOutcome<string>) | undefined,
+  path: string,
+  raw: string,
+  column: string,
+): RecordOutcome<string> {
+  if (!canonicalizer) return recordOk(raw)
+  const result = canonicalizer(path, raw)
+  if (!result.succeeded) return recordFail('invalid-input', `write: '${path}' ${column} — ${result.error}`)
+  return result
+}
+
+function firstRow(rows: unknown): RecordEntryRow | undefined {
+  return Array.isArray(rows) ? (rows[0] as RecordEntryRow | undefined) : undefined
+}
+
+/**
+ * Pick the driver's atomic primitive. `batch` first and unconditionally: on D1
+ * it is the ONLY one that works, and a D1 handle also exposes a `transaction`
+ * method that does not give you a transaction.
+ */
+export function resolveAtomicStrategy(db: RecordDatabase): RecordAtomicStrategy {
+  if (typeof db.batch === 'function') return 'batch'
+  if (typeof db.run === 'function') return 'begin-immediate'
+  throw new Error(
+    'createRecordStore: the injected driver exposes neither batch() nor run() — an atomic supersede is impossible on it',
+  )
+}
+
+interface GuardedPairResult {
+  /** True when the guarded statement matched exactly one row. */
+  guardMatched: boolean
+  /** True when the dependent statement matched at least one row. */
+  mainMatched: boolean
+  /** True when a failed precondition left NOTHING written. */
+  rolledBack: boolean
+  /** Rows the second statement returned. */
+  mainRows: unknown[]
+}
+
+/**
+ * Run a guarded statement and its dependent statement as one atomic unit.
+ *
+ * BOTH statements' row counts are reported, and both matter. With only the
+ * guard's checked, the destructive half of a supersede can commit alone — the
+ * outgoing head stamped `superseded_by_id` while the dependent accept matches
+ * zero rows, leaving the record with no live head at all.
+ *
+ * `batch` (D1, libsql) commits both or neither and cannot inspect the first
+ * statement before the second runs — the guard has to carry the dependent
+ * statement's precondition itself (see `markHeadStatement`), and the row counts
+ * read afterwards say which precondition failed. `begin-immediate`
+ * (better-sqlite3 and any driver without `batch`) can do better: it inspects
+ * each statement as it runs and rolls back on either mismatch, so the caller
+ * retries from a fresh read with nothing written.
+ */
+async function runGuardedPair(
+  db: RecordDatabase,
+  strategy: RecordAtomicStrategy,
+  guard: unknown,
+  main: unknown,
+): Promise<GuardedPairResult> {
+  if (strategy === 'batch') {
+    const batch = db.batch
+    if (typeof batch !== 'function') {
+      throw new Error('runGuardedPair: batch strategy resolved but the driver has no batch()')
+    }
+    const results = await batch.call(db, [guard, main] as [unknown, ...unknown[]])
+    const guardRows = results[0]
+    const mainRows = Array.isArray(results[1]) ? results[1] : []
+    return {
+      guardMatched: Array.isArray(guardRows) && guardRows.length === 1,
+      mainMatched: mainRows.length > 0,
+      rolledBack: false,
+      mainRows,
     }
   }
 
-  /**
-   * The raw live-accepted query. `period <= N` is the only predicate SQL can
-   * express — whether an entry written at an earlier period is still TRUE at
-   * `N` is the period scope's call, and that resolver is per path, so it runs
-   * in JS over these rows.
-   */
-  async function loadHeads(scopeId: string, period: number): Promise<RecordEntryRow[]> {
-    return db
-      .select()
-      .from(table)
-      .where(and(
-        eq(table.scopeId, scopeId),
-        eq(table.reviewState, 'accepted'),
-        isNull(table.supersededById),
-        lte(table.period, period),
-      ))
-      .orderBy(asc(table.seq))
-  }
-
-  async function heads(input: ReadRecordHeadsInput): Promise<RecordOutcome<RecordEntryRow[]>> {
-    const period = input.period ?? RECORD_PERIOD_SENTINEL
-    if (!Number.isInteger(period)) {
-      return recordFail('invalid-input', `heads: period must be an integer, got ${String(period)}`)
+  await db.run(sql`begin immediate`)
+  try {
+    const guardRows = await (guard as Promise<unknown>)
+    if (!Array.isArray(guardRows) || guardRows.length !== 1) {
+      await db.run(sql`rollback`)
+      return { guardMatched: false, mainMatched: false, rolledBack: true, mainRows: [] }
     }
-    try {
-      const rows = await loadHeads(input.scopeId, period)
-      // The same visibility rule `list` applies. Without it an `exact`-scoped
-      // entry written at an earlier period reads as live at a later one, and
-      // the two published reads answer the same question differently.
-      return recordOk(rows.filter((row) => recordEntryVisibleInPeriod(storePeriodScope(row.path), row.period, period)))
-    } catch (error) {
-      return recordFail('storage-failed', `heads: ${errorMessage(error)}`)
+    const mainRows = await (main as Promise<unknown>)
+    if (!Array.isArray(mainRows) || mainRows.length === 0) {
+      await db.run(sql`rollback`)
+      return { guardMatched: true, mainMatched: false, rolledBack: true, mainRows: [] }
     }
+    await db.run(sql`commit`)
+    return { guardMatched: true, mainMatched: true, rolledBack: false, mainRows }
+  } catch (error) {
+    await rollbackQuietly(db)
+    throw error
   }
+}
 
-  async function materialize<T>(input: MaterializeRecordInput<T>): Promise<RecordOutcome<MaterializeRecordResult<T>>> {
-    const period = input.period ?? RECORD_PERIOD_SENTINEL
-    if (!Number.isInteger(period)) {
-      return recordFail('invalid-input', `materialize: period must be an integer, got ${String(period)}`)
-    }
-    // Deliberately the RAW rows, not `heads()`: the fold applies the caller's
-    // own `rules.periodScope` when it supplies one, so pre-filtering here with
-    // the store's resolver would drop entries those rules would have kept.
-    let loaded: RecordEntryRow[]
-    try {
-      loaded = await loadHeads(input.scopeId, period)
-    } catch (error) {
-      return recordFail('storage-failed', `materialize: ${errorMessage(error)}`)
-    }
-
-    const rules: RecordFoldRules<T> = input.rules.periodScope
-      ? input.rules
-      : { ...input.rules, periodScope: storePeriodScope }
-    const folded = foldRecordEntries(loaded.map(toFoldable), { rules, period })
-    if (!folded.succeeded) return folded
-
-    const periodScope = rules.periodScope ?? storePeriodScope
-    try {
-      const proposed = await db
-        .select({ path: table.path, period: table.period, conflict: table.conflict })
-        .from(table)
-        .where(and(
-          eq(table.scopeId, input.scopeId),
-          eq(table.reviewState, 'proposed'),
-          lte(table.period, period),
-        ))
-      const visible = proposed.filter((row) => recordEntryVisibleInPeriod(periodScope(row.path), row.period, period))
-      return recordOk({
-        value: folded.value.value,
-        entryCount: folded.value.entryCount,
-        pendingProposed: visible.length,
-        conflicts: visible.filter((row) => row.conflict).length,
-      })
-    } catch (error) {
-      return recordFail('storage-failed', `materialize: ${errorMessage(error)}`)
-    }
+/** Roll back without masking the error that caused it. */
+async function rollbackQuietly(db: RecordDatabase): Promise<void> {
+  try {
+    await db.run(sql`rollback`)
+  } catch {
+    // The transaction is already gone; the original error is the one to report.
   }
+}
 
-  interface ValidatedKey {
-    dimension: string
-    path: string
-    itemKey: string
-    period: number
+/** Flatten a driver error's cause chain into one readable message. */
+function errorMessage(error: unknown): string {
+  const parts: string[] = []
+  let cursor: unknown = error
+  for (let depth = 0;depth < 5 && cursor instanceof Error;depth++) {
+    parts.push(cursor.message)
+    cursor = cursor.cause
   }
+  return parts.length > 0 ? parts.join(' — ') : String(error)
+}
 
-  interface ValidatedWrite {
-    key: ValidatedKey
-    valueJson: string
-    affirmedEmpty: boolean
-    reviewState: RecordReviewState
-    sourceKind: string
+/** Drizzle wraps driver errors ("Failed query: …") and keeps the SQLite error
+ *  in the cause chain, so the whole chain is inspected. */
+function isUniqueViolation(error: unknown): boolean {
+  let cursor: unknown = error
+  for (let depth = 0;depth < 5 && cursor instanceof Error;depth++) {
+    if (cursor.message.includes('UNIQUE constraint failed')) return true
+    cursor = cursor.cause
   }
+  return false
+}
 
+interface ValidatedKey {
+  dimension: string
+  path: string
+  itemKey: string
+  period: number
+}
+
+interface ValidatedWrite {
+  key: ValidatedKey
+  valueJson: string
+  affirmedEmpty: boolean
+  reviewState: RecordReviewState
+  sourceKind: string
+}
+
+
+function createRecordWriteInputs(
+  policy: CreateRecordStoreOptions['policy'],
+  requireRef: Set<string>,
+  requireQuote: Set<string>,
+  extraColumnNames: Set<string>,
+  tableName: ReturnType<typeof getTableName>,
+  affirmable: Set<string>,
+) {
   function validateWrite(input: WriteRecordEntryInput): RecordOutcome<ValidatedWrite> {
     const period = input.period ?? RECORD_PERIOD_SENTINEL
     const minPeriod = policy.minPeriod ?? RECORD_PERIOD_SENTINEL
@@ -743,149 +797,113 @@ export function createRecordStore(options: CreateRecordStoreOptions): RecordStor
       reviewedBy: null,
     }
   }
-
-  return { atomicStrategy: strategy, write, review, list, heads, materialize }
+  return { validateWrite, insertValues }
 }
 
-/** Project a stored row onto the slice the pure fold reads. */
-export function toFoldable(row: RecordEntryRow): FoldableRecordEntry {
-  return {
-    id: row.id,
-    seq: row.seq,
-    dimension: row.dimension,
-    period: row.period,
-    path: row.path,
-    itemKey: row.itemKey,
-    valueJson: row.valueJson,
-    affirmedEmpty: row.affirmedEmpty,
-  }
-}
-
-function canonicalize(
-  canonicalizer: ((path: string, raw: string) => RecordOutcome<string>) | undefined,
-  path: string,
-  raw: string,
-  column: string,
-): RecordOutcome<string> {
-  if (!canonicalizer) return recordOk(raw)
-  const result = canonicalizer(path, raw)
-  if (!result.succeeded) return recordFail('invalid-input', `write: '${path}' ${column} — ${result.error}`)
-  return result
-}
-
-function firstRow(rows: unknown): RecordEntryRow | undefined {
-  return Array.isArray(rows) ? (rows[0] as RecordEntryRow | undefined) : undefined
-}
-
-/**
- * Pick the driver's atomic primitive. `batch` first and unconditionally: on D1
- * it is the ONLY one that works, and a D1 handle also exposes a `transaction`
- * method that does not give you a transaction.
- */
-export function resolveAtomicStrategy(db: RecordDatabase): RecordAtomicStrategy {
-  if (typeof db.batch === 'function') return 'batch'
-  if (typeof db.run === 'function') return 'begin-immediate'
-  throw new Error(
-    'createRecordStore: the injected driver exposes neither batch() nor run() — an atomic supersede is impossible on it',
-  )
-}
-
-interface GuardedPairResult {
-  /** True when the guarded statement matched exactly one row. */
-  guardMatched: boolean
-  /** True when the dependent statement matched at least one row. */
-  mainMatched: boolean
-  /** True when a failed precondition left NOTHING written. */
-  rolledBack: boolean
-  /** Rows the second statement returned. */
-  mainRows: unknown[]
-}
-
-/**
- * Run a guarded statement and its dependent statement as one atomic unit.
- *
- * BOTH statements' row counts are reported, and both matter. With only the
- * guard's checked, the destructive half of a supersede can commit alone — the
- * outgoing head stamped `superseded_by_id` while the dependent accept matches
- * zero rows, leaving the record with no live head at all.
- *
- * `batch` (D1, libsql) commits both or neither and cannot inspect the first
- * statement before the second runs — the guard has to carry the dependent
- * statement's precondition itself (see `markHeadStatement`), and the row counts
- * read afterwards say which precondition failed. `begin-immediate`
- * (better-sqlite3 and any driver without `batch`) can do better: it inspects
- * each statement as it runs and rolls back on either mismatch, so the caller
- * retries from a fresh read with nothing written.
- */
-async function runGuardedPair(
-  db: RecordDatabase,
-  strategy: RecordAtomicStrategy,
-  guard: unknown,
-  main: unknown,
-): Promise<GuardedPairResult> {
-  if (strategy === 'batch') {
-    const batch = db.batch
-    if (typeof batch !== 'function') {
-      throw new Error('runGuardedPair: batch strategy resolved but the driver has no batch()')
+function createRecordReads(table: CreateRecordStoreOptions['table'], db: CreateRecordStoreOptions['db'], storePeriodScope: RecordPeriodScopeResolver) {
+  async function list(input: ListRecordEntriesInput): Promise<RecordOutcome<RecordEntryRow[]>> {
+    if (input.period !== undefined && !Number.isInteger(input.period)) {
+      return recordFail('invalid-input', `list: period must be an integer, got ${String(input.period)}`)
     }
-    const results = await batch.call(db, [guard, main] as [unknown, ...unknown[]])
-    const guardRows = results[0]
-    const mainRows = Array.isArray(results[1]) ? results[1] : []
-    return {
-      guardMatched: Array.isArray(guardRows) && guardRows.length === 1,
-      mainMatched: mainRows.length > 0,
-      rolledBack: false,
-      mainRows,
+    try {
+      const where = input.period === undefined
+        ? eq(table.scopeId, input.scopeId)
+        : and(eq(table.scopeId, input.scopeId), lte(table.period, input.period))
+      const rows = await db.select().from(table).where(where).orderBy(asc(table.seq))
+
+      const visible = rows.filter((row) => {
+        if (input.period !== undefined
+          && !recordEntryVisibleInPeriod(storePeriodScope(row.path), row.period, input.period)) return false
+        if (input.reviewState !== undefined) {
+          if (row.reviewState !== input.reviewState) return false
+        } else if (!input.includeRejected && row.reviewState === 'rejected') {
+          return false
+        }
+        if (!input.includeSuperseded && row.supersededById !== null) return false
+        return true
+      })
+      return recordOk(visible)
+    } catch (error) {
+      return recordFail('storage-failed', `list: ${errorMessage(error)}`)
     }
   }
 
-  await db.run(sql`begin immediate`)
-  try {
-    const guardRows = await (guard as Promise<unknown>)
-    if (!Array.isArray(guardRows) || guardRows.length !== 1) {
-      await db.run(sql`rollback`)
-      return { guardMatched: false, mainMatched: false, rolledBack: true, mainRows: [] }
+  /**
+   * The raw live-accepted query. `period <= N` is the only predicate SQL can
+   * express — whether an entry written at an earlier period is still TRUE at
+   * `N` is the period scope's call, and that resolver is per path, so it runs
+   * in JS over these rows.
+   */
+  async function loadHeads(scopeId: string, period: number): Promise<RecordEntryRow[]> {
+    return db
+      .select()
+      .from(table)
+      .where(and(
+        eq(table.scopeId, scopeId),
+        eq(table.reviewState, 'accepted'),
+        isNull(table.supersededById),
+        lte(table.period, period),
+      ))
+      .orderBy(asc(table.seq))
+  }
+
+  async function heads(input: ReadRecordHeadsInput): Promise<RecordOutcome<RecordEntryRow[]>> {
+    const period = input.period ?? RECORD_PERIOD_SENTINEL
+    if (!Number.isInteger(period)) {
+      return recordFail('invalid-input', `heads: period must be an integer, got ${String(period)}`)
     }
-    const mainRows = await (main as Promise<unknown>)
-    if (!Array.isArray(mainRows) || mainRows.length === 0) {
-      await db.run(sql`rollback`)
-      return { guardMatched: true, mainMatched: false, rolledBack: true, mainRows: [] }
+    try {
+      const rows = await loadHeads(input.scopeId, period)
+      // The same visibility rule `list` applies. Without it an `exact`-scoped
+      // entry written at an earlier period reads as live at a later one, and
+      // the two published reads answer the same question differently.
+      return recordOk(rows.filter((row) => recordEntryVisibleInPeriod(storePeriodScope(row.path), row.period, period)))
+    } catch (error) {
+      return recordFail('storage-failed', `heads: ${errorMessage(error)}`)
     }
-    await db.run(sql`commit`)
-    return { guardMatched: true, mainMatched: true, rolledBack: false, mainRows }
-  } catch (error) {
-    await rollbackQuietly(db)
-    throw error
   }
-}
 
-/** Roll back without masking the error that caused it. */
-async function rollbackQuietly(db: RecordDatabase): Promise<void> {
-  try {
-    await db.run(sql`rollback`)
-  } catch {
-    // The transaction is already gone; the original error is the one to report.
-  }
-}
+  async function materialize<T>(input: MaterializeRecordInput<T>): Promise<RecordOutcome<MaterializeRecordResult<T>>> {
+    const period = input.period ?? RECORD_PERIOD_SENTINEL
+    if (!Number.isInteger(period)) {
+      return recordFail('invalid-input', `materialize: period must be an integer, got ${String(period)}`)
+    }
+    // Deliberately the RAW rows, not `heads()`: the fold applies the caller's
+    // own `rules.periodScope` when it supplies one, so pre-filtering here with
+    // the store's resolver would drop entries those rules would have kept.
+    let loaded: RecordEntryRow[]
+    try {
+      loaded = await loadHeads(input.scopeId, period)
+    } catch (error) {
+      return recordFail('storage-failed', `materialize: ${errorMessage(error)}`)
+    }
 
-/** Flatten a driver error's cause chain into one readable message. */
-function errorMessage(error: unknown): string {
-  const parts: string[] = []
-  let cursor: unknown = error
-  for (let depth = 0; depth < 5 && cursor instanceof Error; depth++) {
-    parts.push(cursor.message)
-    cursor = cursor.cause
-  }
-  return parts.length > 0 ? parts.join(' — ') : String(error)
-}
+    const rules: RecordFoldRules<T> = input.rules.periodScope
+      ? input.rules
+      : { ...input.rules, periodScope: storePeriodScope }
+    const folded = foldRecordEntries(loaded.map(toFoldable), { rules, period })
+    if (!folded.succeeded) return folded
 
-/** Drizzle wraps driver errors ("Failed query: …") and keeps the SQLite error
- *  in the cause chain, so the whole chain is inspected. */
-function isUniqueViolation(error: unknown): boolean {
-  let cursor: unknown = error
-  for (let depth = 0; depth < 5 && cursor instanceof Error; depth++) {
-    if (cursor.message.includes('UNIQUE constraint failed')) return true
-    cursor = cursor.cause
+    const periodScope = rules.periodScope ?? storePeriodScope
+    try {
+      const proposed = await db
+        .select({ path: table.path, period: table.period, conflict: table.conflict })
+        .from(table)
+        .where(and(
+          eq(table.scopeId, input.scopeId),
+          eq(table.reviewState, 'proposed'),
+          lte(table.period, period),
+        ))
+      const visible = proposed.filter((row) => recordEntryVisibleInPeriod(periodScope(row.path), row.period, period))
+      return recordOk({
+        value: folded.value.value,
+        entryCount: folded.value.entryCount,
+        pendingProposed: visible.length,
+        conflicts: visible.filter((row) => row.conflict).length,
+      })
+    } catch (error) {
+      return recordFail('storage-failed', `materialize: ${errorMessage(error)}`)
+    }
   }
-  return false
+  return { list, heads, materialize }
 }

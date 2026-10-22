@@ -339,57 +339,7 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
   const now = options.now ?? (() => Date.now())
   const generateId = options.generateId ?? (() => crypto.randomUUID())
 
-  async function appendEvent(
-    mission: MissionRecord,
-    level: MissionAuditEvent['level'],
-    step: string,
-    message: string,
-    metadata: Record<string, unknown> = {},
-  ): Promise<void> {
-    await store.appendEvent({
-      missionId: mission.id,
-      workspaceId: mission.workspaceId,
-      level,
-      step,
-      message,
-      metadata,
-      at: now(),
-    })
-  }
-
-  // Guarded status transition: load → validate against the transition table →
-  // CAS-write guarded on the status we read → event. The loser of a racing
-  // transition gets a conflict instead of silently violating the machine.
-  async function transition(
-    id: string,
-    to: MissionStatus,
-    patch: Omit<MissionUpdatePatch, 'status'> = {},
-    eventMeta: Record<string, unknown> = {},
-  ): Promise<MissionOutcome<MissionRecord>> {
-    const mission = await store.load(id)
-    if (!mission) return rejected(`Mission ${id} not found`)
-
-    const from = mission.status
-    if (TERMINAL_STATUSES.has(from)) {
-      return rejected(`Mission ${id} is terminal (${from}); cannot transition to ${to}`)
-    }
-    // Same-status calls are a true no-op (resume-while-running, idempotent
-    // re-assert under at-least-once delivery): no patch re-apply, no phantom
-    // event, so an event row always denotes a real state change.
-    if (from === to) return { succeeded: true, value: mission }
-    if (!MISSION_TRANSITIONS[from].has(to)) {
-      return rejected(`Illegal mission transition ${from} -> ${to} for mission ${id}`)
-    }
-
-    const updated = await store.update(id, { status: from }, { status: to, ...patch })
-    if (!updated) return lostRace(id)
-    await appendEvent(updated, to === 'failed' ? 'error' : 'info', `mission.${to}`, `Mission ${from} -> ${to}`, {
-      from,
-      to,
-      ...eventMeta,
-    })
-    return { succeeded: true, value: updated }
-  }
+  const { appendEvent, transition } = createMissionTransitions(store, now)
 
   const createMission: MissionService['createMission'] = async (input) => {
     const seen = new Set<string>()
@@ -524,18 +474,7 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
     // over-spend protection `addCost` carried: an undercounted concurrent merge
     // surfaces as a lost race, never a clobber.
     const cost = patch.cost
-    const ledgerDelta = cost?.ledgerDelta
-    const base = mission.cost ?? { ...ZERO_LEDGER }
-    const nextCost: MissionCostLedger | undefined =
-      cost === undefined
-        ? undefined
-        : {
-            tokensIn: base.tokensIn + (ledgerDelta?.tokensIn ?? 0),
-            tokensOut: base.tokensOut + (ledgerDelta?.tokensOut ?? 0),
-            costUsd: base.costUsd + (ledgerDelta?.costUsd ?? cost.deltaUsd),
-            wallMs: base.wallMs + (ledgerDelta?.wallMs ?? 0),
-            llmCalls: base.llmCalls + (ledgerDelta?.llmCalls ?? 0),
-          }
+    const nextCost = cost === undefined ? undefined : addMissionLedger(mission.cost, cost.deltaUsd, cost.ledgerDelta)
 
     // The plan write is guarded on the status, plan, metadata, AND (when a cost
     // rides along) the ledger we read: a concurrent stop request (a metadata
@@ -607,14 +546,7 @@ export function createMissionService(options: MissionServiceOptions): MissionSer
     const mission = await store.load(id)
     if (!mission) return rejected(`Mission ${id} not found`)
 
-    const base = mission.cost ?? { ...ZERO_LEDGER }
-    const nextCost: MissionCostLedger = {
-      tokensIn: base.tokensIn + (ledgerDelta?.tokensIn ?? 0),
-      tokensOut: base.tokensOut + (ledgerDelta?.tokensOut ?? 0),
-      costUsd: base.costUsd + (ledgerDelta?.costUsd ?? deltaUsd),
-      wallMs: base.wallMs + (ledgerDelta?.wallMs ?? 0),
-      llmCalls: base.llmCalls + (ledgerDelta?.llmCalls ?? 0),
-    }
+    const nextCost = addMissionLedger(mission.cost, deltaUsd, ledgerDelta)
 
     // Guarded on the ledger we read: an undercounted spend is an over-spend
     // against the budget gate, so a concurrent merge must surface as a lost
@@ -735,5 +667,76 @@ export function createInMemoryMissionStore(): InMemoryMissionStore {
     put(record) {
       rows.set(record.id, structuredClone(record))
     },
+  }
+}
+
+function createMissionTransitions(store: MissionStorePort, now: () => number) {
+  async function appendEvent(
+    mission: MissionRecord,
+    level: MissionAuditEvent['level'],
+    step: string,
+    message: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<void> {
+    await store.appendEvent({
+      missionId: mission.id,
+      workspaceId: mission.workspaceId,
+      level,
+      step,
+      message,
+      metadata,
+      at: now(),
+    })
+  }
+
+  // Guarded status transition: load → validate against the transition table →
+  // CAS-write guarded on the status we read → event. The loser of a racing
+  // transition gets a conflict instead of silently violating the machine.
+  async function transition(
+    id: string,
+    to: MissionStatus,
+    patch: Omit<MissionUpdatePatch, 'status'> = {},
+    eventMeta: Record<string, unknown> = {},
+  ): Promise<MissionOutcome<MissionRecord>> {
+    const mission = await store.load(id)
+    if (!mission) return rejected(`Mission ${id} not found`)
+
+    const from = mission.status
+    if (TERMINAL_STATUSES.has(from)) {
+      return rejected(`Mission ${id} is terminal (${from}); cannot transition to ${to}`)
+    }
+    // Same-status calls are a true no-op (resume-while-running, idempotent
+    // re-assert under at-least-once delivery): no patch re-apply, no phantom
+    // event, so an event row always denotes a real state change.
+    if (from === to) return { succeeded: true, value: mission }
+    if (!MISSION_TRANSITIONS[from].has(to)) {
+      return rejected(`Illegal mission transition ${from} -> ${to} for mission ${id}`)
+    }
+
+    const updated = await store.update(id, { status: from }, { status: to, ...patch })
+    if (!updated) return lostRace(id)
+    await appendEvent(updated, to === 'failed' ? 'error' : 'info', `mission.${to}`, `Mission ${from} -> ${to}`, {
+      from,
+      to,
+      ...eventMeta,
+    })
+    return { succeeded: true, value: updated }
+  }
+  return { appendEvent, transition }
+}
+
+/** The step transition and independent spend update fold the same ledger deltas. */
+function addMissionLedger(
+  cost: MissionCostLedger | null,
+  deltaUsd: number,
+  ledgerDelta?: Partial<MissionCostLedger>,
+): MissionCostLedger {
+  const base = cost ?? ZERO_LEDGER
+  return {
+    tokensIn: base.tokensIn + (ledgerDelta?.tokensIn ?? 0),
+    tokensOut: base.tokensOut + (ledgerDelta?.tokensOut ?? 0),
+    costUsd: base.costUsd + (ledgerDelta?.costUsd ?? deltaUsd),
+    wallMs: base.wallMs + (ledgerDelta?.wallMs ?? 0),
+    llmCalls: base.llmCalls + (ledgerDelta?.llmCalls ?? 0),
   }
 }

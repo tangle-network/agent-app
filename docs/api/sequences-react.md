@@ -4,7 +4,7 @@
 
 Source: `src/sequences-react/index.ts`
 
-108 exports.
+106 exports.
 
 ### `addCaptionCommand`
 
@@ -27,7 +27,7 @@ interface AddCaptionInput
 `function` — Nearest candidate wins; ties keep the first candidate in `points` order (sorted by frame from `collectSnapPoints`, so the lower frame).
 
 ```ts
-(frame: number, points: SnapPoint[], opts: ApplySnapOptions) => SnapResult
+(frame: number, points: SnapPoint[], opts: ApplySnapOptions) => TimelineSnapResult
 ```
 
 ### `ApplySnapOptions`
@@ -46,22 +46,6 @@ interface ApplySnapOptions
 interface AudioBufferLike
 ```
 
-### `BrandMark`
-
-`function`
-
-```ts
-({ size, className }: BrandMarkProps) => Element
-```
-
-### `BrandMarkProps`
-
-`interface`
-
-```ts
-interface BrandMarkProps
-```
-
 ### `captionFontPx`
 
 `function` — Caption type scales with the rendered frame, floored so captions stay legible on small previews.
@@ -75,7 +59,7 @@ interface BrandMarkProps
 `function` — A move drag snaps whichever clip edge lands closest to a snap point: the start edge directly, or the end edge re-expressed as a start.
 
 ```ts
-(input: { candidateStartFrame: number; durationFrames: number; startSnap: SnapResult; endSnap: SnapResult; }) => { star…
+(input: { candidateStartFrame: number; durationFrames: number; startSnap: TimelineSnapResult; endSnap: TimelineSnapResu…
 ```
 
 ### `classifyMediaUrl`
@@ -83,7 +67,7 @@ interface BrandMarkProps
 `function` — Extension-based kind classification; 'unknown' defers to a HEAD content-type probe at draw time.
 
 ```ts
-(url: string) => "unknown" | "image" | "video"
+(url: string) => "image" | "unknown" | "video"
 ```
 
 ### `clipChipGeometry`
@@ -542,14 +526,6 @@ interface SnapIndicatorLineProps
 interface SnapPoint
 ```
 
-### `SnapResult`
-
-`interface` — Describe the result of snapping a point to a frame including success status and snapped point details
-
-```ts
-interface SnapResult
-```
-
 ### `splitClipCommand`
 
 `function` — Source mapping is 1:1 frames (no rate ramps in the model), so the tail's source in-point is the head's in-point advanced by the head duration.
@@ -700,6 +676,14 @@ interface TimelineSmallScreenGateProps
 
 ```ts
 interface TimelineSnapPoint
+```
+
+### `TimelineSnapResult`
+
+`interface` — Describe the result of snapping a point to a frame including success status and snapped point details
+
+```ts
+interface TimelineSnapResult
 ```
 
 ### `TimelineTrackRow`

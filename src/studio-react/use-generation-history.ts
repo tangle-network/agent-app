@@ -1,3 +1,4 @@
+import { useHistoryControls, loadHistoryPage } from '../web-react/history-controls'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { FetchGenerationsPage, GenerationPage, MediaTypeFilter } from '../studio/ports'
@@ -125,52 +126,22 @@ export function useGenerationHistory({
     lastOpRef.current = 'more'
     setPhase('loadingMore')
 
-    void (async () => {
-      try {
-        const page = await current.fetchPage({
+    void loadHistoryPage(
+      () => current.fetchPage({
           q: current.q.trim(),
           type: current.type,
           cursor,
           signal: controller.signal,
-        })
-        if (seq !== seqRef.current) return
-        setItems((previous) => mergeGenerationPages(previous, page.items))
-        setNextCursor(page.nextCursor ?? null)
-        setPhase('idle')
-      } catch {
-        if (controller.signal.aborted || seq !== seqRef.current) return
-        setPhase('error')
-      } finally {
-        if (seq === seqRef.current) loadingMoreRef.current = false
-      }
-    })()
+        }),
+      page => {
+      setItems((previous) => mergeGenerationPages(previous, page.items))
+      setNextCursor(page.nextCursor ?? null)
+      },
+      { controller, seq, seqRef, setPhase, onSettled: () => { loadingMoreRef.current = false } },
+    )
   }, [])
-
-  const retry = useCallback(() => {
-    if (lastOpRef.current === 'more') loadMore()
-    else setReloadKey((key) => key + 1)
-  }, [loadMore])
-
-  const reload = useCallback(() => {
-    setReloadKey((key) => key + 1)
-  }, [])
-
-  useEffect(
-    () => () => {
-      resetAbortRef.current?.abort()
-      loadMoreAbortRef.current?.abort()
-    },
-    [],
+  return useHistoryControls(
+    { items, nextCursor, phase, loadMore },
+    { lastOpRef, setReloadKey, resetAbortRef, loadMoreAbortRef },
   )
-
-  return {
-    items,
-    hasMore: nextCursor !== null,
-    isLoadingFirst: phase === 'loadingFirst',
-    isLoadingMore: phase === 'loadingMore',
-    isError: phase === 'error',
-    loadMore,
-    retry,
-    reload,
-  }
 }

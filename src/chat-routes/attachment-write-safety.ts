@@ -1,3 +1,4 @@
+import { redactErrorMessage } from '../redact'
 import type {
   AtomicAttachmentWriteResult,
   AttachmentWriteOwnership,
@@ -68,4 +69,23 @@ export function inspectAtomicAttachmentWriteResult(
     // A malformed or hostile adapter result is a storage failure.
   }
   return undefined
+}
+
+/** Sanitize adapter diagnostics and keep storage failures typed when the logger itself fails. */
+export function logAttachmentStorageError(
+  logger: { error(message: string, fields: Record<string, unknown>): void },
+  message: string,
+  fields: Record<string, unknown>,
+): void {
+  try {
+    const safeFields = Object.fromEntries(
+      Object.entries(fields).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? redactErrorMessage(value) : value,
+      ]),
+    )
+    logger.error(message, safeFields)
+  } catch {
+    // Logging must not turn a typed storage failure into a thrown response.
+  }
 }

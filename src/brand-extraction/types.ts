@@ -95,7 +95,7 @@ export type BrandExtractionResult =
 
 /** Fetch boundary, injectable so callers (Workers, Node, tests) supply their
  *  own fetch and so tests can run fully offline against fixture HTML. */
-export type FetchLike = (url: string, init?: { signal?: AbortSignal; headers?: Record<string, string> }) => Promise<{
+type FetchLike = (url: string, init?: { signal?: AbortSignal; headers?: Record<string, string> }) => Promise<{
   ok: boolean
   status: number
   text(): Promise<string>

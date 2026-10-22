@@ -281,8 +281,7 @@ const TERMINAL_NOTES = interactionTerminalNotes('question', {
   cancelled: 'The agent withdrew this question. Answer here to send it as a new message.',
   declined: 'You declined this question.',
 })
-
-export function InteractionQuestionCard({
+function useInteractionQuestionCardViewState({
   interaction,
   canWrite,
   submitAnswer,
@@ -482,8 +481,24 @@ export function InteractionQuestionCard({
   const missingHint = unanswered
     ? missingAnswerHint(unanswered, interaction.fields.length, lateAnswerable ? 'send' : 'submit')
     : null
+  return { className, kindLabel, answered, status, interaction, renderMarkdown, values, disabled,
+    toggleSelected, setFieldValue, error, terminalNote, showSubmitButton, showTimeoutNote, timeoutNote,
+    missingHint, showDeclineButton, decline, declining, submit, answerData, submitLabel,
+    lateAnswerSent, lateAnswerOutcome }
+}
 
-  return (
+type InteractionQuestionCardViewState = ReturnType<typeof useInteractionQuestionCardViewState>
+
+export function InteractionQuestionCard(props: InteractionQuestionCardProps) {
+  const view = useInteractionQuestionCardViewState(props)
+  return <InteractionQuestionCardView {...view} />
+}
+
+function InteractionQuestionCardView({ className, kindLabel, answered, status, interaction,
+  renderMarkdown, values, disabled, toggleSelected, setFieldValue, error, terminalNote,
+  showSubmitButton, showTimeoutNote, timeoutNote, missingHint, showDeclineButton, decline, declining,
+  submit, answerData, submitLabel, lateAnswerSent, lateAnswerOutcome }: InteractionQuestionCardViewState) {
+  return ((
     // The card LANDS. This is the moment the run stopped and handed the turn
     // back — a surface that blinks into place reads as chrome that was always
     // there, which is exactly the wrong reading for the one thing on screen
@@ -509,7 +524,52 @@ export function InteractionQuestionCard({
         ? <div className="mb-3 text-sm leading-5 text-muted-foreground">{renderMarkdown(interaction.body)}</div>
         : <p className="mb-3 text-sm leading-5 text-muted-foreground">{interaction.body}</p>)}
 
-      <div className="space-y-4">
+      <InteractionQuestionFields interaction={interaction} values={values} disabled={disabled}
+        toggleSelected={toggleSelected} answered={answered} setFieldValue={setFieldValue} />
+
+      {/* Announced, not just shown: a submit that failed is the one thing on this
+          card that changes without the reader having moved focus. */}
+      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {terminalNote && <p className="mt-3 text-sm text-muted-foreground">{terminalNote}</p>}
+
+      {(showSubmitButton || showTimeoutNote) && (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+          {showTimeoutNote && (
+            <div className="mr-auto text-sm text-muted-foreground">{timeoutNote}</div>
+          )}
+          {missingHint && <span aria-live="polite" className="text-sm text-muted-foreground">{missingHint}</span>}
+          {showDeclineButton && (
+            <InteractionActionButton variant="outline" onClick={() => void decline()} disabled={disabled}>
+              {declining ? 'Declining…' : 'Decline'}
+            </InteractionActionButton>
+          )}
+          {showSubmitButton && (
+            <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>
+              {submitLabel}
+            </InteractionActionButton>
+          )}
+        </div>
+      )}
+      {answered && (
+        <div className="mt-4 flex items-center justify-end">
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><CheckGlyph className="h-3 w-3" />Answered</span>
+        </div>
+      )}
+      {lateAnswerSent && (
+        <div className="mt-4 flex items-center justify-end">
+          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+            <CheckGlyph className="h-3 w-3" />
+            {lateAnswerOutcome === 'queued' ? 'Queued. It sends when the agent finishes.' : 'Sent as new message'}
+          </span>
+        </div>
+      )}
+    </div>
+  ))
+}
+
+function InteractionQuestionFields({ interaction, values, disabled, toggleSelected, answered,
+  setFieldValue }: Pick<InteractionQuestionCardViewState, "interaction" | "values" | "disabled" | "toggleSelected" | "answered" | "setFieldValue">) {
+  return (<div className="space-y-4">
         {interaction.fields.map((field) => {
           const value = values[field.name] ?? {}
           const select = selectField(field)
@@ -593,44 +653,5 @@ export function InteractionQuestionCard({
             </fieldset>
           )
         })}
-      </div>
-
-      {/* Announced, not just shown: a submit that failed is the one thing on this
-          card that changes without the reader having moved focus. */}
-      {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-      {terminalNote && <p className="mt-3 text-sm text-muted-foreground">{terminalNote}</p>}
-
-      {(showSubmitButton || showTimeoutNote) && (
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-          {showTimeoutNote && (
-            <div className="mr-auto text-sm text-muted-foreground">{timeoutNote}</div>
-          )}
-          {missingHint && <span aria-live="polite" className="text-sm text-muted-foreground">{missingHint}</span>}
-          {showDeclineButton && (
-            <InteractionActionButton variant="outline" onClick={() => void decline()} disabled={disabled}>
-              {declining ? 'Declining…' : 'Decline'}
-            </InteractionActionButton>
-          )}
-          {showSubmitButton && (
-            <InteractionActionButton onClick={() => void submit()} disabled={disabled || !answerData}>
-              {submitLabel}
-            </InteractionActionButton>
-          )}
-        </div>
-      )}
-      {answered && (
-        <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground"><CheckGlyph className="h-3 w-3" />Answered</span>
-        </div>
-      )}
-      {lateAnswerSent && (
-        <div className="mt-4 flex items-center justify-end">
-          <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-            <CheckGlyph className="h-3 w-3" />
-            {lateAnswerOutcome === 'queued' ? 'Queued. It sends when the agent finishes.' : 'Sent as new message'}
-          </span>
-        </div>
-      )}
-    </div>
-  )
+      </div>)
 }

@@ -17,6 +17,7 @@
  */
 
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { sequenceMetaFromRow } from './row-mapping'
 import type { BaseSQLiteDatabase, SQLiteUpdateSetSource } from 'drizzle-orm/sqlite-core'
 import {
   MIN_SEQUENCE_CLIP_FRAMES,
@@ -113,7 +114,7 @@ export function createDrizzleSequenceStore(options: CreateDrizzleSequenceStoreOp
       ])
       const media = resolveMedia ? await resolveMedia(clipRows) : undefined
       return {
-        sequence: mapSequence(sequenceRow),
+        sequence: sequenceMetaFromRow(sequenceRow),
         tracks: trackRows.map(mapTrack),
         clips: clipRows.map((row) => mapClip(row, media?.get(row.id))),
       }
@@ -229,7 +230,7 @@ export function createDrizzleSequenceStore(options: CreateDrizzleSequenceStoreOp
         .where(sequenceScope())
         .returning()
       if (!row) throw new Error(`Sequence ${scope.sequenceId} not found in workspace ${scope.workspaceId}`)
-      return mapSequence(row)
+      return sequenceMetaFromRow(row)
     },
 
     async recordDecision(input: NewSequenceDecision): Promise<SequenceDecision> {
@@ -293,20 +294,6 @@ export function createDrizzleSequenceStore(options: CreateDrizzleSequenceStoreOp
 // representation conversion, not an error-hiding fallback. Nullable text
 // columns map to the model's optional (`undefined`) fields the same way.
 // ---------------------------------------------------------------------------
-
-function mapSequence(row: SequenceRow): SequenceMeta {
-  return {
-    id: row.id,
-    title: row.title,
-    fps: row.fps,
-    width: row.width,
-    height: row.height,
-    aspectRatio: row.aspectRatio,
-    durationFrames: row.durationFrames,
-    status: row.status,
-    metadata: row.metadata ?? {},
-  }
-}
 
 function mapTrack(row: SequenceTrackRow): SequenceTrack {
   return {

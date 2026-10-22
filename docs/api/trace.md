@@ -4,7 +4,7 @@
 
 Source: `src/trace/index.ts`
 
-20 exports.
+13 exports.
 
 ### `buildFlowTrace`
 
@@ -20,14 +20,6 @@ Source: `src/trace/index.ts`
 
 ```ts
 (parent: MissionTraceContext | StepSpanContext, seed?: string | undefined) => StepSpanContext
-```
-
-### `composeMissionFlowTrace`
-
-`function` — Compose a mission-wide FlowTrace: one 'pipeline' span per step, the step's delegated runs ('tool' spans, from `activity[stepId]`) beneath it.
-
-```ts
-(input: { steps: MissionFlowStep[]; activity?: Record<string, StepAgentActivity[]> | undefined; startedAt?: number | un…
 ```
 
 ### `createMissionTraceContext`
@@ -46,14 +38,6 @@ Source: `src/trace/index.ts`
 (activity: StepAgentActivity[], turnStartMs: number, opts?: { nowMs?: number | undefined; } | undefined) => FlowSpan[]
 ```
 
-### `DistributionSummary`
-
-`interface` — Summarize key statistics of a numerical distribution including count, min, percentiles, and max
-
-```ts
-interface DistributionSummary
-```
-
 ### `FlowSpan`
 
 `interface` — The shared FlowSpan / FlowTrace data shapes — the LEAF both the trace barrel (`./index`, which builds + renders them) and the delegation converters (`./mission-flow`, which emit them) import, so neit…
@@ -70,44 +54,12 @@ interface FlowSpan
 interface FlowTrace
 ```
 
-### `LoopTraceEventLike`
-
-`interface` — Structural mirror of agent-runtime's `LoopTraceEvent` — same fields, no import, so journals parsed from JSON feed straight in.
-
-```ts
-interface LoopTraceEventLike
-```
-
-### `loopTraceEventsToFlowSpans`
-
-`function` — Reconstruct one delegation's loop → round → iteration tree from its journaled LoopTraceEvents, as FlowSpans relative to `loop.started` (or the first event).
-
-```ts
-(events: LoopTraceEventLike[]) => FlowSpan[]
-```
-
-### `MissionFlowStep`
-
-`interface` — Define a step in a mission flow with id, intent, optional status, start time, and duration
-
-```ts
-interface MissionFlowStep
-```
-
 ### `MissionTraceContext`
 
 `interface` — Mission trace context — mint + thread the trace ids that join a mission's step attempts and its delegated agent runs into ONE trace tree.
 
 ```ts
 interface MissionTraceContext
-```
-
-### `renderHistogram`
-
-`function` — ASCII histogram for multi-run samples (eval latencies, costs, scores).
-
-```ts
-(values: number[], opts?: { buckets?: number | undefined; width?: number | undefined; unit?: string | undefined; format…
 ```
 
 ### `renderWaterfall`
@@ -132,14 +84,6 @@ interface MissionTraceContext
 
 ```ts
 interface StepSpanContext
-```
-
-### `summarize`
-
-`function` — Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max
-
-```ts
-(values: number[]) => DistributionSummary
 ```
 
 ### `TimedEvent`

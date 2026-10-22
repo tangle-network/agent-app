@@ -1,4 +1,5 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { ChatMessageValues } from '../chat-store/core'
 import type { ChatTurnPrefetch, ChatTurnPrefetchIdentity } from './turn-prefetch'
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime/durable'
 import type { ChatMessagePart } from '../chat-store/parts'
@@ -33,45 +34,18 @@ export interface ChatTurnMessageStore {
     content: string
     parts?: ChatMessagePart[] | null
   }>>
-  appendMessage(input: {
+  appendMessage(input: ChatMessageValues & {
     /** Caller-assigned row id. Honored by `/chat-store`'s `createChatStore`;
      *  a product store free to ignore it (the writer then adopts whatever id
      *  the insert returns). Set only by incremental persistence. */
     id?: string
     threadId: string
     role: 'user' | 'assistant'
-    content: string
-    parts?: ChatMessagePart[]
-    model?: string | null
-    requestedModel?: string | null
-    servedModel?: string | null
-    servedProvider?: string | null
-    servedSource?: string | null
-    inputTokens?: number | null
-    outputTokens?: number | null
-    reasoningTokens?: number | null
-    cacheReadTokens?: number | null
-    cacheWriteTokens?: number | null
-    costUsd?: number | null
   }): Promise<unknown>
   /** Patch an existing row. Its PRESENCE is what enables incremental assistant
    *  persistence — a store without it keeps today's exact single-write-on-
    *  completion behavior, which is what makes this additive. */
-  updateMessage?(id: string, patch: {
-    content?: string
-    parts?: ChatMessagePart[]
-    model?: string | null
-    requestedModel?: string | null
-    servedModel?: string | null
-    servedProvider?: string | null
-    servedSource?: string | null
-    inputTokens?: number | null
-    outputTokens?: number | null
-    reasoningTokens?: number | null
-    cacheReadTokens?: number | null
-    cacheWriteTokens?: number | null
-    costUsd?: number | null
-  }): Promise<unknown>
+  updateMessage?(id: string, patch: Partial<ChatMessageValues>): Promise<unknown>
   /** Remove a row. Used to retract a draft assistant row for a turn that ended
    *  producing nothing, so the empty-turn case still leaves no row at all. */
   deleteMessage?(id: string): Promise<unknown>

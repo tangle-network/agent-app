@@ -69,3 +69,15 @@ Media is outside the package `files` allowlist (`dist`, `bin`, `.claude/skills`)
 and manifest above retain their original de38/UI11.37 identity. Their full-page
 screenshot recording artifact leaves motion appearance unqualified; functional
 and scoped geometry observations remain as recorded.
+
+
+## Retained historical source
+
+The capture and gate snapshots for this completed proof are plain-text source artifacts. They are historical evidence, not maintained executable entrypoints. Original manifests and recordings are unchanged. [The source artifact map](source-artifacts.json) records each former path, its retained text path, byte count and original SHA-256.
+
+- [capture.mjs.txt](capture.mjs.txt)
+- [capture-after.sh.txt](capture-after.sh.txt)
+- [dismiss-ui-11.38.1/capture-used.mjs.txt](dismiss-ui-11.38.1/capture-used.mjs.txt)
+- [dismiss-ui-11.38.1/gate-used.sh.txt](dismiss-ui-11.38.1/gate-used.sh.txt)
+- [dismiss-ui-11.38.1/failed-before-brand-presence/capture-used.mjs.txt](dismiss-ui-11.38.1/failed-before-brand-presence/capture-used.mjs.txt)
+- [dismiss-ui-11.38.1/failed-before-brand-presence/gate-used.sh.txt](dismiss-ui-11.38.1/failed-before-brand-presence/gate-used.sh.txt)

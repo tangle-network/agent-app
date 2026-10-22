@@ -59,7 +59,7 @@ import { createTurnTrace, type TurnTrace, type TurnTraceSink } from '../turn-tra
 import { createIntelligenceTurnTraceSink } from '../turn-trace/otel'
 import { storeSupportsDraftPersistence, type AssistantDraftStore, type DraftPersistenceTuning } from './draft-persistence'
 import { startTurnPrefetch } from './turn-prefetch'
-import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgress } from './turn-admission'
+import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgressCallback } from './turn-admission'
 import { createAdmittedTurnRunner, type AfterAuthorizeWork } from './turn-execution'
 import {
   INTENT_LINE_TIMEOUT_MS,
@@ -250,7 +250,7 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
       }
     }
     const writeEvent = (event: ChatRouteEvent): Promise<void> => write(encoder.encode(`${JSON.stringify(event)}\n`))
-    const progress: TurnProgress = (phase, message) => {
+    const progress: TurnProgressCallback = (phase, message) => {
       void writeEvent(buildTurnPhaseEvent(phase, message, { sinceRequestMs: Date.now() - receivedAt }))
     }
     progress('accepted', progressMessages.accepted)
@@ -346,7 +346,7 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
     request: Request,
     ctx: ChatTurnRequestContext | undefined,
     admitted: AdmittedTurn<TContext>,
-    progress?: TurnProgress,
+    progress?: TurnProgressCallback,
     startedIntent?: Promise<string | null>,
   ): Promise<Response> {
     const early = startAfterAuthorize(request, admitted)

@@ -16,7 +16,7 @@ export type ProfileAuthorKind = 'person' | 'agent' | 'optimizer'
 export type ProfileRevisionState = 'active' | 'candidate' | 'pending-consent'
 
 /** The decision table used by every write path; products may narrow access, never widen it. */
-export const PROFILE_CHANGE_POLICY = {
+const PROFILE_CHANGE_POLICY = {
   textEdit: { admission: 'automatic', conversation: 'same', destructive: false },
   sameAuthoritySwitch: { admission: 'prepare-then-flip', conversation: 'same', destructive: false },
   differentAuthoritySwitch: { admission: 'prepare-then-flip', conversation: 'same', destructive: false },
@@ -84,11 +84,6 @@ export interface ProfileKnowledgeEvent {
   createdAt: number
 }
 
-export interface ProfileKnowledgeDocument {
-  documentId: string
-  content: string
-  addEventId: string
-}
 
 export interface ProfileSwitchReceipt {
   key: ProfileBindingKey
@@ -169,63 +164,6 @@ export function profileAuthority(profile: AgentProfile): AgentProfile {
 
 export function profileAuthorityDigest(profile: AgentProfile): string {
   return canonicalAgentProfileDigest(profileAuthority(snapshotAgentProfile(profile)))
-}
-
-export function projectKnowledgeDocuments(events: readonly ProfileKnowledgeEvent[]): ProfileKnowledgeDocument[] {
-  const removed = new Set(events.filter(event => event.kind === 'remove').flatMap(event => event.observedAddIds))
-  const visible = events.filter(event => event.kind === 'add' && !removed.has(event.id))
-  const latest = new Map<string, ProfileKnowledgeEvent>()
-  for (const event of visible) {
-    const prior = latest.get(event.documentId)
-    if (!prior || event.createdAt > prior.createdAt ||
-        (event.createdAt === prior.createdAt && event.id > prior.id)) latest.set(event.documentId, event)
-  }
-  return [...latest.values()].sort((a, b) => a.documentId.localeCompare(b.documentId))
-    .map(event => ({ documentId: event.documentId, content: event.content!, addEventId: event.id }))
-}
-
-export async function addProfileKnowledgeDocument(input: {
-  store: ProfileRevisionStore
-  workspaceId: string
-  profileId: string
-  documentId: string
-  content: string
-  actorRole: 'owner' | 'manager' | 'member' | 'viewer'
-  id?: string
-  now?: number
-}): Promise<ProfileKnowledgeEvent> {
-  if (input.actorRole !== 'owner' && input.actorRole !== 'manager') {
-    throw new ProfileAccessError('Profile management is required')
-  }
-  if (!input.documentId || !input.content) throw new TypeError('A knowledge document needs an id and content')
-  const event: ProfileKnowledgeEvent = { id: input.id ?? crypto.randomUUID(),
-    workspaceId: input.workspaceId, profileId: input.profileId, documentId: input.documentId,
-    kind: 'add', content: input.content, observedAddIds: [], createdAt: input.now ?? Date.now() }
-  await input.store.appendKnowledgeEvent(event)
-  return event
-}
-
-export async function removeProfileKnowledgeDocument(input: {
-  store: ProfileRevisionStore
-  workspaceId: string
-  profileId: string
-  documentId: string
-  actorRole: 'owner' | 'manager' | 'member' | 'viewer'
-  id?: string
-  now?: number
-}): Promise<ProfileKnowledgeEvent> {
-  if (input.actorRole !== 'owner' && input.actorRole !== 'manager') {
-    throw new ProfileAccessError('Profile management is required')
-  }
-  const events = await input.store.listKnowledgeEvents(input.workspaceId, input.profileId)
-  const removed = new Set(events.filter(event => event.kind === 'remove').flatMap(event => event.observedAddIds))
-  const observedAddIds = events.filter(event => event.kind === 'add' &&
-    event.documentId === input.documentId && !removed.has(event.id)).map(event => event.id)
-  const event: ProfileKnowledgeEvent = { id: input.id ?? crypto.randomUUID(),
-    workspaceId: input.workspaceId, profileId: input.profileId, documentId: input.documentId,
-    kind: 'remove', content: null, observedAddIds, createdAt: input.now ?? Date.now() }
-  await input.store.appendKnowledgeEvent(event)
-  return event
 }
 
 /** The per-turn text overlay is validated without admitting tools, model, MCP or resources. */
@@ -382,7 +320,7 @@ export async function promoteRevision(input: {
 }
 
 /** A source identity joins the command hash without entering the receipt row. */
-export function profileSwitchInputHashFromContentHash(contentHash: string,
+function profileSwitchInputHashFromContentHash(contentHash: string,
   identityContext?: string): string {
   return identityContext === undefined ? contentHash
     : sha256Utf8(JSON.stringify([identityContext, contentHash]))
@@ -491,56 +429,6 @@ export async function handleProfileSwitchText(
     authorityDigest: null, planDigest: null, conflicts: [],
     message: 'Send only “Switch to [agent name]” to change agents.' },
   binding?.version ?? 0)
-}
-
-/** One-step rollback moves this member/channel to its previous immutable revision. */
-export async function rollbackProfileBinding(input: {
-  store: ProfileRevisionStore
-  key: ProfileBindingKey
-  messageId: string
-  conversationId?: string
-  actorRole: 'owner' | 'manager' | 'member' | 'viewer'
-  canSelect: (profileId: string) => Promise<boolean>
-  prepareAuthority: SwitchProfileInput['prepareAuthority']
-}): Promise<ProfileSwitchReceipt> {
-  if (input.actorRole !== 'owner' && input.actorRole !== 'manager') {
-    throw new ProfileAccessError('Only an owner or manager can roll back a profile')
-  }
-  const inputHash = sha256Utf8(`rollback:${input.messageId}`)
-  const prior = await input.store.getSwitchReceipt(input.key, input.messageId, inputHash)
-  if (prior) return prior
-  const binding = await input.store.getBinding(input.key)
-  if (!binding || !await input.canSelect(binding.profileId)) throw new ProfileAccessError('Profile is unavailable')
-  const current = binding.pinnedRevisionId
-    ? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
-    : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
-  if (!current?.parentId) throw new ProfileConflictError('The bound profile has no previous revision')
-  const parent = await input.store.getRevision(input.key.workspaceId, binding.profileId, current.parentId)
-  if (!parent) throw new ProfileConflictError('The previous revision is unavailable')
-  let planDigest = binding.planDigest
-  let conflicts: string[] = []
-  if (binding.authorityDigest !== parent.authorityDigest || binding.planDigest !== parent.planDigest) {
-    try {
-      const prepared = await input.prepareAuthority(parent, input.key)
-      if (!prepared.healthy || prepared.planDigest !== parent.planDigest) {
-        throw new ProfileConflictError('The prior managed plan was not prepared')
-      }
-      planDigest = prepared.planDigest
-      conflicts = prepared.conflicts
-    } catch {
-      return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
-        conversationId: input.conversationId,
-        profileId: null, revisionId: null, pinnedRevisionId: null, outcome: 'refused',
-        authorityDigest: null, planDigest: null, conflicts: [],
-        message: 'Could not prepare the previous profile; your current agent is unchanged.' },
-      binding.version)
-    }
-  }
-  return input.store.recordSwitch({ key: input.key, messageId: input.messageId, inputHash,
-    conversationId: input.conversationId,
-    profileId: parent.profileId, revisionId: parent.id, pinnedRevisionId: parent.id,
-    authorityDigest: parent.authorityDigest, planDigest, outcome: 'switched', conflicts,
-    message: `Now talking to ${parent.profile.name ?? 'this profile'}` }, binding.version)
 }
 
 /**
@@ -657,7 +545,7 @@ const textChangeSchema = z.object({
 const updateToolSchema = z.object({ expectedRevisionId: z.string().min(1), changes: textChangeSchema }).strict()
 const rememberToolSchema = z.object({ fact: z.string().trim().min(1).max(1000) }).strict()
 
-export function profileTextChange(revision: ProfileRevision, changes: z.infer<typeof textChangeSchema>): {
+function profileTextChange(revision: ProfileRevision, changes: z.infer<typeof textChangeSchema>): {
   profile: AgentProfile; knowledgeText: string
 } {
   const profile = structuredClone(revision.profile)

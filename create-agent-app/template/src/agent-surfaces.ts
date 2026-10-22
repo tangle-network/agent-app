@@ -1,7 +1,7 @@
 import { createAgentSurfaceHandler, renderAgentSetupSkill, type AgentSurfaceConfig } from '@tangle-network/agent-app/agent-surfaces'
 
 /** The headless skeleton must not advertise customer readiness before auth exists. */
-export function agentSurfaces(origin: string) {
+export function headlessAgentSurfaces(origin: string) {
   const product: AgentSurfaceConfig = {
     id: '__PACKAGE_NAME__', name: '__PROJECT_NAME__', origin,
     summary: 'A headless tool-loop development skeleton. External-agent operation is disabled until the product installs trusted authentication and workspace authorization.',

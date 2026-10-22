@@ -66,7 +66,7 @@ function positiveInt(raw: string, flag: string): number {
   return value
 }
 
-export function parseArgs(argv: readonly string[]): ParsedArgs {
+function parseArgs(argv: readonly string[]): ParsedArgs {
   const parsed: {
     repoDir?: string
     configPath?: string

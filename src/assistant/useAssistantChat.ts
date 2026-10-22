@@ -231,12 +231,162 @@ export function useAssistantChat(
   }, []);
 
   const startChatStream = useCallback(
-    (
-      text: string,
-      deliveryMode: AssistantDeliveryMode | undefined,
-      model: string | undefined,
-      threadId: string | undefined,
-    ) => {
+    (text: string, deliveryMode: AssistantDeliveryMode | undefined, model: string | undefined,
+      threadId: string | undefined) => startAssistantChatStream(text, deliveryMode, model, threadId,
+      { dispatch, streamSeqRef, abortRef, sendingRef, clientRef, contextRef }),
+    [],
+  );
+
+  // When the signed-in user changes under a mounted panel (auth refresh, or a
+  // mount before auth resolved), invalidate the in-flight stream, abort it, and
+  // reload that user's own thread. Without this, the prior user's transcript
+  // would persist under the new user's key — a cross-account leak.
+  useEffect(() => hydrateAssistantChatOwner({ hydratedUserRef, userId, streamSeqRef, confirmSeqRef,
+    abortActiveStream, clearPendingQueuedSend, historyAbortRef, setRestoringBoth, sendingRef,
+    confirmingRef, setConfirmingIds, selectedModelRef, setSelectedModel, dispatch }), [userId,
+    abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
+
+  useEffect(() => {
+    const pending = pendingQueuedSendRef.current;
+    if (!pending || state.status === "streaming") return;
+    pendingQueuedSendRef.current = null;
+    if (
+      pending.ownerId !== userIdRef.current ||
+      state.pendingProposals.length > 0
+    ) {
+      return;
+    }
+    startChatStream(
+      pending.text,
+      "queue",
+      pending.model,
+      state.threadId ?? undefined,
+    );
+  }, [state.status, state.pendingProposals.length, startChatStream]);
+
+  // Restore the visible transcript for the persisted thread from the server,
+  // keyed by user (runs on mount and whenever the signed-in user changes). The
+  // transcript is never cached client-side — it can carry workflow YAML or
+  // pasted secrets, and localStorage survives logout — so a reload starts blank
+  // and the prior conversation is rehydrated here from the durable thread.
+  // The reducer applies it only if the conversation is still idle/empty for this
+  // exact owner+thread, so a late response can never clobber a started turn, a
+  // new chat, or a switched account.
+  useEffect(() => {
+    const threadId = loadThread(userId).threadId;
+    if (!userId || !threadId) return;
+    const ac = new AbortController();
+    historyAbortRef.current?.abort();
+    historyAbortRef.current = ac;
+    restoreAssistantThreadHistory(clientRef.current, userId, threadId, ac, dispatch);
+    return () => ac.abort();
+  }, [userId]);
+
+  // Persist thread id + transcript whenever the conversation settles, under the
+  // owner carried in state. Because `state.ownerId` and the data it labels move
+  // together (set atomically by the reducer), a write can never land under a
+  // different user's key. Skipped while streaming: `state.messages` gets a fresh
+  // reference on every delta, so persisting per-delta would hammer localStorage;
+  // the turn is saved once it settles (status leaves "streaming").
+  useEffect(() => persistAssistantChatSelection({ state, userIdRef, selectedModelRef }), [state.ownerId, state.threadId, state.status]);
+
+  // Abort any in-flight stream on unmount so a closed panel stops billing.
+  useEffect(() => {
+    return () => {
+      abortActiveStream();
+      clearPendingQueuedSend();
+    };
+  }, [abortActiveStream, clearPendingQueuedSend]);
+
+  const send = useCallback((message: string,
+    options?: AssistantSendOptions) => sendAssistantChatMessage(message, options, { sendingRef,
+    pendingQueuedSendRef, stateRef, userIdRef, restoringRef, selectedModelRef, startChatStream }), [startChatStream]);
+
+  const stop = useCallback(() => {
+    streamSeqRef.current += 1;
+    abortActiveStream();
+    clearPendingQueuedSend();
+    sendingRef.current = false;
+    dispatch({ type: "stopped" });
+  }, [abortActiveStream, clearPendingQueuedSend]);
+
+  const confirm = useCallback((proposal: PendingProposal) => confirmAssistantChatProposal(proposal,
+    { dispatch, confirmingRef, setConfirmingIds, confirmSeqRef, clientRef, onWorkflowMutationRef }), []);
+
+  const cancel = useCallback((proposal: PendingProposal) => cancelAssistantChatProposal(proposal, { confirmingRef, dispatch }), []);
+
+  const connectRequirement = useCallback(
+    (proposal: PendingProposal,
+      requirement: ConnectionRequirement) => connectAssistantChatRequirement(proposal, requirement,
+      { onConnectRequirementRef, confirmSeqRef, dispatch }),
+    [],
+  );
+
+  const reset = useCallback(() => resetAssistantChat({ streamSeqRef, confirmSeqRef,
+    abortActiveStream, clearPendingQueuedSend, historyAbortRef, setRestoringBoth, sendingRef,
+    confirmingRef, setConfirmingIds, dispatch }), [abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
+
+  // Open a past thread from the history switcher: invalidate any in-flight
+  // stream/confirmation (so their late events can't land in the switched-to
+  // conversation), pin the chosen thread, persist it, then load its transcript.
+  // Guarded by owner so a stale render can't switch under a different account.
+  const switchThread = useCallback(
+    (threadId: string) => switchAssistantChatThread(threadId, { stateRef, userIdRef, streamSeqRef,
+      confirmSeqRef, abortActiveStream, clearPendingQueuedSend, sendingRef, confirmingRef,
+      setConfirmingIds, dispatch, setRestoringBoth, selectedModelRef, historyAbortRef, clientRef }),
+    [abortActiveStream, clearPendingQueuedSend, setRestoringBoth],
+  );
+
+  // Choose the model for subsequent turns. The model preference is per user, not
+  // per turn, so persist it immediately (alongside the current thread id) rather
+  // than waiting for a turn to settle.
+  const setModel = useCallback((model: string | null) => selectAssistantChatModel(model, { selectedModelRef, setSelectedModel, userIdRef, stateRef }), []);
+
+  // Reactive recovery: if a turn is rejected because the selected model is no
+  // longer offered (e.g. ASSISTANT_MODELS was changed and a stale slug was still
+  // persisted), clear the selection so the NEXT send falls back to the server
+  // default instead of failing again. The picker also reconciles proactively
+  // once the model list loads; this closes the window where a send races that
+  // load. Guarded by owner so a late error from a prior user can't act here.
+  useEffect(() => {
+    if (
+      state.error?.code === "MODEL_NOT_ALLOWED" &&
+      state.ownerId === userIdRef.current &&
+      selectedModelRef.current !== null
+    ) {
+      setModel(null);
+    }
+  }, [state.error, state.ownerId, setModel]);
+
+  // Expose only state that belongs to the current user: between an auth change
+  // and the hydrate effect that follows it, the raw state still holds the prior
+  // user's conversation, which must never render. Operations (send/confirm) read
+  // the raw state via `stateRef`, so they still act on the true thread.
+  const visibleState = selectVisibleState(state, userId);
+  return {
+    state: visibleState,
+    confirmingIds,
+    selectedModel,
+    setModel,
+    send,
+    stop,
+    confirm,
+    cancel,
+    canConnectRequirement: Boolean(options?.onConnectRequirement),
+    connectRequirement,
+    reset,
+    switchThread,
+    restoring,
+  };
+}
+
+
+function startAssistantChatStream(text: string, deliveryMode: AssistantDeliveryMode | undefined,
+  model: string | undefined, threadId: string | undefined, { dispatch, streamSeqRef, abortRef,
+  sendingRef, clientRef,
+  contextRef }: { dispatch: (action: Parameters<typeof assistantReducer>[1]) => void;
+  streamSeqRef: { current: number }; abortRef: { current: AbortController | null };
+  sendingRef: { current: boolean }; clientRef: { current: ReturnType<typeof useAssistantClient> }; contextRef: { current: AssistantPageContext | null } }) {
       dispatch({
         type: "send",
         messageId: uuid(),
@@ -290,193 +440,15 @@ export function useAssistantChat(
           if (streamSeqRef.current === seq) sendingRef.current = false;
           if (abortRef.current === ac) abortRef.current = null;
         });
-    },
-    [],
-  );
-
-  // When the signed-in user changes under a mounted panel (auth refresh, or a
-  // mount before auth resolved), invalidate the in-flight stream, abort it, and
-  // reload that user's own thread. Without this, the prior user's transcript
-  // would persist under the new user's key — a cross-account leak.
-  useEffect(() => {
-    if (hydratedUserRef.current === userId) return;
-    streamSeqRef.current += 1;
-    confirmSeqRef.current += 1;
-    abortActiveStream();
-    clearPendingQueuedSend();
-    // Abort a pending thread-history load and re-open the composer so a switch
-    // that was mid-restore for the prior user doesn't leave the new user's
-    // conversation wedged closed.
-    historyAbortRef.current?.abort();
-    setRestoringBoth(false);
-    sendingRef.current = false;
-    confirmingRef.current.clear();
-    setConfirmingIds(EMPTY_IDS);
-    hydratedUserRef.current = userId;
-    // Load the new user's own model preference (the prior user's must not carry
-    // over). The ref is updated synchronously so a send on this commit reads it.
-    const nextModel = loadThread(userId).model;
-    selectedModelRef.current = nextModel;
-    setSelectedModel(nextModel);
-    dispatch({
-      type: "hydrate",
-      ownerId: userId,
-      threadId: loadThread(userId).threadId,
-      messages: [],
-    });
-  }, [userId, abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
-
-  useEffect(() => {
-    const pending = pendingQueuedSendRef.current;
-    if (!pending || state.status === "streaming") return;
-    pendingQueuedSendRef.current = null;
-    if (
-      pending.ownerId !== userIdRef.current ||
-      state.pendingProposals.length > 0
-    ) {
-      return;
-    }
-    startChatStream(
-      pending.text,
-      "queue",
-      pending.model,
-      state.threadId ?? undefined,
-    );
-  }, [state.status, state.pendingProposals.length, startChatStream]);
-
-  // Restore the visible transcript for the persisted thread from the server,
-  // keyed by user (runs on mount and whenever the signed-in user changes). The
-  // transcript is never cached client-side — it can carry workflow YAML or
-  // pasted secrets, and localStorage survives logout — so a reload starts blank
-  // and the prior conversation is rehydrated here from the durable thread.
-  // The reducer applies it only if the conversation is still idle/empty for this
-  // exact owner+thread, so a late response can never clobber a started turn, a
-  // new chat, or a switched account.
-  useEffect(() => {
-    const threadId = loadThread(userId).threadId;
-    if (!userId || !threadId) return;
-    const ac = new AbortController();
-    historyAbortRef.current?.abort();
-    historyAbortRef.current = ac;
-    void clientRef.current
-      .fetchThreadHistory(threadId, ac.signal)
-      .then((result) => {
-        if (ac.signal.aborted) return;
-        if (result.status === "ok") {
-          // An existing thread with no completed turns AND no pending proposals
-          // yields nothing to restore — keep the thread id (it's live). A pending
-          // proposal alone is enough to restore (its card must come back).
-          if (result.messages.length > 0 || result.proposals.length > 0) {
-            dispatch({
-              type: "restore_history",
-              ownerId: userId,
-              threadId,
-              messages: result.messages,
-              proposals: result.proposals,
-            });
-          }
-        } else if (result.status === "gone") {
-          // The thread was deleted server-side (404). Drop the dead id so the next
-          // send starts fresh instead of 404-ing forever. The reducer setting
-          // threadId to null cascades to the persistence effect, clearing storage.
-          dispatch({ type: "thread_gone", ownerId: userId, threadId });
-        }
-        // status === "error" → transient; keep the thread id and don't restore.
-      })
-      .catch(() => {
-        // fetchThreadHistory returns a typed {status:"error"} rather than
-        // rejecting; guard a future change from leaking an unhandled rejection.
-      });
-    return () => ac.abort();
-  }, [userId]);
-
-  // Persist thread id + transcript whenever the conversation settles, under the
-  // owner carried in state. Because `state.ownerId` and the data it labels move
-  // together (set atomically by the reducer), a write can never land under a
-  // different user's key. Skipped while streaming: `state.messages` gets a fresh
-  // reference on every delta, so persisting per-delta would hammer localStorage;
-  // the turn is saved once it settles (status leaves "streaming").
-  useEffect(() => {
-    if (state.status === "streaming") return;
-    // Skip while the data's owner doesn't match the live user — the window
-    // between an auth change and the hydrate that follows it. `selectedModelRef`
-    // lives outside the reducer, so it can already hold the NEW user's preference
-    // while `state.ownerId` still holds the OLD user's id; persisting then would
-    // write the new user's model under the old user's key. The owner guard closes
-    // that cross-account write, matching the same pattern `send`/`confirm` use.
-    if (state.ownerId !== userIdRef.current) return;
-    saveThread(state.ownerId, {
-      threadId: state.threadId,
-      model: selectedModelRef.current,
-    });
-    // `selectedModel` is intentionally NOT a dependency: a model-only change is
-    // persisted immediately by `setModel` itself, so this effect only needs to
-    // re-run on the conversation transitions above. If that direct persist is
-    // ever removed, add `selectedModel` here.
-  }, [state.ownerId, state.threadId, state.status]);
-
-  // Abort any in-flight stream on unmount so a closed panel stops billing.
-  useEffect(() => {
-    return () => {
-      abortActiveStream();
-      clearPendingQueuedSend();
-    };
-  }, [abortActiveStream, clearPendingQueuedSend]);
-
-  const send = useCallback((message: string, options?: AssistantSendOptions) => {
-    const deliveryMode = options?.deliveryMode;
-    const shouldQueue = deliveryMode === "queue";
-    // Synchronous in-flight guard — closes the window where two submits in the
-    // same tick both read a not-yet-committed `idle` status and start two
-    // billable streams. Explicit queue is allowed through so the server can
-    // append it behind the active response instead of forcing products to guard.
-    if (sendingRef.current && !shouldQueue) return;
-    if (!shouldQueue && pendingQueuedSendRef.current) return;
-    // Single-slot hold: the server owns queue ordering; the hook only stores one
-    // follow-up until the active turn settles.
-    if (shouldQueue && pendingQueuedSendRef.current) return;
-    const text = message.trim();
-    const current = stateRef.current;
-    // Refuse if the loaded conversation doesn't belong to the current user. This
-    // only differs for the brief committed frame between an auth change and the
-    // hydrate that follows it, where `current` still holds the prior user's
-    // thread — sending then would attach this message to that thread id.
-    if (current.ownerId !== userIdRef.current) return;
-    // Refuse while a switched-to thread's transcript is still loading — sending
-    // now would run a turn against context the user can't see yet.
-    if (restoringRef.current) return;
-    // Refuse while a turn is streaming unless the caller explicitly queues the
-    // text behind it, or while a mutating proposal is awaiting the user's
-    // decision — a new turn must not abandon an unresolved proposal.
-    if (!text) return;
-    if (current.pendingProposals.length > 0) return;
-    if (current.status === "streaming") {
-      if (!shouldQueue) return;
-      pendingQueuedSendRef.current = {
-        ownerId: current.ownerId,
-        text,
-        model: selectedModelRef.current ?? undefined,
-      };
-      return;
     }
 
-    startChatStream(
-      text,
-      deliveryMode,
-      selectedModelRef.current ?? undefined,
-      current.threadId ?? undefined,
-    );
-  }, [startChatStream]);
 
-  const stop = useCallback(() => {
-    streamSeqRef.current += 1;
-    abortActiveStream();
-    clearPendingQueuedSend();
-    sendingRef.current = false;
-    dispatch({ type: "stopped" });
-  }, [abortActiveStream, clearPendingQueuedSend]);
-
-  const confirm = useCallback(async (proposal: PendingProposal) => {
+async function confirmAssistantChatProposal(proposal: PendingProposal, { dispatch, confirmingRef,
+  setConfirmingIds, confirmSeqRef, clientRef,
+  onWorkflowMutationRef }: { dispatch: (action: Parameters<typeof assistantReducer>[1]) => void;
+  confirmingRef: { current: Set<string> }; setConfirmingIds: (ids: ReadonlySet<string>) => void;
+  confirmSeqRef: { current: number };
+    clientRef: { current: ReturnType<typeof useAssistantClient> }; onWorkflowMutationRef: { current: UseAssistantChatOptions['onWorkflowMutation'] } }) {
     const pid = proposal.proposalId;
     if (!pid) {
       dispatch({
@@ -575,25 +547,13 @@ export function useAssistantChat(
         setConfirmingIds(new Set(confirmingRef.current));
       }
     }
-  }, []);
+  }
 
-  const cancel = useCallback((proposal: PendingProposal) => {
-    // Once a confirmation is in flight the action is already running server-side
-    // and can't be cancelled — ignore a cancel click that races it, so the
-    // transcript can't show both "cancelled" and the action's success.
-    if (proposal.proposalId && confirmingRef.current.has(proposal.proposalId)) {
-      return;
-    }
-    dispatch({
-      type: "proposal_resolved",
-      callId: proposal.callId,
-      status: statusMessage("Action cancelled."),
-      error: null,
-    });
-  }, []);
 
-  const connectRequirement = useCallback(
-    async (proposal: PendingProposal, requirement: ConnectionRequirement) => {
+async function connectAssistantChatRequirement(proposal: PendingProposal,
+  requirement: ConnectionRequirement, { onConnectRequirementRef, confirmSeqRef,
+  dispatch }: { onConnectRequirementRef: { current: UseAssistantChatOptions['onConnectRequirement'] };
+  confirmSeqRef: { current: number }; dispatch: (action: Parameters<typeof assistantReducer>[1]) => void }) {
       const handler = onConnectRequirementRef.current;
       if (!handler) return;
       // Guard the flip against a conversation swap: if a user switch, reset, or
@@ -623,29 +583,20 @@ export function useAssistantChat(
           kind: requirement.kind,
         });
       }
-    },
-    [],
-  );
+    }
 
-  const reset = useCallback(() => {
-    streamSeqRef.current += 1;
-    confirmSeqRef.current += 1;
-    abortActiveStream();
-    clearPendingQueuedSend();
-    historyAbortRef.current?.abort();
-    setRestoringBoth(false);
-    sendingRef.current = false;
-    confirmingRef.current.clear();
-    setConfirmingIds(EMPTY_IDS);
-    dispatch({ type: "reset" });
-  }, [abortActiveStream, clearPendingQueuedSend, setRestoringBoth]);
 
-  // Open a past thread from the history switcher: invalidate any in-flight
-  // stream/confirmation (so their late events can't land in the switched-to
-  // conversation), pin the chosen thread, persist it, then load its transcript.
-  // Guarded by owner so a stale render can't switch under a different account.
-  const switchThread = useCallback(
-    (threadId: string) => {
+function switchAssistantChatThread(threadId: string, { stateRef, userIdRef, streamSeqRef,
+  confirmSeqRef, abortActiveStream, clearPendingQueuedSend, sendingRef, confirmingRef,
+  setConfirmingIds, dispatch, setRestoringBoth, selectedModelRef, historyAbortRef,
+  clientRef }: { stateRef: { current: AssistantState }; userIdRef: { current: string | null };
+  streamSeqRef: { current: number }; confirmSeqRef: { current: number };
+  abortActiveStream: () => void; clearPendingQueuedSend: () => void;
+  sendingRef: { current: boolean }; confirmingRef: { current: Set<string> };
+  setConfirmingIds: (ids: ReadonlySet<string>) => void;
+  dispatch: (action: Parameters<typeof assistantReducer>[1]) => void;
+  setRestoringBoth: (value: boolean) => void; selectedModelRef: { current: string | null };
+  historyAbortRef: { current: AbortController | null }; clientRef: { current: ReturnType<typeof useAssistantClient> } }) {
       const current = stateRef.current;
       const uid = userIdRef.current;
       if (current.ownerId !== uid) return;
@@ -682,57 +633,110 @@ export function useAssistantChat(
       const ac = new AbortController();
       historyAbortRef.current?.abort();
       historyAbortRef.current = ac;
-      void clientRef.current
-        .fetchThreadHistory(threadId, ac.signal)
-        .then((result) => {
-          if (ac.signal.aborted) return;
-          if (result.status === "ok") {
-            if (result.messages.length > 0 || result.proposals.length > 0) {
-              dispatch({
-                type: "restore_history",
-                ownerId: uid,
-                threadId,
-                messages: result.messages,
-                proposals: result.proposals,
-              });
-            }
-          } else if (result.status === "gone") {
-            dispatch({ type: "thread_gone", ownerId: uid, threadId });
-          } else {
-            // Transient load failure: drop the active thread (it carries
-            // server-side context the user can't see) and surface a visible
-            // error. The next send then starts a FRESH thread rather than running
-            // against the unloaded conversation's hidden context.
-            dispatch({
-              type: "history_failed",
-              ownerId: uid,
-              threadId,
-              error: {
-                code: "HISTORY_LOAD_FAILED",
-                message:
-                  "Couldn't load that conversation. You're in a new chat — reopen it from history to try again.",
-              },
-            });
-          }
-          // Re-open the composer once the load settles (success shows the
-          // transcript; failure dropped the thread + showed the error above).
-          // Only the current fetch clears it — a superseded one returned early on
-          // `aborted`.
-          setRestoringBoth(false);
-        })
-        .catch(() => {
-          // fetchThreadHistory returns a typed {status:"error"} rather than
-          // rejecting; guard a future change from leaking an unhandled rejection.
-          if (!ac.signal.aborted) setRestoringBoth(false);
-        });
-    },
-    [abortActiveStream, clearPendingQueuedSend, setRestoringBoth],
-  );
+      restoreAssistantThreadHistory(clientRef.current, uid, threadId, ac, dispatch, () => {
+            dispatch({ type: "history_failed", ownerId: uid, threadId,
+              error: { code: "HISTORY_LOAD_FAILED", message: "Couldn't load that conversation. You're in a new chat — reopen it from history to try again." } });
+          }, () => setRestoringBoth(false));
+    }
 
-  // Choose the model for subsequent turns. The model preference is per user, not
-  // per turn, so persist it immediately (alongside the current thread id) rather
-  // than waiting for a turn to settle.
-  const setModel = useCallback((model: string | null) => {
+
+function sendAssistantChatMessage(message: string, options: AssistantSendOptions | undefined,
+  { sendingRef, pendingQueuedSendRef, stateRef, userIdRef, restoringRef, selectedModelRef,
+  startChatStream }: { sendingRef: { current: boolean };
+  pendingQueuedSendRef: { current: PendingQueuedSend | null }; stateRef: { current: AssistantState };
+  userIdRef: { current: string | null }; restoringRef: { current: boolean };
+  selectedModelRef: { current: string | null }; startChatStream: (text: string,
+  deliveryMode: AssistantDeliveryMode | undefined, model: string | undefined, threadId: string | undefined) => void }) {
+    const deliveryMode = options?.deliveryMode;
+    const shouldQueue = deliveryMode === "queue";
+    // Synchronous in-flight guard — closes the window where two submits in the
+    // same tick both read a not-yet-committed `idle` status and start two
+    // billable streams. Explicit queue is allowed through so the server can
+    // append it behind the active response instead of forcing products to guard.
+    if (sendingRef.current && !shouldQueue) return;
+    if (!shouldQueue && pendingQueuedSendRef.current) return;
+    // Single-slot hold: the server owns queue ordering; the hook only stores one
+    // follow-up until the active turn settles.
+    if (shouldQueue && pendingQueuedSendRef.current) return;
+    const text = message.trim();
+    const current = stateRef.current;
+    // Refuse if the loaded conversation doesn't belong to the current user. This
+    // only differs for the brief committed frame between an auth change and the
+    // hydrate that follows it, where `current` still holds the prior user's
+    // thread — sending then would attach this message to that thread id.
+    if (current.ownerId !== userIdRef.current) return;
+    // Refuse while a switched-to thread's transcript is still loading — sending
+    // now would run a turn against context the user can't see yet.
+    if (restoringRef.current) return;
+    // Refuse while a turn is streaming unless the caller explicitly queues the
+    // text behind it, or while a mutating proposal is awaiting the user's
+    // decision — a new turn must not abandon an unresolved proposal.
+    if (!text) return;
+    if (current.pendingProposals.length > 0) return;
+    if (current.status === "streaming") {
+      if (!shouldQueue) return;
+      pendingQueuedSendRef.current = {
+        ownerId: current.ownerId,
+        text,
+        model: selectedModelRef.current ?? undefined,
+      };
+      return;
+    }
+
+    startChatStream(
+      text,
+      deliveryMode,
+      selectedModelRef.current ?? undefined,
+      current.threadId ?? undefined,
+    );
+  }
+
+
+/** Shared response handling; mount and explicit-switch callers retain their own failure policy. */
+function restoreAssistantThreadHistory(client: ReturnType<typeof useAssistantClient>,
+  ownerId: string | null, threadId: string, ac: AbortController,
+  dispatch: (action: Parameters<typeof assistantReducer>[1]) => void, onLoadError?: () => void, onSettled?: () => void): void {
+  void client.fetchThreadHistory(threadId, ac.signal).then((result) => {
+    if (ac.signal.aborted) return;
+    if (result.status === "ok") {
+      if (result.messages.length > 0 || result.proposals.length > 0) {
+        dispatch({ type: "restore_history", ownerId, threadId, messages: result.messages, proposals: result.proposals });
+      }
+    } else if (result.status === "gone") {
+      dispatch({ type: "thread_gone", ownerId, threadId });
+    } else {
+      onLoadError?.();
+    }
+    onSettled?.();
+  }).catch(() => {
+    if (!ac.signal.aborted) onSettled?.();
+  });
+}
+
+
+function resetAssistantChat({ streamSeqRef, confirmSeqRef, abortActiveStream,
+  clearPendingQueuedSend, historyAbortRef, setRestoringBoth, sendingRef, confirmingRef,
+  setConfirmingIds, dispatch }: { streamSeqRef: { current: number };
+  confirmSeqRef: { current: number }; abortActiveStream: () => void;
+  clearPendingQueuedSend: () => void; historyAbortRef: { current: AbortController | null };
+  setRestoringBoth: (value: boolean) => void; sendingRef: { current: boolean };
+  confirmingRef: { current: Set<string> }; setConfirmingIds: (ids: ReadonlySet<string>) => void; dispatch: (action: Parameters<typeof assistantReducer>[1]) => void }) {
+    streamSeqRef.current += 1;
+    confirmSeqRef.current += 1;
+    abortActiveStream();
+    clearPendingQueuedSend();
+    historyAbortRef.current?.abort();
+    setRestoringBoth(false);
+    sendingRef.current = false;
+    confirmingRef.current.clear();
+    setConfirmingIds(EMPTY_IDS);
+    dispatch({ type: "reset" });
+  }
+
+
+function selectAssistantChatModel(model: string | null, { selectedModelRef, setSelectedModel,
+  userIdRef, stateRef }: { selectedModelRef: { current: string | null };
+  setSelectedModel: (model: string | null) => void; userIdRef: { current: string | null }; stateRef: { current: AssistantState } }) {
     selectedModelRef.current = model;
     setSelectedModel(model);
     // Same owner guard the persistence effect uses: in the window between an auth
@@ -748,42 +752,80 @@ export function useAssistantChat(
         model,
       });
     }
-  }, []);
+  }
 
-  // Reactive recovery: if a turn is rejected because the selected model is no
-  // longer offered (e.g. ASSISTANT_MODELS was changed and a stale slug was still
-  // persisted), clear the selection so the NEXT send falls back to the server
-  // default instead of failing again. The picker also reconciles proactively
-  // once the model list loads; this closes the window where a send races that
-  // load. Guarded by owner so a late error from a prior user can't act here.
-  useEffect(() => {
-    if (
-      state.error?.code === "MODEL_NOT_ALLOWED" &&
-      state.ownerId === userIdRef.current &&
-      selectedModelRef.current !== null
-    ) {
-      setModel(null);
+
+function hydrateAssistantChatOwner({ hydratedUserRef, userId, streamSeqRef, confirmSeqRef,
+  abortActiveStream, clearPendingQueuedSend, historyAbortRef, setRestoringBoth, sendingRef,
+  confirmingRef, setConfirmingIds, selectedModelRef, setSelectedModel,
+  dispatch }: { hydratedUserRef: { current: string | null }; userId: string | null;
+  streamSeqRef: { current: number }; confirmSeqRef: { current: number };
+  abortActiveStream: () => void; clearPendingQueuedSend: () => void;
+  historyAbortRef: { current: AbortController | null }; setRestoringBoth: (value: boolean) => void;
+  sendingRef: { current: boolean }; confirmingRef: { current: Set<string> };
+  setConfirmingIds: (ids: ReadonlySet<string>) => void; selectedModelRef: { current: string | null };
+  setSelectedModel: (model: string | null) => void; dispatch: (action: Parameters<typeof assistantReducer>[1]) => void }) {
+    if (hydratedUserRef.current === userId) return;
+    streamSeqRef.current += 1;
+    confirmSeqRef.current += 1;
+    abortActiveStream();
+    clearPendingQueuedSend();
+    // Abort a pending thread-history load and re-open the composer so a switch
+    // that was mid-restore for the prior user doesn't leave the new user's
+    // conversation wedged closed.
+    historyAbortRef.current?.abort();
+    setRestoringBoth(false);
+    sendingRef.current = false;
+    confirmingRef.current.clear();
+    setConfirmingIds(EMPTY_IDS);
+    hydratedUserRef.current = userId;
+    // Load the new user's own model preference (the prior user's must not carry
+    // over). The ref is updated synchronously so a send on this commit reads it.
+    const nextModel = loadThread(userId).model;
+    selectedModelRef.current = nextModel;
+    setSelectedModel(nextModel);
+    dispatch({
+      type: "hydrate",
+      ownerId: userId,
+      threadId: loadThread(userId).threadId,
+      messages: [],
+    });
+  }
+
+
+function persistAssistantChatSelection({ state, userIdRef,
+  selectedModelRef }: { state: AssistantState; userIdRef: { current: string | null }; selectedModelRef: { current: string | null } }) {
+    if (state.status === "streaming") return;
+    // Skip while the data's owner doesn't match the live user — the window
+    // between an auth change and the hydrate that follows it. `selectedModelRef`
+    // lives outside the reducer, so it can already hold the NEW user's preference
+    // while `state.ownerId` still holds the OLD user's id; persisting then would
+    // write the new user's model under the old user's key. The owner guard closes
+    // that cross-account write, matching the same pattern `send`/`confirm` use.
+    if (state.ownerId !== userIdRef.current) return;
+    saveThread(state.ownerId, {
+      threadId: state.threadId,
+      model: selectedModelRef.current,
+    });
+    // `selectedModel` is intentionally NOT a dependency: a model-only change is
+    // persisted immediately by `setModel` itself, so this effect only needs to
+    // re-run on the conversation transitions above. If that direct persist is
+    // ever removed, add `selectedModel` here.
+  }
+
+
+function cancelAssistantChatProposal(proposal: PendingProposal, { confirmingRef,
+  dispatch }: { confirmingRef: { current: Set<string> }; dispatch: (action: Parameters<typeof assistantReducer>[1]) => void }) {
+    // Once a confirmation is in flight the action is already running server-side
+    // and can't be cancelled — ignore a cancel click that races it, so the
+    // transcript can't show both "cancelled" and the action's success.
+    if (proposal.proposalId && confirmingRef.current.has(proposal.proposalId)) {
+      return;
     }
-  }, [state.error, state.ownerId, setModel]);
-
-  // Expose only state that belongs to the current user: between an auth change
-  // and the hydrate effect that follows it, the raw state still holds the prior
-  // user's conversation, which must never render. Operations (send/confirm) read
-  // the raw state via `stateRef`, so they still act on the true thread.
-  const visibleState = selectVisibleState(state, userId);
-  return {
-    state: visibleState,
-    confirmingIds,
-    selectedModel,
-    setModel,
-    send,
-    stop,
-    confirm,
-    cancel,
-    canConnectRequirement: Boolean(options?.onConnectRequirement),
-    connectRequirement,
-    reset,
-    switchThread,
-    restoring,
-  };
-}
+    dispatch({
+      type: "proposal_resolved",
+      callId: proposal.callId,
+      status: statusMessage("Action cancelled."),
+      error: null,
+    });
+  }

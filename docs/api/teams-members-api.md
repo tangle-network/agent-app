@@ -46,12 +46,12 @@ interface MembersApiActor
 interface MembersApiOptions
 ```
 
-### `MemberSyncSeam`
+### `MemberSyncCallbacks`
 
 `interface` — Optional membership-change propagation to an external system (e.g.
 
 ```ts
-interface MemberSyncSeam
+interface MemberSyncCallbacks
 ```
 
 ### `SeatLimitError`

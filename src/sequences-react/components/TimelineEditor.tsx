@@ -1,3 +1,4 @@
+import { createTimelineHistoryHandlers, type TimelineHistoryEntry } from "./TimelineHistory"
 /**
  * The timeline editor surface: program monitor, transport row, and the
  * scrollable track area, composed over the engine (command stack, zoom math,
@@ -93,10 +94,6 @@ import {
 
 export const SEQUENCE_MEDIA_DRAG_TYPE = 'application/x-sequence-media'
 
-/** Matches the engine's COMMAND_HISTORY_LIMIT so the operation mirror and the
- *  stack's history can never disagree about what an undo refers to. */
-const HISTORY_MIRROR_LIMIT = 200
-
 const MIN_ZOOM = 0.005
 const MAX_ZOOM = 24
 /** Tailwind w-36 on the track header column. */
@@ -143,8 +140,7 @@ function parseMediaDragPayload(raw: string): MediaDragPayload {
   }
   return parsed as MediaDragPayload
 }
-
-export function TimelineEditor(props: TimelineEditorProps) {
+function useTimelineEditorViewState(props: TimelineEditorProps) {
   const { canWrite, onApplyOperations } = props
   const fps = props.timeline.sequence.fps
   const durationFrames = props.timeline.sequence.durationFrames
@@ -288,306 +284,19 @@ export function TimelineEditor(props: TimelineEditorProps) {
     return byTrack
   }, [timeline.clips])
 
-  // --- command commit + history mirror ---------------------------------------
-
-  interface HistoryEntry {
-    command: TimelineCommand
-    /** Optimistic ids this command's clip-creating operations minted, in
-     *  operation order — the pairing key for id reconciliation. */
-    createdLocalIds: string[]
-  }
-
-  const historyRef = useRef<{ done: HistoryEntry[]; undone: HistoryEntry[] }>({ done: [], undone: [] })
+  const historyRef = useRef<{ done: TimelineHistoryEntry[]; undone: TimelineHistoryEntry[] }>({ done: [], undone: [] })
 
   /** Local→server clip-id aliases, fed by `onApplyOperations` results and
    *  consulted live by every command (see engine/commands resolveClipId). */
   const clipIdAliasesRef = useRef(new Map<string, string>())
-
-  function resolveClipId(clipId: string): string {
-    return clipIdAliasesRef.current.get(clipId) ?? clipId
-  }
-
-  /** Pair each clip-creating operation with its apply result and record the
-   *  local→server alias. Results are index-aligned with operations (the
-   *  `applySequenceOperations` contract); a host returning a mismatched array
-   *  is a wiring bug surfaced loud, not silently skipped. */
-  function reconcileCreatedClipIds(
-    operations: SequenceOperation[],
-    createdLocalIds: string[],
-    results: SequenceApplyResult[] | void,
-  ) {
-    if (createdLocalIds.length === 0 || !Array.isArray(results)) return
-    if (results.length !== operations.length) {
-      setCommitError(
-        `onApplyOperations returned ${results.length} results for ${operations.length} operations — clip-id reconciliation skipped`,
-      )
-      return
-    }
-    let cursor = 0
-    operations.forEach((operation, index) => {
-      if (operation.type !== 'place_clip' && operation.type !== 'add_caption' && operation.type !== 'split_clip') return
-      const localId = createdLocalIds[cursor]
-      cursor += 1
-      const result = results[index]
-      if (localId !== undefined && result !== undefined && result.kind === 'clip') {
-        clipIdAliasesRef.current.set(localId, result.clip.id)
-      }
-    })
-  }
-
-  function commitCommand(command: TimelineCommand, createdLocalIds: string[] = []) {
-    if (!canWrite) return
-    try {
-      stack.execute(command)
-    } catch (error) {
-      setCommitError(error instanceof Error ? error.message : String(error))
-      return
-    }
-    const history = historyRef.current
-    const entry: HistoryEntry = { command, createdLocalIds }
-    history.done.push(entry)
-    if (history.done.length > HISTORY_MIRROR_LIMIT) history.done.splice(0, history.done.length - HISTORY_MIRROR_LIMIT)
-    history.undone = []
-    setCommitError(null)
-    const operations = command.operations()
-    void onApplyOperations(operations)
-      .then((results) => reconcileCreatedClipIds(operations, createdLocalIds, results))
-      .catch((error: unknown) => {
-        // Roll back ONLY when this command is still the newest local edit; if
-        // the user already undid or stacked more edits, local rollback would
-        // corrupt history — surface the error and let the next server refresh
-        // (stack.reset) reconcile.
-        const mirror = historyRef.current
-        if (mirror.done[mirror.done.length - 1] === entry && stack.canUndo()) {
-          stack.undo()
-          mirror.done.pop()
-        }
-        setCommitError(error instanceof Error ? error.message : String(error))
-      })
-  }
-
-  function undoLast() {
-    const history = historyRef.current
-    const entry = history.done[history.done.length - 1]
-    if (!entry || !stack.canUndo()) return
-    try {
-      stack.undo()
-    } catch (error) {
-      // A reset() removed the command's target clip; the stack kept the entry
-      // (it may succeed after the next refresh), so the mirror stays too.
-      setCommitError(`Undo failed: ${error instanceof Error ? error.message : String(error)}`)
-      return
-    }
-    history.done.pop()
-    history.undone.push(entry)
-    void onApplyOperations(entry.command.inverseOperations()).catch((error: unknown) => {
-      // The undo's persist rejected: the server still has the command applied,
-      // so the local undo diverged. Re-redo it ONLY when this entry is still the
-      // newest undone edit (mirror commitCommand: still-newest guard); if the
-      // user has since stacked more undo/redo, a local re-redo would corrupt
-      // history — defer to the next server refresh (stack.reset).
-      const mirror = historyRef.current
-      if (mirror.undone[mirror.undone.length - 1] === entry && stack.canRedo()) {
-        stack.redo()
-        mirror.undone.pop()
-        mirror.done.push(entry)
-      }
-      setCommitError(error instanceof Error ? error.message : String(error))
-    })
-  }
-
-  function redoLast() {
-    const history = historyRef.current
-    const entry = history.undone[history.undone.length - 1]
-    if (!entry || !stack.canRedo()) return
-    try {
-      stack.redo()
-    } catch (error) {
-      setCommitError(`Redo failed: ${error instanceof Error ? error.message : String(error)}`)
-      return
-    }
-    history.undone.pop()
-    history.done.push(entry)
-    const operations = entry.command.operations()
-    // A redo of a clip-creating command mints fresh server ids — re-pair them
-    // so a later undo deletes the recreated clips, not the stale ones.
-    void onApplyOperations(operations)
-      .then((results) => reconcileCreatedClipIds(operations, entry.createdLocalIds, results))
-      .catch((error: unknown) => {
-        // The redo's persist rejected: the server does NOT have the command
-        // applied, so the local redo diverged. Re-undo it ONLY when this entry
-        // is still the newest done edit (mirror commitCommand:341); else a local
-        // re-undo would corrupt history — defer to the next server refresh.
-        const mirror = historyRef.current
-        if (mirror.done[mirror.done.length - 1] === entry && stack.canUndo()) {
-          stack.undo()
-          mirror.done.pop()
-          mirror.undone.push(entry)
-        }
-        setCommitError(error instanceof Error ? error.message : String(error))
-      })
-  }
-
-  // --- edit handlers ----------------------------------------------------------
-
-  function handleCommitMove(input: ClipMoveCommit) {
-    const current = stack.getState().timeline
-    const clip = current.clips.find((candidate) => candidate.id === input.clipId)
-    if (!clip) return
-    commitCommand(
-      moveClipCommand({
-        timeline: current,
-        clipId: input.clipId,
-        startFrame: input.startFrame,
-        ...(input.trackId !== clip.trackId ? { trackId: input.trackId } : {}),
-        resolveClipId,
-      }),
-    )
-  }
-
-  function handleCommitTrim(input: ClipTrimCommit) {
-    commitCommand(
-      trimClipCommand({
-        timeline: stack.getState().timeline,
-        clipId: input.clipId,
-        startFrame: input.startFrame,
-        durationFrames: input.durationFrames,
-        sourceInFrame: input.sourceInFrame,
-        resolveClipId,
-      }),
-    )
-  }
-
-  function handleCommitText(input: { clipId: string; text: string }) {
-    commitCommand(
-      setClipTextCommand({ timeline: stack.getState().timeline, clipId: input.clipId, text: input.text, resolveClipId }),
-    )
-  }
-
-  function deleteSelection() {
-    const current = stack.getState().timeline
-    const lockedTrackIds = new Set(current.tracks.filter((track) => track.locked).map((track) => track.id))
-    const targets = selectedClips.filter((clip) => !lockedTrackIds.has(clip.trackId))
-    if (targets.length === 0) return
-    const commands = targets.map((clip) => deleteClipCommand({ timeline: current, clipId: clip.id, resolveClipId }))
-    commitCommand(commands.length === 1 ? (commands[0] as TimelineCommand) : compositeCommand(`Delete ${commands.length} clips`, commands))
-    setSelectedClipIds([])
-  }
-
-  function deleteClip(clipId: string) {
-    const current = stack.getState().timeline
-    const clip = current.clips.find((candidate) => candidate.id === clipId)
-    if (!clip) return
-    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
-    if (track?.locked) return
-    commitCommand(deleteClipCommand({ timeline: current, clipId, resolveClipId }))
-    setSelectedClipIds((ids) => ids.filter((id) => id !== clipId))
-  }
-
-  function focusStepClip(clipId: string, direction: -1 | 1) {
-    const index = orderedClipIds.indexOf(clipId)
-    if (index === -1) return
-    const nextId = orderedClipIds[index + direction]
-    if (nextId === undefined) return
-    const root = trackViewportRef.current
-    const next = root?.querySelector<HTMLElement>(`[data-clip-id="${CSS.escape(nextId)}"]`)
-    next?.focus()
-  }
-
-  /** Step the playhead by whole frames, clamped to the sequence. The transport
-   *  clock owns the playhead, so this seeks it — frame-accurate, no float drift. */
-  function stepPlayhead(deltaFrames: number) {
-    const max = stack.getState().timeline.sequence.durationFrames - 1
-    const next = Math.max(0, Math.min(max, playheadFrameRef.current + deltaFrames))
-    clock.seek(next)
-  }
-
-  /** Nudge the single selected clip by whole frames through the same optimistic
-   *  move command a pointer drag commits (one undo step per keypress). */
-  function nudgeSelectedClip(deltaFrames: number) {
-    if (!canWrite) return
-    const selectedId = selectedClipIds.length === 1 ? selectedClipIds[0] : undefined
-    if (selectedId === undefined) return
-    const current = stack.getState().timeline
-    const clip = current.clips.find((candidate) => candidate.id === selectedId)
-    if (!clip) return
-    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
-    if (track?.locked) return
-    const startFrame = clampClipStart({
-      startFrame: clip.startFrame + deltaFrames,
-      durationFrames: clip.durationFrames,
-      sequenceDurationFrames: current.sequence.durationFrames,
-    })
-    if (startFrame === clip.startFrame) return
-    commitCommand(moveClipCommand({ timeline: current, clipId: selectedId, startFrame, resolveClipId }))
-  }
-
-  const splittableClip =
-    selectedClips.length === 1 &&
-    selectedClips[0] &&
-    playheadFrame > selectedClips[0].startFrame &&
-    playheadFrame < selectedClips[0].startFrame + selectedClips[0].durationFrames
-      ? selectedClips[0]
-      : null
-
-  function splitAtPlayhead() {
-    if (!splittableClip) return
-    const newClipId = mintClipId()
-    commitCommand(
-      splitClipCommand({
-        timeline: stack.getState().timeline,
-        clipId: splittableClip.id,
-        atFrame: playheadFrame,
-        newClipId,
-        resolveClipId,
-      }),
-      [newClipId],
-    )
-  }
-
-  function addCaptionAtPlayhead() {
-    const current = stack.getState().timeline
-    const captionTrack = [...current.tracks]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .find((track) => track.kind === 'caption' && !track.locked)
-    if (!captionTrack) {
-      setCommitError('No unlocked caption track in this sequence — add one before inserting captions.')
-      return
-    }
-    // Throws when the caption track has no free gap left near the playhead.
-    let placement: { startFrame: number; durationFrames: number }
-    try {
-      placement = chooseCaptionPlacement({
-        playheadFrame,
-        fps,
-        sequenceDurationFrames: current.sequence.durationFrames,
-        occupiedIntervals: trackIntervals(current, captionTrack.id),
-      })
-    } catch (error) {
-      setCommitError(error instanceof Error ? error.message : String(error))
-      return
-    }
-    const clipId = mintClipId()
-    commitCommand(
-      addCaptionCommand({
-        timeline: current,
-        clipId,
-        trackId: captionTrack.id,
-        text: 'New caption',
-        startFrame: placement.startFrame,
-        durationFrames: placement.durationFrames,
-        resolveClipId,
-      }),
-      [clipId],
-    )
-  }
-
-  function selectClip(clipId: string, additive: boolean) {
-    setSelectedClipIds((current) => {
-      if (!additive) return [clipId]
-      return current.includes(clipId) ? current.filter((id) => id !== clipId) : [...current, clipId]
-    })
-  }
+  const { resolveClipId, reconcileCreatedClipIds, commitCommand, undoLast,
+    redoLast } = createTimelineHistoryHandlers({ clipIdAliasesRef, setCommitError, canWrite, stack,
+    historyRef, onApplyOperations })
+  const { handleCommitMove, handleCommitTrim, handleCommitText, deleteSelection, deleteClip,
+    focusStepClip, stepPlayhead, nudgeSelectedClip, splittableClip, splitAtPlayhead,
+    addCaptionAtPlayhead, selectClip } = createTimelineEditHandlers({ stack, commitCommand,
+    resolveClipId, selectedClips, setSelectedClipIds, orderedClipIds, trackViewportRef,
+    playheadFrameRef, clock, canWrite, selectedClipIds, playheadFrame, setCommitError, fps })
 
   // --- snapping ---------------------------------------------------------------
 
@@ -664,69 +373,36 @@ export function TimelineEditor(props: TimelineEditorProps) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   })
-
-  // --- asset drops ------------------------------------------------------------
-
-  function handleTrackAreaDragOver(event: ReactDragEvent<HTMLDivElement>) {
-    if (!canWrite || !event.dataTransfer.types.includes(SEQUENCE_MEDIA_DRAG_TYPE)) return
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-  }
-
-  function handleTrackAreaDrop(event: ReactDragEvent<HTMLDivElement>) {
-    if (!canWrite || !event.dataTransfer.types.includes(SEQUENCE_MEDIA_DRAG_TYPE)) return
-    event.preventDefault()
-    const lane = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-lane-track]') : null
-    if (!lane || !lane.dataset.laneTrack) {
-      setCommitError('Drop media on a track lane to place it.')
-      return
-    }
-    let payload: MediaDragPayload
-    try {
-      payload = parseMediaDragPayload(event.dataTransfer.getData(SEQUENCE_MEDIA_DRAG_TYPE))
-    } catch (error) {
-      setCommitError(error instanceof Error ? error.message : String(error))
-      return
-    }
-    const laneKind = lane.dataset.laneKind
-    const accepts = laneKind === 'video' ? payload.kind === 'video' || payload.kind === 'image' : laneKind === 'audio' ? payload.kind === 'audio' : false
-    if (!accepts || lane.dataset.laneLocked === 'true') {
-      setCommitError(`A ${laneKind ?? 'unknown'} track cannot take ${payload.kind} media${lane.dataset.laneLocked === 'true' ? ' (track is locked)' : ''}.`)
-      return
-    }
-    const current = stack.getState().timeline
-    const rect = lane.getBoundingClientRect()
-    const dropFrame = Math.max(0, Math.round((event.clientX - rect.left) / zoom))
-    const naturalDuration = payload.durationSeconds !== undefined
-      ? secondsToFrames(payload.durationSeconds, fps)
-      : payload.kind === 'image'
-        ? fps * 3
-        : fps * 5
-    const startFrame = Math.min(dropFrame, current.sequence.durationFrames - 1)
-    const placedDuration = Math.max(1, Math.min(naturalDuration, current.sequence.durationFrames - startFrame))
-    const clipId = mintClipId()
-    commitCommand(
-      placeClipCommand({
-        timeline: current,
-        clipId,
-        trackId: lane.dataset.laneTrack,
-        label: payload.label ?? payload.url.split('/').pop() ?? payload.url,
-        startFrame,
-        durationFrames: placedDuration,
-        media: { url: payload.url, kind: payload.kind },
-        ...(payload.generationId !== undefined ? { generationId: payload.generationId } : {}),
-        ...(payload.assetId !== undefined ? { assetId: payload.assetId } : {}),
-        resolveClipId,
-      }),
-      [clipId],
-    )
-  }
+  const { handleTrackAreaDragOver, handleTrackAreaDrop } = createTimelineDropHandlers({ canWrite,
+    setCommitError, stack, zoom, fps, commitCommand, resolveClipId })
 
   // --- render -------------------------------------------------------------------
 
   const timelineWidth = timeline.sequence.durationFrames * zoom
+  return { props, timeline, clock, frameProvider, isPlaying, togglePlayback, playheadFrame, fps,
+    stack, canWrite, undoLast, redoLast, snapEnabled, setSnapEnabled, labels, splittableClip,
+    splitAtPlayhead, addCaptionAtPlayhead, zoomMath, zoom, setZoom, fitZoom, commitError,
+    setCommitError, trackViewportRef, handleTrackAreaDragOver, handleTrackAreaDrop, timelineWidth,
+    sortedTracks, clipsByTrack, selectedClipIds, tabbableClipId, snapMove, snapEdge,
+    setActiveSnapPoint, selectClip, deleteClip, focusStepClip, handleCommitMove, handleCommitTrim,
+    handleCommitText, activeSnapPoint, selectedClips }
+}
 
-  return (
+type TimelineEditorViewState = ReturnType<typeof useTimelineEditorViewState>
+
+export function TimelineEditor(props: TimelineEditorProps) {
+  const view = useTimelineEditorViewState(props)
+  return <TimelineEditorView {...view} />
+}
+
+function TimelineEditorView({ props, timeline, clock, frameProvider, isPlaying, togglePlayback,
+  playheadFrame, fps, stack, canWrite, undoLast, redoLast, snapEnabled, setSnapEnabled, labels,
+  splittableClip, splitAtPlayhead, addCaptionAtPlayhead, zoomMath, zoom, setZoom, fitZoom,
+  commitError, setCommitError, trackViewportRef, handleTrackAreaDragOver, handleTrackAreaDrop,
+  timelineWidth, sortedTracks, clipsByTrack, selectedClipIds, tabbableClipId, snapMove, snapEdge,
+  setActiveSnapPoint, selectClip, deleteClip, focusStepClip, handleCommitMove, handleCommitTrim,
+  handleCommitText, activeSnapPoint, selectedClips }: TimelineEditorViewState) {
+  return ((
     <div className={`flex h-full min-h-0 flex-col bg-[var(--bg-input)] text-[var(--text-primary)] ${props.className ?? ''}`}>
       {/* Phone: the gesture-heavy editor doesn't fit, so show a short on-brand
           gate instead of a squeezed canvas. The editor below is `sm`+ only. */}
@@ -892,7 +568,251 @@ export function TimelineEditor(props: TimelineEditorProps) {
         ) : null}
       </div>
     </div>
-  )
+  ))
 }
 
+
+
 export default TimelineEditor
+
+
+function createTimelineEditHandlers({ stack, commitCommand, resolveClipId, selectedClips,
+  setSelectedClipIds, orderedClipIds, trackViewportRef, playheadFrameRef, clock, canWrite,
+  selectedClipIds, playheadFrame, setCommitError,
+  fps }: { stack: ReturnType<typeof createCommandStack>; commitCommand: (command: TimelineCommand,
+  createdLocalIds?: string[]) => void; resolveClipId: (id: string) => string;
+  selectedClips: SequenceClip[];
+  setSelectedClipIds: (ids: string[] | ((ids: string[]) => string[])) => void;
+  orderedClipIds: string[]; trackViewportRef: { current: HTMLDivElement | null };
+  playheadFrameRef: { current: number }; clock: PlaybackClock; canWrite: boolean;
+  selectedClipIds: string[]; playheadFrame: number; setCommitError: (error: string | null) => void; fps: number }) {
+
+  // --- edit handlers ----------------------------------------------------------
+
+  function handleCommitMove(input: ClipMoveCommit) {
+    const current = stack.getState().timeline
+    const clip = current.clips.find((candidate) => candidate.id === input.clipId)
+    if (!clip) return
+    commitCommand(
+      moveClipCommand({
+        timeline: current,
+        clipId: input.clipId,
+        startFrame: input.startFrame,
+        ...(input.trackId !== clip.trackId ? { trackId: input.trackId } : {}),
+        resolveClipId,
+      }),
+    )
+  }
+
+  function handleCommitTrim(input: ClipTrimCommit) {
+    commitCommand(
+      trimClipCommand({
+        timeline: stack.getState().timeline,
+        clipId: input.clipId,
+        startFrame: input.startFrame,
+        durationFrames: input.durationFrames,
+        sourceInFrame: input.sourceInFrame,
+        resolveClipId,
+      }),
+    )
+  }
+
+  function handleCommitText(input: { clipId: string; text: string }) {
+    commitCommand(
+      setClipTextCommand({ timeline: stack.getState().timeline, clipId: input.clipId, text: input.text, resolveClipId }),
+    )
+  }
+
+  function deleteSelection() {
+    const current = stack.getState().timeline
+    const lockedTrackIds = new Set(current.tracks.filter((track) => track.locked).map((track) => track.id))
+    const targets = selectedClips.filter((clip) => !lockedTrackIds.has(clip.trackId))
+    if (targets.length === 0) return
+    const commands = targets.map((clip) => deleteClipCommand({ timeline: current, clipId: clip.id, resolveClipId }))
+    commitCommand(commands.length === 1 ? (commands[0] as TimelineCommand) : compositeCommand(`Delete ${commands.length} clips`, commands))
+    setSelectedClipIds([])
+  }
+
+  function deleteClip(clipId: string) {
+    const current = stack.getState().timeline
+    const clip = current.clips.find((candidate) => candidate.id === clipId)
+    if (!clip) return
+    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
+    if (track?.locked) return
+    commitCommand(deleteClipCommand({ timeline: current, clipId, resolveClipId }))
+    setSelectedClipIds((ids) => ids.filter((id) => id !== clipId))
+  }
+
+  function focusStepClip(clipId: string, direction: -1 | 1) {
+    const index = orderedClipIds.indexOf(clipId)
+    if (index === -1) return
+    const nextId = orderedClipIds[index + direction]
+    if (nextId === undefined) return
+    const root = trackViewportRef.current
+    const next = root?.querySelector<HTMLElement>(`[data-clip-id="${CSS.escape(nextId)}"]`)
+    next?.focus()
+  }
+
+  /** Step the playhead by whole frames, clamped to the sequence. The transport
+   *  clock owns the playhead, so this seeks it — frame-accurate, no float drift. */
+  function stepPlayhead(deltaFrames: number) {
+    const max = stack.getState().timeline.sequence.durationFrames - 1
+    const next = Math.max(0, Math.min(max, playheadFrameRef.current + deltaFrames))
+    clock.seek(next)
+  }
+
+  /** Nudge the single selected clip by whole frames through the same optimistic
+   *  move command a pointer drag commits (one undo step per keypress). */
+  function nudgeSelectedClip(deltaFrames: number) {
+    if (!canWrite) return
+    const selectedId = selectedClipIds.length === 1 ? selectedClipIds[0] : undefined
+    if (selectedId === undefined) return
+    const current = stack.getState().timeline
+    const clip = current.clips.find((candidate) => candidate.id === selectedId)
+    if (!clip) return
+    const track = current.tracks.find((candidate) => candidate.id === clip.trackId)
+    if (track?.locked) return
+    const startFrame = clampClipStart({
+      startFrame: clip.startFrame + deltaFrames,
+      durationFrames: clip.durationFrames,
+      sequenceDurationFrames: current.sequence.durationFrames,
+    })
+    if (startFrame === clip.startFrame) return
+    commitCommand(moveClipCommand({ timeline: current, clipId: selectedId, startFrame, resolveClipId }))
+  }
+
+  const splittableClip =
+    selectedClips.length === 1 &&
+    selectedClips[0] &&
+    playheadFrame > selectedClips[0].startFrame &&
+    playheadFrame < selectedClips[0].startFrame + selectedClips[0].durationFrames
+      ? selectedClips[0]
+      : null
+
+  function splitAtPlayhead() {
+    if (!splittableClip) return
+    const newClipId = mintClipId()
+    commitCommand(
+      splitClipCommand({
+        timeline: stack.getState().timeline,
+        clipId: splittableClip.id,
+        atFrame: playheadFrame,
+        newClipId,
+        resolveClipId,
+      }),
+      [newClipId],
+    )
+  }
+
+  function addCaptionAtPlayhead() {
+    const current = stack.getState().timeline
+    const captionTrack = [...current.tracks]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .find((track) => track.kind === 'caption' && !track.locked)
+    if (!captionTrack) {
+      setCommitError('No unlocked caption track in this sequence — add one before inserting captions.')
+      return
+    }
+    // Throws when the caption track has no free gap left near the playhead.
+    let placement: { startFrame: number; durationFrames: number }
+    try {
+      placement = chooseCaptionPlacement({
+        playheadFrame,
+        fps,
+        sequenceDurationFrames: current.sequence.durationFrames,
+        occupiedIntervals: trackIntervals(current, captionTrack.id),
+      })
+    } catch (error) {
+      setCommitError(error instanceof Error ? error.message : String(error))
+      return
+    }
+    const clipId = mintClipId()
+    commitCommand(
+      addCaptionCommand({
+        timeline: current,
+        clipId,
+        trackId: captionTrack.id,
+        text: 'New caption',
+        startFrame: placement.startFrame,
+        durationFrames: placement.durationFrames,
+        resolveClipId,
+      }),
+      [clipId],
+    )
+  }
+
+  function selectClip(clipId: string, additive: boolean) {
+    setSelectedClipIds((current) => {
+      if (!additive) return [clipId]
+      return current.includes(clipId) ? current.filter((id) => id !== clipId) : [...current, clipId]
+    })
+  }
+  return { handleCommitMove, handleCommitTrim, handleCommitText, deleteSelection, deleteClip,
+    focusStepClip, stepPlayhead, nudgeSelectedClip, splittableClip, splitAtPlayhead,
+    addCaptionAtPlayhead, selectClip }
+}
+
+
+function createTimelineDropHandlers({ canWrite, setCommitError, stack, zoom, fps, commitCommand,
+  resolveClipId }: { canWrite: boolean; setCommitError: (error: string | null) => void;
+  stack: ReturnType<typeof createCommandStack>; zoom: number; fps: number;
+  commitCommand: (command: TimelineCommand, createdLocalIds?: string[]) => void; resolveClipId: (id: string) => string }) {
+
+  // --- asset drops ------------------------------------------------------------
+
+  function handleTrackAreaDragOver(event: ReactDragEvent<HTMLDivElement>) {
+    if (!canWrite || !event.dataTransfer.types.includes(SEQUENCE_MEDIA_DRAG_TYPE)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  function handleTrackAreaDrop(event: ReactDragEvent<HTMLDivElement>) {
+    if (!canWrite || !event.dataTransfer.types.includes(SEQUENCE_MEDIA_DRAG_TYPE)) return
+    event.preventDefault()
+    const lane = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-lane-track]') : null
+    if (!lane || !lane.dataset.laneTrack) {
+      setCommitError('Drop media on a track lane to place it.')
+      return
+    }
+    let payload: MediaDragPayload
+    try {
+      payload = parseMediaDragPayload(event.dataTransfer.getData(SEQUENCE_MEDIA_DRAG_TYPE))
+    } catch (error) {
+      setCommitError(error instanceof Error ? error.message : String(error))
+      return
+    }
+    const laneKind = lane.dataset.laneKind
+    const accepts = laneKind === 'video' ? payload.kind === 'video' || payload.kind === 'image' : laneKind === 'audio' ? payload.kind === 'audio' : false
+    if (!accepts || lane.dataset.laneLocked === 'true') {
+      setCommitError(`A ${laneKind ?? 'unknown'} track cannot take ${payload.kind} media${lane.dataset.laneLocked === 'true' ? ' (track is locked)' : ''}.`)
+      return
+    }
+    const current = stack.getState().timeline
+    const rect = lane.getBoundingClientRect()
+    const dropFrame = Math.max(0, Math.round((event.clientX - rect.left) / zoom))
+    const naturalDuration = payload.durationSeconds !== undefined
+      ? secondsToFrames(payload.durationSeconds, fps)
+      : payload.kind === 'image'
+        ? fps * 3
+        : fps * 5
+    const startFrame = Math.min(dropFrame, current.sequence.durationFrames - 1)
+    const placedDuration = Math.max(1, Math.min(naturalDuration, current.sequence.durationFrames - startFrame))
+    const clipId = mintClipId()
+    commitCommand(
+      placeClipCommand({
+        timeline: current,
+        clipId,
+        trackId: lane.dataset.laneTrack,
+        label: payload.label ?? payload.url.split('/').pop() ?? payload.url,
+        startFrame,
+        durationFrames: placedDuration,
+        media: { url: payload.url, kind: payload.kind },
+        ...(payload.generationId !== undefined ? { generationId: payload.generationId } : {}),
+        ...(payload.assetId !== undefined ? { assetId: payload.assetId } : {}),
+        resolveClipId,
+      }),
+      [clipId],
+    )
+  }
+  return { handleTrackAreaDragOver, handleTrackAreaDrop }
+}

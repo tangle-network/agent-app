@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import type { InviteAcceptPageProps } from '../contracts'
-import { BrandMark } from './BrandMark'
+import { BrandMark } from '../../web-react/brand-mark'
 
 export function InviteAcceptPage({ details, onAccept, onNavigate, onResendVerification }: InviteAcceptPageProps) {
   const [accepting, setAccepting] = useState(false)

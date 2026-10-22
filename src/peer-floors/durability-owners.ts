@@ -1,3 +1,4 @@
+import { sourceDirectoryEntries } from './source-entries'
 /**
  * DURABILITY OWNERS — products must not grow their own turn durability.
  *
@@ -69,21 +70,13 @@ export interface DurabilityOwnerReport {
 }
 
 function collect(dir: string, repoDir: string, exclude: readonly string[], out: string[]): void {
-  let entries: import('node:fs').Dirent[]
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry.name)
-    const rel = relative(repoDir, full).split(sep).join('/')
-    if (exclude.some((prefix) => rel === prefix || rel.startsWith(`${prefix}/`))) continue
+  for (const { entry, full } of sourceDirectoryEntries(dir, repoDir, exclude)) {
     if (entry.isDirectory()) {
       if (!SKIP_DIRS.has(entry.name)) collect(full, repoDir, exclude, out)
     } else if (entry.isFile() && SOURCE_FILE.test(entry.name) && !TEST_FILE.test(entry.name)) {
       out.push(full)
     }
+
   }
 }
 

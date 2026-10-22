@@ -201,6 +201,211 @@ export function createExportEngine(options: ExportEngineOptions) {
     return result.etag
   }
 
+  const { writeEntry, runUnit } = createExportUnitWriter(storage, base, now)
+
+  const { finalize } = createExportFinalizer(options, now, base, writeEntry)
+
+  return {
+    archiveKey,
+
+    async list(workspaceId: string): Promise<ExportJob[]> {
+      const ids = new Set<string>()
+      let cursor: string | undefined
+      do {
+        const page = await storage.list(`${prefix}/${assertSafeKeySegment(workspaceId)}/`, cursor)
+        for (const key of page.keys) if (key.endsWith('/job.json')) ids.add(key.split('/').at(-2)!)
+        cursor = page.cursor
+      } while (cursor)
+      const jobs: ExportJob[] = []
+      for (const id of [...ids].sort().reverse().slice(0, 10)) {
+        const loaded = await loadJob(workspaceId, id)
+        if (loaded) jobs.push(loaded.job)
+      }
+      return jobs
+    },
+
+    async get(workspaceId: string, id: string): Promise<ExportJob | null> {
+      return (await loadJob(workspaceId, id))?.job ?? null
+    },
+
+    /** Start an export, or return the one already running for this workspace. */
+    async start(workspaceId: string, requestedBy: string): Promise<ExportJob> {
+      const existing = (await this.list(workspaceId)).find(
+        (job) => job.status === 'running' && now() - Date.parse(job.updatedAt) < 15 * 60_000,
+      )
+      if (existing) return existing
+      const plan = await options.plan({ workspaceId })
+      const names = new Set<string>()
+      for (const source of plan.sources) {
+        if (!SOURCE_NAME.test(source.name)) throw new Error(`workspace-export: invalid source name "${source.name}"`)
+        if (names.has(source.name)) throw new Error(`workspace-export: duplicate source name "${source.name}"`)
+        names.add(source.name)
+      }
+      const created = now()
+      const job: ExportJob = {
+        v: 1,
+        id: `${created.toString(36)}-${crypto.randomUUID().slice(0, 8)}`,
+        workspaceId,
+        requestedBy,
+        createdAt: iso(created),
+        updatedAt: iso(created),
+        status: 'running',
+        units: plan.sources.map((s) => ({
+          name: s.name,
+          kind: s.kind,
+          dataClass: s.dataClass,
+          description: s.description,
+          status: 'pending',
+          attempts: 0,
+          entries: [],
+          redactions: 0,
+        })),
+      }
+      await saveJob(job)
+      await storage.put(runningKey(workspaceId, job.id), new Uint8Array(0))
+      return job
+    },
+
+    /**
+     * Run pending units until `budgetMs` passes. A unit that starts always
+     * finishes, so one call can run longer than the budget. Returns the job as
+     * stored; another request holding the lease leaves it unchanged.
+     */
+    ...createExportAdvancer(loadJob, now, saveJob, storage, runningKey, options, nextBatch, runUnit, finalize),
+
+    progress(job: ExportJob): Omit<ExportProgress, 'downloadUrl' | 'downloadExpiresAt'> {
+      const bytesOf = (u: ExportUnit) => u.entries.reduce((n, e) => n + e.size, 0)
+      return {
+        id: job.id,
+        status: job.status,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt,
+        error: job.error,
+        unitsTotal: job.units.length,
+        unitsDone: job.units.filter((u) => u.status === 'done' || u.status === 'empty').length,
+        unitsFailed: job.units.filter((u) => u.status === 'failed').length,
+        current: job.status === 'running' ? job.units.find((u) => u.status === 'pending')?.name : undefined,
+        bytes: job.units.reduce((n, u) => n + bytesOf(u), 0),
+        units: job.units.map((u) => ({
+          name: u.name,
+          dataClass: u.dataClass,
+          status: u.status,
+          rows: u.rows,
+          files: u.files,
+          bytes: bytesOf(u),
+          error: u.error,
+        })),
+      }
+    },
+
+    /** The finished archive as one stream with an exact length. */
+    zip(job: ExportJob): { length: number; stream: ReadableStream<Uint8Array>; filename: string } {
+      if (job.status !== 'complete' || !job.meta) throw new Error('workspace-export: export is not complete')
+      const modifiedAt = new Date(job.completedAt ?? job.createdAt)
+      const entries: ZipEntrySpec[] = [...job.meta, ...job.units.flatMap((u) => u.entries)].map((entry) => ({
+        name: entry.path,
+        method: entry.method,
+        crc32: entry.crc32,
+        compressedSize: entry.compressedSize,
+        uncompressedSize: entry.size,
+        modifiedAt,
+        open: async () => {
+          let index = 0
+          let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+          return new ReadableStream<Uint8Array>({
+            async pull(controller) {
+              for (;;) {
+                if (!reader) {
+                  const segment = entry.segments[index]
+                  if (!segment) {
+                    controller.close()
+                    return
+                  }
+                  index += 1
+                  const object = await storage.get(segment.key)
+                  if (!object || object.size !== segment.size) {
+                    controller.error(new Error(`workspace-export: segment ${segment.key} is missing or changed`))
+                    return
+                  }
+                  reader = object.body.getReader()
+                }
+                const { done, value } = await reader.read()
+                if (!done) {
+                  controller.enqueue(value)
+                  return
+                }
+                reader = null
+              }
+            },
+            async cancel(reason) {
+              await reader?.cancel(reason)
+            },
+          })
+        },
+      }))
+      const { length, stream } = createZipStream(entries)
+      const date = (job.completedAt ?? job.createdAt).slice(0, 10)
+      return { length, stream, filename: `${options.app}-workspace-export-${date}.zip` }
+    },
+
+    /** Delete exports older than `retentionMs`, and any export by id when given. */
+    /**
+     * Advance every running export whose lease has lapsed, so an export keeps
+     * going after the owner closes the tab. Call it from the product's scheduled
+     * handler (a one-minute cron). Returns how many exports it advanced.
+     */
+    async continueRunning(budgetMs = 60_000): Promise<number> {
+      const deadline = now() + budgetMs
+      const keys: string[] = []
+      let cursor: string | undefined
+      do {
+        const page = await storage.list(`${prefix}/_running/`, cursor)
+        keys.push(...page.keys)
+        cursor = page.cursor
+      } while (cursor)
+      let advanced = 0
+      for (const key of keys) {
+        const remaining = deadline - now()
+        if (remaining <= 0) break
+        const name = key.split('/').at(-1) ?? ''
+        const workspaceId = name.slice(0, name.lastIndexOf('~'))
+        const id = name.slice(name.lastIndexOf('~') + 1)
+        if (!workspaceId || !id) continue
+        const loaded = await loadJob(workspaceId, id)
+        if (!loaded || loaded.job.status !== 'running') {
+          await storage.delete([key])
+          continue
+        }
+        if (loaded.job.lease && loaded.job.lease.until > now()) continue
+        await this.advance(workspaceId, id, Math.min(remaining, 20_000))
+        advanced += 1
+      }
+      return advanced
+    },
+
+    async prune(workspaceId: string, retentionMs: number, onlyId?: string): Promise<number> {
+      const cutoff = now() - retentionMs
+      const doomed: string[] = []
+      let cursor: string | undefined
+      const root = `${prefix}/${assertSafeKeySegment(workspaceId)}/`
+      do {
+        const page = await storage.list(root, cursor)
+        for (const key of page.keys) {
+          const id = key.slice(root.length).split('/')[0] ?? ''
+          const created = Number.parseInt(id.split('-')[0] ?? '', 36)
+          if (onlyId ? id === onlyId : Number.isFinite(created) && created < cutoff) doomed.push(key)
+        }
+        cursor = page.cursor
+      } while (cursor)
+      await storage.delete(doomed)
+      return doomed.length
+    },
+  }
+}
+
+export type ExportEngine = ReturnType<typeof createExportEngine>
+
+function createExportUnitWriter(storage: ExportEngineOptions['storage'], base: (workspaceId: string, id: string) => string, now: () => number) {
   async function writeEntry(
     keyBase: string,
     path: string,
@@ -246,7 +451,7 @@ export function createExportEngine(options: ExportEngineOptions) {
       }
       await flush()
     } catch (err) {
-      await reader.cancel(err).catch(() => {})
+      await reader.cancel(err).catch(() => { })
       throw err
     } finally {
       reader.releaseLock()
@@ -402,7 +607,7 @@ export function createExportEngine(options: ExportEngineOptions) {
           })()
           // Observe errors immediately while the next listing may be pending;
           // flush still reports the original failure after its siblings settle.
-          void entry.catch(() => {})
+          void entry.catch(() => { })
           chunk.push({ position, entry })
           seen += 1
           if (chunk.length >= FILES_IN_PARALLEL) await flush()
@@ -428,7 +633,7 @@ export function createExportEngine(options: ExportEngineOptions) {
     // pipeThrough hides its pipeTo promise. Retain the source pump so errors
     // wait for upstream cancellation (and box restoration) before settling.
     const pumping = archive.pipeTo(decompressor.writable)
-    void pumping.catch(() => {})
+    void pumping.catch(() => { })
     const tarGz = decompressor.readable
       .pipeThrough(createTarInspector(stats, source.exclude))
       .pipeThrough(scanner.maskBytes((n) => (unit.redactions += n)))
@@ -436,13 +641,21 @@ export function createExportEngine(options: ExportEngineOptions) {
     try {
       unit.entries.push(await writeEntry(`${keyBase}/0`, `sandbox/${source.name}.tar.gz`, tarGz, false))
     } finally {
-      await pumping.catch(() => {})
+      await pumping.catch(() => { })
     }
     unit.archive = stats
     unit.files = stats.files
     unit.status = 'done'
   }
+  return { writeEntry, runUnit }
+}
 
+function createExportFinalizer(
+  options: ExportEngineOptions,
+  now: () => number,
+  base: (workspaceId: string, id: string) => string,
+  writeEntry: ReturnType<typeof createExportUnitWriter>['writeEntry'],
+) {
   function manifest(job: ExportJob, notes: Record<string, unknown> | undefined) {
     const classes: Record<string, string[]> = {}
     for (const unit of job.units) {
@@ -525,73 +738,21 @@ export function createExportEngine(options: ExportEngineOptions) {
     ]
     job.status = 'complete'
   }
+  return { finalize }
+}
 
+function createExportAdvancer(
+  loadJob: (workspaceId: string, id: string) => Promise<{ job: ExportJob; etag: string } | null>,
+  now: () => number,
+  saveJob: (job: ExportJob, etag?: string) => Promise<string>,
+  storage: ExportStorage,
+  runningKey: (workspaceId: string, id: string) => string,
+  options: ExportEngineOptions,
+  nextBatch: <T extends { unit: ExportUnit }>(pending: T[], from: number) => T[],
+  runUnit: (job: ExportJob, unit: ExportUnit, index: number, source: ExportSource, scanner: SecretScanner, deadline: number) => Promise<void>,
+  finalize: (job: ExportJob, plan: ExportPlan, scanner: SecretScanner) => Promise<void>,
+) {
   return {
-    archiveKey,
-
-    async list(workspaceId: string): Promise<ExportJob[]> {
-      const ids = new Set<string>()
-      let cursor: string | undefined
-      do {
-        const page = await storage.list(`${prefix}/${assertSafeKeySegment(workspaceId)}/`, cursor)
-        for (const key of page.keys) if (key.endsWith('/job.json')) ids.add(key.split('/').at(-2)!)
-        cursor = page.cursor
-      } while (cursor)
-      const jobs: ExportJob[] = []
-      for (const id of [...ids].sort().reverse().slice(0, 10)) {
-        const loaded = await loadJob(workspaceId, id)
-        if (loaded) jobs.push(loaded.job)
-      }
-      return jobs
-    },
-
-    async get(workspaceId: string, id: string): Promise<ExportJob | null> {
-      return (await loadJob(workspaceId, id))?.job ?? null
-    },
-
-    /** Start an export, or return the one already running for this workspace. */
-    async start(workspaceId: string, requestedBy: string): Promise<ExportJob> {
-      const existing = (await this.list(workspaceId)).find(
-        (job) => job.status === 'running' && now() - Date.parse(job.updatedAt) < 15 * 60_000,
-      )
-      if (existing) return existing
-      const plan = await options.plan({ workspaceId })
-      const names = new Set<string>()
-      for (const source of plan.sources) {
-        if (!SOURCE_NAME.test(source.name)) throw new Error(`workspace-export: invalid source name "${source.name}"`)
-        if (names.has(source.name)) throw new Error(`workspace-export: duplicate source name "${source.name}"`)
-        names.add(source.name)
-      }
-      const created = now()
-      const job: ExportJob = {
-        v: 1,
-        id: `${created.toString(36)}-${crypto.randomUUID().slice(0, 8)}`,
-        workspaceId,
-        requestedBy,
-        createdAt: iso(created),
-        updatedAt: iso(created),
-        status: 'running',
-        units: plan.sources.map((s) => ({
-          name: s.name,
-          kind: s.kind,
-          dataClass: s.dataClass,
-          description: s.description,
-          status: 'pending',
-          attempts: 0,
-          entries: [],
-          redactions: 0,
-        })),
-      }
-      await saveJob(job)
-      await storage.put(runningKey(workspaceId, job.id), new Uint8Array(0))
-      return job
-    },
-
-    /**
-     * Run pending units until `budgetMs` passes. A unit that starts always
-     * finishes, so one call can run longer than the budget. Returns the job as
-     * stored; another request holding the lease leaves it unchanged.
-     */
     async advance(workspaceId: string, id: string, budgetMs = 20_000): Promise<ExportJob | null> {
       const loaded = await loadJob(workspaceId, id)
       if (!loaded) return null
@@ -617,7 +778,7 @@ export function createExportEngine(options: ExportEngineOptions) {
         // index existed, so the background sweep can finish it if this tab closes.
         await storage.put(runningKey(workspaceId, id), new Uint8Array(0))
         heartbeat = setInterval(() => {
-          save().catch(() => {})
+          save().catch(() => { })
         }, HEARTBEAT_MS)
         // Units waiting out a deferral are skipped until their time comes.
         const pending = job.units.flatMap((unit, index) =>
@@ -707,7 +868,7 @@ export function createExportEngine(options: ExportEngineOptions) {
           await finalize(job, plan, scanner)
         }
         clearInterval(heartbeat)
-        await saving.catch(() => {})
+        await saving.catch(() => { })
         job.lease = undefined
         await saveJob(job, etag)
         if (job.status !== 'running') await storage.delete([runningKey(workspaceId, id)])
@@ -718,147 +879,17 @@ export function createExportEngine(options: ExportEngineOptions) {
         // the lease back, so the panel's retry continues now instead of waiting it out.
         // Only the stored job is touched, never this request's half-applied copy.
         clearInterval(heartbeat)
-        await saving.catch(() => {})
+        await saving.catch(() => { })
         const leaseId = job.lease?.id
         const stored = leaseId ? await loadJob(workspaceId, id).catch(() => null) : null
         if (stored && stored.job.lease?.id === leaseId) {
           stored.job.lease = undefined
-          await saveJob(stored.job, stored.etag).catch(() => {})
+          await saveJob(stored.job, stored.etag).catch(() => { })
         }
         throw err
       } finally {
         clearInterval(heartbeat)
       }
     },
-
-    progress(job: ExportJob): Omit<ExportProgress, 'downloadUrl' | 'downloadExpiresAt'> {
-      const bytesOf = (u: ExportUnit) => u.entries.reduce((n, e) => n + e.size, 0)
-      return {
-        id: job.id,
-        status: job.status,
-        createdAt: job.createdAt,
-        completedAt: job.completedAt,
-        error: job.error,
-        unitsTotal: job.units.length,
-        unitsDone: job.units.filter((u) => u.status === 'done' || u.status === 'empty').length,
-        unitsFailed: job.units.filter((u) => u.status === 'failed').length,
-        current: job.status === 'running' ? job.units.find((u) => u.status === 'pending')?.name : undefined,
-        bytes: job.units.reduce((n, u) => n + bytesOf(u), 0),
-        units: job.units.map((u) => ({
-          name: u.name,
-          dataClass: u.dataClass,
-          status: u.status,
-          rows: u.rows,
-          files: u.files,
-          bytes: bytesOf(u),
-          error: u.error,
-        })),
-      }
-    },
-
-    /** The finished archive as one stream with an exact length. */
-    zip(job: ExportJob): { length: number; stream: ReadableStream<Uint8Array>; filename: string } {
-      if (job.status !== 'complete' || !job.meta) throw new Error('workspace-export: export is not complete')
-      const modifiedAt = new Date(job.completedAt ?? job.createdAt)
-      const entries: ZipEntrySpec[] = [...job.meta, ...job.units.flatMap((u) => u.entries)].map((entry) => ({
-        name: entry.path,
-        method: entry.method,
-        crc32: entry.crc32,
-        compressedSize: entry.compressedSize,
-        uncompressedSize: entry.size,
-        modifiedAt,
-        open: async () => {
-          let index = 0
-          let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-          return new ReadableStream<Uint8Array>({
-            async pull(controller) {
-              for (;;) {
-                if (!reader) {
-                  const segment = entry.segments[index]
-                  if (!segment) {
-                    controller.close()
-                    return
-                  }
-                  index += 1
-                  const object = await storage.get(segment.key)
-                  if (!object || object.size !== segment.size) {
-                    controller.error(new Error(`workspace-export: segment ${segment.key} is missing or changed`))
-                    return
-                  }
-                  reader = object.body.getReader()
-                }
-                const { done, value } = await reader.read()
-                if (!done) {
-                  controller.enqueue(value)
-                  return
-                }
-                reader = null
-              }
-            },
-            async cancel(reason) {
-              await reader?.cancel(reason)
-            },
-          })
-        },
-      }))
-      const { length, stream } = createZipStream(entries)
-      const date = (job.completedAt ?? job.createdAt).slice(0, 10)
-      return { length, stream, filename: `${options.app}-workspace-export-${date}.zip` }
-    },
-
-    /** Delete exports older than `retentionMs`, and any export by id when given. */
-    /**
-     * Advance every running export whose lease has lapsed, so an export keeps
-     * going after the owner closes the tab. Call it from the product's scheduled
-     * handler (a one-minute cron). Returns how many exports it advanced.
-     */
-    async continueRunning(budgetMs = 60_000): Promise<number> {
-      const deadline = now() + budgetMs
-      const keys: string[] = []
-      let cursor: string | undefined
-      do {
-        const page = await storage.list(`${prefix}/_running/`, cursor)
-        keys.push(...page.keys)
-        cursor = page.cursor
-      } while (cursor)
-      let advanced = 0
-      for (const key of keys) {
-        const remaining = deadline - now()
-        if (remaining <= 0) break
-        const name = key.split('/').at(-1) ?? ''
-        const workspaceId = name.slice(0, name.lastIndexOf('~'))
-        const id = name.slice(name.lastIndexOf('~') + 1)
-        if (!workspaceId || !id) continue
-        const loaded = await loadJob(workspaceId, id)
-        if (!loaded || loaded.job.status !== 'running') {
-          await storage.delete([key])
-          continue
-        }
-        if (loaded.job.lease && loaded.job.lease.until > now()) continue
-        await this.advance(workspaceId, id, Math.min(remaining, 20_000))
-        advanced += 1
-      }
-      return advanced
-    },
-
-    async prune(workspaceId: string, retentionMs: number, onlyId?: string): Promise<number> {
-      const cutoff = now() - retentionMs
-      const doomed: string[] = []
-      let cursor: string | undefined
-      const root = `${prefix}/${assertSafeKeySegment(workspaceId)}/`
-      do {
-        const page = await storage.list(root, cursor)
-        for (const key of page.keys) {
-          const id = key.slice(root.length).split('/')[0] ?? ''
-          const created = Number.parseInt(id.split('-')[0] ?? '', 36)
-          if (onlyId ? id === onlyId : Number.isFinite(created) && created < cutoff) doomed.push(key)
-        }
-        cursor = page.cursor
-      } while (cursor)
-      await storage.delete(doomed)
-      return doomed.length
-    },
   }
 }
-
-export type ExportEngine = ReturnType<typeof createExportEngine>

@@ -1,6 +1,6 @@
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { type DesignCanvasMcpToolEnv, pageSnapshot, elementAabbRecord } from './mcp-context'
-import { objectSchema, requireString } from '../tools/mcp-arguments'
+import { objectSchema, requireMcpString } from '../tools/mcp-arguments'
 import { pageIdProp, optionalNumber } from './mcp-input'
 import { requirePage } from './model'
 
@@ -33,7 +33,7 @@ export const CANVAS_READ_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] = [
       ['page_id'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
+      const pageId = requireMcpString(args, 'page_id')
       const { document, rev } = await env.store.getDocument()
       const page = requirePage(document, pageId)
       return {

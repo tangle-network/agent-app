@@ -1,3 +1,4 @@
+import { bindSearchPickerNavigation } from './focus-navigation'
 /** Searchable catalog selection and truthful model price presentation. */
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ProviderLogo } from './provider-logo'
@@ -225,34 +226,11 @@ export function ModelPicker({
   useEffect(() => {
     const panel = panelRef.current
     if (!expanded || !panel) return
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-      const input = inputRef.current
-      if (!input || !panel) return
-      const controls: HTMLElement[] = [input, ...panel.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
-      const index = controls.indexOf(document.activeElement as HTMLElement)
-      if (index < 0) return
-      if (event.key === 'Tab') {
-        // Portals are last in DOM order. Exit beside the trigger, not at the
-        // top of the page; Shift+Tab from search returns to the trigger itself.
-        if ((event.shiftKey && index === 0) || (!event.shiftKey && index === controls.length - 1)) {
-          changeOpen(false)
-          triggerRef.current?.focus()
-          if (event.shiftKey) event.preventDefault()
-        }
-        return
-      }
-      let next: number
-      if (event.key === 'ArrowDown') next = (index + 1) % controls.length
-      else if (event.key === 'ArrowUp') next = (index - 1 + controls.length) % controls.length
-      else if (event.key === 'Home' && index > 0) next = 1
-      else if (event.key === 'End' && index > 0) next = controls.length - 1
-      else return // Home/End in search remain text-editing keys.
-      event.preventDefault()
-      controls[next]?.focus()
-    }
-    panel.addEventListener('keydown', onKeyDown)
-    return () => panel.removeEventListener('keydown', onKeyDown)
+    return bindSearchPickerNavigation({
+      panel, input: () => inputRef.current, trigger: () => triggerRef.current,
+      onClose: () => changeOpen(false), buttonSelector: 'button:not(:disabled)',
+      homeEnd: true,
+    })
   }, [expanded, changeOpen, panelRef, triggerRef])
 
   const selected = sortedModels.find((m) => m.id === value)

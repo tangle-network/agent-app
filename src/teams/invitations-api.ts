@@ -24,6 +24,7 @@
  * Imports `drizzle-orm`, so this is a subpath, never re-exported from root.
  */
 
+import { fireMemberSync } from './member-sync'
 import { and, eq, lte, sql } from 'drizzle-orm'
 import {
   type InvitationEmailStatus,
@@ -38,7 +39,7 @@ import {
   parseInvitationPermission,
 } from './invitations'
 import { type WorkspaceRole, hasWorkspaceRole } from './roles'
-import { type EnforceSeatSeam, type MemberSyncSeam, SeatLimitError } from './members-api'
+import { type EnforceSeatSeam, type MemberSyncCallbacks, SeatLimitError } from './members-api'
 import type { TeamDatabase, WorkspaceAccessReader } from './drizzle/access'
 import type { TeamParentTable, TeamTables } from './drizzle/schema'
 import type { WorkspaceInvitationRow, WorkspaceInvitationTables } from './drizzle/invitations-schema'
@@ -46,7 +47,7 @@ import type { WorkspaceInvitationRow, WorkspaceInvitationTables } from './drizzl
 // Re-export the seams an adopter wires, so a consumer can import everything the
 // invitations API needs from this one subpath.
 export { SeatLimitError } from './members-api'
-export type { EnforceSeatSeam, MemberSyncSeam } from './members-api'
+export type { EnforceSeatSeam, MemberSyncCallbacks } from './members-api'
 
 /** The app's mail transport. Returns a typed outcome; never throws to the API. */
 export interface SendInvitationEmailInput {
@@ -92,7 +93,7 @@ export interface InvitationsApiOptions {
   /** OPTIONAL — seat-limit gate at create time; mirrors members-api. */
   enforceSeat?: EnforceSeatSeam
   /** OPTIONAL — fire-and-forget member propagation on accept. */
-  memberSyncSeam?: Pick<MemberSyncSeam, 'add'>
+  memberSyncSeam?: Pick<MemberSyncCallbacks, 'add'>
   /** Inviter display fallback when the inviter's email is unknown. */
   productDisplayName?: string
   /** Refuse acceptance until the signed-in account's email is verified. Off by
@@ -206,103 +207,11 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
   const workspaces = opts.workspaceTable
   const productDisplayName = opts.productDisplayName ?? 'A workspace admin'
 
-  function fireSync(op: () => Promise<void> | void) {
-    try {
-      Promise.resolve(op()).catch(() => {})
-    } catch {
-      // seam threw synchronously — swallow; sync is best-effort by contract.
-    }
-  }
 
-  async function createInvitation(input: {
-    workspaceId: string
-    email: string
-    permissions: string | undefined
-    invitedByUserId: string
-    origin: string
-    now?: Date
-  }): Promise<InvitationOutcome<{ invitation: WorkspaceInvitationView; inviteUrl: string; emailError?: string }>> {
-    const now = input.now ?? new Date()
-    const accessRow = await access.getWorkspaceAccess(input.workspaceId, input.invitedByUserId, 'admin')
-    if (!accessRow) return { succeeded: false, status: 404, error: 'Workspace not found' }
 
-    const permissions = parseInvitationPermission(input.permissions ?? 'editor')
-    if (!permissions) return { succeeded: false, status: 400, error: 'Invalid permissions' }
-    if (!hasWorkspaceRole(accessRow.role, permissions)) {
-      return { succeeded: false, status: 403, error: 'Cannot assign higher permissions than your own' }
-    }
+  const { expirePendingInvitations, getPendingInvitation, checkExistingAccountAccess, toInvitationView, getInvitationById, markInvitationExpired, getInvitationByToken, findUsersByNormalizedEmail, getOrganizationMember, getWorkspaceMemberByOrganizationMember } = createInvitationQueries(workspaceInvitations, db, users, organizationMembers, workspaceMembers, workspaces)
 
-    const email = normalizeInvitationEmail(input.email)
-    if (!email) return { succeeded: false, status: 400, error: 'Missing email' }
-    if (!isInvitationEmail(email)) return { succeeded: false, status: 400, error: INVITATION_EMAIL_HINT }
-
-    const organizationId = accessRow.organization.id
-    const workspaceName = (accessRow.workspace as { name: string }).name
-
-    await expirePendingInvitations(input.workspaceId, email, now)
-
-    const existingPending = await getPendingInvitation(input.workspaceId, email)
-    if (existingPending) return { succeeded: false, status: 409, error: 'A pending invitation already exists for this email' }
-
-    const accountCheck = await checkExistingAccountAccess(organizationId, input.workspaceId, email, input.invitedByUserId)
-    if (!accountCheck.succeeded) return accountCheck
-
-    // Seat gate: only a genuinely NEW seat. The checks above reject re-invites,
-    // existing workspace members, and org admins; an existing plain org member is
-    // already billable (no new seat), so skip the gate for them — mirrors
-    // members-api. The pending row is not inserted yet, so the seam's count
-    // reflects current usage and denies the invite that would push OVER the limit
-    // (at invite time, not accept time).
-    if (enforceSeat && !accountCheck.isExistingOrgMember) {
-      try {
-        await enforceSeat({ actorId: input.invitedByUserId, organizationId })
-      } catch (err) {
-        if (err instanceof SeatLimitError) return { succeeded: false, status: err.status, error: err.message }
-        throw err
-      }
-    }
-
-    const token = generateInvitationToken()
-    const expiresAt = getInvitationExpiresAt(now)
-
-    const [created] = await db.insert(workspaceInvitations).values({
-      workspaceId: input.workspaceId,
-      organizationId,
-      email,
-      invitedByUserId: input.invitedByUserId,
-      permissions,
-      token,
-      status: 'pending',
-      emailStatus: 'not_sent',
-      expiresAt,
-      createdAt: now,
-    }).returning()
-
-    const inviteUrl = inviteUrlForToken(input.origin, token)
-    const emailResult = await sendInvitationEmail({
-      to: email,
-      workspaceName,
-      inviterEmail: accountCheck.inviterEmail ?? productDisplayName,
-      permission: permissions,
-      inviteUrl,
-      expiresAt,
-    })
-
-    const emailStatus: InvitationEmailStatus = emailResult.succeeded ? 'sent' : 'failed'
-    const [updated] = await db.update(workspaceInvitations)
-      .set({ emailStatus, lastSentAt: emailResult.succeeded ? now : null })
-      .where(eq(workspaceInvitations.id, created!.id))
-      .returning()
-
-    return {
-      succeeded: true,
-      value: {
-        invitation: toInvitationView(updated!, accountCheck.inviterEmail),
-        inviteUrl,
-        emailError: emailResult.succeeded ? undefined : emailResult.error,
-      },
-    }
-  }
+  const { createInvitation } = createInvitationIssuer(access, expirePendingInvitations, getPendingInvitation, checkExistingAccountAccess, enforceSeat, db, workspaceInvitations, sendInvitationEmail, productDisplayName, toInvitationView)
 
   async function listInvitations(input: {
     workspaceId: string
@@ -523,7 +432,7 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
       return { succeeded: false, status: 409, error: 'The invitation changed. Reload it before continuing.' }
     }
     if (insertedMembers.length && memberSyncSeam?.add) {
-      fireSync(() => memberSyncSeam.add!({
+      fireMemberSync(() => memberSyncSeam.add!({
         workspaceId: invitation.workspaceId,
         userId: currentUser.id,
         role: invitation.permissions as WorkspaceRole,
@@ -533,6 +442,17 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
     return { succeeded: true, value: { workspaceId: invitation.workspaceId } }
   }
 
+  return { createInvitation, listInvitations, resendInvitation, revokeInvitation, getPreview, acceptInvitation }
+}
+
+function createInvitationQueries(
+  workspaceInvitations: InvitationsApiOptions['invitationsTable']['workspaceInvitations'],
+  db: InvitationsApiOptions['db'],
+  users: InvitationsApiOptions['userTable'],
+  organizationMembers: InvitationsApiOptions['tables']['organizationMembers'],
+  workspaceMembers: InvitationsApiOptions['tables']['workspaceMembers'],
+  workspaces: InvitationsApiOptions['workspaceTable'],
+) {
   // ── internal query helpers ──
 
   async function expirePendingInvitations(workspaceId: string, email: string | undefined, now: Date) {
@@ -676,6 +596,109 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
       lastSentAt: invitation.lastSentAt,
     }
   }
+  return { expirePendingInvitations, getPendingInvitation, checkExistingAccountAccess, toInvitationView, getInvitationById, markInvitationExpired, getInvitationByToken, findUsersByNormalizedEmail, getOrganizationMember, getWorkspaceMemberByOrganizationMember }
+}
 
-  return { createInvitation, listInvitations, resendInvitation, revokeInvitation, getPreview, acceptInvitation }
+function createInvitationIssuer(
+  access: InvitationsApiOptions['access'],
+  expirePendingInvitations: ReturnType<typeof createInvitationQueries>['expirePendingInvitations'],
+  getPendingInvitation: ReturnType<typeof createInvitationQueries>['getPendingInvitation'],
+  checkExistingAccountAccess: ReturnType<typeof createInvitationQueries>['checkExistingAccountAccess'],
+  enforceSeat: InvitationsApiOptions['enforceSeat'],
+  db: InvitationsApiOptions['db'],
+  workspaceInvitations: InvitationsApiOptions['invitationsTable']['workspaceInvitations'],
+  sendInvitationEmail: InvitationsApiOptions['sendInvitationEmail'],
+  productDisplayName: string,
+  toInvitationView: ReturnType<typeof createInvitationQueries>['toInvitationView'],
+) {
+  async function createInvitation(input: {
+    workspaceId: string
+    email: string
+    permissions: string | undefined
+    invitedByUserId: string
+    origin: string
+    now?: Date
+  }): Promise<InvitationOutcome<{ invitation: WorkspaceInvitationView; inviteUrl: string; emailError?: string }>> {
+    const now = input.now ?? new Date()
+    const accessRow = await access.getWorkspaceAccess(input.workspaceId, input.invitedByUserId, 'admin')
+    if (!accessRow) return { succeeded: false, status: 404, error: 'Workspace not found' }
+
+    const permissions = parseInvitationPermission(input.permissions ?? 'editor')
+    if (!permissions) return { succeeded: false, status: 400, error: 'Invalid permissions' }
+    if (!hasWorkspaceRole(accessRow.role, permissions)) {
+      return { succeeded: false, status: 403, error: 'Cannot assign higher permissions than your own' }
+    }
+
+    const email = normalizeInvitationEmail(input.email)
+    if (!email) return { succeeded: false, status: 400, error: 'Missing email' }
+    if (!isInvitationEmail(email)) return { succeeded: false, status: 400, error: INVITATION_EMAIL_HINT }
+
+    const organizationId = accessRow.organization.id
+    const workspaceName = (accessRow.workspace as { name: string }).name
+
+    await expirePendingInvitations(input.workspaceId, email, now)
+
+    const existingPending = await getPendingInvitation(input.workspaceId, email)
+    if (existingPending) return { succeeded: false, status: 409, error: 'A pending invitation already exists for this email' }
+
+    const accountCheck = await checkExistingAccountAccess(organizationId, input.workspaceId, email, input.invitedByUserId)
+    if (!accountCheck.succeeded) return accountCheck
+
+    // Seat gate: only a genuinely NEW seat. The checks above reject re-invites,
+    // existing workspace members, and org admins; an existing plain org member is
+    // already billable (no new seat), so skip the gate for them — mirrors
+    // members-api. The pending row is not inserted yet, so the seam's count
+    // reflects current usage and denies the invite that would push OVER the limit
+    // (at invite time, not accept time).
+    if (enforceSeat && !accountCheck.isExistingOrgMember) {
+      try {
+        await enforceSeat({ actorId: input.invitedByUserId, organizationId })
+      } catch (err) {
+        if (err instanceof SeatLimitError) return { succeeded: false, status: err.status, error: err.message }
+        throw err
+      }
+    }
+
+    const token = generateInvitationToken()
+    const expiresAt = getInvitationExpiresAt(now)
+
+    const [created] = await db.insert(workspaceInvitations).values({
+      workspaceId: input.workspaceId,
+      organizationId,
+      email,
+      invitedByUserId: input.invitedByUserId,
+      permissions,
+      token,
+      status: 'pending',
+      emailStatus: 'not_sent',
+      expiresAt,
+      createdAt: now,
+    }).returning()
+
+    const inviteUrl = inviteUrlForToken(input.origin, token)
+    const emailResult = await sendInvitationEmail({
+      to: email,
+      workspaceName,
+      inviterEmail: accountCheck.inviterEmail ?? productDisplayName,
+      permission: permissions,
+      inviteUrl,
+      expiresAt,
+    })
+
+    const emailStatus: InvitationEmailStatus = emailResult.succeeded ? 'sent' : 'failed'
+    const [updated] = await db.update(workspaceInvitations)
+      .set({ emailStatus, lastSentAt: emailResult.succeeded ? now : null })
+      .where(eq(workspaceInvitations.id, created!.id))
+      .returning()
+
+    return {
+      succeeded: true,
+      value: {
+        invitation: toInvitationView(updated!, accountCheck.inviterEmail),
+        inviteUrl,
+        emailError: emailResult.succeeded ? undefined : emailResult.error,
+      },
+    }
+  }
+  return { createInvitation }
 }

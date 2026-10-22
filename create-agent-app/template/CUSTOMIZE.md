@@ -83,7 +83,7 @@ Discovery: **Does the customized agent hold its contract?**
       then `pnpm dev` to exercise `/chat` for real.
 
 Before exposing `/chat`, pass a trusted server-side `HeadlessAuth.authenticate`
-resolver to `createWorker`; the default handler refuses work. The resolver must
+resolver to `createHeadlessWorker`; the default handler refuses work. The resolver must
 validate the session/key, choose the authorized workspace, and enforce budgets.
 Public discovery intentionally reports this skeleton as not ready. Do not
 change that claim until the configured product's client flow is proved.

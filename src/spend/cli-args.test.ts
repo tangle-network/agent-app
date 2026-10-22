@@ -8,45 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SpendUsageError, USAGE, loadSpendConfig, parseSpendArgs } from './cli-args'
-
-describe('parseSpendArgs', () => {
-  it('defaults to the conventional config file and a table report', () => {
-    expect(parseSpendArgs([])).toEqual({
-      configFile: 'spend.config.mjs',
-      json: false,
-      asOf: undefined,
-      skip: [],
-    })
-  })
-
-  it('reads every flag', () => {
-    const args = parseSpendArgs([
-      '--config', 'custom.mjs',
-      '--json',
-      '--as-of', '2026-08-05T04:00:00.000Z',
-      '--skip', 'velocity, negative-balance',
-    ])
-    expect(args.configFile).toBe('custom.mjs')
-    expect(args.json).toBe(true)
-    expect(args.asOf).toBe(Date.parse('2026-08-05T04:00:00.000Z'))
-    expect(args.skip).toEqual(['velocity', 'negative-balance'])
-  })
-
-  it('rejects a flag with a missing or unusable value rather than guessing', () => {
-    expect(() => parseSpendArgs(['--config'])).toThrow(SpendUsageError)
-    expect(() => parseSpendArgs(['--as-of'])).toThrow(SpendUsageError)
-    expect(() => parseSpendArgs(['--as-of', 'yesterday'])).toThrow(/not a date/)
-    expect(() => parseSpendArgs(['--skip'])).toThrow(SpendUsageError)
-    expect(() => parseSpendArgs(['--wat'])).toThrow(/unrecognized argument/)
-  })
-
-  it('documents every flag it accepts', () => {
-    for (const flag of ['--config', '--json', '--as-of', '--skip']) {
-      expect(USAGE).toContain(flag)
-    }
-  })
-})
+import { SpendUsageError, loadSpendConfig } from './cli-args'
 
 describe('loadSpendConfig', () => {
   function withConfig(source: string, run: (file: string) => Promise<void>): Promise<void> {

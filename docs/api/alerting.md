@@ -4,15 +4,7 @@
 
 Source: `src/alerting/index.ts`
 
-8 exports.
-
-### `checkSlackCredential`
-
-`function` — Ask Slack whether the bot token is alive, WITHOUT posting anything.
-
-```ts
-(options: SlackCredentialCheckOptions) => Promise<SlackCredentialVerdict>
-```
+5 exports.
 
 ### `postSlackAlert`
 
@@ -44,22 +36,6 @@ interface SlackAlertOptions
 
 ```ts
 type SlackAlertOutcome
-```
-
-### `SlackCredentialCheckOptions`
-
-`interface` — Define configuration options for verifying that a Slack bot token is live
-
-```ts
-interface SlackCredentialCheckOptions
-```
-
-### `SlackCredentialVerdict`
-
-`type` — What `checkSlackCredential` concluded.
-
-```ts
-type SlackCredentialVerdict
 ```
 
 ### `SlackFailureReason`

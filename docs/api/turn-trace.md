@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-27 exports.
+26 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -52,14 +52,6 @@ interface CreateTurnTraceOptions
 
 ```ts
 interface IntelligenceTurnTraceSinkOptions
-```
-
-### `isTraceId`
-
-`function` — True when the Router and the Sandbox API keep this id as a `x-tangle-trace-id`.
-
-```ts
-(value: string) => boolean
 ```
 
 ### `nextCallIndex`

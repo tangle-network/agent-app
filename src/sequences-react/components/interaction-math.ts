@@ -6,7 +6,7 @@
  */
 
 import { MIN_SEQUENCE_CLIP_FRAMES, clampClipStart } from '../../sequences/model'
-import type { SnapPoint, SnapResult } from '../contracts'
+import type { SnapPoint, TimelineSnapResult } from '../contracts'
 
 /** Quantize a horizontal pointer delta to whole frames at the current zoom. */
 export function framesFromPixelDelta(deltaX: number, zoom: number): number {
@@ -161,8 +161,8 @@ export function clipChipGeometry(input: { startFrame: number; durationFrames: nu
 export function chooseMoveSnap(input: {
   candidateStartFrame: number
   durationFrames: number
-  startSnap: SnapResult
-  endSnap: SnapResult
+  startSnap: TimelineSnapResult
+  endSnap: TimelineSnapResult
 }): { startFrame: number; point: SnapPoint | null } {
   const startDelta = input.startSnap.snapped
     ? Math.abs(input.startSnap.frame - input.candidateStartFrame)

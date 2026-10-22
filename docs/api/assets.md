@@ -4,7 +4,7 @@
 
 Source: `src/assets/index.ts`
 
-41 exports.
+40 exports.
 
 ### `ApprovalEvent`
 
@@ -164,14 +164,6 @@ interface EmailFeatureSection
 
 ```ts
 interface EmailHeroSection
-```
-
-### `EmailSection`
-
-`type` — Define a union type representing different sections of an email template
-
-```ts
-type EmailSection
 ```
 
 ### `EmailTestimonialSection`

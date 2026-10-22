@@ -78,6 +78,14 @@ interface BindSlotInput
 (src: string, naturalSize: { width: number; height: number; }, page: InsertPageGeometry) => SceneOperation
 ```
 
+### `CanvasSnapResult`
+
+`interface` — Define the result of a snap operation including coordinates and active snap lines
+
+```ts
+interface CanvasSnapResult
+```
+
 ### `centeredPosition`
 
 `function` — Top-left position that centers a (width, height) box on the page.
@@ -556,14 +564,6 @@ interface SetPagePropsInput
 
 ```ts
 interface SnapEngine
-```
-
-### `SnapResult`
-
-`interface` — Define the result of a snap operation including coordinates and active snap lines
-
-```ts
-interface SnapResult
 ```
 
 ### `SnapTarget`
