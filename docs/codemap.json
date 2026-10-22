@@ -916,6 +916,12 @@
       "error": null,
       "exports": [
         {
+          "name": "AppAuthColumnMap",
+          "kind": "type",
+          "signature": "type AppAuthColumnMap",
+          "doc": "A table's built columns by field name, as an index callback receives them."
+        },
+        {
           "name": "AppAuthSessionColumns",
           "kind": "type",
           "signature": "type AppAuthSessionColumns",
@@ -934,9 +940,21 @@
           "doc": "The tables `createAppAuthTables` returns."
         },
         {
+          "name": "AppAuthUserColumns",
+          "kind": "type",
+          "signature": "type AppAuthUserColumns",
+          "doc": "Extra user columns, keyed by their TypeScript field name."
+        },
+        {
+          "name": "AppAuthUsersTable",
+          "kind": "type",
+          "signature": "type AppAuthUsersTable",
+          "doc": "The `user` table with the product's extra columns."
+        },
+        {
           "name": "createAppAuthTables",
           "kind": "function",
-          "signature": "<S extends AppAuthSessionColumns = Record<never, never>>(options?: CreateAppAuthTablesOptions<S>) => { users: SQLiteTab…",
+          "signature": "<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>>(options?:…",
           "doc": "Build the better-auth `user`, `session`, `account` and `verification` tables."
         },
         {
