@@ -4,6 +4,7 @@ import { Sandbox } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
+import { noticePart } from '../../src/interactions/contract'
 import { runNativeCompletionWorkflow } from '../../src/preset-cloudflare/native-completion-workflow'
 import { createAssistantDraftWriter } from '../../src/chat-routes/draft-persistence'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
@@ -133,7 +134,7 @@ async function boundary(test: Case) {
           const writer = createAssistantDraftWriter({ store, threadId,
             messageId: `assistant:${turnId}`, snapshot: () => null })
           await writer.finalize({ content: receipt.text,
-            parts: [...receipt.parts, { type: 'notice', kind: 'error', id: 'native-failure', text: receipt.error! }] })
+            parts: [...receipt.parts, noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')] })
           return `assistant:${turnId}`
         },
         async settle(_payload, receipt) {
@@ -169,6 +170,7 @@ async function boundary(test: Case) {
       expect(transcript).toHaveLength(1)
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
+      expect(JSON.stringify(transcript[0]!.parts)).toContain(test.publicCause ?? publicDiskCause)
     }
     if (test.expected !== 'failed') {
       expect(await turnStore.getStatus(turnId)).toBe('running')
