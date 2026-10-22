@@ -97,7 +97,10 @@ export function createWarmCache<T>(namespace: string, options: WarmCacheOptions 
     },
     async forget(key) {
       entries.delete(key)
-      await coloCache()?.delete(coloKey(key)).catch(() => false)
+      // A failed delete leaves the value served until it expires: say so (namespace and key only, never a value).
+      await coloCache()?.delete(coloKey(key)).catch((error: unknown) => {
+        console.warn('[warm-cache] forget failed', { namespace, key, error: error instanceof Error ? error.message : String(error) })
+      })
     },
     clearIsolate() {
       entries.clear()

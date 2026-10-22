@@ -13367,6 +13367,7 @@
         "billing",
         "crypto",
         "runtime",
+        "sandbox",
         "web"
       ],
       "error": null,
@@ -13376,6 +13377,12 @@
           "kind": "interface",
           "signature": "interface AdminGuardOptions",
           "doc": "Define options to resolve user session and control access based on allowed admin emails"
+        },
+        {
+          "name": "AdmitBillableTurnOptions",
+          "kind": "interface",
+          "signature": "interface AdmitBillableTurnOptions",
+          "doc": null
         },
         {
           "name": "agentOperatorScopes",
@@ -13444,6 +13451,36 @@
           "doc": "Describe the billable balance state including overage permission and remaining USD balance"
         },
         {
+          "name": "BillableTurnAdmission",
+          "kind": "interface",
+          "signature": "interface BillableTurnAdmission",
+          "doc": null
+        },
+        {
+          "name": "BillableTurnAdmissionOptions",
+          "kind": "interface",
+          "signature": "interface BillableTurnAdmissionOptions",
+          "doc": null
+        },
+        {
+          "name": "BillableTurnAdmissionResult",
+          "kind": "type",
+          "signature": "type BillableTurnAdmissionResult",
+          "doc": null
+        },
+        {
+          "name": "BillableTurnSeatVerdict",
+          "kind": "interface",
+          "signature": "interface BillableTurnSeatVerdict",
+          "doc": "A seat verdict; `paidThrough` (ISO) ends a kept verdict early, `null` when access is not a dated seat."
+        },
+        {
+          "name": "BillableTurnVerdict",
+          "kind": "interface",
+          "signature": "interface BillableTurnVerdict",
+          "doc": "A Platform read's verdict: only `allowed` decides admission."
+        },
+        {
           "name": "BillingConsentOutcome",
           "kind": "type",
           "signature": "type BillingConsentOutcome",
@@ -13484,6 +13521,12 @@
           "kind": "function",
           "signature": "(auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…",
           "doc": "Canonical `setSessionCookie` wiring for better-auth apps: mint the session Set-Cookie exactly as better-auth's own login flows do — name + attributes from `auth.$context.authCookies.sessionToken` (be…"
+        },
+        {
+          "name": "createBillableTurnAdmission",
+          "kind": "function",
+          "signature": "<Input extends { userId: string; }, Seat extends BillableTurnSeatVerdict, Balance extends BillableTurnVerdict>(options:…",
+          "doc": null
         },
         {
           "name": "createD1TangleIdentityStore",
@@ -14184,6 +14227,7 @@
         "billing",
         "crypto",
         "runtime",
+        "sandbox",
         "web"
       ],
       "error": null,
