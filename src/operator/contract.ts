@@ -155,6 +155,20 @@ export interface OperatorTurn {
   executionId?: string
   model?: string
   costUsd?: number
+  /**
+   * Token usage the app stored on the turn's reply; `operatorTurnUsage` maps
+   * a chat-store row to it.
+   * - `inputTokens`: prompt tokens NOT read from the provider's cache. Unlike
+   *   the turn trace's summary, it never includes cache reads; it is omitted
+   *   when the row's split is ambiguous, including when the row records no
+   *   cache count (see `operatorTurnUsage`).
+   * - `cachedInputTokens`: prompt tokens read from the provider's cache (the
+   *   row's `cacheReadTokens`); with both present the whole prompt is
+   *   `inputTokens + cachedInputTokens`. When absent the cache share is unknown.
+   * - `outputTokens`: completion tokens.
+   * Each field is present only when known; never a guessed zero.
+   */
+  usage?: { inputTokens?: number; cachedInputTokens?: number; outputTokens?: number }
   completedAt?: string
   /** The settled answer; null until the turn settles. */
   reply: { content: string; mediaType: string } | null

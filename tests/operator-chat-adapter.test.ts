@@ -3,6 +3,7 @@ import {
   createChatOperatorAdapter,
   createOperatorApi,
   createOperatorClient,
+  operatorTurnUsage,
   type ChatOperatorAdapterOptions,
   type ChatOperatorAdmission,
   type ChatOperatorAdmissionStore,
@@ -27,6 +28,7 @@ function setup(options: {
   reply?: (content: string) => Record<string, unknown>
   running?: () => string[] | null
   failureOf?: ChatOperatorAdapterOptions<Identity>['failureOf']
+  inputIncludesCache?: ChatOperatorAdapterOptions<Identity>['inputIncludesCache']
 } = {}) {
   const threads = options.threads ?? new Map<string, ChatOperatorThread>([
     ['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }],
@@ -41,7 +43,8 @@ function setup(options: {
     list.push({ id: `u-${input.turnId}`, role: 'user', content: input.content, parts: [{ type: 'text', text: input.content, turnId: input.turnId }], createdAt: ++clock })
     const reply = options.reply?.(input.content) ?? { content: `Done: ${input.content}`, parts: [{ type: 'session-artifact', path: 'notes/plan.md', action: 'created' }] }
     list.push({ id: `a-${input.turnId}`, role: 'assistant', content: String(reply.content ?? ''), parts: (reply.parts as Array<Record<string, unknown>>) ?? [], createdAt: ++clock, servedModel: 'gpt-6-luna', costUsd: 0.12,
-      ...(reply.metadata ? { metadata: reply.metadata as Record<string, unknown> } : {}) })
+      ...(reply.metadata ? { metadata: reply.metadata as Record<string, unknown> } : {}),
+      ...(reply.usage ? reply.usage as Pick<ChatOperatorMessage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'> : {}) })
     messages.set(input.threadId, list)
     return new Response('{"type":"text"}\n{"type":"done"}\n', { headers: { 'content-type': 'application/x-ndjson' } })
   })
@@ -69,6 +72,7 @@ function setup(options: {
     runTurn,
     runningTurns: async () => options.running?.() ?? [],
     ...(options.failureOf ? { failureOf: options.failureOf } : {}),
+    ...(options.inputIncludesCache !== undefined ? { inputIncludesCache: options.inputIncludesCache } : {}),
   })
   const api = createOperatorApi<RequestApiKey, Identity>({
     app: { id: 'legal', name: 'Legal' },
@@ -104,6 +108,50 @@ describe('chat operator adapter', () => {
 
     const thread = await client.getThread('ws-a', started.value.threadId)
     expect(thread).toMatchObject({ succeeded: true, value: { latestTurn: { turnId: '1f0c5a3e-9b7d-4c21-8e6f-0a1b2c3d4e5f', state: 'succeeded' } } })
+  })
+
+  it('reports the token usage stored on the reply row, and none when the row has none', async () => {
+    const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [],
+      ...(content === 'Metered' ? { usage: { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0, reasoningTokens: 40 } } : {}),
+      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: 300, cacheReadTokens: 0 } } : {}),
+      ...(content === 'Cache unrecorded' ? { usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: null } } : {}) }) })
+
+    const metered = await client.startTurn('ws-a', { content: 'Metered' })
+    if (!metered.succeeded) throw new Error(metered.error)
+    // A recorded zero is reported; columns the operator turn does not carry are not.
+    // The adapter does not know which agent-app wrote the row, so a cached split is ambiguous and inputTokens is omitted.
+    expect(metered.value.usage).toEqual({ cachedInputTokens: 800, outputTokens: 0 })
+
+    const partly = await client.startTurn('ws-a', { content: 'Partly metered' })
+    if (!partly.succeeded) throw new Error(partly.error)
+    // A recorded zero cache read makes the input count unambiguous.
+    expect(partly.value.usage).toEqual({ inputTokens: 300, cachedInputTokens: 0, outputTokens: 55 })
+
+    // A missing cache count is unknown, not zero, so the input count is omitted.
+    const unrecorded = await client.startTurn('ws-a', { content: 'Cache unrecorded' })
+    if (!unrecorded.succeeded) throw new Error(unrecorded.error)
+    expect(unrecorded.value.usage).toEqual({ outputTokens: 20 })
+
+    const unmetered = await client.startTurn('ws-a', { content: 'Unmetered' })
+    if (!unmetered.succeeded) throw new Error(unmetered.error)
+    expect(unmetered.value.state).toBe('succeeded')
+    expect('usage' in unmetered.value).toBe(false)
+    // An app whose rows all exclude cache reads says so, and gets the uncached input.
+    const current = setup({ inputIncludesCache: false, reply: (content) => ({ content: `Done: ${content}`, parts: [], usage: { inputTokens: 1200, cacheReadTokens: 800 } }) })
+    const currentTurn = await current.client.startTurn('ws-a', { content: 'Metered' })
+    expect(currentTurn).toMatchObject({ succeeded: true, value: { usage: { inputTokens: 1200, cachedInputTokens: 800 } } })
+
+    // An app with its own operator turns maps its rows through the same function, naming its writer's convention.
+    const row = { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 9 }
+    expect(operatorTurnUsage(row, { inputIncludesCache: false })).toEqual({ inputTokens: 1200, cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage(row, { inputIncludesCache: true })).toEqual({ inputTokens: 400, cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage({ inputTokens: 500, cacheReadTokens: 800 }, { inputIncludesCache: true })).toEqual({ cachedInputTokens: 800 })
+    expect(operatorTurnUsage(row)).toEqual({ cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage({ inputTokens: 7, cacheReadTokens: 0 })).toEqual({ inputTokens: 7, cachedInputTokens: 0 })
+    const unrecordedRow = { inputTokens: 100, outputTokens: 20, cacheReadTokens: null }
+    expect(operatorTurnUsage(unrecordedRow)).toEqual({ outputTokens: 20 })
+    expect(operatorTurnUsage(unrecordedRow, { inputIncludesCache: false })).toEqual({ inputTokens: 100, outputTokens: 20 })
+    expect(operatorTurnUsage(unrecordedRow, { inputIncludesCache: true })).toEqual({ outputTokens: 20 })
   })
 
   it('reports a failure notice as a failed turn', async () => {
