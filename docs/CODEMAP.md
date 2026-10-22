@@ -98,7 +98,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./rollout`](api/rollout.md) | 14 | `signoff` |
 | [`./rollout/cli`](api/rollout-cli.md) | 3 | `signoff` |
-| [`./rollout/d1`](api/rollout-d1.md) | 7 | `signoff` |
+| [`./rollout/d1`](api/rollout-d1.md) | 8 | `signoff` |
 | [`./runtime`](api/runtime.md) | 109 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 29 | `tools`, `turn-trace` |
 | [`./runtime/telemetry-cap`](api/runtime-telemetry-cap.md) | 4 | `tools`, `turn-trace` |
@@ -1015,11 +1015,11 @@ Depends on: `signoff`
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · 7 exports
+Source: `src/rollout/d1.ts` · 8 exports
 
 Depends on: `signoff`
 
-`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `stageMetrics`, `TurnTimingRow`
+`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL`, `stageMetrics`, `TurnTimingRow`
 
 [Full API →](api/rollout-d1.md)
 

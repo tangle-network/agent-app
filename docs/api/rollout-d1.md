@@ -4,7 +4,7 @@
 
 Source: `src/rollout/d1.ts`
 
-7 exports.
+8 exports.
 
 ### `createD1TurnTimingStore`
 
@@ -44,6 +44,14 @@ interface D1LikeForRollout
 
 ```ts
 "\nCREATE TABLE IF NOT EXISTS rollout_turn_timing (\n turn_id TEXT PRIMARY KEY,\n rollout TEXT NOT NULL,\n workspace_id…
+```
+
+### `ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL`
+
+`const` — Apply once through the product migration runner before any row carries `variant`; old rows stay NULL.
+
+```ts
+"ALTER TABLE rollout_turn_timing ADD COLUMN variant TEXT;"
 ```
 
 ### `stageMetrics`
