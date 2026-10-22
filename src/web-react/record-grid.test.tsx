@@ -310,27 +310,6 @@ describe('RecordGrid add form', () => {
     expect(onCreate).not.toHaveBeenCalled()
   })
 
-  it('writes the typed values and shows the row the create returned', async () => {
-    const onCreate = vi.fn(async (_values: Readonly<Record<string, RecordGridValue>>): Promise<RecordGridCreateOutcome> => ({
-      succeeded: true,
-      value: { id: 'srv-9', values: { holder: 'Ada', shares: 4000 } },
-    }))
-    render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Add holder' }))
-    fireEvent.change(screen.getByLabelText(/^Holder/), { target: { value: 'Ada' } })
-    fireEvent.change(screen.getByLabelText(/^Shares/), { target: { value: '4000' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    })
-    await flush()
-
-    expect(onCreate).toHaveBeenCalledWith({ holder: 'Ada', shares: 4000 })
-    expect(screen.getByText('Ada')).toBeTruthy()
-    expect(screen.getByText('4,000')).toBeTruthy()
-    expect(screen.queryByRole('form', { name: 'Add holder' })).toBeNull()
-  })
-
   it('drops the optimistic row and keeps the form when the create is refused', async () => {
     const onCreate = vi.fn(async (_values: Readonly<Record<string, RecordGridValue>>): Promise<RecordGridCreateOutcome> => ({ succeeded: false, error: 'duplicate holder' }))
     render(<RecordGrid columns={COLUMNS} state={readyState(ROWS)} caption="Cap table" empty={EMPTY} onCreate={onCreate} addLabel="Add holder" />)

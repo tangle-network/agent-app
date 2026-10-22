@@ -54,12 +54,12 @@
 import { withD1QueryCount, currentD1QueryCounter } from '../launch-invariants/d1-query-count'
 import { createInteractionAnswerRoute } from '../interactions/route'
 import { replayTurnEvents, stampReplaySeq } from '../stream/index'
-import { checkModelPolicy } from '../policy-filters/index'
 import { parseJsonObjectBody } from '../web/index'
 import { createTurnTrace, type TurnTrace, type TurnTraceSink } from '../turn-trace/recorder'
 import { createIntelligenceTurnTraceSink } from '../turn-trace/otel'
 import { storeSupportsDraftPersistence, type AssistantDraftStore, type DraftPersistenceTuning } from './draft-persistence'
-import { errorResponse, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgress } from './turn-admission'
+import { startTurnPrefetch } from './turn-prefetch'
+import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgress } from './turn-admission'
 import { createAdmittedTurnRunner, type AfterAuthorizeWork } from './turn-execution'
 import {
   INTENT_LINE_TIMEOUT_MS,
@@ -205,25 +205,14 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
       throw err
     }
     parse.end()
-    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload) }))
-    if (!auth.ok) return { ok: false, response: auth.response }
-    // Admission policy on the model the turn NAMES, before any side effect.
-    // The unnamed-model half resolves inside `produce`; the producer-side
-    // policy covers it at execution.
-    const namedModel = typeof parsed.payload.model === 'string' ? parsed.payload.model.trim() : ''
-    const policy = options.modelPolicy
-    if (policy && namedModel) {
-      const decision = await trace.measure('admission.model_policy', 'admission', () => checkModelPolicy(
-        namedModel,
-        policy.catalog,
-        policy.filter,
-        policy.context,
-      ))
-      if (!decision.allowed) {
-        return { ok: false, response: Response.json({ code: 'model_policy_denied', error: decision.reason }, { status: 403 }) }
-      }
-    }
-    return { ok: true, parsed, auth, trace }
+    const prefetch = options.prefetch && startTurnPrefetch(options.prefetch, { request, body: parsed.payload, trace })
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload), ...(prefetch ? { identified: prefetch.identified } : {}) }))
+    // A refusal drops what the prefetch read; so does a refused named model, checked before any side effect (the
+    // unnamed-model half is the producer's).
+    if (!auth.ok) { prefetch?.discard(); return { ok: false, response: auth.response } }
+    const refusal = await namedModelRefusal(options.modelPolicy, parsed.payload, trace)
+    if (refusal) { prefetch?.discard(); return { ok: false, response: refusal } }
+    return { ok: true, parsed, auth, trace, ...(prefetch ? { prefetched: prefetch.admitted(auth) } : {}) }
   }
 
   /**

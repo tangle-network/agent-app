@@ -155,6 +155,14 @@ export interface OperatorTurn {
   executionId?: string
   model?: string
   costUsd?: number
+  /** Producer-recorded basis for costUsd; catalog is an estimate, ledger is settlement evidence. */
+  costSource?: 'ledger' | 'catalog' | 'reported' | 'unreported' | 'subscription'
+  /** Producer-recorded billing path, not the identity of a payer. */
+  billingOwner?: 'router' | 'sandbox-router' | 'subscription'
+  /** Producer-recorded credential path; never inferred from costUsd or billingOwner. */
+  credentialSource?: 'router' | 'subscription'
+  /** Opaque producer settlement reference; its presence alone does not prove a charge or zero provider cost. */
+  settlementRecord?: string
   /**
    * Token usage the app stored on the turn's reply; `operatorTurnUsage` maps
    * a chat-store row to it.

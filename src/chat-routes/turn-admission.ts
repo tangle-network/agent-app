@@ -3,7 +3,8 @@ import { mentionInputToPart, toChatMessageParts, type ChatMessagePart } from '..
 import { normalizeClientTurnId } from '../stream/index'
 import type { TurnTrace } from '../turn-trace/recorder'
 import { formatServerTiming } from '../turn-trace/server-timing'
-import type { ChatTurnAuthorization } from './turn-route-contracts'
+import { checkModelPolicy } from '../policy-filters/index'
+import type { ChatTurnAuthorization, CreateChatTurnRoutesOptions } from './turn-route-contracts'
 import {
   assertPromptPartsWithinCap,
   ChatTurnInputError,
@@ -15,7 +16,13 @@ import {
 } from './wire'
 
 /** A turn whose body parsed and whose caller `authorize` admitted. */
-export type AdmittedTurn<TContext> = { parsed: ParsedTurnBody; auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }>; trace: TurnTrace }
+export type AdmittedTurn<TContext> = {
+  parsed: ParsedTurnBody
+  auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }>
+  trace: TurnTrace
+  /** The route's read-only prefetch for this admitted identity (`./turn-prefetch`). */
+  prefetched?: Promise<unknown>
+}
 
 /** Emits one stage on a progress-first stream. */
 export type TurnProgress = (phase: string, message: string) => void
@@ -45,6 +52,19 @@ export function admissionServerTiming(trace: TurnTrace): string {
     .sort((a, b) => a.startMs - b.startMs)
     .map((span) => ({ name: span.name, durMs: span.endMs - span.startMs }))
   return formatServerTiming([{ name: 'admission', durMs: now - trace.startedAt }, ...steps])
+}
+
+/** The admission policy's refusal of the model the turn names, or null when it allows it or names none. */
+export async function namedModelRefusal(
+  policy: CreateChatTurnRoutesOptions<unknown>['modelPolicy'],
+  payload: ChatTurnRequestPayload,
+  trace: TurnTrace,
+): Promise<Response | null> {
+  const namedModel = typeof payload.model === 'string' ? payload.model.trim() : ''
+  if (!policy || !namedModel) return null
+  const decision = await trace.measure('admission.model_policy', 'admission', () =>
+    checkModelPolicy(namedModel, policy.catalog, policy.filter, policy.context))
+  return decision.allowed ? null : Response.json({ code: 'model_policy_denied', error: decision.reason }, { status: 403 })
 }
 
 export function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: number | undefined): ParsedTurnBody {

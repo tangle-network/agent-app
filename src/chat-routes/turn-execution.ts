@@ -243,7 +243,7 @@ export function createAdmittedTurnRunner<TContext>({
       priorMessages: chatTurn.priorMessages,
       handoffCompletion,
       trace,
-      ...(intentLine ? { intentLine } : {}),
+      ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
       ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
     }
     // Dispatch-first: the model call starts now; its output waits for the chain below to commit (./dispatch-first).

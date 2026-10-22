@@ -35,7 +35,7 @@ interface CampaignResult
 `function` — Compare complete optimization methods on disjoint train, selection, and final test data.
 
 ```ts
-<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…
+<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…
 ```
 
 ### `CompareOptimizationMethodsOptions`
@@ -104,7 +104,7 @@ interface Gate
 
 ### `gepaOptimizationMethod`
 
-`function` — Environment for a bridge child that spawns `claude` CLI subprocesses.
+`function`
 
 ```ts
 <TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…

@@ -3105,6 +3105,24 @@
           "doc": "Resolve input as either a text part or a file part of a chat turn"
         },
         {
+          "name": "ChatTurnPrefetch",
+          "kind": "type",
+          "signature": "type ChatTurnPrefetch",
+          "doc": null
+        },
+        {
+          "name": "ChatTurnPrefetchArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnPrefetchArgs",
+          "doc": null
+        },
+        {
+          "name": "ChatTurnPrefetchIdentity",
+          "kind": "interface",
+          "signature": "interface ChatTurnPrefetchIdentity",
+          "doc": "Who `authorize` verified the caller to be: the workspace (tenant) and the member."
+        },
+        {
           "name": "ChatTurnPrepareArgs",
           "kind": "interface",
           "signature": "interface ChatTurnPrepareArgs",
@@ -7691,7 +7709,7 @@
         {
           "name": "compareOptimizationMethods",
           "kind": "function",
-          "signature": "<TScenario extends Scenario, TArtifact>(rawOpts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Op…",
+          "signature": "<TScenario extends Scenario, TArtifact>(opts: CompareOptimizationMethodsOptions<TScenario, TArtifact>) => Promise<Optim…",
           "doc": "Compare complete optimization methods on disjoint train, selection, and final test data."
         },
         {
@@ -7746,7 +7764,7 @@
           "name": "gepaOptimizationMethod",
           "kind": "function",
           "signature": "<TScenario extends Scenario, TArtifact>(config: GepaOptimizationMethodConfig<TScenario, TArtifact>) => OptimizationMeth…",
-          "doc": "Environment for a bridge child that spawns `claude` CLI subprocesses."
+          "doc": null
         },
         {
           "name": "GepaOptimizationMethodConfig",

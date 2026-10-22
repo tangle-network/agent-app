@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.60.281
+
+- fix(customer-db-gateway): use patched Node 24 base image (#1265)
+
+## 0.60.280
+
+- Retire redundant mocked RecordGrid create check (#1266)
+
+## 0.60.279
+
+- feat(chat-routes): prefetch reads a turn's prompt inputs while authorize finishes (#1263)
+
+## 0.60.278
+
+- Expose producer-supplied turn cost provenance (#1262)
+- chore(deps): adopt @tangle-network/sandbox 0.64.12 (#1261)
+
 ## 0.60.277
 
 - feat(review): compare blind rows in the existing inbox (#1259)
