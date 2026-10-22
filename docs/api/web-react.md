@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-521 exports.
+522 exports.
 
 ### `acceptRejectionReason`
 
@@ -2212,6 +2212,14 @@ interface MentionTextSegment
 
 ```ts
 interface MessageAttachmentsProps
+```
+
+### `mintThreadId`
+
+`function` — A thread id in the server's own format (32 lowercase hex), minted in the browser for a new chat's first turn: send it as both `threadId` and `newThread.id`, and the turn route's `createThread` option…
+
+```ts
+() => string
 ```
 
 ### `missingAnswerHint`

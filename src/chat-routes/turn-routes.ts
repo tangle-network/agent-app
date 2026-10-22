@@ -81,6 +81,7 @@ import {
   type TurnIntentEvent,
   type TurnRoutePhase,
 } from './turn-progress'
+import { bindTurnThreadCreation } from './minted-thread'
 import { ChatTurnInputError } from './wire'
 
 export * from './turn-route-contracts'
@@ -112,8 +113,8 @@ function earlyTurnWork(
 }
 
 /** Build chat turn routes to handle and validate incoming chat requests with optional logging */
-export function createChatTurnRoutes<TContext = void>(
-  options: CreateChatTurnRoutesOptions<TContext>,
+export function createChatTurnRoutes<TContext = void, TThread = unknown>(
+  options: CreateChatTurnRoutesOptions<TContext, TThread>,
 ): ChatTurnRoutes {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
@@ -204,7 +205,7 @@ export function createChatTurnRoutes<TContext = void>(
       throw err
     }
     parse.end()
-    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span }))
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload) }))
     if (!auth.ok) return { ok: false, response: auth.response }
     // Admission policy on the model the turn NAMES, before any side effect.
     // The unnamed-model half resolves inside `produce`; the producer-side
