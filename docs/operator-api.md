@@ -118,7 +118,8 @@ Errors are `{ error, code, retryable? }`.
    `unknown` means the app cannot establish the state; it is never evidence of success.
    A turn with a reply may carry `model`, `costUsd`, and `usage` with the token counts the app stored on it: `inputTokens` (prompt not served from cache), `cachedInputTokens` (prompt served from the provider's cache), and `outputTokens`.
    The whole prompt is `inputTokens + cachedInputTokens`; a count the app did not record is absent, never zero.
-   An app that builds its own turns maps a stored row with `operatorTurnUsage` from `@tangle-network/agent-app/operator`.
+   Rows written before agent-app 0.60.248 may count cache reads inside `inputTokens`, and a row does not say which, so `inputTokens` is omitted on a row with cache reads unless the app sets `inputIncludesCache` on `createChatOperatorAdapter`.
+   An app that builds its own turns maps a stored row with `operatorTurnUsage(row, { inputIncludesCache })` from `@tangle-network/agent-app/operator`.
 4. To stop the turn early, the caller posts its cancel route; see [Cancel a turn](#cancel-a-turn).
 
 An accepted turn or an open connection does not establish completion; read the settled turn.

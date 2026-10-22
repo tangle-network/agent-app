@@ -28,6 +28,7 @@ function setup(options: {
   reply?: (content: string) => Record<string, unknown>
   running?: () => string[] | null
   failureOf?: ChatOperatorAdapterOptions<Identity>['failureOf']
+  inputIncludesCache?: ChatOperatorAdapterOptions<Identity>['inputIncludesCache']
 } = {}) {
   const threads = options.threads ?? new Map<string, ChatOperatorThread>([
     ['thread-b', { id: 'thread-b', workspaceId: 'ws-b', title: 'Other' }],
@@ -71,6 +72,7 @@ function setup(options: {
     runTurn,
     runningTurns: async () => options.running?.() ?? [],
     ...(options.failureOf ? { failureOf: options.failureOf } : {}),
+    ...(options.inputIncludesCache !== undefined ? { inputIncludesCache: options.inputIncludesCache } : {}),
   })
   const api = createOperatorApi<RequestApiKey, Identity>({
     app: { id: 'legal', name: 'Legal' },
@@ -111,23 +113,35 @@ describe('chat operator adapter', () => {
   it('reports the token usage stored on the reply row, and none when the row has none', async () => {
     const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [],
       ...(content === 'Metered' ? { usage: { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0, reasoningTokens: 40 } } : {}),
-      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: null } } : {}) }) })
+      ...(content === 'Partly metered' ? { usage: { outputTokens: 55, inputTokens: 300, cacheReadTokens: null } } : {}) }) })
 
     const metered = await client.startTurn('ws-a', { content: 'Metered' })
     if (!metered.succeeded) throw new Error(metered.error)
     // A recorded zero is reported; columns the operator turn does not carry are not.
-    expect(metered.value.usage).toEqual({ inputTokens: 1200, cachedInputTokens: 800, outputTokens: 0 })
+    // The adapter does not know which agent-app wrote the row, so a cached split is ambiguous and inputTokens is omitted.
+    expect(metered.value.usage).toEqual({ cachedInputTokens: 800, outputTokens: 0 })
 
     const partly = await client.startTurn('ws-a', { content: 'Partly metered' })
     if (!partly.succeeded) throw new Error(partly.error)
-    expect(partly.value.usage).toEqual({ outputTokens: 55 })
+    // With no cache reads the input count is unambiguous.
+    expect(partly.value.usage).toEqual({ inputTokens: 300, outputTokens: 55 })
 
     const unmetered = await client.startTurn('ws-a', { content: 'Unmetered' })
     if (!unmetered.succeeded) throw new Error(unmetered.error)
     expect(unmetered.value.state).toBe('succeeded')
     expect('usage' in unmetered.value).toBe(false)
-    // An app with its own operator turns maps its rows through the same function.
-    expect(operatorTurnUsage({ inputTokens: 7, cacheReadTokens: null })).toEqual({ inputTokens: 7 })
+    // An app whose rows all exclude cache reads says so, and gets the uncached input.
+    const current = setup({ inputIncludesCache: false, reply: (content) => ({ content: `Done: ${content}`, parts: [], usage: { inputTokens: 1200, cacheReadTokens: 800 } }) })
+    const currentTurn = await current.client.startTurn('ws-a', { content: 'Metered' })
+    expect(currentTurn).toMatchObject({ succeeded: true, value: { usage: { inputTokens: 1200, cachedInputTokens: 800 } } })
+
+    // An app with its own operator turns maps its rows through the same function, naming its writer's convention.
+    const row = { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 9 }
+    expect(operatorTurnUsage(row, { inputIncludesCache: false })).toEqual({ inputTokens: 1200, cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage(row, { inputIncludesCache: true })).toEqual({ inputTokens: 400, cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage({ inputTokens: 500, cacheReadTokens: 800 }, { inputIncludesCache: true })).toEqual({ cachedInputTokens: 800 })
+    expect(operatorTurnUsage(row)).toEqual({ cachedInputTokens: 800, outputTokens: 9 })
+    expect(operatorTurnUsage({ inputTokens: 7, cacheReadTokens: 0 })).toEqual({ inputTokens: 7, cachedInputTokens: 0 })
   })
 
   it('reports a failure notice as a failed turn', async () => {

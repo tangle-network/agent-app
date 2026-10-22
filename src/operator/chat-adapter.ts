@@ -29,7 +29,7 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
-  /** Usage columns as chat-store stores them; `inputTokens` excludes `cacheReadTokens`. */
+  /** Usage columns as chat-store stores them; see `operatorTurnUsage` for what `inputTokens` holds. */
   inputTokens?: number | null
   cacheReadTokens?: number | null
   outputTokens?: number | null
@@ -136,6 +136,14 @@ export interface ChatOperatorAdapterOptions<Identity> {
    * `errorNotice` mode), a `turn-failure` notice or an `error` part.
    */
   failureOf?(message: ChatOperatorMessage): { code?: string; message: string } | null
+  /**
+   * Whether stored rows' `inputTokens` include cache reads, for
+   * `operatorTurnUsage`. A row does not say which agent-app wrote it: since
+   * 0.60.248 the writers exclude them (`false`), so an app whose rows all
+   * date from then may pass `false`. Default `'unknown'` omits `inputTokens`
+   * on rows with cache reads.
+   */
+  inputIncludesCache?: boolean | 'unknown'
 }
 
 const iso = (value: Date | string | number | null | undefined): string | undefined => {
@@ -182,19 +190,37 @@ function turnIdOf(message: ChatOperatorMessage): string | null {
 
 /**
  * The operator turn usage of a stored assistant row, for `OperatorTurn.usage`.
- * Reads chat-store's columns, where `inputTokens` is the prompt not read from
- * cache and `cacheReadTokens` the cache reads (reported as `cachedInputTokens`);
- * a lane that reports no cache split stores no `cacheReadTokens`, so its cache
- * share stays unknown. A count
- * that is not a finite number is omitted, never zeroed; a row with none gives
- * `undefined`. An app that builds its own operator turns from such rows calls
- * this rather than mapping them itself.
+ * `cachedInputTokens` is the row's `cacheReadTokens` and `outputTokens` its
+ * `outputTokens`, each when the row has it. `inputTokens` is reported only as
+ * the prompt NOT read from cache, and a row does not record whether its
+ * `inputTokens` already excludes cache reads (agent-app's writers exclude them
+ * since 0.60.248; earlier Router-lane rows include them). So:
+ * - with no cache reads (absent or 0), the row's `inputTokens` is unambiguous;
+ * - `inputIncludesCache: false` reports the row's `inputTokens`;
+ * - `inputIncludesCache: true` reports `inputTokens - cacheReadTokens`, omitted
+ *   when that would be negative;
+ * - `'unknown'` (the default) omits `inputTokens`.
+ * A count that is not a finite number is omitted, never zeroed; a row with no
+ * count gives `undefined`. An app that builds its own operator turns from such
+ * rows calls this rather than mapping them itself.
  */
-export function operatorTurnUsage(row: Pick<ChatOperatorMessage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>): OperatorTurn['usage'] {
-  const usage: NonNullable<OperatorTurn['usage']> = {}
-  const counts = [['inputTokens', row.inputTokens], ['cachedInputTokens', row.cacheReadTokens], ['outputTokens', row.outputTokens]] as const
-  for (const [key, count] of counts) {
-    if (typeof count === 'number' && Number.isFinite(count)) usage[key] = count
+export function operatorTurnUsage(
+  row: Pick<ChatOperatorMessage, 'inputTokens' | 'cacheReadTokens' | 'outputTokens'>,
+  options: { inputIncludesCache?: boolean | 'unknown' } = {},
+): OperatorTurn['usage'] {
+  const count = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined)
+  const input = count(row.inputTokens)
+  const cached = count(row.cacheReadTokens)
+  const output = count(row.outputTokens)
+  const includes = options.inputIncludesCache ?? 'unknown'
+  const uncached = input === undefined ? undefined
+    : !cached || includes === false ? input
+    : includes === true && input - cached >= 0 ? input - cached
+    : undefined
+  const usage: NonNullable<OperatorTurn['usage']> = {
+    ...(uncached !== undefined ? { inputTokens: uncached } : {}),
+    ...(cached !== undefined ? { cachedInputTokens: cached } : {}),
+    ...(output !== undefined ? { outputTokens: output } : {}),
   }
   return Object.keys(usage).length > 0 ? usage : undefined
 }
@@ -262,7 +288,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const model = assistant.servedModel ?? assistant.model
       if (model) turn.model = model
       if (typeof assistant.costUsd === 'number') turn.costUsd = assistant.costUsd
-      const usage = operatorTurnUsage(assistant)
+      const usage = operatorTurnUsage(assistant, { inputIncludesCache: options.inputIncludesCache ?? 'unknown' })
       if (usage) turn.usage = usage
       if (state !== 'working' && terminal) {
         const failure = (options.failureOf ?? defaultFailure)(assistant) ?? (status === 'error' ? { code: 'turn.error', message: 'The turn failed; retained text may be partial' } : null)

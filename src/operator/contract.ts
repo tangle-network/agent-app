@@ -158,16 +158,14 @@ export interface OperatorTurn {
   /**
    * Token usage the app stored on the turn's reply; `operatorTurnUsage` maps
    * a chat-store row to it.
-   * - `inputTokens`: prompt tokens NOT read from the provider's cache (the
-   *   row's `inputTokens`, which excludes cache reads; the Router lane
-   *   subtracts them before storing).
+   * - `inputTokens`: prompt tokens NOT read from the provider's cache. Unlike
+   *   the turn trace's summary, it never includes cache reads; it is omitted
+   *   when the row's split is ambiguous (see `operatorTurnUsage`).
    * - `cachedInputTokens`: prompt tokens read from the provider's cache (the
-   *   row's `cacheReadTokens`). The whole prompt is
-   *   `inputTokens + cachedInputTokens`. Unlike the turn trace's summary,
-   *   `inputTokens` here never includes them. When absent, the cache share
-   *   is unknown, not zero.
+   *   row's `cacheReadTokens`); with both present the whole prompt is
+   *   `inputTokens + cachedInputTokens`. When absent the cache share is unknown.
    * - `outputTokens`: completion tokens.
-   * Each field is present only when the app recorded it; never a guessed zero.
+   * Each field is present only when known; never a guessed zero.
    */
   usage?: { inputTokens?: number; cachedInputTokens?: number; outputTokens?: number }
   completedAt?: string
