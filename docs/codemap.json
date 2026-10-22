@@ -13023,6 +13023,12 @@
           "doc": "`succeeded` and `failed` are settled."
         },
         {
+          "name": "operatorTurnUsage",
+          "kind": "function",
+          "signature": "(row: Pick<ChatOperatorMessage, \"inputTokens\" | \"outputTokens\" | \"cacheReadTokens\">) => Pick<ChatTurnUsage, \"inputToken…",
+          "doc": "The operator turn usage of a stored assistant row, for `OperatorTurn.usage`."
+        },
+        {
           "name": "OperatorWorkspace",
           "kind": "interface",
           "signature": "interface OperatorWorkspace",
