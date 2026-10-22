@@ -14,7 +14,7 @@ import { assignRolloutArm, decideRollout } from '../src/rollout/index'
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
 const frozen = JSON.parse(readFileSync(new URL('./fixtures/rollout/creative-e8.json', import.meta.url), 'utf8'))
 
-it('the CLI reports lane deficits on the frozen E8 window, measures holds, and narrows on an injected failure breach', async () => {
+it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the value changed, and narrows on an injected failure breach', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
   try {
     writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "*"\n`)
@@ -26,33 +26,61 @@ it('the CLI reports lane deficits on the frozen E8 window, measures holds, and n
     ] }
     await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false, config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
     const cli = join(dir, 'cli.mjs')
-    const run = (breach: boolean, to: string) => {
+    // `honourSince`: the instrument measures from the CLI's `since`, as a product reading its rows since the change does.
+    const run = (breach: boolean, args: string[], honourSince = false) => {
       const measured = structuredClone(frozen.measured)
       if (breach) measured.metrics.failure_rate_delta = 0.02
-      const config = `export default { plans: ${JSON.stringify([plan])}, async measure() { return ${JSON.stringify(measured)} } }`
-      writeFileSync(join(dir, 'rollout.config.mjs'), config)
-      const child = spawnSync(process.execPath, [cli, dir,
-        '--from', frozen.from.value, '--to', to, '--record', 'decisions.jsonl'], { encoding: 'utf8' })
+      const measure = honourSince
+        ? `async measure({ since }) { const m = ${JSON.stringify(measured)}; return { ...m, window: { ...m.window, from: new Date(since).toISOString() } } }`
+        : `async measure() { return ${JSON.stringify(measured)} }`
+      writeFileSync(join(dir, 'rollout.config.mjs'), `export default { plans: ${JSON.stringify([plan])}, ${measure} }`)
+      const child = spawnSync(process.execPath, [cli, dir, ...args, '--record', 'decisions.jsonl'], { encoding: 'utf8' })
       const records = readFileSync(join(dir, 'decisions.jsonl'), 'utf8').trim().split('\n')
       return { ...child, decision: JSON.parse(records.at(-1)!) }
     }
-    const widening = run(false, '*')
+    const qa = ['--from', frozen.from.value]
+    const widening = run(false, [...qa, '--to', '*'])
     expect(widening.status, widening.stderr).toBe(3)
     expect(widening.stdout).toContain('UNDECIDED')
     console.info(widening.stdout.trim())
     expect(widening.decision).toMatchObject({ decision: 'undecided', turnsNeeded: { router: 14, sandbox: 2 } })
-    const hold = run(false, frozen.from.value)
+    const hold = run(false, [...qa, '--to', frozen.from.value])
     expect(hold.status).toBe(0)
     expect(hold.stdout).toContain('UNDECIDED')
     expect(hold.decision.measured.window).toEqual(frozen.measured.window)
-    const breach = run(true, frozen.from.value)
-    expect(breach.status).toBe(1)
-    expect(breach.stdout).toContain('(narrow)')
-    console.info(breach.stdout.trim())
-    expect(breach.decision).toMatchObject({ decision: 'refused', recommendation: 'narrow' })
-    const narrowing = run(true, '')
+    const narrowing = run(true, [...qa, '--to', ''])
     expect(narrowing.status).toBe(0)
     expect(narrowing.decision).toMatchObject({ decision: 'allowed', recommendation: 'narrow', measured: { samples: 6 } })
+
+    // The value's history: empty, then set to the QA stage after the frozen window closed, then an unrelated commit.
+    const commit = (at: string, value: string, message: string) => {
+      writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "${value}"\nOTHER = "${message}"\n`)
+      const env = { ...process.env, GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
+        GIT_COMMITTER_NAME: 'rollout', GIT_COMMITTER_EMAIL: 'rollout@example.com', GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at }
+      for (const args of [['add', 'wrangler.toml'], ['commit', '-q', '-m', message]]) {
+        const git = spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' })
+        expect(git.status, git.stderr).toBe(0)
+      }
+    }
+    expect(spawnSync('git', ['init', '-q'], { cwd: dir }).status).toBe(0)
+    const changed = '2026-10-21T00:00:00.000Z'
+    commit('2026-10-01T00:00:00Z', '', 'empty')
+    commit(changed, frozen.from.value, 'qa')
+    commit('2026-10-22T00:00:00Z', frozen.from.value, 'unrelated')
+    const freshBreach = run(true, ['--base', 'HEAD'], true)
+    expect(freshBreach.status, freshBreach.stderr).toBe(1)
+    expect(freshBreach.stdout).toContain('(narrow)')
+    console.info(freshBreach.stdout.trim())
+    expect(freshBreach.decision).toMatchObject({ decision: 'refused', recommendation: 'narrow', measured: { window: { from: changed } } })
+    // Legal, 2026-10-22: a 7-day window of turns served before the value changed, none since.
+    const staleBreach = run(true, ['--base', 'HEAD'])
+    expect(staleBreach.status, staleBreach.stderr).toBe(0)
+    expect(staleBreach.stdout).toContain('UNDECIDED')
+    expect(staleBreach.stdout).toContain('(narrow)')
+    console.info(staleBreach.stdout.trim())
+    expect(staleBreach.decision).toMatchObject({ decision: 'undecided', recommendation: 'narrow' })
+    expect(staleBreach.decision.reasons).toEqual(expect.arrayContaining([
+      'failure_rate_delta 0.02 over kill line 0.01', expect.stringContaining(`last changed at ${changed}`)]))
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
