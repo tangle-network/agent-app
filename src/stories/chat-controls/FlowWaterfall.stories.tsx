@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 
-import { FlowWaterfall } from '../../web-react'
+import { FlowWaterfall } from '../../web-react/flow-waterfall'
 import { failedFlowTrace, posterFlowTrace } from './fixtures'
 import { discoveryWaterfallTrace } from './discovery-waterfall-fixture'
 import type { FlowTrace } from '../../trace'

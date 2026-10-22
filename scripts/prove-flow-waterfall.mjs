@@ -49,10 +49,18 @@ try {
   context = await browser.newContext({ viewport: { width: 1100, height: 900 }, recordVideo: { dir: output, size: { width: 1100, height: 900 } } })
   const page = await context.newPage()
   const failures = []
+  const networkFailures = []
+  page.on('requestfailed', request => networkFailures.push({ url: request.url(), error: request.failure()?.errorText }))
+  page.on('response', response => { if (response.status() >= 400) networkFailures.push({ url: response.url(), status: response.status() }) })
   page.on('pageerror', error => failures.push(error.message))
   const story = async (name, theme = 'agent-dark') => {
     await page.goto(`${base}/iframe.html?id=chatcontrols-flowwaterfall--${name}&viewMode=story&globals=agentTheme:${theme}`)
-    await page.locator('[data-flow-waterfall]').waitFor({ timeout: 60_000 })
+    try { await page.locator('[data-flow-waterfall]').waitFor({ timeout: 60_000 }) }
+    catch (error) {
+      writeFileSync(`${output}/preview-failure.json`, JSON.stringify({ story: name, pageErrors: failures, networkFailures, body: await page.locator('body').innerText() }, null, 2))
+      await page.screenshot({ path: `${output}/preview-failure.png`, fullPage: true })
+      throw error
+    }
   }
   await story('healthy')
   assert.match(await page.locator('[data-slowest]').innerText(), /sandbox_run_command/)
