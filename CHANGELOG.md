@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.60.283
+
+- Admit Eval 0.220 with a compatible development cohort (#1269)
+- feat: searchable nested live trace waterfall (#1267)
+
 ## 0.60.282
 
 - fix(chat): discard prefetch when admission throws
