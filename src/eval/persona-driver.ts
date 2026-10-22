@@ -56,7 +56,7 @@ function describeCompletion(persona: PersonaConfig, state: DriverState): string 
  * them, and signs off only when a real practitioner would act on the work
  * unmodified. Pure function of persona, produced state, and product context.
  */
-export function buildPersonaDriverSystemPrompt(
+function buildPersonaDriverSystemPrompt(
   persona: PersonaConfig,
   state: DriverState,
   productContext = '',

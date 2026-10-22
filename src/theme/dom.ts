@@ -23,7 +23,7 @@ export function applyThemeDom(dark: boolean, doc: Document = document) {
   if (metaThemeColor) metaThemeColor.setAttribute('content', dark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR)
 }
 
-export function resolveThemePreference(theme: ThemePreference, win: Window = window): boolean {
+function resolveThemePreference(theme: ThemePreference, win: Window = window): boolean {
   if (theme === 'dark') return true
   if (theme === 'light') return false
   return win.matchMedia('(prefers-color-scheme: dark)').matches

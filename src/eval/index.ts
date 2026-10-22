@@ -89,7 +89,7 @@ export function createTokenRecallChecker(opts: { minRecall?: number; minContentL
 }
 
 // Reactive persona driver: the simulated user of an app's persona eval.
-export { buildPersonaDriverSystemPrompt, decidePersonaTurn } from './persona-driver'
+export { decidePersonaTurn } from './persona-driver'
 export type { DecidePersonaTurnOpts } from './persona-driver'
 
 // Scorecard timeline: append a run and diff it against the previous commit.

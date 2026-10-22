@@ -3,7 +3,7 @@ import { isBlockedFetchHostname } from '../web/fetch-guard'
 import { routerResponseErrorMessage, type RouterMediaClient } from './router-client'
 
 const MAX_TRANSCRIPTION_BYTES = 25 * 1024 * 1024
-export const SUPPORTED_TRANSCRIPTION_FORMATS: ReadonlySet<string> = new Set(['wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm', 'aac'])
+const SUPPORTED_TRANSCRIPTION_FORMATS: ReadonlySet<string> = new Set(['wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm', 'aac'])
 
 /** A public http(s) URL a server may fetch; throws naming `field` for anything else. */
 export function validatePublicHttpUrl(value: string, field: string): string {

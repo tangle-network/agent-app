@@ -148,7 +148,7 @@ export function modelForRequest(
 }
 
 /** A required https URL that does not point at this machine or a private network. */
-export function requiredHttpsUrl(value: unknown, field: string): Checked<string> {
+function requiredHttpsUrl(value: unknown, field: string): Checked<string> {
   const text = requiredText(value)
   if (!text) return { succeeded: false, error: `${field} is required` }
   return validateExternalHttpsUrl(text, field)
@@ -160,7 +160,7 @@ export function optionalHttpsUrl(value: unknown, field: string): Checked<string 
   return validateExternalHttpsUrl(text, field)
 }
 
-export function validateExternalHttpsUrl(value: string, field: string): Checked<string> {
+function validateExternalHttpsUrl(value: string, field: string): Checked<string> {
   try {
     const url = new URL(value)
     if (url.protocol !== 'https:') {

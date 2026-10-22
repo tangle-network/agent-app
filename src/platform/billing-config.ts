@@ -15,7 +15,7 @@ const WEBHOOK_PROHIBITION = "Do not create, re-enable or repoint a Stripe webhoo
  * customer integration names. Covers dotenv/shell assignments, quoted JSON keys
  * and optional/readonly Worker bindings.
  */
-export function localStripeBindings(text: string): string[] {
+function localStripeBindings(text: string): string[] {
   return [...text.matchAll(/^\s*(?:(?:export|readonly)\s+)?["']?(STRIPE_[A-Z0-9_]+)["']?\s*\??\s*[:=]/gm)].map(
     (match) => match[1]!,
   )

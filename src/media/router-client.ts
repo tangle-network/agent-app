@@ -45,7 +45,7 @@ export function routerV1Url(value: string): string {
 }
 
 /** A failed Router response's message, and the `error.code` its body names, when it names one. */
-export async function routerResponseError(response: Response): Promise<{ message: string; code?: string }> {
+async function routerResponseError(response: Response): Promise<{ message: string; code?: string }> {
   const text = await response.text()
   if (!text) return { message: response.statusText }
   try {
