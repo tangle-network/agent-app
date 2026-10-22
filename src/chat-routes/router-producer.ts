@@ -128,7 +128,9 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
     : { ...part })
 
   const usage = (): ChatTurnUsage => ({
-    inputTokens: outcome?.usage.promptTokens ?? 0,
+    // The Router's prompt tokens include the cached ones; the sandbox lanes report input and cache reads apart, so
+    // the stored row counts them apart here too and `inputTokens + cacheReadTokens` is the prompt on either lane.
+    inputTokens: (outcome?.usage.promptTokens ?? 0) - (outcome?.usage.cachedPromptTokens ?? 0),
     outputTokens: outcome?.usage.completionTokens ?? 0,
     ...(outcome?.usage.cachedPromptTokens !== undefined ? { cacheReadTokens: outcome.usage.cachedPromptTokens } : {}),
   })

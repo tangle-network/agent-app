@@ -86,7 +86,9 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
     // Usage can ride a chunk with an empty choices array — read it before the
     // choice guard. Each report is cumulative, so the last one is the call's.
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
-      const cached = chunk.usage.prompt_tokens_details?.cached_tokens
+      // Cumulative like the rest, but a provider may send the details on an earlier chunk only: keep the largest.
+      const reported = chunk.usage.prompt_tokens_details?.cached_tokens
+      const cached = typeof reported === 'number' ? Math.max(reported, usage?.cachedPromptTokens ?? 0) : usage?.cachedPromptTokens
       usage = {
         promptTokens: chunk.usage.prompt_tokens ?? 0,
         completionTokens: chunk.usage.completion_tokens ?? 0,

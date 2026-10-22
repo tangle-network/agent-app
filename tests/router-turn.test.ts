@@ -510,11 +510,13 @@ describe('composeRouterTurnPromptSections', () => {
 describe('prompt-cache usage', () => {
   it('reads the cached prompt tokens the Router reports into the outcome, the span and the trace summary', async () => {
     // The final two chunks of a recorded gemini-3.7-flash call through the Router (2026-10-22): usage repeats on
-    // each chunk, and only the last carries prompt_tokens_details.
+    // each chunk, and only the last carries prompt_tokens_details. A third chunk without the details, as another
+    // provider may send, keeps the count.
     const { fetchImpl } = router(sse([
       { ...text('ok.'), usage: { completion_tokens: 2, prompt_tokens: 40698, total_tokens: 40700 } },
       { choices: [{ delta: { role: 'assistant' }, finish_reason: 'stop', index: 0 }], model: 'gemini-3.7-flash',
         usage: { completion_tokens: 2, prompt_tokens: 40698, prompt_tokens_details: { cached_tokens: 38649 }, total_tokens: 40700 } },
+      { choices: [], usage: { completion_tokens: 2, prompt_tokens: 40698, total_tokens: 40700 } },
     ]))
     let clock = 1_000
     const trace = createTurnTrace({ now: () => clock, startedAt: 1_000 })
