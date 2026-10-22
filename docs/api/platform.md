@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-133 exports.
+140 exports.
 
 ### `AdminGuardOptions`
 
@@ -12,6 +12,14 @@ Source: `src/platform/index.ts`
 
 ```ts
 interface AdminGuardOptions
+```
+
+### `AdmitBillableTurnOptions`
+
+`interface`
+
+```ts
+interface AdmitBillableTurnOptions
 ```
 
 ### `agentOperatorScopes`
@@ -102,6 +110,46 @@ interface BetterAuthSessionCookieSource
 interface BillableBalanceState
 ```
 
+### `BillableTurnAdmission`
+
+`interface`
+
+```ts
+interface BillableTurnAdmission
+```
+
+### `BillableTurnAdmissionOptions`
+
+`interface`
+
+```ts
+interface BillableTurnAdmissionOptions
+```
+
+### `BillableTurnAdmissionResult`
+
+`type`
+
+```ts
+type BillableTurnAdmissionResult
+```
+
+### `BillableTurnSeatVerdict`
+
+`interface` — A seat verdict; `paidThrough` (ISO) ends a kept verdict early, `null` when access is not a dated seat.
+
+```ts
+interface BillableTurnSeatVerdict
+```
+
+### `BillableTurnVerdict`
+
+`interface` — A Platform read's verdict: only `allowed` decides admission.
+
+```ts
+interface BillableTurnVerdict
+```
+
 ### `BillingConsentOutcome`
 
 `type`
@@ -156,6 +204,14 @@ interface BillingConsentRefusal
 
 ```ts
 (auth: BetterAuthSessionCookieSource, options?: BetterAuthSessionCookieMinterOptions) => (args: TangleSsoSessionCookieA…
+```
+
+### `createBillableTurnAdmission`
+
+`function`
+
+```ts
+<Input extends { userId: string; }, Seat extends BillableTurnSeatVerdict, Balance extends BillableTurnVerdict>(options:…
 ```
 
 ### `createD1TangleIdentityStore`
