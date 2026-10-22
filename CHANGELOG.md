@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.60.265
+
+- agent-app accepts agent-runtime 0.343 (#1248)
+
 ## 0.60.264
 
 - feat(router-turn): a test fails when the stable prompt prefix carries per-turn bytes (#1240)
