@@ -112,6 +112,39 @@ function earlyTurnWork(
   }
 }
 
+/** Parse and validate the body, then authorize the caller. */
+async function admitTurn<TContext, TThread>(
+  request: Request, trace: TurnTrace, options: CreateChatTurnRoutesOptions<TContext, TThread>,
+): Promise<({ ok: true } & AdmittedTurn<TContext>) | { ok: false; response: Response }> {
+  const parse = trace.start('admission.parse', 'admission')
+  const [rawBody, badBody] = await parseJsonObjectBody(request)
+  if (badBody) return { ok: false, response: badBody }
+  let parsed: ParsedTurnBody
+  try {
+    parsed = validateTurnBody(rawBody, options.maxInlinePartBytes)
+  } catch (err) {
+    if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
+    throw err
+  }
+  parse.end()
+  const prefetch = options.prefetch && startTurnPrefetch(options.prefetch, { request, body: parsed.payload, trace })
+  let handedOff = false
+  try {
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload), ...(prefetch ? { identified: prefetch.identified } : {}) }))
+    if (!auth.ok) return { ok: false, response: auth.response }
+    // Check the named model before side effects; the producer checks the unnamed model.
+    const refusal = await namedModelRefusal(options.modelPolicy, parsed.payload, trace)
+    if (refusal) return { ok: false, response: refusal }
+    const admitted = { ok: true as const, parsed, auth, trace, ...(prefetch ? { prefetched: prefetch.admitted(auth) } : {}) }
+    handedOff = true
+    return admitted
+  } finally {
+    // Refusals and thrown admission errors both abandon the read-only work.
+    if (!handedOff) prefetch?.discard()
+  }
+}
+
+
 /** Build chat turn routes to handle and validate incoming chat requests with optional logging */
 export function createChatTurnRoutes<TContext = void, TThread = unknown>(
   options: CreateChatTurnRoutesOptions<TContext, TThread>,
@@ -186,34 +219,12 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
     // shapes: a refusal is always a plain HTTP response that reveals nothing
     // beyond what it says, and nothing runs for a caller who is not admitted.
     // The turn's clock starts at the request, so admission is inside its trace.
-    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }))
+    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }), options)
     if (!admitted.ok) return admitted.response
     if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx, admitted)
     return progressFirstTurn(request, ctx, admitted)
   }
 
-  /** Parse and validate the body, then authorize the caller. */
-  async function admitTurn(request: Request, trace: TurnTrace): Promise<({ ok: true } & AdmittedTurn<TContext>) | { ok: false; response: Response }> {
-    const parse = trace.start('admission.parse', 'admission')
-    const [rawBody, badBody] = await parseJsonObjectBody(request)
-    if (badBody) return { ok: false, response: badBody }
-    let parsed: ParsedTurnBody
-    try {
-      parsed = validateTurnBody(rawBody, options.maxInlinePartBytes)
-    } catch (err) {
-      if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
-      throw err
-    }
-    parse.end()
-    const prefetch = options.prefetch && startTurnPrefetch(options.prefetch, { request, body: parsed.payload, trace })
-    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload), ...(prefetch ? { identified: prefetch.identified } : {}) }))
-    // A refusal drops what the prefetch read; so does a refused named model, checked before any side effect (the
-    // unnamed-model half is the producer's).
-    if (!auth.ok) { prefetch?.discard(); return { ok: false, response: auth.response } }
-    const refusal = await namedModelRefusal(options.modelPolicy, parsed.payload, trace)
-    if (refusal) { prefetch?.discard(); return { ok: false, response: refusal } }
-    return { ok: true, parsed, auth, trace, ...(prefetch ? { prefetched: prefetch.admitted(auth) } : {}) }
-  }
 
   /**
    * Open the response stream as soon as the caller is admitted, so the client
