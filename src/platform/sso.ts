@@ -638,7 +638,6 @@ function stateBinding(payload: StateCookiePayload, callbackUrl: string): string 
   return JSON.stringify([payload.s, payload.r, payload.v ?? null, callbackUrl])
 }
 
-/** Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies */
 /** The callback step that threw while creating the local session. */
 type TangleSsoPersistenceStep = 'upsert' | 'createSession' | 'cookies' | 'saveTangleLink'
 
@@ -660,6 +659,7 @@ function persistenceFailure(step: TangleSsoPersistenceStep, error: unknown) {
   }
 }
 
+/** Create Tangle SSO handlers to manage authentication state, callbacks, and session cookies */
 export function createTangleSsoHandlers(
   opts: TangleSsoHandlerOptions | TangleOidcSsoHandlerOptions | TangleIdentitySsoHandlerOptions,
 ): TangleSsoHandlers {
