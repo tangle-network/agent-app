@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.60.286
+
+- chore(deps-dev): bump @modelcontextprotocol/sdk from 1.30.1 to 1.32.0 (#1271)
+- docs(waterfall): retain calibrated playback and delivery proof [skip release] (#1277)
+- fix(chat): settle native bootstrap failures before assistant creation (#1274)
+
 ## 0.60.285
 
 - chore(deps): adopt @tangle-network/sandbox 0.64.14 (#1275)
