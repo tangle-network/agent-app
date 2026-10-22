@@ -55,7 +55,7 @@ function harness(options: { gate?: ChatTurnGateResult; lockMs?: number } = {}) {
   const routes = createChatTurnRoutes<Record<string, never>>({
     projectId: 'dispatch-first',
     authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }),
-    dispatchFirst: { gatesInAuthorize: true },
+    dispatchFirst: { billing: 'model-service' },
     store,
     turnStore: createMemoryTurnEventStore(),
     incrementalPersistence: false,

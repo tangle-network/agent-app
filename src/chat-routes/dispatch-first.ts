@@ -12,10 +12,11 @@
  * work fits inside it.
  *
  * What stays fail-closed: `authorize` has already run, so no model call starts
- * for a caller without identity and workspace access. Billing gates must run
- * in `authorize` (the product declares it with `dispatchFirst: { gatesInAuthorize: true }`)
- * or at the model service, which holds spend before it calls the provider.
- * Single-flight is unchanged: the lock still decides which turn's output is
+ * for a caller without identity and workspace access. Billing is enforced in
+ * `authorize` or at the model service, which holds spend before it calls the
+ * provider; the product names which (`dispatchFirst: { billing }`). Gates the
+ * model service cannot know, such as a seat, run in `contextGate` beside the
+ * model call, and the output waits for them. Single-flight is unchanged: the lock still decides which turn's output is
  * kept; a refused duplicate costs only the model call it started, which its
  * `admissionSignal` cancels.
  */

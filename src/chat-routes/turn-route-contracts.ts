@@ -531,11 +531,14 @@ export interface CreateChatTurnRoutesOptions<TContext = void> {
    * the turn buffer or the transcript before that chain commits; a refusal aborts it through `args.admissionSignal`
    * and drops its output. `produce` receives `args.admitted` for the final args.
    *
-   * Opt in only when every billing gate runs in `authorize` (or at the model service before it calls a provider):
-   * the declaration is the literal `gatesInAuthorize: true`. `beforeTurn` may still mutate `context` but must not
-   * return a patch, since the prompt has already been sent; a patch throws. Omit → `produce` runs after admission.
+   * Opt in only by naming where billing is enforced before any provider is paid: `'authorize'` (the product's
+   * balance and spend checks run there) or `'model-service'` (the Tangle Router holds the spend and refuses an
+   * unfunded key before it calls a provider, fail-closed). Entitlement gates the model service cannot know (a seat,
+   * a plan feature) belong in `contextGate`, which then runs while the model starts and holds its output until it
+   * passes. `beforeTurn` may still mutate `context` but must not return a patch, since the prompt has already been
+   * sent; a patch throws. Omit → `produce` runs after admission.
    */
-  dispatchFirst?: { gatesInAuthorize: true }
+  dispatchFirst?: { billing: 'authorize' | 'model-service' }
   /** Single-flight lock acquired before any side effect and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
