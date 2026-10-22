@@ -52,7 +52,7 @@ function innerOf(e: Record<string, unknown>): Record<string, unknown> {
  */
 export function buildFlowTrace(
   events: TimedEvent[],
-  opts?: { pricing?: { prompt?: string | number; completion?: string | number } },
+  opts?: { pricing?: { prompt?: string | number; completion?: string | number }; running?: boolean },
 ): FlowTrace {
   const spans: FlowSpan[] = []
   let promptTokens = 0
@@ -105,6 +105,7 @@ export function buildFlowTrace(
       if (open) {
         spans.push({
           kind: 'tool',
+          id: id,
           name: open.name,
           // Execution happens between the end of the model turn that emitted
           // the call and the result landing in the buffer.
@@ -124,6 +125,11 @@ export function buildFlowTrace(
   closeSegment()
 
   const totalMs = events.length ? events[events.length - 1]!.t : 0
+  for (const [id, open] of openCalls) {
+    spans.push({ id, kind: 'tool', name: open.name, startMs: open.lastDeltaT,
+      endMs: totalMs, status: opts?.running ? 'running' : undefined, approx: true })
+  }
+  if (opts?.running && spans.at(-1)?.kind === 'model') spans.at(-1)!.status = 'running'
   const trace: FlowTrace = { spans, totalMs, promptTokens, completionTokens, toolCalls }
   const p = opts?.pricing
   if (p && (p.prompt != null || p.completion != null)) {

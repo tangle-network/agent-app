@@ -84,38 +84,10 @@ export function mergeActivityPages(
   return [...byTask.values()].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
 }
 
-export interface WaterfallRow {
-  name: string
-  kind: 'pipeline' | 'model' | 'tool'
-  /** Bar geometry as percentages of the trace's total span. */
-  offsetPct: number
-  widthPct: number
-  durationLabel: string
-  approx: boolean
-  /** False only when the span's meta carries an explicit failure. */
-  ok: boolean
-}
-
-/** Project a FlowTrace into proportional bar geometry for {@link FlowWaterfall}. */
-export function waterfallLayout(trace: FlowTrace): WaterfallRow[] {
-  const total = trace.totalMs > 0 ? trace.totalMs : 1
-  return [...trace.spans]
-    .sort((a, b) => a.startMs - b.startMs)
-    .map((span) => {
-      const meta = span.meta ?? {}
-      const failed =
-        meta.ok === false || (typeof meta.status === 'string' && activityTone(meta.status) === 'error')
-      return {
-        name: span.name,
-        kind: span.kind,
-        offsetPct: Math.max(0, Math.min(100, (span.startMs / total) * 100)),
-        widthPct: Math.max(0.5, Math.min(100, ((span.endMs - span.startMs) / total) * 100)),
-        durationLabel: `${((span.endMs - span.startMs) / 1000).toFixed(1)}s${span.approx ? '~' : ''}`,
-        approx: span.approx === true,
-        ok: !failed,
-      }
-    })
-}
+// Retain the established subpath exports after extracting the trace surface.
+export { waterfallLayout, type WaterfallRow } from './flow-waterfall-model'
+export { FlowWaterfall, type FlowWaterfallProps } from './flow-waterfall'
+import { FlowWaterfall } from './flow-waterfall'
 
 // ── glyphs ────────────────────────────────────────────────────────────────
 
@@ -219,47 +191,6 @@ function RunLabel({ tool, detail, live }: { tool: string; detail: string; live: 
       </span>
       <span className="text-muted-foreground"> — {detail}</span>
     </span>
-  )
-}
-
-// ── FlowWaterfall ─────────────────────────────────────────────────────────
-
-const BAR_CLASS: Record<WaterfallRow['kind'], string> = {
-  pipeline: 'bg-muted-foreground/30',
-  model: 'bg-primary/60',
-  tool: 'bg-primary',
-}
-
-export interface FlowWaterfallProps {
-  trace: FlowTrace
-}
-
-/** Compact proportional waterfall over a FlowTrace — span name, bar, duration
- *  per row; total + cost in the footer. */
-export function FlowWaterfall({ trace }: FlowWaterfallProps) {
-  const rows = waterfallLayout(trace)
-  if (rows.length === 0) return null
-  const cost = formatActivityCost(trace.costUsd)
-  return (
-    <div className="space-y-1">
-      {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto] items-center gap-2">
-          <span className="truncate font-mono text-xs text-muted-foreground" title={row.name}>
-            {row.name}
-          </span>
-          <div className="relative h-2 rounded-sm bg-secondary">
-            <div
-              className={`absolute inset-y-0 rounded-sm ${row.ok ? BAR_CLASS[row.kind] : 'bg-destructive/80'} ${row.approx ? 'opacity-70' : ''}`}
-              style={{ left: `${row.offsetPct}%`, width: `${row.widthPct}%` }}
-            />
-          </div>
-          <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground/70">{row.durationLabel}</span>
-        </div>
-      ))}
-      <p className="pt-0.5 text-right font-mono text-xs tabular-nums text-muted-foreground/60">
-        {(trace.totalMs / 1000).toFixed(1)}s{cost ? ` · ${cost}` : ''}
-      </p>
-    </div>
   )
 }
 

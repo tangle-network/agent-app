@@ -1,0 +1,15 @@
+{
+  "checks": {
+    "search": "PASS",
+    "searchEmpty": "PASS",
+    "nesting": "PASS",
+    "collapseExpand": "PASS",
+    "summary": "PASS",
+    "colors": "PASS",
+    "slowest": "PASS",
+    "playback": "PASS",
+    "streaming": "PASS"
+  },
+  "passed": 9,
+  "target": 9
+}

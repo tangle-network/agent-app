@@ -9,9 +9,8 @@
  *    available live, from the step's journaled lane.
  *  - FINE: `loopTraceEventsToFlowSpans` reconstructs agent-runtime's
  *    loop → round → iteration hierarchy from the LoopTraceEvent journal a
- *    delegation persists. FlowSpans carry no parent ids, so nesting rides the
- *    span NAME (`loop ▸ round 0 ▸ iter 1 (coder)`), matching how the ASCII
- *    waterfall reads.
+ *    delegation persists. Stable ids carry the hierarchy; descriptive names
+ *    retain context in the ASCII waterfall as well.
  *
  * `composeMissionFlowTrace` lays a whole mission out: one 'pipeline' span per
  * step, each step's delegations beneath it. Pure data transforms — the
@@ -41,6 +40,7 @@ const rec = (v: unknown): Record<string, unknown> =>
 
 /** Statuses that mean the delegation is still producing wall time. */
 const LIVE_DELEGATION_STATUSES = new Set(['pending', 'running'])
+const ERROR_STATUSES = new Set(['failed', 'error', 'cancelled', 'aborted', 'down'])
 
 /**
  * One 'tool' FlowSpan per delegation, positioned relative to `turnStartMs`
@@ -68,6 +68,8 @@ export function delegationActivityToFlowSpans(
           ? opts.nowMs - turnStartMs
           : startMs
     spans.push({
+      id: run.taskId,
+      status: live ? 'running' : ERROR_STATUSES.has(run.status) ? 'failed' : 'done',
       kind: 'tool',
       name: `${run.tool} — ${run.detail}`,
       startMs,
@@ -102,12 +104,15 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
   const origin = started?.timestamp ?? ordered[0]!.timestamp
   const rootEnd = ended?.timestamp ?? ordered[ordered.length - 1]!.timestamp
   const t = (epochMs: number) => epochMs - origin
+  const rootId = `loop:${ordered[0]!.runId}`
 
   const spans: FlowSpan[] = []
   const sp = rec(started?.payload)
   const ep = rec(ended?.payload)
   spans.push({
     kind: 'pipeline',
+    id: rootId,
+    status: ended ? 'done' : 'running',
     name: 'loop',
     startMs: 0,
     endMs: t(rootEnd),
@@ -122,12 +127,15 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
     },
   })
 
-  const iterStart = new Map<number, number>()
+  const iterStart = new Map<number, { timestamp: number; parentId: string }>()
   let round: { index: number; startMs: number; meta: Record<string, unknown>; moveKind: string } | undefined
-  const flushRound = (endEpochMs: number) => {
+  const flushRound = (endEpochMs: number, running = false) => {
     if (!round) return
     spans.push({
       kind: 'pipeline',
+      id: `${rootId}:round-${round.index}`,
+      parentId: rootId,
+      status: running ? 'running' : 'done',
       name: `loop ▸ round ${round.index} (${round.moveKind})`,
       startMs: round.startMs,
       endMs: t(endEpochMs),
@@ -158,18 +166,23 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
       }
       case 'loop.iteration.started': {
         const idx = num(p.iterationIndex)
-        if (idx !== undefined) iterStart.set(idx, e.timestamp)
+        if (idx !== undefined) iterStart.set(idx, { timestamp: e.timestamp, parentId: round ? `${rootId}:round-${round.index}` : rootId })
         break
       }
       case 'loop.iteration.ended': {
         const idx = num(p.iterationIndex) ?? 0
-        const startEpoch = iterStart.get(idx) ?? e.timestamp
+        const open = iterStart.get(idx)
+        const startEpoch = open?.timestamp ?? e.timestamp
+        iterStart.delete(idx)
         const error = str(p.error)
         const verdict = rec(p.verdict)
         const tokens = rec(p.tokenUsage)
         const roundLabel = round ? `round ${round.index} ▸ ` : ''
         spans.push({
           kind: 'model',
+          id: `${rootId}:iteration-${idx}`,
+          parentId: open?.parentId ?? rootId,
+          status: error ? 'failed' : 'done',
           name: `loop ▸ ${roundLabel}iter ${idx} (${str(p.agentRunName) ?? 'agent'})`,
           startMs: t(startEpoch),
           endMs: t(e.timestamp),
@@ -196,7 +209,12 @@ export function loopTraceEventsToFlowSpans(events: LoopTraceEventLike[]): FlowSp
       }
     }
   }
-  flushRound(rootEnd)
+  flushRound(rootEnd, !ended)
+  for (const [idx, open] of iterStart) {
+    spans.push({ kind: 'model', id: `${rootId}:iteration-${idx}`, parentId: open.parentId,
+      name: `loop ▸ iter ${idx}`, startMs: t(open.timestamp), endMs: t(rootEnd),
+      status: ended ? 'failed' : 'running', approx: true })
+  }
   return spans
 }
 
@@ -291,6 +309,8 @@ export function composeMissionFlowTrace(input: {
 
     spans.push({
       kind: 'pipeline',
+      id: `step-${step.id}`,
+      ...(step.status && LIVE_DELEGATION_STATUSES.has(step.status) ? { status: 'running' as const } : {}),
       name: step.intent,
       startMs,
       endMs,
@@ -298,7 +318,7 @@ export function composeMissionFlowTrace(input: {
       meta: { stepId: step.id, ...(step.status !== undefined ? { status: step.status } : {}) },
     })
     for (const span of runSpans) {
-      spans.push({ ...span, name: `${step.intent} ▸ ${span.name}` })
+      spans.push({ ...span, id: `step-${step.id}:${span.id}`, parentId: `step-${step.id}`, name: `${step.intent} ▸ ${span.name}` })
       toolCalls++
       const c = num(rec(span.meta).costUsd)
       if (c !== undefined) costUsd = (costUsd ?? 0) + c

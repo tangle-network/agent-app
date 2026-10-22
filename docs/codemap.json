@@ -28531,8 +28531,8 @@
         {
           "name": "FlowWaterfall",
           "kind": "function",
-          "signature": "({ trace }: FlowWaterfallProps) => Element | null",
-          "doc": "Compact proportional waterfall over a FlowTrace — span name, bar, duration per row; total + cost in the footer."
+          "signature": "({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element",
+          "doc": "Shared trace inspector."
         },
         {
           "name": "FlowWaterfallProps",
@@ -30428,7 +30428,7 @@
           "name": "waterfallLayout",
           "kind": "function",
           "signature": "(trace: FlowTrace) => WaterfallRow[]",
-          "doc": "Project a FlowTrace into proportional bar geometry for {@link FlowWaterfall}."
+          "doc": "One geometry owner for the web surface and its established public helper."
         },
         {
           "name": "WaterfallRow",
@@ -30919,6 +30919,43 @@
           "kind": "function",
           "signature": "() => null",
           "doc": "The shared `useTheme` hook toggles only `.dark` on <html>."
+        }
+      ]
+    },
+    {
+      "id": "./web-react/flow-waterfall",
+      "source": "src/web-react/flow-waterfall.tsx",
+      "dependsOn": [
+        "brand",
+        "chat-routes",
+        "chat-store",
+        "harness",
+        "hub-approvals",
+        "hub-approvals-react",
+        "interactions",
+        "missions",
+        "plans",
+        "platform",
+        "profile-editor",
+        "runtime",
+        "session-shell",
+        "theme",
+        "trace",
+        "work-product"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "FlowWaterfall",
+          "kind": "function",
+          "signature": "({ trace, live, startedAt, label, defaultCollapsed }: FlowWaterfallProps) => Element",
+          "doc": "Shared trace inspector."
+        },
+        {
+          "name": "FlowWaterfallProps",
+          "kind": "interface",
+          "signature": "interface FlowWaterfallProps",
+          "doc": null
         }
       ]
     },

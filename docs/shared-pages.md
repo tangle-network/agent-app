@@ -316,3 +316,13 @@ SUPER imports no agent-app UI; it uses `/hosted-agent/application` and `/platfor
 | Workspace, team and account settings | local | — | `public/app.js` L1261–L1296 (36), `public/app.js` L1648–L1650 (3) |
 | Billing and usage | not offered | — | — |
 | Help, error and unavailable | local | — | `public/app.js` L1309–L1311 (3) |
+
+## Trace waterfall
+
+`FlowWaterfall` is the shared trace inspector, exported from `/web-react` and the narrow `/web-react/flow-waterfall` subpath. It accepts the browser-safe `FlowTrace` contract from `/trace`; producers supply stable span `id` and `parentId` values for nesting and `status: 'running'` for spans that grow between snapshots. `live` can override automatic running detection, and `startedAt` can anchor growth to an epoch-ms run origin.
+
+The inspector owns search (Cmd/Ctrl+F while the surface owns focus), filtered empty states, nested collapse/expand, playback and scrubbing, the summary, type colors and slowest leaf-step emphasis. Search reveals matching collapsed branches with their ancestors and restores the reader's collapse state when cleared. Playback clips presentation without rewriting trace records or summary totals. Unknown cost and LLM-request counts remain unknown; approximate reconstructed spans do not establish exact request counts.
+
+The regular `/styles` entry includes its styles. Hosts without Tailwind can import `/web-react/flow-waterfall.css` alongside their existing Brand tokens. Both entries ship the same scoped stylesheet. Products adapt their evidence records; they do not fork the renderer or stylesheet.
+
+Storybook's recorded Discovery state and streaming replay use the [timing-only fixture and provenance](../src/stories/chat-controls/discovery-waterfall-provenance.md). `node scripts/prove-flow-waterfall.mjs` exercises the real Storybook HTTP surface and saves a nine-capability result plus screenshots and an uncut browser video. Set `WATERFALL_PROOF_DIR` to retain the evidence outside the checkout, or `WATERFALL_STORYBOOK_URL` to test an already served catalog.
