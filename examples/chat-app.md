@@ -556,6 +556,30 @@ short-circuit; `beforeTurn` is the prompt-composition step; `lifecycle` is the
 engine underneath — these only wrap its input, its producer stream, and its
 settle.
 
+## Dispatch first (provisional)
+
+`dispatchFirst` starts `produce`, and so the model call, right after the
+history read, while the lock, the history recheck, the user-row insert,
+`contextGate` and `beforeTurn` run beside it. Nothing it emits reaches the
+member, the turn buffer or the transcript until that chain commits; a refusal
+aborts `args.admissionSignal`, rejects `args.admitted` and writes no assistant
+row. On Creative production that chain held about 780 ms of every turn's p50
+before the model was called (2026-10-21, n=32).
+
+```ts
+createChatTurnRoutes({
+  // The Router holds spend fail-closed before it calls a provider; a seat check runs in contextGate.
+  dispatchFirst: { billing: 'model-service', when: (args) => args.context.lane === 'router' },
+  contextGate: async (args) => (await hasSeat(args.context) ? { proceed: true } : { proceed: false, response: noSeat() }),
+  produce: async (args) => createRouterTurnProducer({ ...turnOptions(args), signal: args.admissionSignal }),
+  // Rows the producer writes wait for `await args.admitted`; beforeTurn returns no patch.
+})
+```
+
+`when` must return false for a producer whose dispatch is keyed by the turn's
+execution id (a box session): two sends on one thread share that id, and the
+refused one would reach the winner's execution before the lock refused it.
+
 ## Carry the effective profile into Sandbox execution
 
 Resolve the profile on the server after authorizing the workspace and any user selections.

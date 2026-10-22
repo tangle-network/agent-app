@@ -17264,10 +17264,22 @@
           "doc": null
         },
         {
+          "name": "createD1WarmReceiptStore",
+          "kind": "function",
+          "signature": "(db: WarmReceiptD1Like, options?: { table?: string | undefined; now?: (() => number) | undefined; }) => WarmReceiptStore",
+          "doc": "Receipts in one D1 table, shared by every isolate."
+        },
+        {
           "name": "createEscalationSpeculator",
           "kind": "function",
           "signature": "(options: EscalationSpeculatorOptions) => EscalationSpeculator",
           "doc": "One speculator per turn."
+        },
+        {
+          "name": "createMemoryWarmReceiptStore",
+          "kind": "function",
+          "signature": "(options?: { limit?: number | undefined; }) => WarmReceiptStore",
+          "doc": "Receipts in one isolate's memory: for tests and single-process hosts."
         },
         {
           "name": "createSandboxExecTool",
@@ -17376,6 +17388,12 @@
           "kind": "const",
           "signature": "\"sandbox_warm_lease\"",
           "doc": "`createD1WarmLeaseStore`: the `WarmLeaseStore` every Workers product uses, one row per key in one table."
+        },
+        {
+          "name": "DEFAULT_WARM_RECEIPT_TABLE",
+          "kind": "const",
+          "signature": "\"warm_receipts\"",
+          "doc": null
         },
         {
           "name": "deferredCorpusHash",
@@ -18416,6 +18434,12 @@
           "doc": "Paste into a migration."
         },
         {
+          "name": "WARM_RECEIPT_TABLE_DDL",
+          "kind": "const",
+          "signature": "\"CREATE TABLE IF NOT EXISTS warm_receipts (\\n id TEXT PRIMARY KEY,\\n at INTEGER NOT NULL,\\n expires_at INTEGER NOT NULL…",
+          "doc": "Paste into a product migration; the store never runs DDL."
+        },
+        {
           "name": "WARM_SLOTS",
           "kind": "const",
           "signature": "151",
@@ -18432,6 +18456,12 @@
           "kind": "type",
           "signature": "type WarmBoxOutcome",
           "doc": "What the product's `warm` did to the box."
+        },
+        {
+          "name": "warmKey",
+          "kind": "function",
+          "signature": "(parts: Record<string, string | number | boolean | null>) => Promise<string>",
+          "doc": "A warm key from exactly the values a step depends on: the same values give the same key whatever their order, and any change gives a new one."
         },
         {
           "name": "WarmLeaseD1Like",
@@ -18474,6 +18504,36 @@
           "kind": "type",
           "signature": "type WarmReason",
           "doc": "Why a warm was requested."
+        },
+        {
+          "name": "WarmReceipt",
+          "kind": "interface",
+          "signature": "interface WarmReceipt",
+          "doc": null
+        },
+        {
+          "name": "WarmReceiptD1Like",
+          "kind": "interface",
+          "signature": "interface WarmReceiptD1Like",
+          "doc": "The D1 surface the store uses."
+        },
+        {
+          "name": "warmReceiptId",
+          "kind": "function",
+          "signature": "(step: string, key: string) => string",
+          "doc": "The receipt id for one step and its key."
+        },
+        {
+          "name": "WarmReceiptReport",
+          "kind": "type",
+          "signature": "type WarmReceiptReport",
+          "doc": "Warm receipts: the record that a warm step already ran for exactly the inputs it depends on, so a second warm with the same inputs does no work."
+        },
+        {
+          "name": "WarmReceiptStore",
+          "kind": "interface",
+          "signature": "interface WarmReceiptStore",
+          "doc": null
         },
         {
           "name": "WarmSignalOutcome",
@@ -18563,7 +18623,7 @@
           "name": "WorkspacePrewarmReason",
           "kind": "type",
           "signature": "type WorkspacePrewarmReason",
-          "doc": "Why the browser asked: `useWorkspacePrewarm` sends `page-open` or `composer-focus`."
+          "doc": "Why the browser asked: `useWorkspacePrewarm` sends `page-open`, `composer-focus`, or `heartbeat` while the tab stays open."
         },
         {
           "name": "WorkspacePrewarmReport",
@@ -18689,6 +18749,24 @@
           "name": "WorkspaceSandboxSnapshotFreshness",
           "kind": "type",
           "signature": "type WorkspaceSandboxSnapshotFreshness",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceWarmStep",
+          "kind": "interface",
+          "signature": "interface WorkspaceWarmStep",
+          "doc": "One warm step, keyed by exactly what it depends on."
+        },
+        {
+          "name": "WorkspaceWarmStepOutcome",
+          "kind": "type",
+          "signature": "type WorkspaceWarmStepOutcome",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceWarmStepResult",
+          "kind": "interface",
+          "signature": "interface WorkspaceWarmStepResult",
           "doc": null
         },
         {
