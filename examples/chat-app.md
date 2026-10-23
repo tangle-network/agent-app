@@ -653,6 +653,12 @@ the stopped fields. A changed attempt or unconfirmed interruption leaves the
 turn unchanged. Without `cancel` configuration, the method returns 405 before
 parsing or authorization.
 
+The running route observes the same target using its committed user message ID,
+including a fresh read before accepting stream completion. Confirmed stopped or
+superseded state aborts the transport and retracts the route's assistant draft.
+Observation never interrupts a native execution or writes Stop metadata; the
+registered native completion owner retains its existing lock and persistence authority.
+
 ## Carry the effective profile into Sandbox execution
 
 Resolve the profile on the server after authorizing the workspace and any user selections.
