@@ -282,8 +282,9 @@ export default {
       finally { connection.close() }
     }
     if (url.pathname === '/observe') {
-      const connection = await connectDurableTurnCancellation(namespace, input, auth).catch(() => null)
-      if (!connection) return Response.json({ refused: true }, { status: 409 })
+      let connection
+      try { connection = await connectDurableTurnCancellation(namespace, input, auth) }
+      catch (error) { return Response.json({ refused: true, error: error instanceof Error ? error.message : String(error) }, { status: 409 }) }
       const aborted = connection.signal.aborted
       connection.close()
       return Response.json({ aborted })
