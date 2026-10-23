@@ -17709,6 +17709,12 @@
           "doc": "What a peek can find."
         },
         {
+          "name": "plannedHostRestart",
+          "kind": "function",
+          "signature": "(error: unknown) => boolean",
+          "doc": "A planned host-agent swap leaves the sandbox alive; an ordinary probe failure is not that evidence."
+        },
+        {
           "name": "predictColdArrival",
           "kind": "function",
           "signature": "(row: Pick<WarmLeaseRow, \"slots\" | \"slotsAt\" | \"firstSeenAt\">, at: number, windowMs: number) => number",
@@ -17815,6 +17821,12 @@
           "kind": "const",
           "signature": "readonly [\"pypi.org\", \"files.pythonhosted.org\", \"pypi.python.org\"]",
           "doc": "Hosts required when a product installs its pinned Python tooling at boot."
+        },
+        {
+          "name": "readDuringPlannedHostRestart",
+          "kind": "function",
+          "signature": "<T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>",
+          "doc": "Wait only for the platform typed planned-restart signal, within the caller budget."
         },
         {
           "name": "readSandboxBinaryBytes",
