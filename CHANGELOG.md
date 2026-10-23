@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.62.4
+
+- ci: isolate release producers from public PR runners (#1294)
+- fix(signoff): exit after both output streams drain
+- docs(sandbox): refresh generated planned restart API (#1295)
+- fix(signoff): drain CLI report streams before exiting
+- ci: retire hosted verification runners
+
 ## 0.62.3
 
 - test: delete stale Runtime cohort unit after valid adoption (#1290)
