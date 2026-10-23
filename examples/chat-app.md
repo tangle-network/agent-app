@@ -1,611 +1,139 @@
-# A multimodal chat app on the assembled vertical
+# Assemble a multimodal chat app
 
-The whole server chat vertical — auth, thread/message tables, streaming turn
-with buffered replay, file uploads, sidecar question answering — assembled from
-factories. No hand-rolled orchestration: the turn engine is agent-runtime's
-`handleChatTurn`, durability is `/stream`'s turn buffer, persistence is
-`/chat-store`, asks are `/interactions`. This file is the seed of the
-`create-agent-app --chat` scaffold.
+Use `create-agent-app --chat` for a runnable application. Its maintained
+[chat assembly](../create-agent-app/template-chat/src/chat.ts),
+[backend selection and provisioning](../create-agent-app/template-chat/src/sandbox.ts),
+[Worker routes](../create-agent-app/template-chat/src/worker.ts), and
+[client conversation](../create-agent-app/template-chat/web/Conversation.tsx)
+are the executable reference. Extend those product files rather than copying a
+second authentication, provisioning, stream, or persistence loop from this guide.
 
-Who owns each hop:
-
-| Hop | Owner |
+| Responsibility | Owner |
 | --- | --- |
-| Session auth + guards | `/app-auth` (`createAppAuth`) |
-| Thread/message tables + CRUD | `/chat-store` (`createChatTables` + `createChatStore`) |
-| Body parse, turn identity, routes | `/chat-routes` (`createChatTurnRoutes`) |
-| Turn engine (NDJSON protocol, hook order) | agent-runtime `handleChatTurn` |
-| The default turn: Router first, box through `sandbox_run` | `/chat-routes` (`createHybridTurnProducer`, `startHybridBox` in `afterAuthorize`) |
-| Sandbox events → client vocabulary + persisted parts | `/chat-routes` (`createSandboxChatProducer`) |
-| Model failover on a dead upstream (attributed, pre-first-byte) | `/chat-routes` (`openEvents` + `fallbackModels` on the producer) |
-| Buffered replay after a drop | `/stream` turn buffer (wired by default) |
-| Upload → `PromptInputPart` descriptors | `/chat-routes` (`createUploadRoute`) |
-| Store-backed attachments (validate, dispatch, promote) | `/chat-routes` (`resolveChatAttachments`, `buildDispatchParts`, `promoteAgentFilePart`) |
-| Ask answering (list/answer, 410 mapping, dedupe) | `/interactions` via `routes.interactions` |
-| Durable plan projection | `/plans` codec + `/chat-routes` `withDurableChatProjection` (structural) |
-| Composer, stream consumption, cards | `/web-react` |
+| Session authentication | `/app-auth`, with product workspace and thread access checks |
+| Tables, canonical parts, messages and usage | `/chat-store` |
+| Admission, retry identity, replay and completion | `/chat-routes`, using Runtime's `handleChatTurn` |
+| Router tools and escalation through `sandbox_run` | Router/Hybrid producer configuration |
+| Sandbox events and persisted projection | `createSandboxChatProducer` |
+| Questions and plans | `/interactions`, `/plans`, and Sandbox's plan authority |
+| Composer, reconnect, reasoning and cards | `/web-react` |
 
-A deliberate retry keeps the original `turnId` and supplies a new `retryAttemptId`.
-Transport retries reuse both identifiers, preserving the user message while each deliberate attempt gets separate execution and completion records.
+## One route assembly
 
-## The default turn
-
-A chat turn answers on the Router with the app's tools in process
-(`createHybridTurnProducer`), and work that needs a computer goes to the
-workspace box through one `sandbox_run` call. The box starts once per turn: at
-admission when the ask needs it (`startHybridBox` in `afterAuthorize`, handed
-to the producer as `box.started`), or when the model names `sandbox_run`.
-A turn that carries files runs on the sandbox lane, where the
-files are (`turnCarriesFiles`). The generated `--chat` app's `createHybridLane`
-in `src/sandbox.ts` is the reference wiring. The shell warms the open
-workspace through `AgentWorkspaceLayout`'s `prewarm` and the shared
-`createWorkspacePrewarmRoute`; a Router-lane workspace declines the warm and
-relies on the speculator.
-
-## Schema (Drizzle + shared migration constants)
+The product supplies the authenticated `authorize`, scoped `store`, backend
+options, and optional domain seams below. They are product callbacks, not SDK
+exports. The scaffold supplies runnable single-user wiring and migrations;
+products add their operation-specific authorization and billing policy.
 
 ```ts
-// db/schema.ts
-import { createChatTables } from '@tangle-network/agent-app/chat-store'
-import { PREWARM_CLAIM_TABLE_DDL } from '@tangle-network/agent-app/sandbox' // append to migrations
-import { TURN_EVENTS_MIGRATION_SQL } from '@tangle-network/agent-app/stream' // append to migrations
+import { createChatTurnRoutes } from '@tangle-network/agent-app/chat-routes'
 
-export const { threads, messages } = createChatTables({ workspaceTable: workspaces })
-```
-
-## Server (one worker route file)
-
-```ts
-// server/chat.ts
-import { createAppAuth } from '@tangle-network/agent-app/app-auth'
-import {
-  createChatTurnRoutes, createSandboxChatProducer, createUploadRoute,
-} from '@tangle-network/agent-app/chat-routes'
-import { createChatStore } from '@tangle-network/agent-app/chat-store'
-import { guardResolution } from '@tangle-network/agent-app/platform'
-import {
-  createD1PrewarmClaimStore,
-  ensureWorkspaceSandbox,
-  peekWorkspaceSandbox,
-  runForegroundSandboxSingleFlight,
-  streamSandboxPrompt,
-} from '@tangle-network/agent-app/sandbox'
-import { createD1TurnEventStore } from '@tangle-network/agent-app/stream'
-import { drizzle } from 'drizzle-orm/d1'
-import { shell } from './sandbox-shell' // your SandboxRuntimeConfig (see build-agent-app)
-import { messages, threads, users, sessions, accounts, verifications } from '../db/schema'
-
-export function buildChat(env: Env) {
-  const db = drizzle(env.DB)
-  const { requireApiUser } = createAppAuth({
-    appName: 'Acme Agent', baseURL: env.BETTER_AUTH_URL, secret: env.BETTER_AUTH_SECRET,
-    db, schema: { users, sessions, accounts, verifications },
-  })
-
-  const ensureForegroundBox = (scope: { workspaceId: string; userId?: string }) =>
-    runForegroundSandboxSingleFlight({
-      claim: createD1PrewarmClaimStore(env.DB),
-      workspaceId: scope.workspaceId,
-      harness: 'opencode',
-      provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: 'opencode' }),
-      peek: () => peekWorkspaceSandbox(shell, scope),
-      adopt: ({ box }) => box,
-    })
-
-  // The guard throws a JSON 401; guardResolution adapts it to {ok, response}.
-  // A dispatched/synthetic turn (e.g. a follow-up the product raised itself, not
-  // typed by the user) can set `insertUserMessage: false` to run the turn without
-  // surfacing a new `role:'user'` row. It only subtracts — the engine's retry
-  // dedup still applies — and defaults to today's behavior when omitted.
-  const authorize = async ({ request, body }: { request: Request; body?: { planFollowUp?: unknown } }) => {
-    const auth = await guardResolution(() => requireApiUser(request))
-    if (!auth.ok) return auth
-    const { user } = auth.value
-    return {
-      ok: true as const, tenantId: user.id, userId: user.id, context: { user },
-      ...(body?.planFollowUp ? { insertUserMessage: false } : {}),
-    }
-  }
-
-  const routes = createChatTurnRoutes({
-    projectId: 'acme-agent',
-    authorize,
-    store: createChatStore(db, { threads, messages }),
-    turnStore: createD1TurnEventStore(env.DB),
-    produce: async ({ prompt, body, identity, executionId }) => {
-      const box = await ensureForegroundBox({
-        workspaceId: identity.tenantId, userId: identity.userId,
-      })
-      const planEnabled = body.enablePlans === true
-      return createSandboxChatProducer({
-        model: body.model,
-        // Reactive model failover, ON by default: a dead upstream (quota wall,
-        // 502, provider outage) moves the turn to the next model BEFORE any
-        // client-visible byte. Never silent — the persisted row + billing
-        // receipt name the model that served, and the transcript gets a notice.
-        fallbackModels: ['gemini-2.5-flash-lite', 'gpt-5-mini'],
-        // Defaults keep cold source startup (120 s, through the first event)
-        // separate from provider first response (60 s after that event).
-        // Override with `openTimeoutMs` / `firstResponseTimeoutMs` only when a
-        // product has measured requirements that differ.
-        // No separate producer planMode option: close over the product's
-        // per-turn policy and auto-decline plan asks no card will render.
-        isRenderableInteraction: (kind) =>
-          kind === 'question' || (kind === 'plan' && planEnabled),
-        openEvents: ({ model, attempt, signal }) => streamSandboxPrompt(shell, box, prompt, {
-          // A failover attempt is a NEW dispatch — its own execution identity.
-          sessionId: identity.sessionId,
-          executionId: attempt === 1 ? executionId : `${executionId}-f${attempt}`,
-          model, effort: body.effort, signal,
-          interactions: { question: true, plan: true },
-        }),
-      })
-    },
-    interactions: {
-      resolveConnection: async ({ request, body }) => {
-        const auth = await authorize({ request })
-        if (!auth.ok) return auth
-        const threadId = String(body?.threadId ?? new URL(request.url).searchParams.get('threadId') ?? '')
-        const box = await ensureForegroundBox({ workspaceId: auth.userId })
-        const c = box.connection
-        if (!c?.runtimeUrl) return { ok: false as const, unavailable: 'SANDBOX_UNAVAILABLE' }
-        // sessionId = the agent session the turn streams under (the thread id).
-        return { ok: true as const, connection: { runtimeUrl: c.runtimeUrl, authToken: c.authToken, sessionId: threadId } }
-      },
-    },
-  })
-
-  const upload = createUploadRoute({
-    authorize: async ({ request }) => {
-      const auth = await authorize({ request })
-      if (!auth.ok) return auth
-      const box = await ensureForegroundBox({ workspaceId: auth.userId })
-      return { ok: true as const, sink: box.fs }
-    },
-  })
-
-  return { routes, upload }
-}
-
-// worker fetch handler
-export async function handleChat(request: Request, env: Env, ctx: ExecutionContext) {
-  const { routes, upload } = buildChat(env)
-  const url = new URL(request.url)
-  if (url.pathname === '/api/chat' && request.method === 'POST') return routes.turn(request, ctx)
-  const replay = url.pathname.match(/^\/api\/chat\/replay\/([^/]+)$/)
-  if (replay) return routes.replay(request, { turnId: replay[1]! })
-  // Reconnect discovery: a client that dropped mid-turn asks which turn id is
-  // live for its thread, then replays it. Returns the running turn id or null.
-  if (url.pathname === '/api/chat/running' && request.method === 'GET') return routes.running(request)
-  if (url.pathname === '/api/chat/upload') return upload(request)
-  if (url.pathname === '/api/chat/interactions' && request.method === 'GET') return routes.interactions!.list(request)
-  if (url.pathname === '/api/chat/interactions' && request.method === 'POST') return routes.interactions!.answer(request)
-  return new Response('Not found', { status: 404 })
-}
-```
-
-## Client (composer → parts → stream → resume)
-
-```tsx
-// app/chat.tsx
-import { ChatComposer, chatTurnRequestInit, streamChatTurn, type ComposerFile } from '@tangle-network/agent-app/web-react'
-
-function Chat({ threadId }: { threadId: string }) {
-  const [files, setFiles] = useState<ComposerFile[]>([])
-
-  async function attach(list: FileList) {
-    const form = new FormData()
-    for (const f of Array.from(list)) form.append('files', f)
-    const res = await fetch('/api/chat/upload', { method: 'POST', body: form })
-    const { files: uploaded } = await res.json()
-    setFiles((prev) => [...prev, ...uploaded.map((u) => ({
-      id: u.id, name: u.name, size: u.size, kind: 'file' as const, status: 'ready' as const, part: u.part,
-    }))])
-  }
-
-  async function send(content: string, parts: ComposerFile['part'][]) {
-    setFiles([])
-    await streamChatTurn({
-      start: () => fetch('/api/chat', chatTurnRequestInit({ threadId, content, parts })),
-      resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
-      callbacks: {
-        onText: appendDelta,
-        onReasoningState: setReasoning, // a ChatReasoningState: spread it onto <ReasoningRow>
-        onToolCall: showToolChip,
-        onInteraction: showQuestionCard,
-        onNotice: ({ noticeKind, text }) => showTranscriptNotice(noticeKind, text),
-        onErrorEvent: (message) => showTurnError(message), // existing string path
-        onErrorEventDetail: ({ code, details }) => recordFailureDetail(code, details),
-      },
-    })
-  }
-
-  return <ChatComposer onSendParts={send} onAttach={attach} pendingFiles={files} onRemoveFile={(id) => setFiles((p) => p.filter((f) => f.id !== id))} />
-}
-```
-
-Uploads ≤700 KiB come back as inline `data:` parts; bigger files are written
-into the sandbox workspace and referenced by `path` (the ~1 MiB gateway body
-cap makes that two-step mandatory). Question cards render with
-`InteractionQuestionCard` + `useChatInteractions` and answer through
-`/api/chat/interactions` — see `/web-react`.
-
-The producer keeps the flattened stream vocabulary: `text`, `reasoning`,
-`tool_call`, `tool_result`, and `usage`, plus additive `notice` lines and
-structured `{ type: 'error', data: { message, code?, details? } }` lines.
-`onNotice` consumes visible warning/auto-decline notices;
-`onErrorEventDetail` receives the structured fields while the existing
-`onErrorEvent(message)` callback continues to fire unchanged.
-
-Reasoning has one path. Both producers stream `reasoning` deltas and persist
-each reasoning run as `{ type: 'reasoning', text, time: { start, end } }`.
-`onReasoningState` hands the client a `ChatReasoningState` (`text`,
-`startedAt`, `endedAt`, `thinking`) after every delta and once when the answer
-starts; `chatReasoningFromParts(message.parts)` gives a saved message the same
-state, settled. `ChatMessages` renders it from `ChatUiMessage.reasoning`,
-`reasoningStartedAt` and `reasoningEndedAt`; anywhere else, spread the state
-onto `ReasoningRow`. `trackChatReasoning` takes callbacks, not a stream, so
-it is the entry point for any other transport: an app that dispatches lines
-itself, or reads its own frames (a Durable Object's live parts, server-side
-events), wraps its handlers with it, feeds `onReasoning`, `onText` and
-`onToolCall`, and calls `end()` when its stream closes. `streamChatTurn` keeps
-one state across a resume, so a reconnect neither repeats the reasoning nor
-restarts its clock.
-An engine turn on an OpenAI model streams reasoning only when its
-`reasoningEffort` is above `none`.
-
-### Bounded server tools
-
-Use `createProtectedRuntimeChatProducer` when a server turn needs provider-enforced spending and tool-call limits.
-It composes Runtime's protected grant with its Router executor and the shared chat event projection.
-Use `createRouterProtectedModelPort` from `/runtime` for the maintained Router transport.
-Supply an authenticated product key, an exact profile and turn digest, a deadline, and authorized tools.
-The supported route uses Anthropic without reasoning or provider-hosted tools.
-Tool callbacks receive an abort signal and must validate arguments and recheck access before effects.
-
-Retain the full Router settlement through `onSettlement` in the product's durable audit store.
-Router settles that authorization; do not deduct its cost again in product post-processing.
-A failed or cancelled turn can still incur a provider charge.
-The producer retains validated usage when execution or audit persistence fails.
-A `ProtectedModelSettlementError` carries the validated settlement when the audit callback fails.
-An invalid or unverified receipt cannot establish a charge or successful budget enforcement.
-
-The producer executes once and does not retry an uncertain execution.
-The normal chat route still owns admission, durable history, event replay, and completion records.
-Its success does not prove a particular product's tools, live provider billing, or scheduling.
-
-## Attachments (store-backed files, #224)
-
-An attachment is a file the product already saved to its own store (vault /
-`/object-store`) ahead of the turn — distinct from an inline upload part (which
-carries bytes) and from a `@`-mention (a path the sandbox already holds). Every
-path is re-validated and every size re-derived from the STORED body, never the
-client-reported one. Storage is REQUIRED injection — `ReadAttachmentFn` /
-`AtomicAttachmentWriter` (`./attachment-store`) — there is no default store.
-
-`WriteAttachmentFn` and its original `{ ok: true }` result remain available for
-existing products. That legacy lane does not promise batch rollback. New code
-should use the atomic writer adapter below, which keeps the write and its
-ownership-safe cleanup together.
-
-```ts
-import {
-  resolveChatAttachments, buildDispatchParts, promoteAgentFilePart,
-  createAtomicAttachmentWriter, createSandboxChatProducer,
-} from '@tangle-network/agent-app/chat-routes'
-import type {
-  AtomicAttachmentWriter,
-  AttachmentWriteOwnership,
-  ReadAttachmentFn,
-} from '@tangle-network/agent-app/chat-routes'
-import { createR2ObjectStore } from '@tangle-network/agent-app/object-store' // or a fleet's own vault adapter
-
-const store = createR2ObjectStore({ bucket: env.ATTACHMENTS })
-
-const readAttachment: ReadAttachmentFn = async (scopeId, path) => {
-  const obj = await store.get(`${scopeId}/${path}`)
-  if (!obj) return { ok: false, reason: 'not found' }
-  const bytes = new Uint8Array(await new Response(obj.stream()).arrayBuffer())
-  return { ok: true, size: obj.size, bytes, mediaType: obj.contentType }
-}
-
-const abortAttachment: AtomicAttachmentWriter['abort'] = async (
-  scopeId: string,
-  ownership: AttachmentWriteOwnership,
-) => {
-  // Upload and promotion paths contain a fresh ownership suffix, so each key is
-  // immutable. If a product reuses keys, replace this with compare-and-delete.
-  await store.delete(`${scopeId}/${ownership.path}`)
-}
-
-const attachmentWriter: AtomicAttachmentWriter = createAtomicAttachmentWriter({
-  abort: abortAttachment,
-  write: async (scopeId, path, content, { mediaType, ownership }) => {
-    const bytes = typeof content === 'string' ? Uint8Array.from(atob(content), (c) => c.charCodeAt(0)) : content
-    await store.put(`${scopeId}/${path}`, bytes, { contentType: mediaType })
-    return {
-      ok: true,
-      receipt: {
-        ownership,
-        rollback: () => abortAttachment(scopeId, ownership),
-      },
-    }
-  },
-})
-
-// In the turn route, before dispatch: validate the wire `attachments` field
-// and re-derive size, then fold it into the dispatched prompt parts.
-const resolved = await resolveChatAttachments(body.attachments, { scopeId: identity.tenantId, readAttachment })
-if (!resolved.succeeded) return Response.json({ error: resolved.error }, { status: 400 })
-
-const dispatch = await buildDispatchParts({
-  text, attachments: resolved.value, mentions, history, systemPrompt, profileWireBytes,
-  scopeId: identity.tenantId, readAttachment,
-  resolveAttachmentPath: (path) => `/workspace/${path}`,
-})
-if (!dispatch.succeeded) return Response.json({ error: dispatch.error }, { status: 413 })
-
-// In the producer: promote harness-emitted files into the same store instead of
-// persisting a transient data:/sandbox-path url.
-createSandboxChatProducer({
-  events,
-  promoteFilePart: (raw) => promoteAgentFilePart({
-    raw, box, scopeId: identity.tenantId, sessionId: identity.sessionId, attachmentWriter,
-  }),
-})
-```
-
-When a product carries earlier files into a sandbox turn, use
-`historyAttachmentsFromMessages(currentAttachments, priorMessages)` from
-`/chat-store` to exclude current-turn paths and retain first-seen path order.
-Then await `prepareDispatchAttachments` from `/chat-routes` **before** constructing
-prompt, history or profile-size arguments. Pass the current and carried files,
-mention count, store reader, path resolver, and optional `materialize` adapter.
-The adapter supplies `upload(path, bytes)` and its product-specific
-`missingBytesMessage(path)`; preparation copies sequentially, deduplicates target
-paths and checks uploaded byte counts. Keep the product's existing trace span
-around this preparation call.
-
-Use the returned files as `buildDispatchParts.attachments` and
-`projectDispatchHistory(priorMessages)` as `history`; all other dispatch inputs
-remain product-owned. Projection preserves assistant roles and treats other
-persisted roles as user, including the existing attachment pointers in history
-text. The builder itself remains read-only and retains its existing signature.
-
-
-`/object-store` is a ready-made backend for both seams when a product has no
-vault of its own; fleet apps that already have one (gtm's KV vault) inject
-their own `ReadAttachmentFn`/`AtomicAttachmentWriter` instead of this module — the
-seams are storage-agnostic by design.
-
-## Attachment upload + composer + transcript (#234)
-
-#224 above is the store-backed attachment vertical's read/dispatch half; this
-is the other half — the upload route, the composer's staged-upload hook, and
-the transcript renderer — so a fleet app no longer hand-rolls its own vault
-upload route to get there.
-
-### Server: hardened durable-store upload route
-
-```ts
-import { createAttachmentUploadRoute } from '@tangle-network/agent-app/chat-routes'
-
-const uploadAttachment = createAttachmentUploadRoute({
-  authorize: async ({ request }) => {
-    const auth = await authorize({ request }) // same seam as the turn route: auth + rate-limit + scope
-    if (!auth.ok) return auth
-    return { ok: true as const, scopeId: auth.tenantId }
-  },
-  attachmentWriter, // the same #224 adapter defined above
-})
-```
-
-`authorize` owns auth, rate limiting (a 429 rides `{ok:false, response}`
-exactly like a 401), and the store scope — never a query param. A raw-bytes
-download route reads back through the matching `readAttachment`:
-
-```ts
-async function downloadAttachment(request: Request, scopeId: string) {
-  const path = new URL(request.url).searchParams.get('path') ?? ''
-  const attachment = await readAttachment(scopeId, path)
-  if (!attachment.ok) return new Response('Not found', { status: 404 })
-  return new Response(attachment.bytes, { headers: { 'content-type': attachment.mediaType } })
-}
-```
-
-### Client: staged-upload composer hook
-
-```tsx
-import { ChatComposer, useComposerAttachments } from '@tangle-network/agent-app/web-react'
-
-const attachments = useComposerAttachments({
-  uploadUrl: '/api/chat/attachments',
-  onReject: (reason) => toast(reason),
-})
-
-<ChatComposer
-  pendingFiles={attachments.composerFiles}
-  onAttach={(files) => attachments.addFiles(files)}
-  onSend={(text) => streamChatTurn({
-    start: () => fetch('/api/chat', chatTurnRequestInit({ threadId, content: text, attachments: attachments.references })),
-    resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
-    callbacks: { onText: appendDelta },
-  })}
-/>
-```
-
-`references` is the server's pass-through `ChatAttachmentInput[]` — it rides
-straight onto the turn body's `attachments` field with no client-side recompute
-of size or mime; the server already derived both from the sniffed bytes.
-
-### Transcript: raw-bytes attachment renderer
-
-```tsx
-<ChatMessages
-  messages={messages}
-  resolveAttachmentUrl={(part) => `/api/chat/attachments/file?path=${encodeURIComponent(part.path)}`}
-  ...
-/>
-```
-
-`resolveAttachmentUrl` is additive — omit it and `ChatMessages` renders exactly
-as before. `MessageAttachments` is also exported standalone for a transcript
-that renders attachments outside `ChatMessages`.
-
-## Durable plan and question workflow
-
-agent-app shipped a `/durable-chat` subpath here — an authorization-scoped
-command/settlement protocol (CAS plan decisions, stable follow-up receipts,
-answer intent/ack/finalize) over a product-supplied store. It was **removed in
-0.44.0**: it exported 60 symbols and, across nine consumer repos on their
-default branches, had exactly zero imports. Three apps that needed a plan
-decision hand-rolled a local one instead, which is the signal that the
-abstraction was not the one they wanted.
-
-What survives, and what to use:
-
-- The durable plan **authority** is the Sandbox SDK's — `SandboxSession.plan()`.
-  Read it there; do not re-implement a plan state machine.
-- `/plans` still owns the browser-safe projection (lifecycle event parsing, the
-  persisted `type:'plan'` codec, revision-aware transcript keys).
-- `/chat-routes` still exports `withDurableChatProjection`, which is fully
-  structural: hand it any `{ observe, materialize }` object and it folds your
-  materialized parts into the producer lane. Your own store, your own protocol.
-- `/interactions`' `createInteractionAnswerRoute` still takes a `durable` seam,
-  so answer persistence stays available without the removed module.
-
-## Advanced hooks (optional)
-
-A complex product turn-orchestrator does more than stream: it holds a
-single-flight lock, keeps the client alive through long tool calls, gates on
-domain readiness, and books telemetry. `createChatTurnRoutes` exposes optional
-seams for exactly that — **omit any one and the route behaves exactly as
-above.** They compose with `authorize` / `produce` / `store` / `interactions`.
-
-**Stability** — `turnLock`, `contextGate`, `beforeTurn`, `lifecycle`,
-`heartbeat` and `onRawEvent` are all **stable and safe to depend on**, as is the
-`authorize` result's `insertUserMessage` flag (used above for
-dispatched/synthetic follow-up turns). They graduated in #227, once each had two
-independent product consumers exercising it — the bar this package uses, because
-a single consumer's usage is indistinguishable from that consumer's assumptions.
-
-They stay flat/top-level rather than grouped under a `hooks` object: the
-grouping would break every shipped call for no mechanism gain, and this
-package's exports are additive-only. `onRawEvent` keeps its `(event, context)`
-signature for the same reason. Its event type is exported as `ChatRouteEvent`
-(also the return type of `heartbeat.event`) if you want a standalone handler
-rather than an inline literal.
-
-```ts
 const routes = createChatTurnRoutes({
   projectId: 'acme-agent',
-  authorize, store, turnStore, produce, // as above
-
-  // 1. Single-flight lock — acquired before any side effect,
-  //    released once when the turn settles (drain finish), short-circuit, throw.
-  turnLock: {
-    acquire: async ({ identity, executionId }) => {
-      const got = await acquireLock(identity.tenantId, identity.sessionId, executionId)
-      return got.ok
-        ? { acquired: true, handle: got.lockId }
-        : { acquired: false, response: Response.json({ code: 'turn_in_flight' }, { status: 409 }) }
+  authorize,
+  store,
+  turnStore: {
+    db: env.DB,
+    lock: {
+      namespace: env.TURN_STREAM,
+      auth: { secret: env.TURN_STREAM_AUTH_SECRET },
     },
-    release: (lockId) => releaseLock(lockId as string),
   },
-
-  // 2. Domain-readiness gate — short-circuit BEFORE the producer
-  //    runs (the user row is already persisted; return the assistant side).
-  contextGate: async ({ identity, prompt }) => {
-    const ready = await computeContextSufficiency(identity.tenantId)
-    return ready.ok ? { proceed: true } : { proceed: false, response: cannedAskForContext(ready.missing) }
-  },
-
-  // 3. Observe + augment the assembled input before the producer runs.
-  //    Return a patch, or return nothing and mutate `context` for `produce` to read.
-  beforeTurn: async ({ prompt, priorMessages, identity }) => {
-    const composed = await composeSystemPromptWithCertified(identity.tenantId)
-    return { priorMessages: [systemMessage(composed), ...priorMessages] }
-  },
-
-  // 4. Deterministic run telemetry — start, then exactly one of complete/error.
-  lifecycle: {
-    onTurnStart: ({ identity, executionId }) => startRun(identity, executionId),
-    onTurnComplete: ({ finalText, usage, durationMs }) => endRun({ pass: true, finalText, usage, durationMs }),
-    onTurnError: ({ error, durationMs }) => endRun({ pass: false, error, durationMs }),
-  },
-
-  // 5. Keepalive while the producer is quiet (provisioning, first-token
-  //    wait). Window resets on every real event; a chatty producer never fires one.
-  heartbeat: {
-    intervalMs: 5_000,
-    event: ({ elapsedMs }) => ({ type: 'run-phase', data: { phase: 'working', heartbeat: true, elapsedMs } }),
-  },
-
-  // 6. Raw producer events for telemetry, before the engine frames them (distinct
-  //    from `onEvent`, which sees the engine-framed stream incl. lifecycle). Never
-  //    sees an injected keepalive; a throw here is swallowed, never fails the turn.
-  onRawEvent: (event) => emitToTrace(event),
-})
-```
-
-Each seam replaces a slice a hand-rolled generator otherwise owns: the lock is
-the dual-scope session/workspace guard; `contextGate` is the sufficiency
-short-circuit; `beforeTurn` is the prompt-composition step; `lifecycle` is the
-`startRun`/`endRun`/`flush` triple (fires on failure too); `heartbeat` is the
-`withHeartbeat` wrapper around silent waits. `handleChatTurn` stays the turn
-engine underneath — these only wrap its input, its producer stream, and its
-settle.
-
-## Declare Router and Sandbox backends
-
-The Router backend starts its model call after authorization, overlapping the
-lock, user insert and gates. The model service enforces spend before paying a
-provider. Output remains buffered until admission commits. Refusal cancels
-`args.admissionSignal`, rejects `args.admitted` and leaves no assistant row.
-Router and Hybrid option data automatically bind tracing, cancellation and the
-tool admission fence. Custom producers must await `args.admitted` before tools
-or durable effects. `beforeTurn` cannot patch a prompt already dispatched.
-Reused user rows finish admission before another model call, so duplicate
-refusals do not spend on another answer.
-
-```ts
-createChatTurnRoutes({
-  // The other required fields supply authorization, persistence and replay.
   produce: {
-    when: args => args.context.lane === 'router',
-    router: args => turnOptions(args), // Router or Hybrid producer options
-    sandbox: args => sandboxOptions(args), // Sandbox options, or a custom producer
+    when: args => useRouter(args),
+    router: args => routerOptions(args),
+    sandbox: args => sandboxOptions(args),
   },
 })
+
+// POST /api/chat. Keep the host continuation bound to its ExecutionContext.
+return routes.turn(request, { waitUntil: work => ctx.waitUntil(work) })
 ```
 
-`when` selects a backend; omit it for a Router-only product. The Sandbox
-backend and an ordinary `produce(args)` function start after admission. They
-may use the committed user row and `beforeTurn` patches as before. Declare
-only a per-request Router model call in `router`; Sandbox execution sharing a
-thread's native execution id belongs in `sandbox`.
+`turnStore` accepts these bindings or an existing `TurnEventStore`. Bindings
+assemble D1 replay and an authenticated thread lock. A product with native
+handoff or workspace-wide single-flight supplies its existing `turnLock`;
+retain the scaffold's backend-terminal ownership check when adapting that path.
+The buffer serves live reconnect; message storage serves durable history.
 
-Router options default `userMessage` to the request prompt's text and `history`
-to the prior user/assistant messages. Explicit domain-authored values override
-those defaults. Shared tracing, cancellation and admission stay bound to this
-request. A Router/Hybrid option object is distinguished from a custom producer
-by the producer's asynchronous `stream`.
-An options object's existing `admitted` promise can add a domain prerequisite;
-tools await both that promise and the route's admission commitment.
+Mount `routes.replay(request, {turnId})`, `routes.running(request)`, and configured
+`routes.interactions.list/answer` handlers as in the scaffold Worker. Replay
+handles are separate from client message identifiers. A deliberate retry keeps
+`turnId` and supplies a new `retryAttemptId`; transport retries reuse both.
+See [turn observation](../docs/turn-observation.md) for cursor and terminal rules.
 
-## Bind shared storage and request resources
+### Authorization remains product policy
 
-A product with D1 and the authenticated TurnStream binding can pass them
-through the existing `turnStore` field. The route builds replay storage and a
-thread lock; an explicit `turnLock` still supplies product handoff/reconciliation.
+Authenticate the caller and check the requested workspace, thread, and operation
+before returning success. Teams use the shared role rules; pending invitations
+grant no access. Verify replay ownership too: an unguessable handle is not an
+access check. Derive tenant, member, model-key and tool authority from trusted
+server state. A request body cannot grant a user, workspace, role, or payer.
+
+A normal turn returns `{ok: true, tenantId, userId, context}`. Reads can return
+`{ok: true, intent: 'replay', tenantId, userId}` or matching `running` after the
+same access checks. Identity-only success cannot authorize a turn. Existing
+full successes without an intent remain valid for reads. Return
+`{ok: false, response}` for an expected refusal.
+
+A server-authorized plan follow-up can set `insertUserMessage: false` to attach
+to work its decision already dispatched. This only suppresses an insert; it
+does not override retry deduplication. A client `planFollowUp` field alone
+cannot authorize the dispatch or skip its user row.
+
+### Router first; Sandbox after admission
+
+The descriptor starts the Router model call after authorization, overlapping the
+lock, user insert and gates. The model service enforces spend. Output stays
+buffered until admission commits; refusal aborts the call and discards it.
+Reused user rows complete admission before another model call, so a refused
+answered retry does not buy another answer.
+
+`when` declares backend eligibility; omit it for Router-only products. The
+scaffold uses `turnCarriesFiles` to keep files on the Sandbox lane. Sandbox
+callbacks and ordinary `produce(args)` functions start after admission.
+Declare only per-request Router execution in `router`; a backend sharing a
+thread's native execution identity belongs in `sandbox`.
+
+Callbacks may return Router, Hybrid or Sandbox options, or a custom producer
+with an asynchronous `stream`. Options bind the request's trace, cancellation
+and admission fence automatically. Router defaults `userMessage` to prompt
+text and `history` to prior user/assistant text; explicit product values win.
+Custom producers await `args.admitted` before tools, durable effects, or reading
+`beforeTurn` context changes, and forward `args.admissionSignal` to transport.
+An options object's existing `admitted` promise adds its domain prerequisite to
+the route fence. `beforeTurn` cannot patch a prompt already sent to the model.
+
+Keep stable prompt bytes ahead of current-turn context:
 
 ```ts
-turnStore: { db: env.DB, lock: { namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET } } },
+systemPrompt: {
+  profile: effectiveProfile,
+  toolNames: tools.map(tool => tool.name),
+  stable: [workspaceInstructions],
+  context: [turnContext],
+},
 ```
 
-Every request seam receives the bound `args.waitUntil` from `turn(request, ctx)`.
-An opaque acquisition can return its lifetime to the route instead of adding an
-app-owned take/release holder:
+A Hybrid `box` supplies product-owned acquisition and task execution. The shared
+producer starts it once, speculates when execution is likely, and exposes
+`sandbox_run`; `startHybridBox` can overlap an authorized early start through
+`box.started`. The scaffold keeps cross-isolate provisioning single-flight and
+warms open workspaces through `createWorkspacePrewarmRoute`.
+
+For reopenable Sandbox sources, use `openEvents({model, attempt, signal})` and
+product-selected `fallbackModels`. Failover occurs before visible output and
+retains served-model attribution and a transcript notice. A failover dispatch
+needs a distinct attempt identity. An already-open `events` source cannot
+reopen. Detached execution may still run after transport loss: retain its
+completion owner and disable dispatch failover when another attempt could
+repeat hidden work. Source-open and first-response deadlines are separate;
+read their current defaults in [producer options](../src/chat-routes/sandbox-producer.ts).
+
+## Resources, hooks and durable ownership
+
+Request seams receive the bound `args.waitUntil`. Transfer opaque acquisition
+and disposal to the route instead of maintaining a take/release holder:
 
 ```ts
 afterAuthorize: args => ({
@@ -615,60 +143,189 @@ afterAuthorize: args => ({
 produce: async args => buildProducer(await args.earlyResource),
 ```
 
-The second route generic names that resource type. Disposal runs once after
-completion, stream failure, cancellation, handoff or refusal, including when
-acquisition completes after refusal. Acquisition cleans up any partial resource
-before rejecting. A legacy release function keeps its existing behavior: it
-runs only when the turn ends before the producer takes ownership.
+The second route generic names the resource type. Disposal runs once on
+refusal, completion, stream failure, cancellation or handoff, even when
+acquisition finishes after refusal. Acquisition cleans partial resources before
+rejecting. A legacy release function still runs only when the turn ends before
+the producer takes ownership. Start billable work only after the product's
+required authorization and paid-access gates.
 
-## Authorize reads and Stop by identity
+| Existing seam | Product responsibility |
+| --- | --- |
+| `contextGate` | Refuse on domain readiness; the user row already exists |
+| `beforeTurn` | Pin or prepare domain context before committed execution |
+| `lifecycle` | Start and exactly one complete/error receipt; `afterSettle` runs after lock release |
+| `onTurnComplete` | Product settlement using authoritative usage/model attribution |
+| `heartbeat` | Product keepalive event while the producer is quiet |
+| `onRawEvent` | Best-effort producer telemetry before framing; excludes injected heartbeat |
 
-Replay and running-turn discovery need the authenticated workspace and member,
-without a turn's model, prompt or execution context. After the same access
-checks, `authorize` can return `{ok: true, intent: 'replay', tenantId, userId}`
-or the matching `running` intent. A turn requires its full `context` success;
-an identity-only result cannot authorize model execution or transcript writes.
-Existing full successes without an intent remain valid for read endpoints.
+The route records shared trace spans and first-visible/first-text timing.
+`createD1TurnTimingStore(...).lifecycle(...)` supplies rollout persistence without
+another timing adapter. Product labels, cohort arms and domain settlement stay
+explicit. See [turn tracing](../docs/turn-trace.md) and
+[lifecycle ownership](../docs/turn-lifecycle-owner.md).
 
-Stop uses the same authorization seam with `intent: 'cancel'`. Configure its
-exact target through the existing route assembly:
+`waitUntil`, a stream buffer, and projection EOF do not establish a durable
+execution owner. Native execution transfers its original identities, timing,
+transcript and fenced lock to the existing completion owner. Observation loss
+must not redispatch work or release that owner's lock. Preserve product
+reconciliation and idempotent settlement before terminal release.
 
-```ts
-const routes = createChatTurnRoutes({
-  ...appOptions,
-  cancel: { target: args => readOwnedStopTarget(args) },
+## Composer, stream and reconnect
+
+```tsx
+import {
+  ChatComposer, chatTurnRequestInit, streamChatTurn, useComposerAttachments,
+} from '@tangle-network/agent-app/web-react'
+
+const attachments = useComposerAttachments({
+  uploadUrl: '/api/chat/attachments',
+  onReject: reason => toast(reason),
 })
-// POST handler:
-return routes.cancel(request)
+
+<ChatComposer
+  pendingFiles={attachments.composerFiles}
+  onAttach={files => attachments.addFiles(files)}
+  onSend={content => streamChatTurn({
+    start: () => fetch('/api/chat', chatTurnRequestInit({
+      threadId, content, attachments: attachments.references,
+    })),
+    resume: (turnId, fromSeq) => fetch(`/api/chat/replay/${turnId}?fromSeq=${fromSeq}`),
+    callbacks: { onText: appendDelta, onReasoningState: setReasoning },
+  })}
+/>
 ```
 
-The product authenticates the editor and verifies access to the requested
-thread and turn, then projects the captured metadata, dispatch token and
-original native execution into `ChatTurnCancelTarget`. A matching identity-only
-cancel success is sufficient; target resolution receives `tenantId` and
-`userId`, with `context` only when authorization supplied it. The target's
-`source()` resolves that execution's existing authorized box. Its
-`markStopped` compares the complete captured metadata atomically before merging
-the stopped fields. A changed attempt or unconfirmed interruption leaves the
-turn unchanged. Without `cancel` configuration, the method returns 405 before
-parsing or authorization.
+`streamChatTurn` consumes text, tools, usage, interactions, notices and structured
+errors. `onNotice` renders warning/auto-decline notices; `onErrorEventDetail`
+retains code/details alongside the existing `onErrorEvent(message)` path.
+Question cards use `InteractionQuestionCard` and `useChatInteractions`.
 
-The running route observes the same target using its committed user message ID,
-including a fresh read before accepting stream completion. Confirmed stopped or
-superseded state aborts the transport and retracts the route's assistant draft.
-Observation never interrupts a native execution or writes Stop metadata; the
-registered native completion owner retains its existing lock and persistence authority.
+Both producers persist reasoning parts with run timing. `onReasoningState`
+feeds `ReasoningRow`; `chatReasoningFromParts(message.parts)` reconstructs saved
+state for `ChatMessages`. Reconnect retains one reasoning state and clock.
+Other transports use `trackChatReasoning`, feed reasoning/text/tool callbacks,
+and call `end()` on close. OpenAI reasoning depends on the selected model's
+supported reasoning effort. Read the [client implementation](../src/web-react/chat-stream.ts)
+when adapting callbacks or resume behavior.
 
-## Carry the effective profile into Sandbox execution
+## Uploads, stored attachments and mentions
 
-Resolve the profile on the server after authorizing the workspace and any user selections.
-Pass that complete profile as `profile` to `streamSandboxPrompt` or `driveSandboxTurn`.
-Both entrypoints use its harness, model, reasoning effort, permissions, and resources.
-They share compatibility checks, token limits, prompt limits, and the `onProfileResolved` observation.
-Credentials, session identifiers, cancellation, and interaction policy remain separate execution options.
+Choose the existing storage boundary:
+
+- `createUploadRoute` returns inline parts or writes larger files to an
+  authorized Sandbox filesystem. The scaffold supplies its scoped sink.
+- `createAttachmentUploadRoute` saves bytes to a durable product store and
+  returns `ChatAttachmentInput` references. Pair it with `ReadAttachmentFn`
+  and `AtomicAttachmentWriter`; `/object-store` supplies an R2 backend.
+- Mentions reference paths already available on the workspace box.
+
+Authenticate and rate-limit uploads and downloads, derive scope from authorized
+identity, validate every path, sniff actual bytes, and rederive size from stored
+content. Read current limits in the
+[upload owner](../src/chat-routes/upload.ts) and
+[attachment validation](../src/chat-routes/attachment-validation.ts), rather
+than copying them into product configuration.
+
+Use `createAtomicAttachmentWriter` for new durable adapters. Each successful
+write returns its ownership receipt and rollback; `abort` must compare ownership
+or delete an immutable unique key. A reused path alone is insufficient authority
+to delete a concurrent writer's object. Legacy `WriteAttachmentFn` remains
+available but does not promise atomic batch rollback. See the
+[writer contract](../src/chat-routes/attachment-store.ts).
 
 ```ts
-const stream = streamSandboxPrompt(shell, box, prompt, {
+const upload = createAttachmentUploadRoute({
+  authorize: async ({ request }) => {
+    const auth = await authorizeAttachmentWrite(request)
+    return auth.ok ? { ok: true, scopeId: auth.workspaceId } : auth
+  },
+  attachmentWriter,
+})
+```
+
+Before dispatch, `resolveChatAttachments` validates references with
+`{scopeId, readAttachment}`. Carry earlier files with
+`historyAttachmentsFromMessages(currentAttachments, priorMessages)`.
+Await `prepareDispatchAttachments` before building prompt/history/profile-size
+arguments; it materializes files sequentially, deduplicates target paths and
+checks uploaded byte counts. The product supplies path roots, `upload` and its
+missing-bytes error. Retain the existing trace around preparation.
+
+Pass prepared files and `projectDispatchHistory(priorMessages)` to
+`buildDispatchParts` with product prompt, mention paths and profile wire size.
+It enforces the dispatch budget without writing to storage. Persisted assistant
+roles survive history projection; other roles become user with existing file
+pointers retained. On failure, return the helper's typed failure before dispatch.
+
+`promoteAgentFilePart` in the Sandbox producer's `promoteFilePart` callback
+copies harness files into that same durable store before persisting their
+reference. `ChatMessages.resolveAttachmentUrl` maps stored parts to an
+authenticated raw-bytes download route; `MessageAttachments` is available
+standalone. See [attachment preparation](../src/chat-routes/attachment-store.ts)
+and the [composer hook](../src/web-react/use-composer-attachments.ts).
+
+## Questions, plans and approvals
+
+Sandbox's `SandboxSession.plan()` owns durable plan authority. `/plans` owns
+browser-safe lifecycle projection, persisted plan parts and revision-aware
+transcript keys. `withDurableChatProjection` accepts the product's structural
+`{observe, materialize}` source; `createInteractionAnswerRoute` retains its
+`durable` persistence seam.
+
+`isRenderableInteraction` determines which question/plan cards the product can
+render. Supply `declineInteraction` for unsupported asks so execution does not
+wait indefinitely on an invisible card. Interaction list reads must not
+provision a paid box; the scaffold resolves an existing session for reads.
+Decision endpoints check the caller's role and action sensitivity, and every
+effect capability still enforces approval and finite budget. Automatic mission
+start does not bypass those downstream checks.
+
+## Provider-enforced budgets and tools
+
+`createProtectedRuntimeChatProducer` composes Runtime's protected grant,
+Router executor and shared event projection. Use `createRouterProtectedModelPort`
+from `/runtime`; supply the authenticated product key, exact profile and turn
+digest, deadline, and authorized tools. The supported path uses Anthropic
+without reasoning or provider-hosted tools. Tool callbacks validate arguments,
+recheck access and honor their abort signal before effects.
+
+Retain the validated Router settlement through `onSettlement` in the product's
+durable audit store. Router settles that authorization; do not deduct its cost
+again in post-processing. Failure or cancellation can still incur provider
+charges. `ProtectedModelSettlementError` retains validated settlement when the
+audit callback fails; an invalid receipt proves neither a charge nor enforcement.
+The producer executes once without retrying uncertain work. Admission, history,
+replay and completion records remain with the normal route; prove live product
+tools and provider billing separately.
+
+## Stop uses the original authorized target
+
+Configure `cancel: {target: args => readOwnedStopTarget(args)}` and route POSTs
+to `routes.cancel(request)`. Without configuration it returns 405 before
+parsing or authorization. Its `authorize` intent is `cancel`; matching
+identity-only success is sufficient and `target` receives optional `context`.
+The product authenticates an editor and checks workspace/thread/turn access.
+
+Project the captured metadata, dispatch token and original native receipt into
+`ChatTurnCancelTarget`. Resolve only that receipt's authorized box through
+`source()`. `markStopped` atomically compares the whole captured metadata before
+merging Stop fields. A changed attempt or unconfirmed interruption leaves the
+turn unchanged. OAuth actor/source-key checks remain product policy.
+
+The running route observes this target with its server-committed message ID,
+including a fresh read before accepting EOF. Confirmed stopped/superseded state
+aborts transport and retracts its draft. Observation performs no native
+interrupt or Stop write; the durable completion owner retains transcript and
+lock authority. See [Stop's contract](../src/chat-routes/cancellation.ts).
+
+## Effective Sandbox profiles and credentials
+
+After authorizing the workspace and user selections, pass the complete
+`effectiveProfile` into `streamSandboxPrompt` or `driveSandboxTurn`:
+
+```ts
+streamSandboxPrompt(shell, box, prompt, {
   profile: effectiveProfile,
   modelApiKey: executionKey.apiKey,
   sessionId: thread.id,
@@ -678,19 +335,18 @@ const stream = streamSandboxPrompt(shell, box, prompt, {
 })
 ```
 
-The supplied profile bypasses `shell.profile`; compose product resources before dispatch.
-Existing callers can still use the shell composer and explicit per-turn selections.
-Selections override profile defaults, which override shell provider defaults.
-The dispatched profile records the effective model and harness, without copying credential values into it.
+Both entrypoints share harness/model/effort, permissions, resource, compatibility
+and request-limit resolution plus `onProfileResolved`. The supplied profile
+bypasses `shell.profile`; compose product resources first. Explicit selections
+override profile defaults, then shell provider defaults. Credentials, session
+identity, cancellation and interaction policy remain separate options; the
+effective dispatched profile contains no secret values. Custom SDK transports
+can reuse `resolveSandboxPromptBackend` for the same backend in size checks and
+dispatch. Read [profile authority](../docs/agent-profiles.md) before changing
+text versus harness/tool/secret authority or OAuth execution identity.
 
-Products with their own SDK transport can call `resolveSandboxPromptBackend` directly.
-It accepts only profile, provider, and preparation configuration; it does not require provisioning or storage adapters.
-Use its returned backend for both request-size checks and dispatch, preserving product-specific recovery and persistence.
-
-## Renew workspace credentials
-
-Put expiring application credentials in `SandboxRuntimeConfig.runtimeEnv`, rather than creation-only `env` or a custom bootstrap hook.
-The shell resolves them on creation and before each reuse, resume, or recovery, even when liveness is cached.
+Put expiring workspace-wide application credentials in
+`SandboxRuntimeConfig.runtimeEnv`, rather than creation-only `env`:
 
 ```ts
 runtimeEnv: async ({ workspaceId }) => ({
@@ -698,10 +354,12 @@ runtimeEnv: async ({ workspaceId }) => ({
 }),
 ```
 
-The product owns `mintWorkspaceToolToken` and throws when required credentials are unavailable.
-Profiles reference `APP_TOOL_BEARER` by name; credential values stay outside profile material.
-Values have workspace-wide authority, so this callback cannot carry per-user or per-request secrets.
-Static process configuration remains in `env`; Sandbox owns managed model and Hub credentials.
-On existing sandboxes, the shell awaits the SDK's `setRuntimeEnv` acknowledgement before bootstrap or dispatch.
-An update failure preserves the sandbox and prevents the turn from starting.
-Deploy the matching Sandbox runtime before adopting this callback; a package upgrade cannot update already-running sidecars.
+The shell resolves this on creation and before reuse, resume or recovery,
+even when liveness is cached. Profiles reference the variable name; values stay
+outside profile material. This callback has workspace-wide authority and cannot
+carry per-user/request secrets. Keep static process configuration in `env`;
+Sandbox owns managed model and Hub credentials. Throw when required credentials
+cannot resolve. Existing boxes await `setRuntimeEnv` acknowledgement before
+bootstrap/dispatch; failure preserves the box and refuses the turn. Deploy a
+matching Sandbox runtime before adoption: upgrading the package does not update
+already-running sidecars.
