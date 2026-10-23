@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.1
+
+- test: prove sandbox deadlines through real HTTP turns (#1305)
+
 ## 0.63.0
 
 - test: retire obsolete router and sandbox mock assertions (#1304)
