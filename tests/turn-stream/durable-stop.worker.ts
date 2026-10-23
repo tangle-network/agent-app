@@ -28,7 +28,7 @@ function routes(env: Env) {
     scopeOf: () => 'thread', cancellationOf: () => true })
   return createChatTurnRoutes({ projectId: 'durable-stop-fixture', store: messages(env),
     turnStore: createDurableObjectTurnEventStore(env.TURNS, { secret: env.TURN_STREAM_AUTH_SECRET }),
-    turnTrace: false, log: () => {},
+    turnTrace: false, log: (message, meta) => console.info('[durable-stop-fixture]', message, JSON.stringify(meta ?? {})),
     authorize: async ({ request, threadId }) => {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
       const { results } = await env.CHAT.prepare('SELECT user_id, workspace_id, role FROM members WHERE token = ?')
