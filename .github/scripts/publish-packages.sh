@@ -97,6 +97,18 @@ wait_for_registry_integrity() {
   return 44
 }
 
+publication_pending() {
+  local tarball=$1 name=$2 key=$3 remote status
+  if remote=$(registry_integrity "$name" "$EXPECTED_VERSION" "$key"); then
+    [[ "$remote" == "$(integrity "$tarball")" ]] || die "registry tarball mismatch for $name@$EXPECTED_VERSION."
+    printf 'false'
+  else
+    status=$?
+    [[ $status -eq 44 ]] || return "$status"
+    printf 'true'
+  fi
+}
+
 publish_one() {
   local tarball=$1 name=$2 version=$3 key=$4
   local local_sri remote_sri status
@@ -139,6 +151,11 @@ case "$command" in
     create_version=$(tarball_version "$2" "$CREATE_NAME" create)
     [[ "$root_version" == "$create_version" ]] || die "tarball version mismatch: $root_version != $create_version."
     [[ "$root_version" == "$EXPECTED_VERSION" ]] || die "tarball version mismatch: expected $EXPECTED_VERSION, found $root_version."
+    if [[ -n "${PUBLICATION_OUTPUT:-}" ]]; then
+      root_pending=$(publication_pending "$1" "$ROOT_NAME" root)
+      create_pending=$(publication_pending "$2" "$CREATE_NAME" create)
+      printf 'agent-app-pending=%s\ncreate-agent-app-pending=%s\n' "$root_pending" "$create_pending" >> "$PUBLICATION_OUTPUT"
+    fi
     echo "validated exact tarballs for version $root_version"
     ;;
   publish)
