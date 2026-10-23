@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.2
+
+- fix(sandbox): settle planned restarts even without a liveness probe (#1289)
+
 ## 0.62.1
 
 - fix(sandbox): settle restart-prefetched reads after liveness recovers (#1287)
