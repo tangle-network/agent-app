@@ -217,11 +217,12 @@ it('keeps missing facts unknown, distinguishes raw failures from missing words, 
   const store = timingStore(sqlite)
   try {
     await store.record({ turnId: 'known', rollout: 'r', workspaceId: 'w', lane: 'sandbox', admissionMs: 100,
-      firstVisibleMs: 200, firstTextMs: 300, settledMs: 400, failed: false, model: 'actual', at: 10 })
+      firstVisibleMs: 200, firstTextMs: 300, settledMs: 400, failed: false, model: 'actual', requestReceivedAt: 5, at: 10 })
     await store.record({ turnId: 'unknown', rollout: 'r', workspaceId: 'w', lane: 'sandbox', settledMs: 500, failed: false, at: 20 })
     const measured = await store.measureRequestOrigin({ rollout: 'r', lane: 'sandbox', since: 0, until: 30 })
-    expect(measured).toMatchObject({ samples: 2, failed: 0, failureRate: 0, requestOriginFirstVisibleP50Ms: 300,
-      coverage: { admission: 1, firstVisible: 1, firstText: 1, requestOriginFirstVisible: 1, model: 1 }, truncated: false })
+    expect(measured).toMatchObject({ samples: 1, failed: 0, failureRate: 0, requestOriginFirstVisibleP50Ms: 300,
+      coverage: { admission: 1, firstVisible: 1, firstText: 1, requestOriginFirstVisible: 1, model: 1 }, truncated: false,
+      unassignedOrigins: { samples: 1, failed: 0, truncated: false, selection: { clock: 'settled-at' } } })
     const stage = await store.measureStage({ rollout: 'r', lane: 'sandbox', since: 0, stage: { name: 'all', value: '*', minSamples: 1, kill: {} } })
     expect(stage.metrics.first_visible_p50_ms).toBe(200)
     expect(stage.metrics.failure_rate).toBe(0.5)
@@ -323,7 +324,7 @@ it('measures one all-lane population without merging percentiles and keeps revis
       { turnId: 'a', lane: 'sandbox', revision: 'original', admissionMs: 10, firstVisibleMs: 1000 },
       { turnId: 'b', lane: 'sandbox', revision: 'original', admissionMs: 10, firstVisibleMs: 2000 },
       { turnId: 'c', lane: 'loop', revision: undefined, admissionMs: 10, firstVisibleMs: 100 },
-    ]) await store.record({ ...row, rollout: 'r', workspaceId: 'w', settledMs: 3000, failed: false, at: 10 })
+    ]) await store.record({ ...row, rollout: 'r', workspaceId: 'w', settledMs: 3000, failed: false, requestReceivedAt: 5, at: 10 })
     const all = await store.measureRequestOrigin({ rollout: 'r', since: 0, until: 20 })
     expect(all).toMatchObject({ samples: 3, requestOriginFirstVisibleP50Ms: 1010,
       coverage: { revision: 2, model: 0, requestOriginFirstVisible: 3 }, selection: { lane: null, revision: 'all' } })

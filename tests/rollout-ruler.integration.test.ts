@@ -4,8 +4,8 @@ import type { AddressInfo } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import { build } from 'tsup'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes, createSandboxChatProducer, type ChatTurnMessageStore } from '../src/chat-routes/index'
 import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_SCHEMA_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL, type D1LikeForRollout } from '../src/rollout/d1'
@@ -15,6 +15,8 @@ import { createMemoryTurnEventStore } from '../src/stream/index'
 // Frozen E8 decision measurement: creative-rollout.result, closed seven-day window
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
 const frozen = JSON.parse(readFileSync(new URL('./fixtures/rollout/creative-e8.json', import.meta.url), 'utf8'))
+// Frozen install's prepare builds the exact CLI named by the package bin.
+const cli = fileURLToPath(new URL('../dist/rollout/cli.js', import.meta.url))
 
 it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the deployed commit went live, and narrows on an injected failure breach', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
@@ -26,8 +28,6 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
       } },
       { name: 'all', value: '*', minSamples: 100, kill: { failure_rate_delta: { max: 0.01 } } },
     ] }
-    await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false, config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
-    const cli = join(dir, 'cli.mjs')
     // `from`: 'since' measures from the CLI's `since`, as a product reading only rows at or after it does; an ISO time is a
     // fixed window the instrument chose; absent keeps the frozen seven-day window.
     const run = (breach: boolean, args: string[], from?: string) => {
@@ -129,8 +129,6 @@ it('the shipped CLI completes a narrowing when the measurement HTTP request neve
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false,
-      config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
     writeFileSync(join(dir, 'wrangler.toml'), '[vars]\nIDS = ""\n')
     writeFileSync(join(dir, 'rollout.config.mjs'), `export default {
       measurementTimeoutMs: 500,
@@ -139,7 +137,7 @@ it('the shipped CLI completes a narrowing when the measurement HTTP request neve
       async measure() { return (await fetch(${JSON.stringify(endpoint)})).json() },
     }`)
     const started = Date.now()
-    const child = spawn('timeout', ['3', process.execPath, join(dir, 'cli.mjs'), dir, '--from', 'w', '--to', ''])
+    const child = spawn('timeout', ['3', process.execPath, cli, dir, '--from', 'w', '--to', ''])
     let output = ''
     child.stdout.on('data', chunk => { output += chunk })
     child.stderr.on('data', chunk => { output += chunk })
