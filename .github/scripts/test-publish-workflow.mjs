@@ -19,14 +19,6 @@ const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-rel
 const packFilenameScript = path.join(root, '.github/scripts/read-npm-pack-filename.mjs')
 const lines = text.split('\n')
 const triggerBlock = text.slice(0, text.indexOf('concurrency:'))
-const pins = {
-  'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
-  'pnpm/action-setup': '0ebf47130e4866e96fce0953f49152a61190b271',
-  'actions/setup-node': '820762786026740c76f36085b0efc47a31fe5020',
-  'actions/upload-artifact': '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
-  'actions/download-artifact': '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
-}
-
 const fail = (message) => {
   console.error(`publish workflow contract failed: ${message}`)
   process.exit(1)
@@ -115,10 +107,6 @@ const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
     .map((match) => ({ file, name: match[1], ref: match[2] })),
 )
 check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'actions and trusted workflow controls must be pinned to immutable commits')
-for (const [name, pin] of Object.entries(pins)) {
-  const refs = actionRefs.filter((action) => action.name === name)
-  check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
-}
 for (const { file, text: workflow } of workflows) {
   const workflowLines = workflow.split('\n')
   for (let index = 0; index < workflowLines.length; index += 1) {

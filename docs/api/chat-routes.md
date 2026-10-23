@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-294 exports.
+296 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -851,7 +851,7 @@ interface CreateLegacyAttachmentUploadRouteOptions
 `function`
 
 ```ts
-(options: RouterTurnProducerOptions) => ChatTurnRouteProducer
+(options: RouterTurnProducerOptions) => Omit<ChatTurnRouteProducer, "stream"> & { stream: AsyncGenerator<ProducerWireEv…
 ```
 
 ### `createSandboxChatProducer`
@@ -1382,6 +1382,14 @@ interface NativeCompletionAdmission
 interface NativeCompletionAdmissionStore
 ```
 
+### `NativeCompletionHandoffOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionHandoffOptions
+```
+
 ### `NativeCompletionObservation`
 
 `type`
@@ -1420,6 +1428,14 @@ type NativeCompletionSessionSource
 
 ```ts
 interface NativeCompletionTurnReceipt
+```
+
+### `NativeTurnTimingFacts`
+
+`interface` — Serializable route observations for an admission that transfers terminal authority to a durable native owner.
+
+```ts
+interface NativeTurnTimingFacts
 ```
 
 ### `normalizeChatPromptForSandbox`
