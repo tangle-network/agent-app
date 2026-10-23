@@ -4,7 +4,7 @@
 
 Source: `src/rollout/d1.ts`
 
-9 exports.
+10 exports.
 
 ### `createD1TurnTimingStore`
 
@@ -36,6 +36,14 @@ interface D1LikeForRollout
 
 ```ts
 "ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;"
+```
+
+### `ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL`
+
+`const` — Apply through the product migration runner after request_received_at exists.
+
+```ts
+"\nCREATE INDEX IF NOT EXISTS rollout_turn_timing_by_request_origin ON rollout_turn_timing (rollout, request_received_a…
 ```
 
 ### `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`

@@ -16325,6 +16325,12 @@
           "doc": "Additive upgrade for a table created before durable native timing transfer."
         },
         {
+          "name": "ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"\\nCREATE INDEX IF NOT EXISTS rollout_turn_timing_by_request_origin ON rollout_turn_timing (rollout, request_received_a…",
+          "doc": "Apply through the product migration runner after request_received_at exists."
+        },
+        {
           "name": "ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL",
           "kind": "const",
           "signature": "\"\\nALTER TABLE rollout_turn_timing ADD COLUMN admission_ms INTEGER;\\nALTER TABLE rollout_turn_timing ADD COLUMN model T…",

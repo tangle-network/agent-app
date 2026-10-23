@@ -97,7 +97,7 @@ _152 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./redact`](api/redact.md) | 15 | — |
 | [`./rollout`](api/rollout.md) | 14 | `chat-routes`, `signoff`, `turn-trace` |
 | [`./rollout/cli`](api/rollout-cli.md) | 3 | `chat-routes`, `signoff`, `turn-trace` |
-| [`./rollout/d1`](api/rollout-d1.md) | 9 | `chat-routes`, `signoff`, `turn-trace` |
+| [`./rollout/d1`](api/rollout-d1.md) | 10 | `chat-routes`, `signoff`, `turn-trace` |
 | [`./runtime`](api/runtime.md) | 110 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 30 | `tools`, `turn-trace` |
 | [`./runtime/telemetry-cap`](api/runtime-telemetry-cap.md) | 4 | `tools`, `turn-trace` |
@@ -1003,11 +1003,11 @@ Depends on: `chat-routes`, `signoff`, `turn-trace`
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · 9 exports
+Source: `src/rollout/d1.ts` · 10 exports
 
 Depends on: `chat-routes`, `signoff`, `turn-trace`
 
-`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL`, `stageMetrics`, `TurnTimingRow`
+`createD1TurnTimingStore`, `D1LikeForRollout`, `ROLLOUT_TURN_TIMING_FIRST_VISIBLE_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`, `ROLLOUT_TURN_TIMING_SCHEMA_SQL`, `ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL`, `stageMetrics`, `TurnTimingRow`
 
 [Full API →](api/rollout-d1.md)
 
