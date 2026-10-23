@@ -2,15 +2,19 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { DatabaseSync } from 'node:sqlite'
 import { expect, it } from 'vitest'
-import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnProduceArgs, type ChatTurnRequestContext, type ChatTurnRouterBackend, type ChatTurnSandboxBackend } from '../../src/chat-routes/index'
-import { createMemoryTurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
+import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnProduceArgs, type ChatTurnRequestContext, type ChatTurnRouterBackend, type ChatTurnSandboxBackend, type ChatTurnRouteProducer } from '../../src/chat-routes/index'
+import { createD1TurnEventStore, createMemoryTurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
 import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '../../src/turn-stream/memory'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
+import { settleTurnResponse, TURN_PROGRESS_FIRST, TURN_PROGRESS_HEADER } from '../../src/chat-routes/turn-progress'
+import { ProfileConflictError } from '../../src/agent-profiles/index'
 
-async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 'router-data' | 'sandbox-data'; refuse?: 'authorize' | 'gate'; concurrent?: boolean; bindings?: boolean; customLock?: boolean; cleanup?: boolean; domainFence?: boolean; resource?: 'late' | 'normal' | 'throw' } = {}) {
+type ProofResource = { id: string; box?: Promise<{ id: string }> }
+
+async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 'router-data' | 'sandbox-data' | 'router-class'; refuse?: 'authorize' | 'gate' | 'profile' | 'private'; readAuthorization?: 'replay' | 'running' | 'cancel' | 'matching'; concurrent?: boolean; bindings?: boolean; existingStoreDb?: boolean; customLock?: boolean; cleanup?: boolean; domainFence?: boolean; resource?: 'late' | 'normal' | 'throw' | 'nested' | 'nested-reject' } = {}) {
   const database = new DatabaseSync(':memory:')
   database.exec(`
-    CREATE TABLE message(id TEXT PRIMARY KEY, thread TEXT, role TEXT, content TEXT, parts TEXT, answered INTEGER DEFAULT 0);
+    CREATE TABLE message(id TEXT PRIMARY KEY, thread TEXT, role TEXT, content TEXT, parts TEXT, model TEXT, input_tokens INTEGER, answered INTEGER DEFAULT 0);
     CREATE TABLE active_lock(thread TEXT PRIMARY KEY);
     CREATE TABLE effect(user_message TEXT PRIMARY KEY);
     CREATE TABLE resource_disposal(resource TEXT);
@@ -24,17 +28,20 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
     },
     async appendMessage(input) {
       const id = crypto.randomUUID()
-      database.prepare('INSERT INTO message(id,thread,role,content,parts) VALUES (?,?,?,?,?)')
-        .run(id, input.threadId, input.role, input.content, JSON.stringify(input.parts ?? null))
+      database.prepare('INSERT INTO message(id,thread,role,content,parts,model,input_tokens) VALUES (?,?,?,?,?,?,?)')
+        .run(id, input.threadId, input.role, input.content, JSON.stringify(input.parts ?? null), input.model ?? null, input.inputTokens ?? null)
       return { id }
     },
   }
-  const durable = options.bindings ? sqliteD1(TURN_EVENTS_MIGRATION_SQL) : undefined
+  const durable = options.bindings || options.existingStoreDb ? sqliteD1(TURN_EVENTS_MIGRATION_SQL) : undefined
+  const existingStore = durable && options.existingStoreDb
+    ? Object.assign(createD1TurnEventStore(durable.d1), { db: durable.d1 }) : undefined
   const namespace = createMemoryTurnStreamHarness().namespace
   const forwardContinuation = (phase: string, args: { waitUntil?: ChatTurnRequestContext['waitUntil'] }) => {
     args.waitUntil?.(Promise.resolve(`seam:${phase}`))
   }
   let requests = 0
+  let externalRequests = 0
   let acquired = 0
   let gates = 0
   const signals: AbortSignal[] = []
@@ -53,16 +60,17 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
   const server = createServer((request, response) => {
     request.resume()
     request.on('end', () => {
+      externalRequests++
       if (request.url === '/resource') {
         let finished = false
         const finish = () => {
           if (finished) return
           finished = true
-          response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ id: 'resource-1' }))
+          response.writeHead(options.resource === 'nested-reject' ? 503 : 200, { 'content-type': 'application/json' }).end(JSON.stringify({ id: 'resource-1' }))
         }
         releaseResource = finish
         resourceReady()
-        if (options.resource !== 'late' && !options.cleanup) finish()
+        if (!['late', 'nested', 'nested-reject'].includes(options.resource ?? '') && !options.cleanup) finish()
       } else if (request.method === 'DELETE') {
         database.prepare('INSERT INTO resource_disposal VALUES (?)').run(request.url!)
         response.end('disposed')
@@ -91,7 +99,7 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
     if (args.admissionSignal) signals.push(args.admissionSignal)
     void args.admitted?.catch(error => { refusals.push(error) })
     const text = await fetch(origin, { signal: args.admissionSignal }).then(response => response.text())
-    return {
+    const producer = {
       stream: (async function* () {
         yield { type: 'text' as const, text }
         // The real model call can finish early; durable work still awaits the committed row.
@@ -101,10 +109,23 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
       })(),
       finalText: () => text,
     }
+    if (options.backend !== 'router-class') return producer
+    class HttpProducer {
+      #text = text
+      #model = 'served/private-model'
+      #receipt = { inputTokens: 11 }
+      constructor(readonly stream: ChatTurnRouteProducer['stream']) {}
+      get model() { return this.#model }
+      finalText() { return this.#text }
+      usage() { return this.#receipt }
+      assistantParts() { return [{ type: 'text', text: this.#text }] }
+    }
+    return Object.freeze(new HttpProducer(producer.stream))
   }
   const configured = (args: ChatTurnProduceArgs<Record<string, never>>): ChatTurnRouterBackend | ChatTurnSandboxBackend => {
     seen.push({ id: args.userMessageId, admitted: Boolean(args.admitted),
       locked: Boolean(database.prepare('SELECT thread FROM active_lock').get()), gates })
+    if (args.admissionSignal) signals.push(args.admissionSignal)
     if (options.backend === 'sandbox-data') return {
       events: (async function* () {
         const text = await fetch(origin).then(response => response.text())
@@ -131,17 +152,37 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
         } }],
     }
   }
-  const routes = createChatTurnRoutes({
+  const routes = createChatTurnRoutes<Record<string, never>, ProofResource>({
     projectId: 'dispatch-reuse', store, turnTrace: false,
-    turnStore: durable ? { db: durable.d1, lock: { namespace, auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET } } } : createMemoryTurnEventStore(),
+    turnStore: existingStore ?? (durable ? { db: durable.d1, lock: { namespace, auth: { secret: MEMORY_TURN_STREAM_AUTH_SECRET } } } : createMemoryTurnEventStore()),
     authorize: async args => {
       forwardContinuation('authorize', args)
+      if (options.readAuthorization) {
+        const intent = options.readAuthorization === 'matching'
+          ? (args.intent === 'running' || args.intent === 'cancel' ? args.intent : 'replay') : options.readAuthorization
+        return { ok: true as const, intent, tenantId: 'workspace', userId: 'member' }
+      }
       return options.refuse === 'authorize'
       ? { ok: false as const, response: Response.json({ error: 'unauthorized' }, { status: 401 }) }
       : { ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }
     },
     afterAuthorize: args => {
       forwardContinuation('afterAuthorize', args)
+      if (options.resource === 'nested' || options.resource === 'nested-reject') {
+        const box = fetch(`${origin}/resource`).then(async response => {
+          if (!response.ok) throw new Error('The external box failed to become ready')
+          return response.json() as Promise<{ id: string }>
+        })
+        void box.catch(() => {})
+        return {
+          resource: Promise.resolve({ box, id: 'resource-1' }),
+          async dispose(resource: ProofResource) {
+            await resource.box?.catch(() => {})
+            const response = await fetch(`${origin}/resource/${resource.id}`, { method: 'DELETE' })
+            if (!response.ok) throw new Error('resource disposal failed')
+          },
+        }
+      }
       if (options.resource) return {
         resource: fetch(`${origin}/resource`).then(async response => await response.json() as { id: string }),
         async dispose(resource: { id: string }) {
@@ -176,6 +217,19 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
         ? { proceed: false as const, response: Response.json({ error: 'gate refused' }, { status: 402 }) }
         : { proceed: true as const }
     },
+    beforeTurn: async () => {
+      if (options.refuse === 'private') throw Object.assign(new Error('private credential and internal profile failure'), { code: 'profile_changed' })
+      if (options.refuse !== 'profile') return
+      // The public adapter recognizes this specific domain error. Arbitrary
+      // coded exceptions remain private; the route transports only Responses.
+      try { throw new ProfileConflictError('The agent profile changed while this turn started. Send the message again.', 'profile_changed') }
+      catch (error) {
+        if (error instanceof ProfileConflictError && error.code === 'profile_changed') {
+          throw Response.json({ error: error.message, code: error.code }, { status: 409 })
+        }
+        throw error
+      }
+    },
     produce: options.backend === 'function' ? produce : {
       router: options.backend === 'router-data' ? configured as (args: ChatTurnProduceArgs<Record<string, never>>) => ChatTurnRouterBackend : produce,
       when: () => !['sandbox', 'sandbox-data'].includes(options.backend ?? 'router'),
@@ -185,9 +239,11 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
   })
   return {
     database, signals, refusals, seen, pending, durable, resourceStarted, toolObserved, releaseDomain, releaseResource: () => releaseResource?.(),
-    requests: () => requests, acquired: () => acquired,
-    send: (turnId = 'same-client-turn', ctx?: ChatTurnRequestContext, threadId = 'thread') => routes.turn(new Request('http://app.test/chat', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
+    requests: () => requests, externalRequests: () => externalRequests, acquired: () => acquired,
+    replay: (turnId: string) => routes.replay(new Request('http://app.test/replay'), { turnId }),
+    running: () => routes.running(new Request('http://app.test/running?threadId=thread')),
+    send: (turnId = 'same-client-turn', ctx?: ChatTurnRequestContext, threadId = 'thread', progress = false) => routes.turn(new Request('http://app.test/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json', ...(progress ? { [TURN_PROGRESS_HEADER]: TURN_PROGRESS_FIRST } : {}) },
       body: JSON.stringify({ threadId, turnId, content: 'Answer once.' }),
     }), ctx ?? { waitUntil: promise => { pending.push(promise) } }),
     async close() {
@@ -220,6 +276,25 @@ it('dispatches the default Router backend before the lock and refuses an answere
       { role: 'user', content: 'Answer once.' }, { role: 'assistant', content: 'A persisted answer.' },
     ])
     expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(1)
+  } finally { await h.close() }
+})
+
+it('persists a frozen class-backed Router producer through early dispatch without changing private-state receivers', async () => {
+  const h = await harness({ backend: 'router-class' })
+  try {
+    const response = await h.send()
+    expect(response.status).toBe(200)
+    const body = await response.text()
+    expect(body).toContain('A persisted answer.')
+    expect(body).not.toContain('turn.error')
+    await Promise.all(h.pending)
+    expect(h.seen).toEqual([{ id: undefined, admitted: true, locked: false, gates: 0 }])
+    expect(h.requests()).toBe(1)
+    expect(h.database.prepare("SELECT content,model,input_tokens FROM message WHERE role='assistant'").all()).toEqual([
+      { content: 'A persisted answer.', model: 'served/private-model', input_tokens: 11 },
+    ])
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(1)
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM active_lock').get()?.n).toBe(0)
   } finally { await h.close() }
 })
 
@@ -415,5 +490,133 @@ it('preserves an additional domain fence after shared Router admission has commi
     expect(await response.text()).toContain('A persisted answer.')
     await Promise.all(h.pending)
     expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(1)
+  } finally { await h.close() }
+})
+
+it('preserves a public profile conflict through progress-first turn.response and aborts the speculative HTTP tool loop', async () => {
+  const h = await harness({ backend: 'router-data', refuse: 'profile' })
+  try {
+    const response = await h.send('profile-conflict', undefined, 'thread', true)
+    expect(response.status).toBe(200)
+    const frames = await response.clone().text()
+    expect(frames).toContain('"type":"turn.response"')
+    const settled = await settleTurnResponse(response, () => {})
+    expect(settled.status).toBe(409)
+    expect(await settled.json()).toEqual({ code: 'profile_changed', error: 'The agent profile changed while this turn started. Send the message again.' })
+    await Promise.all(h.pending)
+    expect(h.requests()).toBe(1)
+    expect(h.signals[0]?.aborted).toBe(true)
+    expect(h.database.prepare('SELECT role FROM message').all()).toEqual([{ role: 'user' }])
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(0)
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM active_lock').get()?.n).toBe(0)
+  } finally { await h.close() }
+})
+
+it('keeps ordinary-route thrown Response semantics for a public profile conflict', async () => {
+  const h = await harness({ backend: 'router-data', refuse: 'profile' })
+  try {
+    const refusal = await h.send().catch(error => error)
+    expect(refusal).toBeInstanceOf(Response)
+    expect(refusal.status).toBe(409)
+    expect((await refusal.json()).code).toBe('profile_changed')
+    await Promise.all(h.pending)
+    expect(h.signals[0]?.aborted).toBe(true)
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(0)
+  } finally { await h.close() }
+})
+
+it('keeps an arbitrary coded exception private on a progress-first stream', async () => {
+  const h = await harness({ backend: 'router-data', refuse: 'private' })
+  try {
+    const settled = await settleTurnResponse(await h.send('private-error', undefined, 'thread', true), () => {})
+    expect(settled.status).toBe(500)
+    const body = await settled.text()
+    expect(body).not.toContain('private credential')
+    expect(body).not.toContain('profile_changed')
+    expect(body).toContain('The turn failed before it started. Try again.')
+    await Promise.all(h.pending)
+    expect(h.signals[0]?.aborted).toBe(true)
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM effect').get()?.n).toBe(0)
+  } finally { await h.close() }
+})
+
+for (const resource of ['nested', 'nested-reject'] as const) {
+  it(`keeps an acquired credential until its in-flight HTTP box settles after refusal (${resource})`, async () => {
+    const h = await harness({ backend: 'function', resource, refuse: 'gate' })
+    try {
+      expect((await h.send()).status).toBe(402)
+      await h.resourceStarted
+      expect(h.database.prepare('SELECT COUNT(*) AS n FROM resource_disposal').get()?.n).toBe(0)
+      h.releaseResource()
+      await Promise.all(h.pending)
+      expect(h.database.prepare('SELECT * FROM resource_disposal').all()).toEqual([{ resource: '/resource/resource-1' }])
+      expect(h.requests()).toBe(0)
+    } finally { await h.close() }
+  })
+}
+
+it.each(['replay', 'running', 'cancel'] as const)('refuses %s-only authorization before a turn has any model or SQLite effects', async readAuthorization => {
+  const h = await harness({ backend: 'router-data', readAuthorization, resource: 'normal' })
+  try {
+    const response = await h.send()
+    expect(response.status).toBe(403)
+    expect((await response.json()).code).toBe('chat_authorization_intent_mismatch')
+    await Promise.all(h.pending)
+    expect(h.externalRequests()).toBe(0)
+    expect(h.acquired()).toBe(0)
+    expect(h.seen).toEqual([])
+    for (const table of ['message', 'active_lock', 'effect', 'resource_disposal']) {
+      expect(h.database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()?.n).toBe(0)
+    }
+  } finally { await h.close() }
+})
+
+it.each([undefined, 'matching'] as const)('reads real D1 replay/running state with legacy full or matching identity-only authorization (%s)', async readAuthorization => {
+  const h = await harness({ bindings: true, readAuthorization })
+  try {
+    const buffer = createD1TurnEventStore(h.durable!.d1)
+    await buffer.setStatus('running-read', 'running', 'thread')
+    await buffer.append('finished-read', [{ seq: 0, event: JSON.stringify({ type: 'text', text: 'Persisted replay answer.' }) }])
+    await buffer.setStatus('finished-read', 'complete', 'thread')
+    const running = await h.running()
+    expect(running.status).toBe(200)
+    expect(await running.json()).toEqual({ running: ['running-read'] })
+    const replay = await h.replay('finished-read')
+    expect(replay.status).toBe(200)
+    expect(await replay.text()).toContain('Persisted replay answer.')
+    expect(h.externalRequests()).toBe(0)
+    expect(h.acquired()).toBe(0)
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM message').get()?.n).toBe(0)
+  } finally { await h.close() }
+})
+
+it('rejects a read authorization tagged for another endpoint', async () => {
+  const replayOnly = await harness({ bindings: true, readAuthorization: 'replay' })
+  const runningOnly = await harness({ bindings: true, readAuthorization: 'running' })
+  try {
+    expect((await replayOnly.running()).status).toBe(403)
+    expect((await runningOnly.replay('foreign-turn')).status).toBe(403)
+    expect(replayOnly.externalRequests() + runningOnly.externalRequests()).toBe(0)
+    expect(replayOnly.acquired() + runningOnly.acquired()).toBe(0)
+  } finally { await Promise.all([replayOnly.close(), runningOnly.close()]) }
+})
+
+
+it('preserves an existing real D1 event store that also exposes its database and replays the HTTP answer', async () => {
+  const h = await harness({ existingStoreDb: true, customLock: true })
+  try {
+    const response = await h.send('existing-d1-store')
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('A persisted answer.')
+    await Promise.all(h.pending)
+    const turn = h.durable!.sqlite.prepare('SELECT turnId,status FROM turn_status').get() as { turnId: string; status: string }
+    expect(turn.status).toBe('complete')
+    const replay = await h.replay(turn.turnId)
+    expect(replay.status).toBe(200)
+    expect(await replay.text()).toContain('A persisted answer.')
+    expect(h.requests()).toBe(1)
+    expect(h.acquired()).toBe(1)
+    expect(h.database.prepare('SELECT role FROM message ORDER BY rowid').all()).toEqual([{ role: 'user' }, { role: 'assistant' }])
+    expect(h.database.prepare('SELECT COUNT(*) AS n FROM active_lock').get()?.n).toBe(0)
   } finally { await h.close() }
 })

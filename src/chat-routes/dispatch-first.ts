@@ -7,6 +7,7 @@
 import type { TurnTrace } from '../turn-trace/recorder'
 import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
 import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
+import { withProducerStream } from './producer-stream'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
 export class TurnAdmissionRefusedError extends Error {
@@ -56,7 +57,7 @@ function dispatchProducerFirst<TContext, TResource = unknown>(
   const started = trace.measure('admission.produce', 'admission', () => produce({
     ...args,
     admitted,
-    admissionSignal: abort.signal,
+    admissionSignal: args.admissionSignal ? AbortSignal.any([args.admissionSignal, abort.signal]) : abort.signal,
     ...(handoffCompletion ? { handoffCompletion: () => admitted.then(() => handoffCompletion()) } : {}),
   }))
   // Register before construction resolves: admission can refuse and return
@@ -118,9 +119,7 @@ function dispatchProducerFirst<TContext, TResource = unknown>(
       settled = 'taken'
       admit(final)
       const producer = await started
-      // The producer's own object keeps its getters (`model`, usage, parts); only its stream is replaced. Defined, not
-      // assigned, so a getter-only or frozen `stream` cannot make the hand-over throw.
-      return Object.defineProperty(Object.create(producer) as ChatTurnRouteProducer, 'stream', { value: replay(), enumerable: true })
+      return withProducerStream(producer, replay())
     },
     refuse() {
       if (settled) return
@@ -143,7 +142,7 @@ export function selectTurnProducer<TContext, TResource = unknown>(
   }
   if (!produce.sandbox) throw new Error('The turn selected the Sandbox backend without a Sandbox producer')
   const sandbox = produce.sandbox
-  return { produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => sandboxRouteProducer(await sandbox(final)), router: false }
+  return { produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => sandboxRouteProducer(await sandbox(final), final), router: false }
 }
 
 /** A reused user row must pass duplicate/refusal checks before another model call. */

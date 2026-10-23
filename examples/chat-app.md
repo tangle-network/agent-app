@@ -621,6 +621,38 @@ acquisition completes after refusal. Acquisition cleans up any partial resource
 before rejecting. A legacy release function keeps its existing behavior: it
 runs only when the turn ends before the producer takes ownership.
 
+## Authorize reads and Stop by identity
+
+Replay and running-turn discovery need the authenticated workspace and member,
+without a turn's model, prompt or execution context. After the same access
+checks, `authorize` can return `{ok: true, intent: 'replay', tenantId, userId}`
+or the matching `running` intent. A turn requires its full `context` success;
+an identity-only result cannot authorize model execution or transcript writes.
+Existing full successes without an intent remain valid for read endpoints.
+
+Stop uses the same authorization seam with `intent: 'cancel'`. Configure its
+exact target through the existing route assembly:
+
+```ts
+const routes = createChatTurnRoutes({
+  ...appOptions,
+  cancel: { target: args => readOwnedStopTarget(args) },
+})
+// POST handler:
+return routes.cancel(request)
+```
+
+The product authenticates the editor and verifies access to the requested
+thread and turn, then projects the captured metadata, dispatch token and
+original native execution into `ChatTurnCancelTarget`. A matching identity-only
+cancel success is sufficient; target resolution receives `tenantId` and
+`userId`, with `context` only when authorization supplied it. The target's
+`source()` resolves that execution's existing authorized box. Its
+`markStopped` compares the complete captured metadata atomically before merging
+the stopped fields. A changed attempt or unconfirmed interruption leaves the
+turn unchanged. Without `cancel` configuration, the method returns 405 before
+parsing or authorization.
+
 ## Carry the effective profile into Sandbox execution
 
 Resolve the profile on the server after authorizing the workspace and any user selections.

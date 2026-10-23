@@ -24,6 +24,10 @@ export function routerRouteProducer<TContext, TResource>(value: ChatTurnRouterBa
   return 'box' in value ? createHybridTurnProducer({ ...options, box: value.box }) : createRouterTurnProducer(options)
 }
 
-export function sandboxRouteProducer(value: ChatTurnSandboxBackend): ChatTurnRouteProducer {
-  return isProducer(value) ? value : createSandboxChatProducer(value)
+export function sandboxRouteProducer<TContext, TResource>(value: ChatTurnSandboxBackend, args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouteProducer {
+  if (isProducer(value)) return value
+  const openEvents = value.openEvents
+  return createSandboxChatProducer({ ...value, ...(openEvents && args.admissionSignal ? {
+    openEvents: input => openEvents({ ...input, signal: AbortSignal.any([input.signal, args.admissionSignal!]) }),
+  } : {}) })
 }

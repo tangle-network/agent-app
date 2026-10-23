@@ -84,6 +84,7 @@ import {
 } from './turn-progress'
 import { ChatTurnInputError } from './wire'
 import { resolveTurnStorage } from './route-storage'
+import { cancelChatTurn } from './cancellation'
 
 export * from './turn-route-contracts'
 
@@ -108,6 +109,9 @@ async function admitTurn<TContext, TResource>(
   try {
     const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, waitUntil, intent: 'turn', body: parsed.payload, trace, span, ...(prefetch ? { identified: prefetch.identified } : {}) }))
     if (!auth.ok) return { ok: false, response: auth.response }
+    if (!('context' in auth) || (auth.intent !== undefined && auth.intent !== 'turn')) {
+      return { ok: false, response: Response.json({ error: 'Authorization did not allow this turn.', code: 'chat_authorization_intent_mismatch' }, { status: 403 }) }
+    }
     // Check the named model before side effects; the producer checks the unnamed model.
     const refusal = await namedModelRefusal(options.modelPolicy, parsed.payload, trace)
     if (refusal) return { ok: false, response: refusal }
@@ -244,7 +248,8 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
         inner = await runTurn(request, ctx, admitted, progress, intent)
       } catch (err) {
         log('[chat-routes] turn failed before it streamed', { error: err instanceof Error ? err.message : String(err) })
-        inner = Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
+        inner = err instanceof Response ? err
+          : Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
       }
       if (!inner.body || !inner.headers.get('x-turn-id')) {
         await writeEvent(await turnResponseEventFor(inner))
@@ -335,6 +340,9 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     if (!turnId) return Response.json({ error: 'Missing turnId' }, { status: 400 })
     const auth = await options.authorize({ request, intent: 'replay', turnId })
     if (!auth.ok) return auth.response
+    if (auth.intent !== undefined && auth.intent !== 'replay') {
+      return Response.json({ error: 'Authorization did not allow this replay.', code: 'chat_authorization_intent_mismatch' }, { status: 403 })
+    }
 
     const fromSeqRaw = new URL(request.url).searchParams.get('fromSeq')
     const fromSeq = fromSeqRaw ? Math.max(0, Math.trunc(Number(fromSeqRaw)) || 0) : 0
@@ -374,6 +382,9 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     if (!threadId) return Response.json({ error: 'Missing threadId' }, { status: 400 })
     const auth = await options.authorize({ request, intent: 'running', threadId })
     if (!auth.ok) return auth.response
+    if (auth.intent !== undefined && auth.intent !== 'running') {
+      return Response.json({ error: 'Authorization did not allow this running-turn read.', code: 'chat_authorization_intent_mismatch' }, { status: 403 })
+    }
     // `listRunning` is optional on the store; a store that cannot enumerate
     // running turns simply reports none — the client falls back to the persisted
     // transcript, never to a hang.
@@ -383,6 +394,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
 
   return {
     turn: (request, ctx) => withD1QueryCount(() => turn(request, ctx)),
+    cancel: request => cancelChatTurn(request, { authorize: options.authorize, cancel: options.cancel, log }),
     replay,
     running,
     interactions: options.interactions ? createInteractionAnswerRoute(options.interactions) : null,

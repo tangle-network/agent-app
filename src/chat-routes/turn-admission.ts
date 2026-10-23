@@ -18,7 +18,7 @@ import {
 /** A turn whose body parsed and whose caller `authorize` admitted. */
 export type AdmittedTurn<TContext> = {
   parsed: ParsedTurnBody
-  auth: Extract<ChatTurnAuthorization<TContext>, { ok: true }>
+  auth: Extract<ChatTurnAuthorization<TContext>, { ok: true; context: TContext }>
   trace: TurnTrace
   /** The route's read-only prefetch for this admitted identity (`./turn-prefetch`). */
   prefetched?: Promise<unknown>

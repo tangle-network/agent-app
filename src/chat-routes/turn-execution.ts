@@ -20,6 +20,7 @@ import {
   type DraftPersistenceTuning,
 } from './draft-persistence'
 import { dispatchFirstFor, selectTurnProducer } from './dispatch-first'
+import { observeTurnCancellation } from './cancellation'
 import { admissionServerTiming, errorResponse, userPartsWithFiles, type AdmittedTurn, type TurnProgressCallback } from './turn-admission'
 import { abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, tapRawEvents, withStreamHeartbeat } from './turn-event-stream'
 import type {
@@ -125,6 +126,7 @@ async function runAdmittedTurn<TContext, TResource>({
   // public field optional preserves existing synthetic producers; this
   // assembled route always supplies it to the real `produce` invocation.
   const state = createAdmittedTurnState<TContext>()
+  if (options.cancel) state.cancellationAbort = new AbortController()
 
   const { handoffCompletion, releaseLock } = createTurnOwnership(state, log, turnStreamId, options)
 
@@ -132,6 +134,7 @@ async function runAdmittedTurn<TContext, TResource>({
     request,
     waitUntil: ctx?.waitUntil,
     earlyResource: early.resource,
+    admissionSignal: state.cancellationAbort?.signal,
     body: payload,
     identity,
     context,
@@ -289,7 +292,7 @@ async function runAdmittedTurn<TContext, TResource>({
         threadId: payload.threadId,
         messageId: assistantRowIdForTurn(executionId),
         snapshot: () => {
-          if (!state.producer) return null
+          if (!state.producer || state.cancellationAbort?.signal.aborted) return null
           return {
             content: state.producer.finalText(),
             ...(state.producer.draftParts ? { parts: state.producer.draftParts() } : {}),
@@ -353,6 +356,7 @@ interface AdmittedTurnState<TContext> {
   lockAcquired: boolean
   lockHandle: unknown
   lockReleased: boolean
+  cancellationAbort?: AbortController
   producer: ChatTurnRouteProducer | undefined
   assistantMessageId: string | null | undefined
   runFailed: boolean
@@ -597,7 +601,7 @@ function createTurnSettlement<TContext, TResource>(
         const attribution = state.producer?.modelAttribution?.()
         const completed: ChatTurnLifecycleComplete<TContext> = {
           identity, executionId, turnStreamId, context, durationMs, ...timing,
-          finalText: state.producer?.finalText() ?? '',
+          finalText: state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
           usage: state.producer?.usage?.() ?? {},
           assistantMessageId: assistantRowId(),
           ...(state.gatedTurn ? { gated: true } : {}),
@@ -678,12 +682,20 @@ function createTurnEngine<TContext, TResource>(
       produce: () => ({
         stream: (async function* () {
           // The product's own admission work: its profile pin, prompt and producer construction.
-          state.producer = await (dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => produce(produceArgs)))
-          if (!dispatched && state.producer.cleanup) {
-            ctx?.waitUntil?.(state.producer.cleanup)
-            void state.producer.cleanup.catch(() => {})
+          const producerStream = async function* () {
+            const started = dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => produce(produceArgs))
+            if (!dispatched) {
+              const cleanup = started.then(producer => producer.cleanup, () => undefined)
+              ctx?.waitUntil?.(cleanup)
+              void cleanup.catch(() => {})
+            }
+            state.producer = await started
+            yield* state.producer.stream
           }
-          let source: AsyncIterable<ChatRouteEvent> = state.producer.stream
+          let source: AsyncIterable<ChatRouteEvent> = producerStream()
+          if (options.cancel && state.cancellationAbort) {
+            source = observeTurnCancellation(source, produceArgs, options.cancel, state.cancellationAbort)
+          }
           if (ctx?.cancelOnDisconnect) {
             source = abortOnSignal(source, request.signal)
           }
@@ -695,7 +707,7 @@ function createTurnEngine<TContext, TResource>(
           }
           for await (const event of source) yield event
         })(),
-        finalText: () => state.producer?.finalText() ?? '',
+        finalText: () => state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
       }),
       onEvent: async (event) => {
         if (state.firstVisibleAtMs === undefined && isVisibleOutput(event)) {
@@ -719,7 +731,7 @@ function createTurnEngine<TContext, TResource>(
       ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
       persistAssistantMessage: ({ finalText }) => trace.measure('persist.assistant', 'persist', async () => {
         if (state.completionHandoff) return
-        if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+        if (state.cancellationAbort?.signal.aborted || (ctx?.cancelOnDisconnect && request.signal.aborted)) {
           await state.draft?.discard()
           state.assistantMessageId = null
           return
@@ -750,6 +762,11 @@ function createTurnEngine<TContext, TResource>(
           // no-op on a store without `deleteMessage` (drafting needs only
           // `updateMessage`), and there the draft row genuinely survives.
           state.assistantMessageId = state.draft?.rowId() ?? null
+          return
+        }
+        if (state.cancellationAbort?.signal.aborted) {
+          await state.draft?.discard()
+          state.assistantMessageId = null
           return
         }
         const usage = state.producer?.usage?.() ?? {}
@@ -870,7 +887,7 @@ function startTurnDrain<TContext>(
       return
     }
     const finalize = trace.start('persist.finalize', 'persist')
-    if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+    if (state.cancellationAbort?.signal.aborted || (ctx?.cancelOnDisconnect && request.signal.aborted)) {
       await state.draft?.discard()
     } else {
       await state.draft?.close()

@@ -48,7 +48,8 @@ export interface BillableTurnAdmissionOptions<
   /** A product entitlement freshness limit. Default five minutes, capped by `paidThrough`. */
   windowMs?: number
   readSeat(input: Input): Promise<Seat>
-  readBalance(input: Input): Promise<Balance>
+  /** A separate funding read, when funding is not already part of readSeat's entitlement verdict. */
+  readBalance?(input: Input): Promise<Balance>
   /** The deployment environment in the cache key (see {@link WarmCacheOptions.env}). */
   env?: WarmCacheOptions['env']
   /** What a verdict is kept under: everything `readSeat` and `readBalance` depend on. Default `input.userId`. */
@@ -70,9 +71,9 @@ export type BillableTurnAdmissionResult<Seat, Balance> =
 
 export interface BillableTurnAdmission<Input extends { userId: string }, Seat, Balance> {
   /**
-   * Seat, then balance, read concurrently: a seat refusal or seat read failure
+   * Entitlement and any separate balance read run concurrently: an entitlement refusal or read failure
    * wins over anything the balance read returned. A kept verdict returns
-   * without calling Platform. `balance` is absent only when the seat refused.
+   * without calling Platform. `balance` is absent when the entitlement refused or no separate read is needed.
    */
   admit(input: Input & AdmitBillableTurnOptions): Promise<BillableTurnAdmissionResult<Seat, Balance>>
   /** A refusal seen elsewhere: the next turn under this key (the user id unless `key` is set) reads Platform again. */
@@ -108,7 +109,7 @@ export function createBillableTurnAdmission<
       const mapError = input.mapError ?? ((error: unknown): never => { throw error })
       const [seatSettled, balanceSettled] = await Promise.allSettled([
         track('gate_seat', options.readSeat(input).catch(mapError)),
-        track('gate_balance', options.readBalance(input).catch(mapError)),
+        options.readBalance ? track('gate_balance', options.readBalance(input).catch(mapError)) : Promise.resolve(undefined),
       ])
       if (seatSettled.status === 'rejected') throw seatSettled.reason
       const seat = seatSettled.value
@@ -118,7 +119,7 @@ export function createBillableTurnAdmission<
       }
       if (balanceSettled.status === 'rejected') throw balanceSettled.reason
       const balance = balanceSettled.value
-      if (!balance.allowed) {
+      if (options.readBalance && !balance!.allowed) {
         await verdicts.forget(key)
         return { source: 'platform', allowed: false, paidThrough: seat.paidThrough ?? null, seat, balance }
       }

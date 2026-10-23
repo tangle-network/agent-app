@@ -72,3 +72,28 @@ Each slice ships alone and keeps the earlier behavior for products that have not
 Slice 1 adds two optional store methods and one function; nothing calls them until a product schedules the sweep, and removing the schedule restores the previous behavior. A settled row cannot be un-settled, which is the same exposure as the hand sweeps it replaces. The guarded write leaves a stream running if its producer renewed it after the listing, but the terminal event appended just before can still land in that stream; slice 2's fence closes that gap.
 
 Slice 2 is the risky one: a terminal fence changes what happens when a late producer finishes after its turn was declared failed. Today the late `complete` overwrites the `error`; after slice 2 the failure stands and the late answer is recorded as evidence. Products that relied on the overwrite need the late answer shown from the transcript, which they already persist.
+
+### Product Stop
+
+`createChatTurnRoutes({ cancel: { target } })` adds the existing product Stop
+capability at `routes.cancel(request)`. With no declaration it returns 405
+before authorization. The shared parser bounds JSON using the existing chat
+wire limit; authorization receives `intent: 'cancel'`. The application must
+verify identity, editor access and thread scope before its target reads state.
+Identity-only authorization may return `{ ok: true, intent: 'cancel', tenantId,
+userId }`; an existing untagged authorization with context also remains valid.
+
+The target declares its captured metadata, status, dispatch token requirement,
+exact native receipt and a deferred source lookup. OAuth actor and source-key
+policy remain in the application. The shared owner compares the client token
+before resolving that source, validates its sandbox identifier, and interrupts
+only the captured session and execution. An unsuccessful interrupt needs exact
+session status evidence; missing or ambiguous evidence fails closed.
+
+`markStopped(snapshot, stoppedAt)` must use a full captured-record compare and
+set. The chat store's `patchMessageMetadata(id, mergePatch, { snapshot })`
+compares the existing JSON record byte for byte before applying JSON Merge
+Patch. `{ fields }` remains available for explicitly weaker field fences, such
+as clearing failure presentation only while its status remains failed. A retry
+or receipt update defeats the full snapshot fence; Stop never overwrites it.
+The cancellation owner does not release turn locks or complete native work.

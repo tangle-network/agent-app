@@ -30,9 +30,9 @@ it('merges product-declared metadata atomically through a real SQLite turn and f
     },
     produce: () => ({ stream: (async function* () { yield { type: 'text' as const, text: 'One answer.' } })(), finalText: () => 'One answer.' }),
     onTurnComplete: async () => {
-      staleUpdate = await store.patchMessageMetadata(messageId!, { responseStatus: 'failed' }, { executionId: 'superseded' })
+      staleUpdate = await store.patchMessageMetadata(messageId!, { responseStatus: 'failed' }, { fields: { executionId: 'superseded' } })
       await store.patchMessageMetadata(messageId!, { responseStatus: 'answered', failureMessage: null,
-        product: { remove: null } }, { executionId: 'current', responseStatus: 'streaming' })
+        product: { remove: null } }, { fields: { executionId: 'current', responseStatus: 'streaming' } })
     },
   })
   try {

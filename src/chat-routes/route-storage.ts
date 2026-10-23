@@ -9,7 +9,8 @@ export type ResolvedChatTurnRoutesOptions<TContext, TResource = unknown> = Omit<
 
 export function resolveTurnStorage<TContext, TResource>(options: CreateChatTurnRoutesOptions<TContext, TResource>): ResolvedChatTurnRoutesOptions<TContext, TResource> {
   const store = options.turnStore
-  if (!('db' in store)) return { ...options, turnStore: store }
+  // A custom store may expose its own database; its existing capabilities win.
+  if ('append' in store) return { ...options, turnStore: store }
   return {
     ...options,
     turnStore: createD1TurnEventStore(store.db),

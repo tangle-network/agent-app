@@ -151,7 +151,7 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
   getMessage(id: string): Promise<TMessage | null>
   /** Atomic JSON Merge Patch for a product-declared metadata column. Null removes keys;
    * expected top-level fields fence the update against another attempt. Opaque values stay product-owned. */
-  patchMessageMetadata(id: string, mergePatch: Record<string, unknown>, expected?: Record<string, unknown>): Promise<TMessage | null>
+  patchMessageMetadata(id: string, mergePatch: Record<string, unknown>, expected?: { fields: Record<string, unknown> } | { snapshot: Record<string, unknown> }): Promise<TMessage | null>
   /** Inserts the message and bumps the thread's `updatedAt` in one batch so
    *  workspace recency sorts stay truthful. */
   appendMessage(input: AppendMessageInput): Promise<TMessage>
@@ -343,14 +343,15 @@ export function createChatStore<TTables extends ChatTables>(
       return (row as TMessage | undefined) ?? null
     },
 
-    async patchMessageMetadata(id, mergePatch, expected = {}) {
+    async patchMessageMetadata(id, mergePatch, expected) {
       const metadata = (getTableColumns(tables.messages) as Record<string, AnySQLiteColumn>).metadata
       if (!metadata) throw new Error('Chat metadata requires a product-declared metadata column')
-      const guards = Object.entries(expected).map(([field, value]) => {
+      const guards = Object.entries(expected && 'fields' in expected ? expected.fields : {}).map(([field, value]) => {
         const encoded = JSON.stringify(value)
         if (encoded === undefined) throw new Error('Expected chat metadata must be JSON')
         return sql`json_extract(${metadata}, ${`$.${JSON.stringify(field)}`}) IS json_extract(${encoded}, '$')`
       })
+      if (expected && 'snapshot' in expected) guards.push(sql`coalesce(${metadata}, '{}') = ${JSON.stringify(expected.snapshot)}`)
       const [row] = await db.update(messages).set({
         metadata: sql`json_patch(coalesce(${metadata}, '{}'), ${JSON.stringify(mergePatch)})`,
       } as Partial<NewChatMessageRow>).where(and(eq(messages.id, id), ...guards)).returning()

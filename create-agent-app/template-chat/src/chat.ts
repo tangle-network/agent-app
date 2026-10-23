@@ -116,7 +116,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
    *  `userId`/`workspaceId`. */
   async function authorize(args: {
     request: Request
-    intent: 'turn' | 'replay' | 'running'
+    intent: 'turn' | 'replay' | 'running' | 'cancel'
     body?: Record<string, unknown>
     threadId?: string
   }): Promise<ChatTurnAuthorization<void>> {

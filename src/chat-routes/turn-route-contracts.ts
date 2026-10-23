@@ -15,6 +15,7 @@ import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { RouterTurnProducerOptions } from './router-producer'
 import type { HybridTurnProducerOptions } from './hybrid-producer'
 import type { SandboxChatProducerOptions } from './sandbox-producer'
+import type { ChatTurnCancelOptions, ChatTurnCancelRequest } from './cancellation'
 
 /** The route supplies request tracing, cancellation and the admission fence.
  * Domain callbacks supply model, credentials, policy, tools and prompt data. */
@@ -128,6 +129,8 @@ export type ChatTurnAuthorization<TContext> =
       tenantId: string
       userId: string
       context: TContext
+      /** Omit for existing callers; a full execution authorization may name its intent explicitly. */
+      intent?: 'turn'
       /** When `false`, skip the `role:'user'` message insert for this turn — for
        *  a product-dispatched / synthetic turn (e.g. a follow-up the product
        *  raised itself) that must not surface a new user row. Composes with —
@@ -144,6 +147,13 @@ export type ChatTurnAuthorization<TContext> =
        *  handle that arm rather than assume a string. */
       insertUserMessage?: boolean
     }
+  | {
+      ok: true
+      /** Identity/access for this operation only; it cannot start a turn. */
+      intent: 'replay' | 'running' | 'cancel'
+      tenantId: string
+      userId: string
+    }
   | { ok: false; response: Response }
 
 /** Define arguments required to authorize a chat turn based on intent and request details */
@@ -151,9 +161,9 @@ export interface ChatTurnAuthorizeArgs {
   request: Request
   /** This request's bound host continuation, when supplied to turn(request, ctx). */
   waitUntil?: ChatTurnRequestContext['waitUntil']
-  intent: 'turn' | 'replay' | 'running'
-  /** Parsed, validated POST body (turn intent only). */
-  body?: ChatTurnRequestPayload
+  intent: 'turn' | 'replay' | 'running' | 'cancel'
+  /** Parsed, validated POST body for a turn or cancellation. */
+  body?: ChatTurnRequestPayload | ChatTurnCancelRequest
   /** The buffered turn id being replayed (replay intent only). */
   turnId?: string
   /** The thread whose running turns are being discovered (running intent only). */
@@ -497,6 +507,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
   authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
+  /** Resolve the exact authenticated stop target. Without this capability,
+   *  cancel returns 405 before parsing or authorization. */
+  cancel?: ChatTurnCancelOptions<TContext>
   /** Read the turn's prompt inputs (profile, knowledge, catalogs) while `authorize` finishes: started when `authorize`
    *  calls `args.identified`, or once it allows the turn. Read only: no writes, nothing paid or external beyond what
    *  the verified identity allows. `produce` receives the result as `args.prefetched` only for an allowed turn of that
@@ -718,6 +731,8 @@ export interface ChatTurnRoutes {
    *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
    *  authorized (`./turn-progress`). */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
+  /** POST — stop the exact authorized execution; unavailable unless configured. */
+  cancel(request: Request): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>

@@ -235,7 +235,9 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() 
       emit({ type: 'park_failed', slot: input.slot, code: 'premint_crypto_unusable' })
       return false
     }
-    const minted = await mint({ ...input, turnId: crypto.randomUUID() }, true)
+    const minted = await mint({ ...input, turnId: crypto.randomUUID() }, true).catch(() => ({
+      succeeded: false as const, error: { status: 502, code: 'delegated_key.failed' as const, message: 'Background turn-key mint failed.' },
+    }))
     if (!minted.succeeded) {
       emit({ type: 'park_failed', slot: input.slot, code: minted.error.code })
       return false

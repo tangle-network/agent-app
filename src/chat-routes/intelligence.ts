@@ -1,5 +1,6 @@
 import type { IntelligenceClient } from '@tangle-network/agent-runtime/intelligence'
 import type { ChatTurnRouteProducer } from './turn-routes'
+import { withProducerStream } from './producer-stream'
 
 /** Host-resolved metadata only. Neither input nor output content is exported. */
 export interface ChatTurnIntelligenceOptions {
@@ -111,13 +112,5 @@ export async function produceChatTurnWithIntelligence(
   const snapshot: ChatTurnIntelligenceOptions = { ...options }
   const producer = await options.produce()
   const stream = observeChatTurnStream(producer.stream, snapshot)
-  // The wrapper owns only its stream. Read every other capability on the original
-  // receiver, including future getters and class methods that use private state.
-  return new Proxy(Object.create(producer) as ChatTurnRouteProducer, {
-    get(_target, property) {
-      if (property === 'stream') return stream
-      const value: unknown = Reflect.get(producer, property, producer)
-      return typeof value === 'function' ? value.bind(producer) : value
-    },
-  })
+  return withProducerStream(producer, stream)
 }

@@ -21,7 +21,7 @@ import {
 const SOURCE = 'sk-tan-payer-linked-key-0001'
 
 /** Platform (`/v1/keys/delegate`, `DELETE /v1/keys/:id`) and Router (`/v1/chat/completions`) in one local server. */
-async function platformAndRouter(options: { ssoSource?: boolean; routerStream?: boolean } = {}) {
+async function platformAndRouter(options: { ssoSource?: boolean; routerStream?: boolean; delegationRefused?: boolean } = {}) {
   const minted: Array<{ id: string; key: string; name: string; expiresAt: string; request: Record<string, any> }> = []
   const revoked = new Set<string>()
   const expired = new Set<string>()
@@ -44,6 +44,7 @@ async function platformAndRouter(options: { ssoSource?: boolean; routerStream?: 
       const json = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body))
       if (req.method === 'POST' && req.url === '/v1/keys/delegate') {
         const body = JSON.parse(raw) as Record<string, any>
+        if (options.delegationRefused) return json(403, { success: false, error: { code: 'FORBIDDEN' } })
         if (pausedMint) { didPause?.(); await pausedMint }
         const n = minted.length + 1
         // Platform supersedes an existing child under the same canonical name.
@@ -239,6 +240,38 @@ describe('pre-minted turn keys', () => {
     await Promise.all([keys.forget(input), keys.forget(input)])
     expect(stored()).toEqual([])
     expect(p.revocationCalls.filter(id => id === parked)).toHaveLength(1)
+  })
+
+  it('preserves an inline client exception while background premint settles a real HTTP refusal without exposing its text', async () => {
+    const p = await platformAndRouter({ delegationRefused: true })
+    close = p.close
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(DELEGATED_KEY_PREMINT_TABLE_DDL)
+    const upstream = createPlatformDelegatedKeyClient({ platformUrl: p.url, serviceName: 'creative-agent', serviceToken: 'svc' })
+    class ProductRefusal extends Error { readonly status = 403 }
+    const errors: ProductRefusal[] = []
+    const events: unknown[] = []
+    const pending: Promise<unknown>[] = []
+    const keys = createDelegatedTurnKeys({ client: { ...upstream, async delegate(request) {
+      const outcome = await upstream.delegate(request)
+      if (outcome.succeeded) return outcome
+      const error = new ProductRefusal('Private domain error: sk-tan-fixture-secret')
+      errors.push(error)
+      throw error
+    } }, db: d1(sqlite), crypto: createFieldCrypto('ab'.repeat(32)), onEvent: event => { events.push(event) } })
+    const input = { slot: 'refused-slot', scope: scope(), ttlMs: 30 * 60_000 }
+    try {
+      expect(await keys.park(input)).toBe(false)
+      const rejected = await keys.forTurn({ ...input, turnId: 'refused-turn', waitUntil: work => { pending.push(work) } })
+        .catch(error => error)
+      expect(rejected).toBeInstanceOf(ProductRefusal)
+      expect(errors).toContain(rejected)
+      await Promise.all(pending)
+      expect(errors).toHaveLength(3)
+      expect(events).toContainEqual({ type: 'park_failed', slot: input.slot, code: 'delegated_key.failed' })
+      expect(JSON.stringify(events)).not.toContain('sk-tan-fixture-secret')
+      expect(sqlite.prepare('SELECT * FROM delegated_key_premint').all()).toEqual([])
+    } finally { await Promise.all(pending); sqlite.close() }
   })
 
   it('retires a replacement that finishes minting after the turn closes', async () => {
