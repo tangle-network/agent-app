@@ -2851,6 +2851,18 @@
           "doc": "Product identity and editor access have already been checked before target is called."
         },
         {
+          "name": "ChatTurnCancelControlResult",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelControlResult",
+          "doc": "Acknowledges durable intent only; the execution owner still reconciles actual completion and side effects."
+        },
+        {
+          "name": "ChatTurnCancellation",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancellation",
+          "doc": "Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`)."
+        },
+        {
           "name": "ChatTurnCancelOptions",
           "kind": "interface",
           "signature": "interface ChatTurnCancelOptions",
@@ -2974,7 +2986,7 @@
           "name": "ChatTurnLockResult",
           "kind": "type",
           "signature": "type ChatTurnLockResult",
-          "doc": "Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`)."
+          "doc": null
         },
         {
           "name": "ChatTurnMessageStore",
@@ -4103,6 +4115,12 @@
           "kind": "interface",
           "signature": "interface SniffResult",
           "doc": "Content-based binary/text classification, shared by the attachment upload route (server) and the composer's client-side pre-validation (browser) — both sides must agree on what counts as binary befor…"
+        },
+        {
+          "name": "StaleTurnLockOwnerProbeResult",
+          "kind": "interface",
+          "signature": "interface StaleTurnLockOwnerProbeResult",
+          "doc": "A positive abandoned verdict covers the exact outer producer and every registered child/effect owner."
         },
         {
           "name": "StaleTurnLockSandboxProbeResult",
@@ -25479,6 +25497,12 @@
           "doc": "Coarse per-workspace marker that a thread's turn started / ended — drives a sidebar \"agent responding\" indicator subscribed once per workspace."
         },
         {
+          "name": "connectDurableTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>",
+          "doc": "One server-owned connection on the existing authenticated DO transport, with retained cancellation replay."
+        },
+        {
           "name": "createDurableObjectTurnEventStore",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, auth: TurnStreamAuth) => TurnEventStore",
@@ -25571,8 +25595,8 @@
         {
           "name": "mintTurnStreamToken",
           "kind": "function",
-          "signature": "(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>",
-          "doc": "`v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so it cannot be extended by editing the token."
+          "signature": "(channelName: string, secret: string, now?: () => number, ttlMs?: number, claims?: TurnStreamTokenClaims | undefined) =…",
+          "doc": "Legacy v1 channel capabilities remain unchanged."
         },
         {
           "name": "peekDurableTurnLock",
@@ -25607,14 +25631,20 @@
         {
           "name": "releaseInterruptedDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth: TurnStreamAuth) => Promise<..…",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockInterruptedReleaseInput, auth: TurnStreamAuth) => Promise<...>",
           "doc": "Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch."
         },
         {
           "name": "ReleaseInterruptedDurableTurnLockInput",
-          "kind": "interface",
-          "signature": "interface ReleaseInterruptedDurableTurnLockInput",
+          "kind": "type",
+          "signature": "type ReleaseInterruptedDurableTurnLockInput",
           "doc": "Define input parameters to release an interrupted durable turn lock in a workspace or thread"
+        },
+        {
+          "name": "requestDurableTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>",
+          "doc": "The product authorizes Stop first."
         },
         {
           "name": "scopeIndexChannelKey",
@@ -25657,6 +25687,30 @@
           "kind": "const",
           "signature": "60000",
           "doc": "Default capability lifetime."
+        },
+        {
+          "name": "TurnCancellationConnection",
+          "kind": "interface",
+          "signature": "interface TurnCancellationConnection",
+          "doc": "Per-owner observation only."
+        },
+        {
+          "name": "TurnCancellationIdentity",
+          "kind": "interface",
+          "signature": "interface TurnCancellationIdentity",
+          "doc": "One cancellable turn, including the lock generation that grants its producer authority."
+        },
+        {
+          "name": "TurnCancellationRequestedError",
+          "kind": "class",
+          "signature": "class TurnCancellationRequestedError",
+          "doc": null
+        },
+        {
+          "name": "TurnControlUnavailableError",
+          "kind": "class",
+          "signature": "class TurnControlUnavailableError",
+          "doc": null
         },
         {
           "name": "turnEventStorageKey",
@@ -25791,6 +25845,12 @@
           "doc": "Resolve a stub interface for handling fetch requests with optional initialization parameters"
         },
         {
+          "name": "TurnStreamTokenClaims",
+          "kind": "interface",
+          "signature": "interface TurnStreamTokenClaims",
+          "doc": "Server control authority is separate from the channel capabilities used by existing viewer forwarders."
+        },
+        {
           "name": "TurnStreamUpgradeAuthorization",
           "kind": "type",
           "signature": "type TurnStreamUpgradeAuthorization",
@@ -25799,7 +25859,7 @@
         {
           "name": "verifyTurnStreamToken",
           "kind": "function",
-          "signature": "(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>",
+          "signature": "(channelName: string, token: string, secret: string, now?: () => number, claims?: TurnStreamTokenClaims | undefined) =>…",
           "doc": "Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness."
         },
         {
