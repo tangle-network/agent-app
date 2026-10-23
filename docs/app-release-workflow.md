@@ -42,6 +42,10 @@ The repository-scoped `deploy-production` group serializes only the release job 
 
 There is no reinstall or rebuild between preflight and native release. Keep native credentialed startup checks ahead of migrations, even when those checks need Cloudflare credentials and therefore belong inside `release-command`. Keep account, database, bucket, rollout and service-key checks in their existing owner. Do not substitute a generic Cloudflare deployment for an app's release command.
 
+For the maintained signoff CLI, classify the existing config steps and use `--source head --phase release --keep-workspace --json <report>`. Set `signoff-report` to that report path, relative to the caller checkout or absolute. The shared workflow requires a passing release-phase report for the exact clean source and verifies the retained workspace's HEAD and common Git repository before running the native release from it. This is a same-job handoff of the verified artifact; a second install or rebuild is not equivalent. A partial release report cannot attest a full merge signoff. The phase API must be published before a caller adopts it.
+
+An empty `signoff-report` retains the native in-place preflight contract. Retained signoff workspaces require the signoff owner's cleanup and diagnostic-retention lifecycle before activation; the shared workflow does not remove source worktrees or invent a cleanup command.
+
 Migrations remain additive. A failed post-deploy canary may restore a compatible previously served artifact and its associated cron or multi-Worker state through the native release path. It never reverts merged source or rolls back a database. If a previous artifact is incompatible, the native owner must fail closed and fix forward.
 
 ## Native outputs and honest qualification

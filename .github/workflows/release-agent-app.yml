@@ -10,6 +10,7 @@ on:
       preflight-command: {type: string, required: true}
       release-command: {type: string, required: true}
       suites-command: {type: string, required: true}
+      signoff-report: {type: string, default: ''}
       release-env: {type: string, default: '{}'}
       node-version-file: {type: string, default: .nvmrc}
       release-timeout-minutes: {type: number, default: 40}
@@ -103,12 +104,47 @@ jobs:
         run: |
           set -euo pipefail
           bash -euo pipefail -c "$PREFLIGHT_COMMAND"
+      - name: Resolve the verified artifact workspace
+        id: artifact
+        env:
+          SIGNOFF_REPORT: ${{ inputs.signoff-report }}
+          SOURCE_ROOT: ${{ github.workspace }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, realpathSync, appendFileSync } from 'node:fs'
+          import { resolve } from 'node:path'
+          import { execFileSync } from 'node:child_process'
+          const root = realpathSync(process.env.SOURCE_ROOT)
+          const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+          let workspace = root
+          if (process.env.SIGNOFF_REPORT) {
+            const report = JSON.parse(readFileSync(resolve(root, process.env.SIGNOFF_REPORT), 'utf8'))
+            if (report.ok !== true || report.phase !== 'release' || report.workspaceRetained !== true ||
+                report.repo?.source !== 'head' || report.repo?.dirty !== false ||
+                report.repo?.head !== process.env.SOURCE_SHA || realpathSync(report.repo.root) !== root) {
+              throw Error('signoff report does not qualify this clean release source')
+            }
+            workspace = realpathSync(report.workspace)
+            const common = cwd => realpathSync(resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir')))
+            if (workspace === root || git(workspace, 'rev-parse', 'HEAD') !== process.env.SOURCE_SHA ||
+                common(workspace) !== common(root)) {
+              throw Error('signoff workspace is not the retained worktree for this source')
+            }
+            git(workspace, 'diff', '--quiet')
+            git(workspace, 'diff', '--cached', '--quiet')
+          }
+          if (/[\r\n]/.test(workspace)) throw Error('invalid artifact workspace path')
+          appendFileSync(process.env.GITHUB_OUTPUT, `workspace=${workspace}\n`)
+          NODE
       - name: Native release, served smoke and compatible artifact recovery
         id: native
         # Only this step gets the caller's explicitly named credentials.
         # Environment protections and same-name environment secrets still apply.
         env:
           RELEASE_COMMAND: ${{ inputs.release-command }}
+          ARTIFACT_WORKSPACE: ${{ steps.artifact.outputs.workspace }}
           RELEASE_ENV: ${{ inputs.release-env }}
           SHIP_GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
@@ -152,7 +188,7 @@ jobs:
             'GTM_CHAT_SMOKE_EMAIL', 'GTM_CHAT_SMOKE_PASSWORD', 'PLATFORM_WORKFLOW_SMOKE_EMAIL', 'PLATFORM_WORKFLOW_SMOKE_PASSWORD']
           for (const name of secretNames) if (!nativeEnv[name]) delete nativeEnv[name]
           const result = spawnSync('bash', ['-euo', 'pipefail', '-c', process.env.RELEASE_COMMAND], {
-            stdio: 'inherit', env: nativeEnv,
+            stdio: 'inherit', env: nativeEnv, cwd: process.env.ARTIFACT_WORKSPACE,
           })
           if (result.error) throw result.error
           process.exit(result.status ?? 1)
