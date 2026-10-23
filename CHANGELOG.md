@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.63.0
+
+- test: retire obsolete router and sandbox mock assertions (#1304)
+- Pin trusted release and adoption workflow controls
+- feat!: default shared chat admission and resource ownership (#1300)
+- Delete obsolete exact action pin mirror from publication check (#1302)
+- docs: refresh generated signoff and current API references (#1303)
+- Share native app release sequencing and post-release suite reporting (#1297)
+- fix(chat): preserve fallback warnings and native timing facts (#1299)
+- feat(signoff): select declared release and suites phases (#1298)
+
 ## 0.62.4
 
 - ci: isolate release producers from public PR runners (#1294)
