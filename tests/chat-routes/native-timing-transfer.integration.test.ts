@@ -42,7 +42,7 @@ function durableSteps(sqlite: Database.Database): CloudflareWorkflowStepLike {
   }
 }
 
-it('transfers only observed facts over the actual route, preserves them across owner loss, and records the late Vault verdict once', async () => {
+it.each([false, true])('transfers only observed facts over the actual route, preserves them across owner loss, and records the late Vault verdict once (dispatch-first %s)', async dispatchFirst => {
   const directory = mkdtempSync(join(tmpdir(), 'native-timing-'))
   const filename = join(directory, 'admission.sqlite')
   let sqlite = new Database(filename)
@@ -87,9 +87,11 @@ it('transfers only observed facts over the actual route, preserves them across o
   const pending: Promise<unknown>[] = []
   const routes = createChatTurnRoutes({
     projectId: 'native-timing-transfer', store: chatStore, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false,
+    ...(dispatchFirst ? { dispatchFirst: { billing: 'model-service' as const } } : {}),
     turnTrace: false, log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
     async produce(args) {
+      if (args.admitted) await args.admitted
       streamId = args.turnStreamId
       expect(args.timingFacts, 'the actual assembled route supplies the serializable timing snapshot').toBeTypeOf('function')
       firstSnapshot = args.timingFacts!()
