@@ -16,7 +16,8 @@
  * `variant` are the product's and are written when the row carries them. Pass `measuredFacts: false` to write
  * only the row's own values.
  */
-import { measuredTurnFacts, nativeTimingObservationValues, type NativeTurnTimingFacts } from '../turn-trace/turn-facts'
+import { measuredTurnFacts, nativeTimingObservationValues, readableTurnFailure, type NativeTurnTimingFacts } from '../turn-trace/turn-facts'
+import type { ChatTurnLifecycle, ChatTurnLifecycleComplete, ChatTurnLifecycleError } from '../chat-routes/turn-route-contracts'
 import { rolloutAdmits, type RolloutStage, type StageMeasurement } from './index'
 
 /** Minimal D1 surface (Cloudflare's `D1Database` satisfies it). */
@@ -174,7 +175,7 @@ export function createD1TurnTimingStore(options: {
   readObservedFacts?(turns: readonly { turnStreamId: string; requestReceivedAt: number }[]): Promise<readonly NativeTurnTimingFacts[]>
 }) {
   const now = options.now ?? Date.now
-  return {
+  const store = {
     /** Record one settled turn. Idempotent on `turnId`. Default never throws; durable owners opt into retryable writes with throwOnError. */
     async record(row: TurnTimingRow, write?: { throwOnError?: boolean }): Promise<void> {
       try {
@@ -288,6 +289,27 @@ export function createD1TurnTimingStore(options: {
       }
     },
 
+    /** Record settled chat outcomes without a product timing/serialization adapter. Read revision at settlement. */
+    lifecycle<TContext>(input: {
+      rollout: string
+      identify(info: ChatTurnLifecycleComplete<TContext> | ChatTurnLifecycleError<TContext>):
+        Pick<TurnTimingRow, 'workspaceId' | 'lane' | 'arm' | 'variant' | 'model' | 'failureCode'>
+      revision?: () => string | undefined
+    }): ChatTurnLifecycle<TContext> {
+      const record = (info: ChatTurnLifecycleComplete<TContext> | ChatTurnLifecycleError<TContext>, failed: boolean) => {
+        const identified = input.identify(info)
+        return store.record({ ...identified, rollout: input.rollout, turnId: info.turnStreamId,
+          admissionMs: info.admissionMs, firstVisibleMs: info.firstVisibleMs, firstTextMs: info.firstTextMs,
+          model: identified.model ?? ('model' in info ? info.model : undefined),
+          failureCode: identified.failureCode ?? (failed ? measuredTurnFacts(info.turnStreamId)?.failureCode
+            ?? readableTurnFailure('error' in info ? info.error : undefined) : undefined),
+          revision: input.revision ? input.revision() : (typeof process === 'undefined' ? undefined : process.env.DEPLOY_SHA?.trim()),
+          settledMs: info.durationMs, failed })
+      }
+      return { onTurnComplete: info => info.gated ? undefined : record(info, false),
+        onTurnError: info => record(info, true) }
+    },
+
     /** The stage's numbers: its admitted workspaces' turns in `lane` since `since` (epoch ms). A row carries no
      *  workspace creation time, so a workspace admitted only by a `new-since:` entry is not counted. */
     async measureStage(input: { rollout: string; stage: RolloutStage; lane: string; since: number }): Promise<StageMeasurement> {
@@ -310,4 +332,5 @@ export function createD1TurnTimingStore(options: {
       }
     },
   }
+  return store
 }

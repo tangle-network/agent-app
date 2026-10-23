@@ -7,7 +7,7 @@ import Database from 'better-sqlite3'
 import { expect, it } from 'vitest'
 import { Sandbox } from '@tangle-network/sandbox'
 import { observeNativeCompletion } from '../../src/chat-routes/native-completion'
-import { createChatTurnRoutes, type NativeTurnTimingFacts } from '../../src/chat-routes/index'
+import { createChatTurnRoutes, type ChatTurnProduceArgs, type NativeTurnTimingFacts } from '../../src/chat-routes/index'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { createChatTurnOwnership } from '../../src/chat-routes/turn-ownership'
@@ -85,46 +85,46 @@ it.each([false, true])('transfers only observed facts over the actual route, pre
   const chatStore = createChatStore(chatDb as unknown as ChatDatabase, tables)
   await chatStore.createThread({ id: 'thread', workspaceId: 'workspace' })
   const pending: Promise<unknown>[] = []
+  const produce = async (args: ChatTurnProduceArgs<Record<string, never>>) => {
+    if (args.admitted) await args.admitted
+    streamId = args.turnStreamId
+    expect(args.timingFacts, 'the actual assembled route supplies the serializable timing snapshot').toBeTypeOf('function')
+    firstSnapshot = args.timingFacts!()
+    expect(firstSnapshot.firstVisibleMs).toBeUndefined()
+    // Registration precedes handoff/native dispatch, using the existing admission owner.
+    sqlite.prepare('INSERT INTO admission VALUES (?, ?)').run(streamId, JSON.stringify(firstSnapshot))
+    await args.handoffCompletion!({ async persistTimingFacts(facts) {
+      if (facts.firstVisibleMs !== undefined) { visibleObserved(); await visibilityHeld }
+      sqlite.prepare('UPDATE admission SET timing_facts = ? WHERE id = ?').run(JSON.stringify(facts), facts.turnStreamId)
+      // Admission has committed, but this late projection fails after the Workflow timing checkpoint.
+      if (facts.firstVisibleMs !== undefined) {
+        sqlite.pragma('query_only = ON')
+        try { await timingStore(sqlite).recordFacts(facts) } finally { sqlite.pragma('query_only = OFF') }
+      } else await timingStore(sqlite).recordFacts(facts)
+    } })
+    return {
+      stream: (async function* () {
+        const response = await fetch(`${baseUrl}/events`)
+        const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
+        let buffer = ''
+        for (;;) {
+          const next = await reader.read()
+          if (next.done) break
+          buffer += next.value
+          while (buffer.includes('\n')) {
+            const end = buffer.indexOf('\n')
+            yield JSON.parse(buffer.slice(0, end))
+            buffer = buffer.slice(end + 1)
+          }
+        }
+      })(), finalText: () => 'Answer',
+    }
+  }
   const routes = createChatTurnRoutes({
-    projectId: 'native-timing-transfer', store: chatStore, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false,
-    ...(dispatchFirst ? { dispatchFirst: { billing: 'model-service' as const } } : {}),
+    projectId: 'native-timing-transfer', store: chatStore, turnStore: createMemoryTurnEventStore(),
     turnTrace: false, log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
-    async produce(args) {
-      if (args.admitted) await args.admitted
-      streamId = args.turnStreamId
-      expect(args.timingFacts, 'the actual assembled route supplies the serializable timing snapshot').toBeTypeOf('function')
-      firstSnapshot = args.timingFacts!()
-      expect(firstSnapshot.firstVisibleMs).toBeUndefined()
-      // Registration precedes handoff/native dispatch, using the existing admission owner.
-      sqlite.prepare('INSERT INTO admission VALUES (?, ?)').run(streamId, JSON.stringify(firstSnapshot))
-      await args.handoffCompletion!({ async persistTimingFacts(facts) {
-        if (facts.firstVisibleMs !== undefined) { visibleObserved(); await visibilityHeld }
-        sqlite.prepare('UPDATE admission SET timing_facts = ? WHERE id = ?').run(JSON.stringify(facts), facts.turnStreamId)
-        // Admission has committed, but this late projection fails after the Workflow timing checkpoint.
-        if (facts.firstVisibleMs !== undefined) {
-          sqlite.pragma('query_only = ON')
-          try { await timingStore(sqlite).recordFacts(facts) } finally { sqlite.pragma('query_only = OFF') }
-        } else await timingStore(sqlite).recordFacts(facts)
-      } })
-      return {
-        stream: (async function* () {
-          const response = await fetch(`${baseUrl}/events`)
-          const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
-          let buffer = ''
-          for (;;) {
-            const next = await reader.read()
-            if (next.done) break
-            buffer += next.value
-            while (buffer.includes('\n')) {
-              const end = buffer.indexOf('\n')
-              yield JSON.parse(buffer.slice(0, end))
-              buffer = buffer.slice(end + 1)
-            }
-          }
-        })(), finalText: () => 'Answer',
-      }
-    },
+    produce: dispatchFirst ? { router: produce } : produce,
   })
   try {
     const response = await routes.turn(new Request('http://app.test/chat', { method: 'POST',
@@ -289,7 +289,7 @@ it('retains durable terminal authority when timing persistence rejects after reg
   await store.createThread({ id: 'thread', workspaceId: 'workspace' })
   const pending: Promise<unknown>[] = []
   const routes = createChatTurnRoutes({ projectId: 'handoff-write-refusal', store, turnStore: createMemoryTurnEventStore(),
-    incrementalPersistence: false, turnTrace: false, log: () => {},
+    turnTrace: false, log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
     async produce(args) {
       sqlite.prepare("INSERT INTO effects VALUES ('durable-owner-registered')").run()

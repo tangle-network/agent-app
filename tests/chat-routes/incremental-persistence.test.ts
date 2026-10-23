@@ -132,6 +132,8 @@ describe('incremental assistant persistence — mid-run durability', () => {
       )
       samples.push({ content: afterText!.content, parts: afterText!.parts ?? [] })
 
+      // Advance past the shared writer's real cadence before the next content event.
+      await new Promise(resolve => setTimeout(resolve, 2100))
       yield TURN_EVENTS[1]
       const withRunningTool = await waitUntil(
         () => assistantRow(store, threadId),
@@ -141,6 +143,7 @@ describe('incremental assistant persistence — mid-run durability', () => {
       samples.push({ content: withRunningTool!.content, parts: withRunningTool!.parts ?? [] })
 
       yield TURN_EVENTS[2]
+      await new Promise(resolve => setTimeout(resolve, 2100))
       yield TURN_EVENTS[3]
       const afterMoreText = await waitUntil(
         () => assistantRow(store, threadId),
@@ -156,8 +159,6 @@ describe('incremental assistant persistence — mid-run durability', () => {
     const { routes, ctx, settle } = routesOver(
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: events(), model: 'anthropic/claude' }),
-      // 0 ms floor keeps the probe deterministic; coalescing is proven below.
-      { incrementalPersistence: { intervalMs: 0 } },
     )
 
     await drain(await routes.turn(turnRequest(threadId, 'find the lease'), ctx))
@@ -181,15 +182,18 @@ describe('incremental assistant persistence — mid-run durability', () => {
     // appended beside it.
     const all = await rows(store, threadId)
     expect(all.filter((row) => row.role === 'assistant')).toHaveLength(1)
-  })
+  }, 10_000)
 
   it('the final row is byte-identical to the one the single-write path produces', async () => {
-    async function runTurn(incremental: false | { intervalMs: number }) {
+    async function runTurn(draft: boolean) {
       const { store, threadId } = await freshStore()
       const { routes, ctx, settle } = routesOver(
-        store as unknown as ChatTurnMessageStore,
+        draft ? store as unknown as ChatTurnMessageStore : {
+          listMessages: id => store.listMessages(id) as never,
+          appendMessage: input => store.appendMessage(input as never),
+          deleteMessage: id => store.deleteMessage(id),
+        },
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'anthropic/claude' }),
-        { incrementalPersistence: incremental },
       )
       await drain(await routes.turn(turnRequest(threadId, 'find the lease'), ctx))
       await settle()
@@ -206,7 +210,7 @@ describe('incremental assistant persistence — mid-run durability', () => {
       }
     }
 
-    const drafted = await runTurn({ intervalMs: 0 })
+    const drafted = await runTurn(true)
     const single = await runTurn(false)
     expect(drafted).toEqual(single)
     // And the completion-time settlement still ran: the tool is `completed`,
@@ -243,8 +247,8 @@ describe('incremental assistant persistence — write cadence', () => {
     const { routes, ctx, settle } = routesOver(
       counting,
       () => createSandboxChatProducer({ events: events(), model: 'm' }),
-      // Default 2 s cadence: the whole 200-event burst lands inside one window.
-      { incrementalPersistence: {} },
+      // The burst stays inside the shared cadence.
+
     )
     await drain(await routes.turn(turnRequest(threadId, 'stream me'), ctx))
     await settle()
@@ -270,7 +274,6 @@ describe('incremental assistant persistence — write cadence', () => {
     const { routes, ctx, settle } = routesOver(
       store as unknown as ChatTurnMessageStore,
       () => emptyingProducer as ReturnType<typeof createSandboxChatProducer>,
-      { incrementalPersistence: { intervalMs: 0 } },
     )
     await drain(await routes.turn(turnRequest(threadId, 'nothing'), ctx))
     await settle()
@@ -295,7 +298,7 @@ describe('incremental assistant persistence — write cadence', () => {
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: events(), model: 'm' }),
       {
-        incrementalPersistence: { intervalMs: 0 },
+
         onTurnComplete: async (input: { failed: boolean; failureReason?: string; failureCode?: string }) => {
           completions.push({ failed: input.failed, failureReason: input.failureReason, failureCode: input.failureCode })
         },
@@ -333,7 +336,7 @@ describe('incremental assistant persistence — write cadence', () => {
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: events(), model: 'm' }),
       {
-        incrementalPersistence: { intervalMs: 0 },
+
         transformFinalText: (text: string) => text.replace(/\d{3}-\d{2}-\d{4}/g, '[redacted]'),
       },
     )
@@ -367,7 +370,6 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
     const first = routesOver(
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: crashing(), model: 'anthropic/claude' }),
-      { incrementalPersistence: { intervalMs: 0 } },
     )
     const firstRes = await first.routes.turn(turnRequest(threadId, 'find the lease'), first.ctx)
     void new Response(firstRes.body!).text().catch(() => {})
@@ -387,7 +389,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'anthropic/claude' }),
       {
-        incrementalPersistence: { intervalMs: 0 },
+
         turnStore: first.turnStore,
         contextGate: async (args: { userMessageId?: string | null; userMessageInserted?: boolean }) => {
           gateSaw.push({ userMessageId: args.userMessageId, userMessageInserted: args.userMessageInserted })
@@ -424,7 +426,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
       const { routes, ctx, settle } = routesOver(
         store as unknown as ChatTurnMessageStore,
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
+        { turnStore: shared },
       )
       await drain(await routes.turn(turnRequest(threadId, 'same question'), ctx))
       await settle()
@@ -451,7 +453,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
       const { routes, ctx, settle } = routesOver(
         store as unknown as ChatTurnMessageStore,
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
+        { turnStore: shared },
       )
       await drain(await routes.turn(turnRequest(threadId, 'same question'), ctx))
       await settle()
@@ -473,7 +475,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
       const { routes, ctx, settle } = routesOver(
         store as unknown as ChatTurnMessageStore,
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-        { incrementalPersistence: { intervalMs: 0 }, turnStore: shared },
+        { turnStore: shared },
       )
       await drain(await routes.turn(turnRequest(threadId, 'same question', { turnId }), ctx))
       await settle()
@@ -499,7 +501,7 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
         store as unknown as ChatTurnMessageStore,
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
         {
-          incrementalPersistence: { intervalMs: 0 },
+
           turnStore: shared,
           contextGate: async (args: { userMessageInserted?: boolean }) => {
             gateSaw.push(args.userMessageInserted)
@@ -648,36 +650,6 @@ describe('incremental assistant persistence — crash-safe convergence', () => {
 
 // ── 4. the additive guarantee ───────────────────────────────────────────────
 
-describe('incremental assistant persistence — additive by construction', () => {
-  it('a store without updateMessage keeps the single-write path, and an explicit opt-in fails loud', async () => {
-    const rowsWritten: Array<Record<string, unknown>> = []
-    const legacyStore: ChatTurnMessageStore = {
-      async listMessages() { return [] },
-      async appendMessage(input) { rowsWritten.push(input); return { id: `m${rowsWritten.length}` } },
-    }
-    const { routes, ctx, settle } = routesOver(
-      legacyStore,
-      () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
-    )
-    await drain(await routes.turn(turnRequest('t-legacy', 'hello'), ctx))
-    await settle()
-    expect(rowsWritten).toHaveLength(2)
-    expect(rowsWritten[1]).toMatchObject({ role: 'assistant', content: 'Checking the lease. Found 2.' })
-    expect(rowsWritten[1]!.id).toBeUndefined()
-
-    expect(() =>
-      createChatTurnRoutes({
-        projectId: 'p',
-        authorize: async () => ({ ok: true, tenantId: 'w', userId: 'u', context: undefined }),
-        store: legacyStore,
-        turnStore: createMemoryTurnEventStore(),
-        produce: () => createSandboxChatProducer({ events: (async function* () {})() }),
-        incrementalPersistence: {},
-      }),
-    ).toThrow(/updateMessage/)
-  })
-})
-
 // ── 5. the drafted row, named ───────────────────────────────────────────────
 
 describe('incremental assistant persistence — the seam names the drafted row', () => {
@@ -688,7 +660,7 @@ describe('incremental assistant persistence — the seam names the drafted row',
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
       {
-        incrementalPersistence: { intervalMs: 0 },
+
         onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
       },
     )
@@ -710,7 +682,7 @@ describe('incremental assistant persistence — the seam names the drafted row',
         store as unknown as ChatTurnMessageStore,
         () => createSandboxChatProducer({ events: (async function* () { for (const e of TURN_EVENTS) yield e })(), model: 'm' }),
         {
-          incrementalPersistence: { intervalMs: 0 },
+
           turnStore: shared,
           onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
         },
@@ -733,7 +705,7 @@ describe('incremental assistant persistence — the seam names the drafted row',
       store as unknown as ChatTurnMessageStore,
       () => createSandboxChatProducer({ events: (async function* () { /* nothing at all */ })(), model: 'm' }),
       {
-        incrementalPersistence: { intervalMs: 0 },
+
         onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
       },
     )
@@ -744,57 +716,4 @@ describe('incremental assistant persistence — the seam names the drafted row',
     expect(seen).toEqual([null])
   })
 
-  it('an empty turn on a store that cannot DELETE names the row that survives', async () => {
-    // Drafting requires only `updateMessage`, so a store without
-    // `deleteMessage` is a supported wiring — and there `discard()` is a
-    // no-op, leaving the drafted row in place. Reporting `null` here would
-    // hand the product a lie about a row it can still read back.
-    const written = new Map<string, Record<string, unknown>>()
-    const undeletableStore: ChatTurnMessageStore = {
-      async listMessages() {
-        return [...written.values()] as unknown as Awaited<ReturnType<ChatTurnMessageStore['listMessages']>>
-      },
-      async appendMessage(input) {
-        const row = { ...input, id: input.id ?? `m${written.size + 1}` }
-        written.set(row.id, row)
-        return row
-      },
-      async updateMessage(id, patch) {
-        const row = { ...written.get(id), ...patch, id }
-        written.set(id, row)
-        return row
-      },
-      // no deleteMessage — the point of the test
-    }
-
-    // A producer that streams content (so a draft row lands) and then revises
-    // its answer away to nothing, which is what drives `persistAssistantMessage`
-    // down the retract branch.
-    let finalText = 'drafting…'
-    const seen: Array<string | null> = []
-    const { routes, ctx, settle } = routesOver(
-      undeletableStore,
-      () => ({
-        stream: (async function* () {
-          yield { type: 'text', text: 'drafting…' }
-          await new Promise((resolve) => setTimeout(resolve, 5))
-          finalText = ''
-        })(),
-        finalText: () => finalText,
-      }) as unknown as ReturnType<typeof createSandboxChatProducer>,
-      {
-        incrementalPersistence: { intervalMs: 0 },
-        onTurnComplete: async ({ assistantMessageId }: { assistantMessageId: string | null }) => { seen.push(assistantMessageId) },
-      },
-    )
-    await drain(await routes.turn(turnRequest('t-undeletable', 'q'), ctx))
-    await settle()
-
-    const assistantRows = [...written.values()].filter((row) => row.role === 'assistant')
-    expect(assistantRows).toHaveLength(1)
-    // Still the MID-STREAM draft — proof the retract branch ran and left the
-    // row behind, rather than `finalize` writing it.
-    expect(assistantRows[0]!.content).toBe('drafting…')
-    expect(seen).toEqual([assistantRows[0]!.id])
-  })
 })

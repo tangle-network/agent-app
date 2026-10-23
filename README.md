@@ -238,7 +238,7 @@ measure request to the first reasoning, tool activity or answer output. First an
 Chat routes mark both automatically; lifecycle timings start at `onTurnStart` after
 admission. See [turn timing and rollout migration](docs/turn-trace.md#the-trace).
 
-Work an `afterAuthorize` hook starts (a box, a key) runs before the lock and the profile pin, and its release frees it when the turn ends before `produce` takes it. Under `dispatchFirst` the producer can own that work before admission resolves, so a release or a refusal path must await whatever the hook started before freeing it (legal-agent #518 leaked early-box keys by disposing first).
+An `afterAuthorize` hook can return `{ resource, dispose }` for work started before the lock and profile pin. The route passes that promise as `args.earlyResource` and owns disposal after the producer finishes or admission refuses, including resources that arrive after refusal. Router descriptors dispatch early by default; tools wait for final admission. The legacy release callback remains available for product-owned lifetimes.
 
 `/router-turn` compresses bodies of at least 32 KiB when the base URL has the
 origin of `DEFAULT_TANGLE_ROUTER_BASE_URL`. Other origins stay uncompressed.

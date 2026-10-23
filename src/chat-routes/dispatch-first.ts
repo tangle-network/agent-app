@@ -1,28 +1,14 @@
-/**
- * Dispatch-first admission: start the producer, and so the model call, as soon
- * as the turn's identity is known, while the lock, the history recheck, the
- * user-row insert, `contextGate` and `beforeTurn` run. Nothing the producer
- * emits reaches the member, the turn buffer or the transcript until that chain
- * commits; a refusal aborts the producer and drops what it emitted.
- *
- * Why: on Creative production (2026-10-21, gemini-3.7-flash, n=32 Router
- * turns) the chain between `authorize` and the producer held about 780 ms of
- * every turn's p50 (admission 343, profile pin 338, turn open 99) before the
- * model was even called. The model's own first token takes 2.5-3.6 s, so that
- * work fits inside it.
- *
- * What stays fail-closed: `authorize` has already run, so no model call starts
- * for a caller without identity and workspace access. Billing is enforced in
- * `authorize` or at the model service, which holds spend before it calls the
- * provider; the product names which (`dispatchFirst: { billing }`). Gates the
- * model service cannot know, such as a seat, run in `contextGate` beside the
- * model call, and the output waits for them. Single-flight is unchanged: the lock still decides which turn's output is
- * kept; a refused duplicate costs only the model call it started, which its
- * `admissionSignal` cancels.
+/** Router calls overlap the lock, history recheck, user insert and gates.
+ * authorize already verified identity/access; the model service enforces spend.
+ * Events remain buffered until admission commits. Refusal cancels the call and
+ * drops its output; tools and durable effects must wait for args.admitted.
+ * Ordinary functions and Sandbox backends never execute speculatively.
  */
 import type { TurnTrace } from '../turn-trace/recorder'
 import type { NativeCompletionHandoffOptions } from './native-turn-timing'
 import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
+import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
+import { withProducerStream } from './producer-stream'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
 export class TurnAdmissionRefusedError extends Error {
@@ -32,9 +18,9 @@ export class TurnAdmissionRefusedError extends Error {
   }
 }
 
-export interface DispatchedProducer<TContext> {
+export interface DispatchedProducer<TContext, TResource = unknown> {
   /** The admission chain committed: hand the producer its final args and return it, with what it already emitted first. */
-  take(args: ChatTurnProduceArgs<TContext>): Promise<ChatTurnRouteProducer>
+  take(args: ChatTurnProduceArgs<TContext, TResource>): Promise<ChatTurnRouteProducer>
   /** The turn ended without the producer: abort it and discard its output. Idempotent; a no-op after `take`. */
   refuse(): void
 }
@@ -45,15 +31,15 @@ export interface DispatchedProducer<TContext> {
  * writes nothing durable before it resolves. Its stream is drained into memory
  * from the start, so a producer that only works while pulled still dispatches.
  */
-function dispatchProducerFirst<TContext>(
-  produce: (args: ChatTurnProduceArgs<TContext>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>,
-  args: ChatTurnProduceArgs<TContext>,
+function dispatchProducerFirst<TContext, TResource = unknown>(
+  produce: (args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>,
+  args: ChatTurnProduceArgs<TContext, TResource>,
   trace: TurnTrace,
-): DispatchedProducer<TContext> {
+): DispatchedProducer<TContext, TResource> {
   const abort = new AbortController()
-  let admit!: (final: ChatTurnProduceArgs<TContext>) => void
+  let admit!: (final: ChatTurnProduceArgs<TContext, TResource>) => void
   let reject!: (error: Error) => void
-  const admitted = new Promise<ChatTurnProduceArgs<TContext>>((resolve, fail) => { admit = resolve; reject = fail })
+  const admitted = new Promise<ChatTurnProduceArgs<TContext, TResource>>((resolve, fail) => { admit = resolve; reject = fail })
   // A producer that never awaits `admitted` must not raise an unhandled rejection when the turn is refused.
   admitted.catch(() => {})
   let settled: 'taken' | 'refused' | undefined
@@ -72,9 +58,14 @@ function dispatchProducerFirst<TContext>(
   const started = trace.measure('admission.produce', 'admission', () => produce({
     ...args,
     admitted,
-    admissionSignal: abort.signal,
+    admissionSignal: args.admissionSignal ? AbortSignal.any([args.admissionSignal, abort.signal]) : abort.signal,
     ...(handoffCompletion ? { handoffCompletion: (options?: NativeCompletionHandoffOptions) => admitted.then(() => handoffCompletion(options)) } : {}),
   }))
+  // Register before construction resolves: admission can refuse and return
+  // while a producer is still awaiting an ephemeral credential or resource.
+  const cleanup = started.then(producer => producer.cleanup, () => undefined)
+  args.waitUntil?.(cleanup)
+  void cleanup.catch(() => {})
   const draining = started.then(async (producer) => {
     try {
       source = producer.stream[Symbol.asyncIterator]()
@@ -129,9 +120,7 @@ function dispatchProducerFirst<TContext>(
       settled = 'taken'
       admit(final)
       const producer = await started
-      // The producer's own object keeps its getters (`model`, usage, parts); only its stream is replaced. Defined, not
-      // assigned, so a getter-only or frozen `stream` cannot make the hand-over throw.
-      return Object.defineProperty(Object.create(producer) as ChatTurnRouteProducer, 'stream', { value: replay(), enumerable: true })
+      return withProducerStream(producer, replay())
     },
     refuse() {
       if (settled) return
@@ -142,13 +131,26 @@ function dispatchProducerFirst<TContext>(
   }
 }
 
-/** The dispatched producer for this turn when the route dispatches first and `when` picks it; otherwise none. */
-export function dispatchFirstFor<TContext>(
-  options: CreateChatTurnRoutesOptions<TContext>,
-  args: ChatTurnProduceArgs<TContext>,
+/** Select once, so admission's context mutations cannot switch execution backends. */
+export function selectTurnProducer<TContext, TResource = unknown>(
+  produce: CreateChatTurnRoutesOptions<TContext, TResource>['produce'],
+  args: ChatTurnProduceArgs<TContext, TResource>,
+) {
+  if (typeof produce === 'function') return { produce, router: false }
+  if (produce.when?.(args) ?? true) return {
+    produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => routerRouteProducer(await produce.router(final), final),
+    router: true,
+  }
+  if (!produce.sandbox) throw new Error('The turn selected the Sandbox backend without a Sandbox producer')
+  const sandbox = produce.sandbox
+  return { produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => sandboxRouteProducer(await sandbox(final), final), router: false }
+}
+
+/** A reused user row must pass duplicate/refusal checks before another model call. */
+export function dispatchFirstFor<TContext, TResource = unknown>(
+  selected: ReturnType<typeof selectTurnProducer<TContext, TResource>>,
+  args: ChatTurnProduceArgs<TContext, TResource>,
   trace: TurnTrace,
-): DispatchedProducer<TContext> | undefined {
-  const policy = options.dispatchFirst
-  if (!policy || !(policy.when?.(args) ?? true)) return undefined
-  return dispatchProducerFirst(options.produce, args, trace)
+): DispatchedProducer<TContext, TResource> | undefined {
+  return selected.router && !args.userMessageId ? dispatchProducerFirst(selected.produce, args, trace) : undefined
 }

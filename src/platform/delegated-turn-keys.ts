@@ -11,7 +11,7 @@ import type { DelegatedKeyOutcome, DelegatedKeyRequest, PlatformDelegatedKeyClie
  * turn mints inline. A parked key is used only when it was minted for the same request (source key, product,
  * models, budget, resource, payer: the slot's `scope` digest) and has `minRemainingMs` of life; otherwise the turn
  * mints inline exactly as before. A parked child Platform revoked or let expire is refused by the Router (401
- * `invalid_key` with that reason); `delegatedKeyFallbackFetch` then mints inline once and resends. A spent budget
+ * `invalid_key` with that reason); the turn's `fetchImpl` mints inline once and resends. A spent budget
  * never re-mints: the turn keeps one cap. Each slot holds at most one unused key; a displaced key, or one minted
  * but not stored, is revoked, and one whose revoke fails expires on its own. The secret is stored encrypted.
  */
@@ -52,12 +52,20 @@ export interface DelegatedTurnKeyInput {
 export interface DelegatedTurnKey {
   key: string
   id: string
-  /** The id the child was minted for (`turn:<turnId>` at Platform): the turn's own id when minted inline, a
-   *  random id when pre-minted. The turn records `id` beside its own id. */
+  /** The logical id supplied to the mint: the turn's own id inline, a random id when pre-minted. Platform's
+   *  child name adds a per-mint suffix, so concurrent attempts never supersede one another. */
   turnId: string
   expiresAt: Date
   /** Parked before this turn: a revoked or expired refusal of it means mint inline (`delegatedKeyFallbackFetch`). */
   preminted: boolean
+}
+
+/** One turn owns its claimed/inline key and any revoked-key replacement until it calls `revoke`. */
+export interface DelegatedTurnKeyLease extends DelegatedTurnKey {
+  /** Use with the initial `key`; handles a first-request revoked/expired premint refusal automatically. */
+  fetchImpl: typeof fetch
+  /** Close this lease and retire every key it held, including a replacement still being minted. Idempotent. */
+  revoke(): Promise<void>
 }
 
 export interface DelegatedTurnKeyClaimTiming { digestMs: number; storeMs: number; decryptMs?: number }
@@ -71,7 +79,7 @@ export type DelegatedTurnKeyEvent =
   | { type: 'park_failed'; slot: string; code: string; keyId?: string }
 
 export interface DelegatedTurnKeysOptions {
-  client: PlatformDelegatedKeyClient
+  client: Pick<PlatformDelegatedKeyClient, 'delegate' | 'revoke'>
   /** Null turns pre-minting off: every turn mints inline, as before. */
   db: DelegatedKeyPremintD1Like | null
   /** The app's at-rest crypto (`createFieldCrypto` from `./crypto`). */
@@ -86,13 +94,17 @@ export interface DelegatedTurnKeysOptions {
 
 export interface DelegatedTurnKeys {
   /**
-   * This turn's key: the slot's parked key, taken exactly once, else a fresh mint named `turn:<turnId>`. Then the
+   * This turn's key: the slot's parked key, taken exactly once, else a fresh mint with a unique name. Then the
    * next turn's key is minted and parked through `waitUntil` (the Worker's `ctx.waitUntil`), off this turn's path.
+   * Pass `value` as the shared Router producer's `apiKey`; the producer owns fallback fetch and cleanup.
+   * Direct HTTP callers use `value.fetchImpl` and close `value.revoke()` themselves, including refusals.
    */
   forTurn(input: DelegatedTurnKeyInput & { turnId: string; waitUntil?: (promise: Promise<unknown>) => void }):
-    Promise<DelegatedKeyOutcome<DelegatedTurnKey>>
+    Promise<DelegatedKeyOutcome<DelegatedTurnKeyLease>>
   /** Mint and park a key for the slot's next turn, e.g. when a member session opens. Never throws. */
   park(input: DelegatedTurnKeyInput): Promise<boolean>
+  /** Retire only the parked key matching this exact slot and scope after a live domain refusal. Never throws. */
+  forget(input: Pick<DelegatedTurnKeyInput, 'slot' | 'scope' | 'payerId'>): Promise<void>
   /** Mint inline, as a turn did before pre-minting. */
   mint(input: DelegatedTurnKeyInput & { turnId: string }): Promise<DelegatedKeyOutcome<DelegatedTurnKey>>
 }
@@ -124,7 +136,7 @@ export function createDelegatedTurnKeys(options: DelegatedTurnKeysOptions): Dele
   async function mint(input: DelegatedTurnKeyInput & { turnId: string }, preminted: boolean): Promise<DelegatedKeyOutcome<DelegatedTurnKey>> {
     const expiresAt = new Date(Math.min(now() + input.ttlMs, input.notAfter?.getTime() ?? Infinity))
     const outcome = await options.client.delegate({
-      ...input.scope, name: `turn:${input.turnId}`, expiresAt,
+      ...input.scope, name: `turn:${input.turnId}:${crypto.randomUUID()}`, expiresAt,
       ...(input.retryUnavailable ? { retryUnavailable: input.retryUnavailable } : {}),
     })
     if (!outcome.succeeded) return outcome
@@ -142,6 +154,41 @@ export function createDelegatedTurnKeys(options: DelegatedTurnKeysOptions): Dele
     }).catch(() => null)
   }
 
+  function lease(input: DelegatedTurnKeyInput & { turnId: string }, key: DelegatedTurnKey): DelegatedTurnKeyLease {
+    const turn = { ...input, scope: { ...input.scope,
+      ...(input.scope.allowedModels ? { allowedModels: [...input.scope.allowedModels] } : {}),
+      ...(input.scope.budget ? { budget: { ...input.scope.budget } } : {}),
+      ...(input.scope.resource ? { resource: { ...input.scope.resource } } : {}),
+      ...(input.scope.expect ? { expect: { ...input.scope.expect } } : {}),
+    }, ...(input.notAfter ? { notAfter: new Date(input.notAfter) } : {}) }
+    const held = new Set([key.id])
+    const closed = { succeeded: false as const, error: {
+      status: 409, code: 'delegated_key.refused' as const, message: 'The turn key lease is closed.',
+    } }
+    let released = false
+    let replacement: Promise<DelegatedKeyOutcome<DelegatedTurnKey>> | undefined
+    let retirement: Promise<void> | undefined
+    const fetchImpl = delegatedKeyFallbackFetch({
+      key,
+      fetch: (resource, init) => released
+        ? Promise.reject(new Error(closed.error.message)) : fetch(resource, init),
+      remint: () => {
+        if (released) return Promise.resolve(closed)
+        return replacement ??= mint(turn, false).then(outcome => {
+          if (outcome.succeeded) held.add(outcome.value.id)
+          return released ? closed : outcome
+        })
+      },
+    })
+    return { ...key, fetchImpl, revoke() {
+      released = true
+      return retirement ??= (async () => {
+        await replacement?.catch(() => undefined)
+        await Promise.all([...held].map(id => retire(turn, id)))
+      })()
+    } }
+  }
+
   async function claim(input: DelegatedTurnKeyInput, timing: Partial<DelegatedTurnKeyClaimTiming>): Promise<DelegatedTurnKey | null> {
     if (!db) return null
     const { slot, scope } = input
@@ -149,8 +196,8 @@ export function createDelegatedTurnKeys(options: DelegatedTurnKeysOptions): Dele
     const digest = await scopeDigest(scope)
     timing.digestMs = Date.now() - at
     at = Date.now()
-    const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 AND expires_at > ?3
-RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() + minRemainingMs)
+    const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 AND expires_at > ?3 AND expires_at <= ?4
+RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() + minRemainingMs, input.notAfter?.getTime() ?? Number.MAX_SAFE_INTEGER)
       .first<{ turn_id: string; key_id: string; key_encrypted: string; expires_at: number }>()
     timing.storeMs = Date.now() - at
     if (!row) return null
@@ -172,7 +219,8 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() 
       scope = await scopeDigest(input.scope)
       const held = await db.prepare(`SELECT scope, expires_at FROM ${table} WHERE slot = ?1`).bind(input.slot)
         .first<{ scope: string; expires_at: number }>()
-      if (held?.scope === scope && held.expires_at > now() + minRemainingMs + PREMINT_KEEP_SLACK_MS) {
+      if (held?.scope === scope && held.expires_at > now() + minRemainingMs + PREMINT_KEEP_SLACK_MS
+        && held.expires_at <= (input.notAfter?.getTime() ?? Infinity)) {
         emit({ type: 'park_kept', slot: input.slot })
         return true
       }
@@ -187,7 +235,9 @@ RETURNING turn_id, key_id, key_encrypted, expires_at`).bind(slot, digest, now() 
       emit({ type: 'park_failed', slot: input.slot, code: 'premint_crypto_unusable' })
       return false
     }
-    const minted = await mint({ ...input, turnId: crypto.randomUUID() }, true)
+    const minted = await mint({ ...input, turnId: crypto.randomUUID() }, true).catch(() => ({
+      succeeded: false as const, error: { status: 502, code: 'delegated_key.failed' as const, message: 'Background turn-key mint failed.' },
+    }))
     if (!minted.succeeded) {
       emit({ type: 'park_failed', slot: input.slot, code: minted.error.code })
       return false
@@ -229,9 +279,18 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
       }
       emit({ type: claimed ? 'claimed' : 'missed', slot: input.slot,
         ...(timing.digestMs !== undefined && timing.storeMs !== undefined ? { timing: timing as DelegatedTurnKeyClaimTiming } : {}) })
-      return claimed ? { succeeded: true, value: claimed } : mint(input, false)
+      const outcome = claimed ? { succeeded: true as const, value: claimed } : await mint(input, false)
+      return outcome.succeeded ? { succeeded: true, value: lease(input, outcome.value) } : outcome
     },
     park,
+    async forget(input) {
+      if (!db) return
+      try {
+        const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 RETURNING key_id`)
+          .bind(input.slot, await scopeDigest(input.scope)).first<{ key_id: string }>()
+        if (row) await retire(input, row.key_id)
+      } catch { /* a refused turn never hands out the slot; its key expires if retirement is unavailable */ }
+    },
     mint: (input) => mint(input, false),
   }
 }

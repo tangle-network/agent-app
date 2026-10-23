@@ -96,7 +96,7 @@ describe('Router reasoning release', () => {
       projectId: 'reasoning-timing',
       authorize: async () => { await sleep(60); return { ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} } },
       store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm-1' } } },
-      turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+      turnStore: createMemoryTurnEventStore(), log: () => {},
       turnTrace: { sink: done => { snapshot = done } },
       lifecycle: { onTurnComplete: info => { timing = info } },
       produce: ({ trace }) => createRouterTurnProducer({

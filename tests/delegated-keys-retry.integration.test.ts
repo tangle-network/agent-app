@@ -14,6 +14,7 @@ const SOURCE = 'sk-tan-payer-linked-key-0001'
 async function platform(downForMs: number) {
   let firstAt: number | undefined
   const attempts: number[] = []
+  const received: Array<{ path: string | undefined; authorization: string | undefined; service: string | string[] | undefined }> = []
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     let raw = ''
     req.on('data', (chunk) => { raw += chunk })
@@ -21,6 +22,7 @@ async function platform(downForMs: number) {
       const now = Date.now()
       firstAt ??= now
       attempts.push(now - firstAt)
+      received.push({ path: req.url, authorization: req.headers.authorization, service: req.headers['x-service-name'] })
       if (now - firstAt < downForMs) {
         res.writeHead(503, { 'content-type': 'application/json' }).end(JSON.stringify({ success: false, error: { code: 'PLATFORM_BUSY' } }))
         return
@@ -37,7 +39,7 @@ async function platform(downForMs: number) {
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  return { url, attempts, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
+  return { url, attempts, received, close: () => new Promise<void>((resolve) => server.close(() => resolve())) }
 }
 
 const request = (retryForMs?: number): DelegatedKeyRequest => ({
@@ -50,6 +52,42 @@ let close: (() => Promise<void>) | undefined
 afterEach(async () => { await close?.(); close = undefined })
 
 describe('delegate through a Platform outage', () => {
+  it('uses the configured origin and current service token without caller boilerplate, and fails closed when absent', async () => {
+    const p = await platform(0)
+    close = p.close
+    const names = ['TANGLE_PLATFORM_URL', 'TANGLE_SSO_URL', 'PLATFORM_SERVICE_TOKEN'] as const
+    const previous = names.map(name => process.env[name])
+    try {
+      delete process.env.TANGLE_PLATFORM_URL
+      process.env.TANGLE_SSO_URL = `${p.url}/auth/callback`
+      delete process.env.PLATFORM_SERVICE_TOKEN
+      const client = createPlatformDelegatedKeyClient({ serviceName: 'creative-agent' })
+      await expect(client.delegate(request())).rejects.toThrow('PLATFORM_SERVICE_TOKEN is required')
+      expect(p.received).toHaveLength(0)
+      process.env.PLATFORM_SERVICE_TOKEN = 'fixture-service-one'
+      expect(await client.delegate(request())).toMatchObject({ succeeded: true })
+      process.env.PLATFORM_SERVICE_TOKEN = 'fixture-service-two'
+      expect(await client.delegate(request())).toMatchObject({ succeeded: true })
+      expect(p.received).toEqual([
+        { path: '/v1/keys/delegate', authorization: 'Bearer fixture-service-one', service: 'creative-agent' },
+        { path: '/v1/keys/delegate', authorization: 'Bearer fixture-service-two', service: 'creative-agent' },
+      ])
+      process.env.TANGLE_PLATFORM_URL = `${p.url}/platform/path`
+      process.env.TANGLE_SSO_URL = 'http://127.0.0.1:1/unreachable'
+      expect(await createPlatformDelegatedKeyClient({ serviceName: 'creative-agent' }).delegate(request()))
+        .toMatchObject({ succeeded: true })
+      expect(p.received[2]?.path).toBe('/v1/keys/delegate')
+      delete process.env.TANGLE_PLATFORM_URL
+      delete process.env.TANGLE_SSO_URL
+      expect(() => createPlatformDelegatedKeyClient({ serviceName: 'creative-agent' })).toThrow('TANGLE_PLATFORM_URL is required')
+    } finally {
+      names.forEach((name, index) => {
+        if (previous[index] === undefined) delete process.env[name]
+        else process.env[name] = previous[index]
+      })
+    }
+  })
+
   it('completes the mint once Platform answers again inside the retry window', async () => {
     const p = await platform(1_200)
     close = p.close

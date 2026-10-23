@@ -88,7 +88,8 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
   if (!type) return false
 
   if (type === 'message.part.updated') {
-    const part = asRecord(asRecord(record.data)?.part)
+    const data = asRecord(record.data)
+    const part = asRecord(data?.part)
     const partType = asString(part?.type) ?? ''
     if (NON_COMMITTING_PART_TYPES.has(partType)) return false
     // A text/reasoning part with NO content yet (the platform opens the part
@@ -96,8 +97,8 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
     // capture) puts nothing in front of the user; discarding it cannot
     // duplicate an answer. The first real token commits.
     if (partType === 'text' || partType === 'reasoning') {
-      const text = asString(part?.text) ?? asString(part?.content) ?? ''
-      return text.length > 0
+      return [data?.delta, part?.text, part?.content]
+        .some(value => typeof value === 'string' && value.length > 0)
     }
     return true
   }

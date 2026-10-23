@@ -32,7 +32,7 @@ export interface TurnStreamStubLike {
 /** The surface of `DurableObjectNamespace` the adapters use. */
 export interface TurnStreamNamespaceLike {
   idFromName(name: string): unknown
-  get(id: unknown): TurnStreamStubLike
+  get(id: unknown, options?: { locationHint?: string }): TurnStreamStubLike
 }
 
 const INTERNAL_ORIGIN = 'https://turn-stream.internal'
@@ -183,10 +183,10 @@ export async function acquireDurableTurnLock(
  */
 export async function peekDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
-  input: { workspaceId: string; threadId: string; scope: TurnLockScope },
+  input: { workspaceId: string } & ({ scope: 'workspace'; threadId?: string } | { scope: TurnLockScope; threadId: string }),
   auth: TurnStreamAuth,
 ): Promise<DurableTurnLock | null> {
-  const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
+  const key = turnLockChannelKey(input.workspaceId, input.threadId ?? '', input.scope)
   const result = await postJson<{ active?: DurableTurnLock | null }>(namespace, key, TURN_STREAM_PATHS.lockPeek, {
     scope: input.scope,
     threadId: input.threadId,
@@ -360,13 +360,15 @@ function defaultRefusalResponse(
 export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOptions<TContext>): {
   acquire(args: TurnLockSeamArgs<TContext>): Promise<TurnLockSeamResult>
   release(handle: unknown): Promise<void>
-  warm(target: { tenantId: string; threadId: string }): Promise<void>
+  warm(target: { tenantId: string; threadId?: string }): Promise<void>
 } {
   return {
     // Every lock lives on the workspace channel, so this wakes that object
     // (evicted after idle) before the turn's acquire reaches it.
     async warm(target) {
-      await peekDurableTurnLock(options.namespace, { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }, options.auth)
+      await peekDurableTurnLock(options.namespace, target.threadId
+        ? { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }
+        : { workspaceId: target.tenantId, scope: 'workspace' }, options.auth)
     },
     async acquire(args) {
       const workspaceId = args.identity.tenantId

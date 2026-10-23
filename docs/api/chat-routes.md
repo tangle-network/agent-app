@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-296 exports.
+303 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -342,6 +342,14 @@ interface BuildDispatchPartsInput
 (bytes: Uint8Array<ArrayBufferLike>) => string
 ```
 
+### `cancelChatTurn`
+
+`function` — Existing product Stop, composed with the same authorization and storage owner as chat.
+
+```ts
+<TContext>(request: Request, options: { authorize: (args: ChatTurnAuthorizeArgs) => Promise<ChatTurnAuthorization<TCont…
+```
+
 ### `ChatAttachmentInput`
 
 `interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…
@@ -430,28 +438,52 @@ type ChatTurnAuthorization
 interface ChatTurnAuthorizeArgs
 ```
 
+### `ChatTurnCancelArgs`
+
+`interface` — Product identity and editor access have already been checked before target is called.
+
+```ts
+interface ChatTurnCancelArgs
+```
+
+### `ChatTurnCancelOptions`
+
+`interface`
+
+```ts
+interface ChatTurnCancelOptions
+```
+
+### `ChatTurnCancelRequest`
+
+`interface`
+
+```ts
+interface ChatTurnCancelRequest
+```
+
+### `ChatTurnCancelSource`
+
+`interface` — Structural public Sandbox API; addressing always comes from the captured receipt.
+
+```ts
+interface ChatTurnCancelSource
+```
+
+### `ChatTurnCancelTarget`
+
+`interface` — Application fields are projected once; the shared owner never infers OAuth or source-key authority.
+
+```ts
+interface ChatTurnCancelTarget
+```
+
 ### `ChatTurnCompleteInput`
 
 `interface` — What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit).
 
 ```ts
 interface ChatTurnCompleteInput
-```
-
-### `ChatTurnCreateThreadOptions`
-
-`interface` — The `createThread` route option: who may create a thread from a minted id, and how the row is written.
-
-```ts
-interface ChatTurnCreateThreadOptions
-```
-
-### `ChatTurnCreateThreadResult`
-
-`type` — What `args.createThread` answers: the created row, or the response refusing the turn (404 or 409).
-
-```ts
-type ChatTurnCreateThreadResult
 ```
 
 ### `ChatTurnExecutionLimits`
@@ -484,6 +516,14 @@ type ChatTurnGateResult
 
 ```ts
 interface ChatTurnHeartbeat
+```
+
+### `ChatTurnHybridConfiguration`
+
+`type`
+
+```ts
+type ChatTurnHybridConfiguration
 ```
 
 ### `ChatTurnInputError`
@@ -598,14 +638,6 @@ interface ChatTurnModelAttribution
 interface ChatTurnModelFailover
 ```
 
-### `ChatTurnNewThread`
-
-`interface` — The body field a minted first turn carries.
-
-```ts
-interface ChatTurnNewThread
-```
-
 ### `ChatTurnPartInput`
 
 `type` — Resolve input as either a text part or a file part of a chat turn
@@ -694,6 +726,22 @@ interface ChatTurnRequestPayload
 interface ChatTurnRouteProducer
 ```
 
+### `ChatTurnRouterBackend`
+
+`type`
+
+```ts
+type ChatTurnRouterBackend
+```
+
+### `ChatTurnRouterConfiguration`
+
+`type` — The route supplies request tracing, cancellation and the admission fence.
+
+```ts
+type ChatTurnRouterConfiguration
+```
+
 ### `ChatTurnRoutes`
 
 `interface` — Define routes to run, replay, and list running chat turns with streaming and reconnect support
@@ -702,20 +750,20 @@ interface ChatTurnRouteProducer
 interface ChatTurnRoutes
 ```
 
+### `ChatTurnSandboxBackend`
+
+`type`
+
+```ts
+type ChatTurnSandboxBackend
+```
+
 ### `ChatTurnTextPartInput`
 
 `interface` — Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`).
 
 ```ts
 interface ChatTurnTextPartInput
-```
-
-### `ChatTurnThreadOwner`
-
-`interface` — Who a created thread belongs to: the tenant (workspace) and member `authorize` resolved.
-
-```ts
-interface ChatTurnThreadOwner
 ```
 
 ### `ChatTurnTraceOptions`
@@ -803,7 +851,7 @@ interface CreateAttachmentUploadRouteOptions
 `function` — Build chat turn routes to handle and validate incoming chat requests with optional logging
 
 ```ts
-<TContext = void, TThread = unknown>(options: CreateChatTurnRoutesOptions<TContext, TThread>) => ChatTurnRoutes
+<TContext = void, TResource = unknown>(input: CreateChatTurnRoutesOptions<TContext, TResource>) => ChatTurnRoutes
 ```
 
 ### `CreateChatTurnRoutesOptions`
@@ -1460,6 +1508,14 @@ interface NativeTurnTimingFacts
 
 ```ts
 (options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>
+```
+
+### `observeTurnCancellation`
+
+`function` — Internal route observation of the same product Stop target.
+
+```ts
+<TContext, TResource>(source: AsyncIterable<ChatRouteEvent>, args: ChatTurnProduceArgs<TContext, TResource>, cancel: Ch…
 ```
 
 ### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
