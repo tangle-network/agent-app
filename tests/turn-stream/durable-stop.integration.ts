@@ -22,6 +22,11 @@ const consumer = createRequire(resolve(consumerRoot, 'package.json'))
 const appPackage = consumer('./package.json') as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
 assert(appPackage.dependencies?.wrangler ?? appPackage.devDependencies?.wrangler, 'Consumer must declare Wrangler')
 const wrangler = createRequire(consumer.resolve('wrangler/package.json'))
+const consumerLock = readFileSync(resolve(consumerRoot, 'pnpm-lock.yaml'))
+const lockedWrangler = consumerLock.toString().match(/^ {6}wrangler:\n {8}specifier:[^\n]*\n {8}version: ([^\s(]+)/m)?.[1]
+const installedWrangler = (wrangler('./package.json') as { version: string }).version
+assert(lockedWrangler && installedWrangler === lockedWrangler,
+  `Unsupported consumer toolchain: installed Wrangler ${installedWrangler}, frozen consumer lock ${lockedWrangler ?? 'unreadable'}`)
 const productionConfig = readFileSync(resolve(consumerRoot, 'wrangler.toml'), 'utf8')
 const compatibilityDate = productionConfig.match(/^compatibility_date\s*=\s*"([^"]+)"/m)?.[1]
 const flags = productionConfig.match(/^compatibility_flags\s*=\s*\[([\s\S]*?)\]/m)?.[1]
@@ -445,7 +450,7 @@ try {
   }
   console.log(JSON.stringify({ checks, consumerRoot, scope: transportOnly ? 'transport-only' : 'complete-product-route',
     consumerRevision: execFileSync('git', ['-C', consumerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
-    consumerLockSha256: createHash('sha256').update(readFileSync(resolve(consumerRoot, 'pnpm-lock.yaml'))).digest('hex'),
+    consumerLockSha256: createHash('sha256').update(consumerLock).digest('hex'),
     miniflareEntry: realpathSync(wrangler.resolve('miniflare')), wranglerEntry: dirname(consumer.resolve('wrangler/package.json')),
     compatibilityDate, compatibilityFlags, builder: 'consumer-wrangler-dry-run',
     actualDO: true, actualSQLite: true, actualRouterHTTP: !transportOnly, paidCalls: 0 }))
