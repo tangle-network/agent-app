@@ -1,6 +1,7 @@
 import type { AssistantDraftWriter } from './draft-persistence'
 import type { NativeCompletionHandoffOptions, NativeTimingTransfer } from './native-turn-timing'
 import type { BufferedTurnTap } from '../stream/index'
+import type { ChatTurnLock } from './turn-route-contracts'
 
 interface OwnershipState {
   completionHandoff: boolean
@@ -16,7 +17,7 @@ interface OwnershipState {
 /** One transfer of terminal authority, retaining the route only as a live projector. */
 export function createChatTurnOwnership(state: OwnershipState,
   log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: string,
-  options: { turnLock?: { release(handle: unknown): Promise<void> } },
+  options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release'> },
 ) {
   const handoffCompletion = (handoff?: NativeCompletionHandoffOptions): Promise<void> => {
     if (!state.completionHandoffPromise) {
