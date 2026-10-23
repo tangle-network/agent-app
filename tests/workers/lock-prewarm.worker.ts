@@ -24,7 +24,7 @@ export class ColdStartTurnStreamDO extends TurnStreamDO {
 interface Env { DB: D1Database; TURN_STREAM_DO: TurnStreamNamespaceLike; TURN_STREAM_AUTH_SECRET: string }
 interface BindingCall { channel: string; id: string; locationHint?: string }
 const calls: BindingCall[] = []
-const factories = new Map<string, ReturnType<typeof createWorkspacePrewarmRoute>>()
+const factories = new Map<string, ReturnType<typeof createPrewarm>>()
 const validWorkspace = (value: string) => /^proof-[a-z0-9-]+$/.test(value)
 
 function observedNamespace(namespace: TurnStreamNamespaceLike): TurnStreamNamespaceLike {
