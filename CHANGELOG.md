@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.62.3
+
+- test: delete stale Runtime cohort unit after valid adoption (#1290)
+
+## 0.62.2
+
+- fix(sandbox): settle planned restarts even without a liveness probe (#1289)
+
+## 0.62.1
+
+- fix(sandbox): settle restart-prefetched reads after liveness recovers (#1287)
+
 ## 0.62.0
 
 - refactor!: consolidate framework owners and retire unused APIs (#1280)

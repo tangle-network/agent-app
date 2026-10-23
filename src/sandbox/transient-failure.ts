@@ -47,6 +47,36 @@ function causeChain(error: unknown): Record<string, unknown>[] {
   return chain
 }
 
+/** A planned host-agent swap leaves the sandbox alive; an ordinary probe failure is not that evidence. */
+export function plannedHostRestart(error: unknown): boolean {
+  return causeChain(error).some(cause => cause.code === 'HOST_AGENT_RESTARTING' && cause.status === 503)
+}
+
+/** Wait only for the platform typed planned-restart signal, within the caller budget. */
+export async function readDuringPlannedHostRestart<T>(
+  read: () => Promise<T>,
+  deadline: number,
+): Promise<{ value: T; waited: boolean }> {
+  let waited = false
+  for (;;) {
+    try {
+      return { value: await read(), waited }
+    } catch (error) {
+      if (!plannedHostRestart(error)) throw error
+      const hint = (error as { retryAfterMs?: unknown }).retryAfterMs
+      const delay = typeof hint === 'number' && Number.isFinite(hint) && hint > 0
+        ? hint : sandboxTransientBackoffMs(1)
+      // The existing caller budget bounds retries. Each SDK request
+      // settles under its own deadline before another begins. Preserve the refusal and never start a stop on
+      // expiry; its code, origin and endpoint remain available to the caller.
+      if (Date.now() + delay >= deadline) throw error
+      waited = true
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+}
+
+
 function status(value: unknown): number | undefined {
   if (typeof value === 'number') return value
   if (typeof value === 'string' && /^\d{3}$/.test(value)) return Number(value)

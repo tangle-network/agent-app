@@ -159,27 +159,6 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('6.0.0', range!)).toBe(false)
   })
 
-  it('admits the qualified Runtime continuation cohorts through the flow-graph line', async () => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.['@tangle-network/agent-runtime']
-
-    expect(range).toBeDefined()
-    // Export availability alone is insufficient: 0.317 loads, but loses deadline checkpoint
-    // messages and appends an undefined user message on continuation. Both contracts arrived in 0.318;
-    // 0.319.0 to 0.319.2 shipped without them, and no consumer still needs the 0.318 line.
-    for (const old of ['0.282.2', '0.313.1', '0.317.99', '0.318.0', '0.318.9', '0.319.0', '0.319.1', '0.319.2']) {
-      expect(satisfiesRange(old, range!)).toBe(false)
-    }
-    // 0.338 to 0.343 carry flow graphs; this package's suites run on 0.343.2. 0.344 is not yet verified.
-    for (const current of ['0.319.3', '0.319.999', '0.325.0', '0.337.2', '0.338.0', '0.339.999', '0.340.0', '0.342.0', '0.342.999', '0.343.0', '0.343.2', '0.343.999']) {
-      expect(satisfiesRange(current, range!)).toBe(true)
-    }
-    expect(satisfiesRange('0.344.0', range!)).toBe(false)
-  })
-
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(

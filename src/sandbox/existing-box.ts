@@ -1,5 +1,5 @@
 import type { SandboxRuntimeConfig, SandboxScope } from './configuration'
-import { assertEnvWithinLimits } from './payload-limits'
+import { assertEnvWithinLimits, DEFAULT_PROVISION_TIMEOUT_MS } from './payload-limits'
 import type { SandboxInstance, EgressPolicy } from '@tangle-network/sandbox'
 import { type Outcome, ok, fail } from './outcome'
 import { createHash } from 'node:crypto'
@@ -12,6 +12,7 @@ import {
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxEgressPolicyMismatchError } from './lifecycle-errors'
 import type { Harness } from '../harness/index'
+import { plannedHostRestart, readDuringPlannedHostRestart } from './transient-failure'
 
 export async function resolveWorkspaceRuntimeEnv(
   shell: SandboxRuntimeConfig,
@@ -68,9 +69,15 @@ async function pushRuntimeEnv(
   box: SandboxInstance,
   env: Record<string, string>,
   measure?: ReuseMeasure,
+  deadline?: number,
 ): Promise<Outcome<void>> {
   try {
-    await (measure ? measure('runtime_env_push', () => box.setRuntimeEnv(env)) : box.setRuntimeEnv(env))
+    const push = () => box.setRuntimeEnv(env)
+    const deliver = async () => {
+      if (deadline === undefined) await push()
+      else await readDuringPlannedHostRestart(push, deadline)
+    }
+    await (measure ? measure('runtime_env_push', deliver) : deliver())
     recordCheck(box, { env: { digest: runtimeEnvDigest(env), at: Date.now() } })
     return ok(undefined)
   } catch (cause) {
@@ -151,8 +158,9 @@ export async function finalizeExistingBox(
   runtimeEnv: Record<string, string>,
   prefetch: Omit<ExistingBoxPrefetch, 'decided'> = {},
 ): Promise<SandboxInstance> {
+  const deadline = Date.now() + (shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS)
   if (!prefetch.egressVerified) {
-    await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, prefetch.egress)
+    await assertExistingBoxEgress(box, shell.egressPolicy, shell.migrateEgressPolicy, stage, name, deadline, prefetch.egress)
   }
   const written = await materializeDeferredFilesForExistingBox(
     shell,
@@ -170,12 +178,15 @@ export async function finalizeExistingBox(
   }
   const finalBox = written.value
   if (prefetch.runtimeEnv) {
-    // The same renewal, sent while the probe ran; its failure fails the reuse
-    // exactly as a renewal sent here would.
-    const renewed = await prefetch.runtimeEnv
+    // Liveness may be cached or omitted. Await only the typed restart signal
+    // within the existing budget, after the previous push has settled.
+    let renewed = await prefetch.runtimeEnv
+    if (!renewed.succeeded && plannedHostRestart(renewed.error)) {
+      renewed = await pushRuntimeEnv(finalBox, runtimeEnv, undefined, deadline)
+    }
     if (!renewed.succeeded) throw renewed.error
   } else if (!prefetch.envDelivered && Object.keys(runtimeEnv).length > 0) {
-    const renewed = await pushRuntimeEnv(finalBox, runtimeEnv)
+    const renewed = await pushRuntimeEnv(finalBox, runtimeEnv, undefined, deadline)
     if (!renewed.succeeded) throw renewed.error
   }
   if (shell.bootstrap) {
@@ -245,17 +256,22 @@ async function assertExistingBoxEgress(
   migrate: boolean | undefined,
   stage: SandboxExistingBoxStage,
   name: string,
+  deadline: number,
   prefetched?: Promise<Outcome<Awaited<ReturnType<SandboxInstance['egress']['get']>>>>,
 ): Promise<void> {
   if (!desired) return
   let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
-  if (prefetched) {
-    const read = await prefetched
-    if (!read.succeeded) throw existingBoxEgressError('read', box, stage, name, read.error)
+  const read = prefetched ? await prefetched : undefined
+  if (read?.succeeded) {
     current = read.value
   } else {
+    if (read && !read.succeeded && !plannedHostRestart(read.error)) {
+      throw existingBoxEgressError('read', box, stage, name, read.error)
+    }
+    // A cached or omitted probe may not have observed the host return.
+    // Wait for the typed refusal to clear before asserting current policy.
     try {
-      current = await box.egress.get()
+      current = (await readDuringPlannedHostRestart(() => box.egress.get(), deadline)).value
     } catch (cause) {
       throw existingBoxEgressError('read', box, stage, name, cause)
     }

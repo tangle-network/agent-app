@@ -6,43 +6,7 @@ import { sandboxEdgeFailed, sandboxRuntimeUrl, refreshRuntimeConnection } from '
 import { SANDBOX_BACKING_CONTAINER_MISSING_CODE, isLegacySandboxBackingContainerMissingMessage } from './diagnostics'
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxBoxBusyError, SandboxRecoveryFailedError } from './lifecycle-errors'
-import { sandboxTransientBackoffMs } from './transient-failure'
-
-// Planned host-agent swaps leave the sandbox alive. Only the platform's typed
-// refusal is evidence to wait; an ordinary failed probe still gets recovery.
-function plannedHostRestart(error: unknown): boolean {
-  const seen = new Set<object>()
-  for (let depth = 0; error && typeof error === 'object' && depth < 8 && !seen.has(error); depth++) {
-    seen.add(error)
-    const cause = error as { code?: unknown; status?: unknown; cause?: unknown }
-    if (cause.code === 'HOST_AGENT_RESTARTING' && cause.status === 503) return true
-    error = cause.cause
-  }
-  return false
-}
-
-async function readDuringPlannedHostRestart<T>(
-  read: () => Promise<T>,
-  deadline: number,
-): Promise<{ value: T; waited: boolean }> {
-  let waited = false
-  for (;;) {
-    try {
-      return { value: await read(), waited }
-    } catch (error) {
-      if (!plannedHostRestart(error)) throw error
-      const hint = (error as { retryAfterMs?: unknown }).retryAfterMs
-      const delay = typeof hint === 'number' && Number.isFinite(hint) && hint > 0
-        ? hint : sandboxTransientBackoffMs(1)
-      // The existing liveness/resume budget bounds retries. Each SDK request
-      // settles under its own deadline before another begins. Preserve the refusal and never start a stop on
-      // expiry; its code, origin and endpoint remain available to the caller.
-      if (Date.now() + delay >= deadline) throw error
-      waited = true
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-}
+import { plannedHostRestart, readDuringPlannedHostRestart } from './transient-failure'
 
 // The SDK owns the exec deadline. Await settlement before starting recovery;
 // an application timeout race would leave the original request in flight.
