@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.0
+
+- refactor!: consolidate framework owners and retire unused APIs (#1280)
+
 ## 0.61.4
 
 - chore(deps): adopt 4 @tangle-network/* packages (#1278)
