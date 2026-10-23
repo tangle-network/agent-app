@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.1
+
+- fix(chat): retain readable terminal failures in timing records (#1283)
+
 ## 0.61.0
 
 - refactor(web-react)!: move trace rendering to charts (#1282)
