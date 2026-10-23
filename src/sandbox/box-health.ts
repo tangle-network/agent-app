@@ -6,21 +6,63 @@ import { sandboxEdgeFailed, sandboxRuntimeUrl, refreshRuntimeConnection } from '
 import { SANDBOX_BACKING_CONTAINER_MISSING_CODE, isLegacySandboxBackingContainerMissingMessage } from './diagnostics'
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxBoxBusyError, SandboxRecoveryFailedError } from './lifecycle-errors'
+import { sandboxTransientBackoffMs } from './transient-failure'
+
+// Planned host-agent swaps leave the sandbox alive. Only the platform's typed
+// refusal is evidence to wait; an ordinary failed probe still gets recovery.
+function plannedHostRestart(error: unknown): boolean {
+  const seen = new Set<object>()
+  for (let depth = 0; error && typeof error === 'object' && depth < 8 && !seen.has(error); depth++) {
+    seen.add(error)
+    const cause = error as { code?: unknown; status?: unknown; cause?: unknown }
+    if (cause.code === 'HOST_AGENT_RESTARTING' && cause.status === 503) return true
+    error = cause.cause
+  }
+  return false
+}
+
+async function readDuringPlannedHostRestart<T>(
+  read: () => Promise<T>,
+  deadline: number,
+): Promise<{ value: T; waited: boolean }> {
+  let waited = false
+  for (;;) {
+    try {
+      return { value: await read(), waited }
+    } catch (error) {
+      if (!plannedHostRestart(error)) throw error
+      const hint = (error as { retryAfterMs?: unknown }).retryAfterMs
+      const delay = typeof hint === 'number' && Number.isFinite(hint) && hint > 0
+        ? hint : sandboxTransientBackoffMs(1)
+      // The existing liveness/resume budget bounds retries. Each SDK request
+      // settles under its own deadline before another begins. Preserve the refusal and never start a stop on
+      // expiry; its code, origin and endpoint remain available to the caller.
+      if (Date.now() + delay >= deadline) throw error
+      waited = true
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+}
 
 // The SDK owns the exec deadline. Await settlement before starting recovery;
 // an application timeout race would leave the original request in flight.
 async function isBoxAlive(
   box: SandboxInstance,
   probe: LivenessProbeConfig | undefined,
+  deadline: number,
 ): Promise<Outcome<void>> {
   if (!probe) return ok(undefined)
   try {
-    const alive = await box.exec('echo alive', { timeoutMs: probe.execTimeoutMs ?? 5000 })
+    const { value: alive } = await readDuringPlannedHostRestart(
+      () => box.exec('echo alive', { timeoutMs: probe.execTimeoutMs ?? 5000 }),
+      deadline,
+    )
     if (alive.exitCode !== 0 || alive.stdout.trim() !== 'alive') {
       return fail(new Error('alive check did not return a successful alive marker'))
     }
     return ok(undefined)
   } catch (cause) {
+    if (plannedHostRestart(cause)) throw cause
     return fail(new Error('alive check failed', { cause }))
   }
 }
@@ -43,6 +85,7 @@ function hasRecentLivenessVerification(
 export async function isReusableBox(
   box: SandboxInstance,
   probe: LivenessProbeConfig | undefined,
+  restartTimeoutMs = probe?.execTimeoutMs ?? 5000,
 ): Promise<Outcome<void>> {
   if (sandboxEdgeFailed(box) || !sandboxRuntimeUrl(box)) {
     forgetBox(box.id)
@@ -53,7 +96,7 @@ export async function isReusableBox(
     trustedBoxes.add(box)
     return ok(undefined)
   }
-  const alive = await isBoxAlive(box, probe)
+  const alive = await isBoxAlive(box, probe, Date.now() + restartTimeoutMs)
   if (alive.succeeded) recordCheck(box, { alive: Date.now() })
   else forgetBox(box.id)
   return alive
@@ -149,16 +192,17 @@ function resumeEnvRequiredKeys(cause: unknown): string[] | undefined {
 // running, an active execution, or queued with an admitted execution. The SDK
 // owns the request deadline; settlement is awaited so no stop is issued while
 // the answer is still in flight.
-async function runningSessionCount(box: SandboxInstance): Promise<number | undefined> {
+async function runningSessionCount(box: SandboxInstance, deadline: number): Promise<{ running?: number; waited: boolean }> {
   try {
-    const sessions = await box.sessions()
-    return sessions.filter(({ info }) =>
+    const { value: sessions, waited } = await readDuringPlannedHostRestart(() => box.sessions(), deadline)
+    return { waited, running: sessions.filter(({ info }) =>
       info.status === 'running' ||
       Boolean(info.activeExecutionId) ||
       (info.status === 'queued' && Boolean(info.latestExecutionId)),
-    ).length
-  } catch {
-    return undefined
+    ).length }
+  } catch (error) {
+    if (plannedHostRestart(error)) throw error
+    return { waited: false }
   }
 }
 
@@ -189,7 +233,11 @@ export async function recoverUnresponsiveBox(
   runtimeEnv: Record<string, string>,
   onProgress?: (event: ProvisionEvent) => void,
 ): Promise<SandboxInstance> {
-  const running = await runningSessionCount(box)
+  const deadline = Date.now() + resumeTimeout
+  const { running, waited } = await runningSessionCount(box, deadline)
+  // The missed probe preceded a planned swap, not a dead runtime. Observe
+  // the same runtime again before deciding whether a restart is necessary.
+  if (waited && (await isReusableBox(box, probe, Math.max(1, deadline - Date.now()))).succeeded) return box
   if (running) {
     if (sandboxRuntimeUrl(box) && !sandboxEdgeFailed(box)) return box
     throw new SandboxBoxBusyError(
@@ -221,7 +269,7 @@ export async function recoverUnresponsiveBox(
     )
   }
   const recovered = await refreshRuntimeConnection(client, resumed.value)
-  const reusable = await isReusableBox(recovered, probe)
+  const reusable = await isReusableBox(recovered, probe, resumeTimeout)
   if (!reusable.succeeded) {
     throw new SandboxRecoveryFailedError(
       stage,

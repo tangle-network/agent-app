@@ -145,7 +145,7 @@ async function runAdmittedTurn<TContext>({
     prompt,
     executionId,
     turnStreamId,
-    priorMessages: chatTurn.priorMessages,
+    priorMessages: chatTurn.priorMessages, ...(chatTurn.reusedUserMessageId ? { userMessageId: chatTurn.reusedUserMessageId, userMessageInserted: false } : {}),
     handoffCompletion,
     trace,
     ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
