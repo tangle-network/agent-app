@@ -94,7 +94,7 @@ it.each([
   let draft: Array<Record<string, unknown>> = []
   const routes = createChatTurnRoutes({
     projectId: 'hybrid-fallback', store, turnStore: createD1TurnEventStore(d1), turnTrace: false,
-    incrementalPersistence: false, log: () => {},
+    log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
     lifecycle: { onTurnComplete: () => { completions.push('complete') }, onTurnError: () => { completions.push('error') } },
     produce: async () => {

@@ -199,7 +199,7 @@ it('a product writer that omits timing still records first visible, admission an
   const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
   const pending: Promise<unknown>[] = []
   const routes = createChatTurnRoutes<Record<string, never>>({
-    projectId: 'timing-default', store, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    projectId: 'timing-default', store, turnStore: createMemoryTurnEventStore(), log: () => {},
     authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} }),
     produce: () => ({
       model: 'served-model',
@@ -250,7 +250,7 @@ it.each([
   const routes = createChatTurnRoutes({
     projectId: 'failure-default',
     store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } },
-    turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    turnStore: createMemoryTurnEventStore(), log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }),
     produce: () => createSandboxChatProducer({ errorNotice: true, events: (async function* () {
       yield { type: 'error', data: { code, message } }
@@ -273,5 +273,76 @@ it.each([
       failure_code: failureCode === 'product.refused' ? failureCode
         : `${code}: ${message}`,
     })
+  } finally { sqlite.close() }
+})
+
+it('shared timing lifecycle records real route outcomes and current revision, excluding a gated turn', async () => {
+  const sqlite = new Database(':memory:')
+  sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) } })
+  const before = process.env.DEPLOY_SHA
+  process.env.DEPLOY_SHA = 'not-the-settled-revision'
+  const lifecycle = timing.lifecycle<{ mode: string }>({ rollout: 'defaults', identify: info => ({
+    workspaceId: 'workspace', lane: info.context.mode === 'failure' ? 'sandbox' : 'router', arm: 'control',
+  }) })
+  const pending: Promise<unknown>[] = []
+  const routes = createChatTurnRoutes<{ mode: string }>({
+    projectId: 'lifecycle-default',
+    store: { async listMessages() { return [] }, async appendMessage() { return { id: crypto.randomUUID() } } },
+    turnStore: createMemoryTurnEventStore(), log: () => {},
+    authorize: async args => ({ ok: true, tenantId: 'workspace', userId: 'user', context: { mode: String(args.body?.content) } }),
+    contextGate: args => args.context.mode === 'gated' ? { proceed: false, response: Response.json({ declined: true }) } : { proceed: true },
+    produce: args => createSandboxChatProducer({ events: (async function* () {
+      yield args.context.mode === 'failure'
+        ? { type: 'error', data: { code: 'MODEL_REFUSED', message: 'Outside the allowed models.' } }
+        : { type: 'message.part.updated', data: { part: { type: 'text', text: 'Done.' }, delta: 'Done.' } }
+    })(), model: 'served-model' }),
+    lifecycle,
+  })
+  try {
+    process.env.DEPLOY_SHA = 'settled-revision'
+    for (const mode of ['success', 'failure', 'gated']) {
+      const response = await routes.turn(new Request('https://app.test/api/chat', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: mode, content: mode }) }),
+      { waitUntil: promise => { pending.push(promise) } })
+      await response.text()
+      await Promise.all(pending)
+    }
+    const rows = sqlite.prepare('SELECT lane, failed, model, revision, arm, failure_code FROM rollout_turn_timing ORDER BY failed').all()
+    expect(rows).toEqual([
+      { lane: 'router', failed: 0, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: null },
+      { lane: 'sandbox', failed: 1, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: 'MODEL_REFUSED: Outside the allowed models.' },
+    ])
+  } finally {
+    if (before === undefined) delete process.env.DEPLOY_SHA
+    else process.env.DEPLOY_SHA = before
+    sqlite.close()
+  }
+})
+
+it('records native settlement facts without an ephemeral route trace, using the shared redacted typed failure', async () => {
+  const sqlite = new Database(':memory:')
+  sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) } })
+  try {
+    const lifecycle = timing.lifecycle<{ model: string }>({ rollout: 'native',
+      identify: ({ context }) => ({ workspaceId: 'workspace', lane: 'sandbox', model: context.model }),
+      revision: () => 'native-settlement-revision',
+    })
+    await lifecycle.onTurnError?.({
+      identity: { tenantId: 'workspace', sessionId: 'thread', userId: 'user', turnIndex: 0 },
+      executionId: 'native-execution', turnStreamId: 'native-unrecorded', context: { model: 'native-served-model' },
+      error: { code: 'NATIVE_REFUSED', message: 'Refused request with Authorization: Bearer native-fixture-secret' }, durationMs: 42,
+    })
+    const row = sqlite.prepare('SELECT model, revision, failed, failure_code FROM rollout_turn_timing').get() as Record<string, unknown>
+    expect(row).toMatchObject({ model: 'native-served-model', revision: 'native-settlement-revision', failed: 1 })
+    expect(row.failure_code).toContain('NATIVE_REFUSED:')
+    expect(row.failure_code).not.toContain('native-fixture-secret')
   } finally { sqlite.close() }
 })

@@ -117,11 +117,12 @@ export interface DelegatedKey {
 }
 
 export interface PlatformDelegatedKeyClientOptions {
-  /** Platform origin, e.g. `https://id.tangle.tools`. */
-  platformUrl: string
+  /** Platform origin. Default: TANGLE_PLATFORM_URL or TANGLE_SSO_URL from the request environment. */
+  platformUrl?: string
   /** This app's Platform service name; Platform admits delegation per named service. */
   serviceName: string
-  serviceToken: string | (() => string)
+  /** Default: lazily read PLATFORM_SERVICE_TOKEN; missing configuration fails closed. */
+  serviceToken?: string | (() => string)
   fetch?: typeof fetch
   now?: () => number
 }
@@ -260,8 +261,16 @@ function childProblem(data: Record<string, unknown>, request: DelegatedKeyReques
 export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyClientOptions): PlatformDelegatedKeyClient {
   const fetchImpl = options.fetch ?? fetch
   const now = options.now ?? Date.now
-  const base = options.platformUrl.replace(/\/+$/, '')
-  const serviceToken = () => typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken
+  const env = () => (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+  const origin = options.platformUrl ?? env()?.TANGLE_PLATFORM_URL ?? env()?.TANGLE_SSO_URL
+  if (!origin) throw new Error('TANGLE_PLATFORM_URL is required for delegated product keys')
+  const base = options.platformUrl ? origin.replace(/\/+$/, '') : new URL(origin).origin
+  const serviceToken = () => {
+    if (options.serviceToken !== undefined) return typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken
+    const token = env()?.PLATFORM_SERVICE_TOKEN?.trim()
+    if (!token) throw new Error('PLATFORM_SERVICE_TOKEN is required for delegated product keys')
+    return token
+  }
 
   async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown }) {
     try {

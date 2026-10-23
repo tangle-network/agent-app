@@ -117,17 +117,17 @@ async function turn(request: Request, env: Env, ctx: Context) {
     scopeOf: () => 'thread', cancellationOf: () => true })
   const routes = createChatTurnRoutes({ projectId: 'durable-stop-fixture', store: messages(env),
     turnStore: createDurableObjectTurnEventStore(env.TURNS, { secret: env.TURN_STREAM_AUTH_SECRET }),
-    incrementalPersistence: false, turnTrace: false, log: () => {},
+    turnTrace: false, log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: { signal: undefined as AbortSignal | undefined } }),
     turnLock: { ...baseLock, async release(handle) {
       await baseLock.release(handle)
       await fetch(`${env.MODEL_URL}/released`, { method: 'POST', body: JSON.stringify({ aborted: signal?.aborted }) })
     } },
     produce(args) {
-      args.context.signal = args.signal
-      signal = args.signal
+      args.context.signal = args.admissionSignal
+      signal = args.admissionSignal
       return createRouterTurnProducer({ apiKey: 'fixture-no-spend', model: 'fixture/model', baseUrl: env.MODEL_URL,
-        systemPrompt: 'Answer the member.', userMessage: String(args.prompt), signal: args.signal, repeat: false })
+        systemPrompt: 'Answer the member.', userMessage: String(args.prompt), signal: args.admissionSignal, repeat: false })
     },
     lifecycle: {
       async onTurnError(info) {

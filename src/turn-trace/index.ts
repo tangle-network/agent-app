@@ -9,3 +9,5 @@ export * from './recorder'
 export * from './server-timing'
 export * from './traced-fetch'
 export * from './otel'
+
+export type { TurnPhaseTiming, TurnPhaseTimingOptions } from './phase-timing'

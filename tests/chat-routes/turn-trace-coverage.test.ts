@@ -76,7 +76,7 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
       authorize: async () => { await sleep(30); return { ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} } },
       store,
       turnStore: createMemoryTurnEventStore(),
-      incrementalPersistence: false,
+
       turnTrace: {
         // The Intelligence sink posts OTLP to the same socket; the capture keeps the snapshot for the span assertions.
         sink: async (done, labels) => {
@@ -189,7 +189,7 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
       authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'user-1', context: {} }),
       store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm-1' } } },
       turnStore: createMemoryTurnEventStore(),
-      incrementalPersistence: false,
+
       turnTrace: { sink: (done) => { snapshot = done } },
       // The product's completion work runs before the stream ends, as a product's billing and row updates do.
       onTurnComplete: async () => { await sleep(80) },

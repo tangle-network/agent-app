@@ -183,7 +183,7 @@ Source: `src/agent-profiles/index.ts` · depends on `tools`
 `function`
 
 ```ts
-(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; observedManagedPlanD…
+(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; expectedRevisionId?:…
 ```
 
 ### `bindProfileText`
@@ -3173,7 +3173,7 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-trace`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`
 
 ### `AbortAttachmentWriteFn`
 
@@ -3511,6 +3511,14 @@ interface BuildDispatchPartsInput
 (bytes: Uint8Array<ArrayBufferLike>) => string
 ```
 
+### `cancelChatTurn`
+
+`function` — Existing product Stop, composed with the same authorization and storage owner as chat.
+
+```ts
+<TContext>(request: Request, options: { authorize: (args: ChatTurnAuthorizeArgs) => Promise<ChatTurnAuthorization<TCont…
+```
+
 ### `ChatAttachmentInput`
 
 `interface` — `POST` turn-body entry describing a file already uploaded to the product's store (vault/object-store) — distinct from an inline {@link * ChatTurnFilePartInput} (which carries bytes) and from a {@link…
@@ -3599,28 +3607,52 @@ type ChatTurnAuthorization
 interface ChatTurnAuthorizeArgs
 ```
 
+### `ChatTurnCancelArgs`
+
+`interface` — Product identity and editor access have already been checked before target is called.
+
+```ts
+interface ChatTurnCancelArgs
+```
+
+### `ChatTurnCancelOptions`
+
+`interface`
+
+```ts
+interface ChatTurnCancelOptions
+```
+
+### `ChatTurnCancelRequest`
+
+`interface`
+
+```ts
+interface ChatTurnCancelRequest
+```
+
+### `ChatTurnCancelSource`
+
+`interface` — Structural public Sandbox API; addressing always comes from the captured receipt.
+
+```ts
+interface ChatTurnCancelSource
+```
+
+### `ChatTurnCancelTarget`
+
+`interface` — Application fields are projected once; the shared owner never infers OAuth or source-key authority.
+
+```ts
+interface ChatTurnCancelTarget
+```
+
 ### `ChatTurnCompleteInput`
 
 `interface` — What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit).
 
 ```ts
 interface ChatTurnCompleteInput
-```
-
-### `ChatTurnCreateThreadOptions`
-
-`interface` — The `createThread` route option: who may create a thread from a minted id, and how the row is written.
-
-```ts
-interface ChatTurnCreateThreadOptions
-```
-
-### `ChatTurnCreateThreadResult`
-
-`type` — What `args.createThread` answers: the created row, or the response refusing the turn (404 or 409).
-
-```ts
-type ChatTurnCreateThreadResult
 ```
 
 ### `ChatTurnExecutionLimits`
@@ -3653,6 +3685,14 @@ type ChatTurnGateResult
 
 ```ts
 interface ChatTurnHeartbeat
+```
+
+### `ChatTurnHybridConfiguration`
+
+`type`
+
+```ts
+type ChatTurnHybridConfiguration
 ```
 
 ### `ChatTurnInputError`
@@ -3767,14 +3807,6 @@ interface ChatTurnModelAttribution
 interface ChatTurnModelFailover
 ```
 
-### `ChatTurnNewThread`
-
-`interface` — The body field a minted first turn carries.
-
-```ts
-interface ChatTurnNewThread
-```
-
 ### `ChatTurnPartInput`
 
 `type` — Resolve input as either a text part or a file part of a chat turn
@@ -3863,6 +3895,22 @@ interface ChatTurnRequestPayload
 interface ChatTurnRouteProducer
 ```
 
+### `ChatTurnRouterBackend`
+
+`type`
+
+```ts
+type ChatTurnRouterBackend
+```
+
+### `ChatTurnRouterConfiguration`
+
+`type` — The route supplies request tracing, cancellation and the admission fence.
+
+```ts
+type ChatTurnRouterConfiguration
+```
+
 ### `ChatTurnRoutes`
 
 `interface` — Define routes to run, replay, and list running chat turns with streaming and reconnect support
@@ -3871,20 +3919,20 @@ interface ChatTurnRouteProducer
 interface ChatTurnRoutes
 ```
 
+### `ChatTurnSandboxBackend`
+
+`type`
+
+```ts
+type ChatTurnSandboxBackend
+```
+
 ### `ChatTurnTextPartInput`
 
 `interface` — Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`).
 
 ```ts
 interface ChatTurnTextPartInput
-```
-
-### `ChatTurnThreadOwner`
-
-`interface` — Who a created thread belongs to: the tenant (workspace) and member `authorize` resolved.
-
-```ts
-interface ChatTurnThreadOwner
 ```
 
 ### `ChatTurnTraceOptions`
@@ -3972,7 +4020,7 @@ interface CreateAttachmentUploadRouteOptions
 `function` — Build chat turn routes to handle and validate incoming chat requests with optional logging
 
 ```ts
-<TContext = void, TThread = unknown>(options: CreateChatTurnRoutesOptions<TContext, TThread>) => ChatTurnRoutes
+<TContext = void, TResource = unknown>(input: CreateChatTurnRoutesOptions<TContext, TResource>) => ChatTurnRoutes
 ```
 
 ### `CreateChatTurnRoutesOptions`
@@ -4629,6 +4677,14 @@ interface NativeTurnTimingFacts
 
 ```ts
 (options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>
+```
+
+### `observeTurnCancellation`
+
+`function` — Internal route observation of the same product Stop target.
+
+```ts
+<TContext, TResource>(source: AsyncIterable<ChatRouteEvent>, args: ChatTurnProduceArgs<TContext, TResource>, cancel: Ch…
 ```
 
 ### `OOXML_PRESENTATION_MACRO_ENABLED_MIME`
@@ -17531,6 +17587,14 @@ type DelegatedTurnKeyEvent
 interface DelegatedTurnKeyInput
 ```
 
+### `DelegatedTurnKeyLease`
+
+`interface` — One turn owns its claimed/inline key and any revoked-key replacement until it calls `revoke`.
+
+```ts
+interface DelegatedTurnKeyLease
+```
+
 ### `DelegatedTurnKeys`
 
 `interface`
@@ -18490,7 +18554,7 @@ Source: `src/preflight/cli.ts` · depends on `signoff`
 
 ## `./preset-cloudflare`
 
-Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `tools`, `web`
+Source: `src/preset-cloudflare/index.ts` · depends on `billing`, `chat-routes`, `crypto`, `knowledge`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`
 
 ### `CloudflareHeadersRule`
 
@@ -18546,6 +18610,30 @@ interface CloudflareWorkflowStepLike
 
 ```ts
 (opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor
+```
+
+### `createD1NativeCompletionStore`
+
+`function`
+
+```ts
+<TPayload extends NativeCompletionPayload>(db: D1Like, table: string) => { read: (executionId: string) => Promise<{ pay…
+```
+
+### `createNativeCompletionOwner`
+
+`function`
+
+```ts
+<TPayload extends NativeCompletionPayload, TSource extends NativeCompletionSessionSource>(options: NativeCompletionOwne…
+```
+
+### `createNativeCompletionTraceSink`
+
+`function` — A handed-off projection must never export the durable owner's root early.
+
+```ts
+(attached: TurnTraceSink) => { own: (rootSpanId: string) => void; sink: TurnTraceSink; }
 ```
 
 ### `createPresetDrizzleSchema`
@@ -18682,6 +18770,70 @@ interface DrizzleSqliteCoreLike
 
 ```ts
 interface EnsureCloudflareWorkflowInstanceResult
+```
+
+### `NATIVE_CHECKPOINT_MAX_BYTES`
+
+`const`
+
+```ts
+number
+```
+
+### `nativeCompletionCheckpoint`
+
+`function` — Build a checkpoint without ending or replacing the original request trace.
+
+```ts
+(trace: TurnTrace, timing: NativeCompletionTimingSource, turnStartedAt: number) => NativeCompletionCheckpoint
+```
+
+### `NativeCompletionCheckpoint`
+
+`interface` — Absolute event clocks retain both request and post-admission origins.
+
+```ts
+interface NativeCompletionCheckpoint
+```
+
+### `NativeCompletionOwnerOptions`
+
+`interface` — Binding to the existing native completion owner.
+
+```ts
+interface NativeCompletionOwnerOptions
+```
+
+### `NativeCompletionPayload`
+
+`interface` — Server-authorized identities.
+
+```ts
+interface NativeCompletionPayload
+```
+
+### `nativeCompletionTerminalTrace`
+
+`function` — Reuse the trace owner's reducer, retaining every original exported identity.
+
+```ts
+(checkpoint: NativeCompletionCheckpoint, endedAt: number, error?: string | undefined) => TurnTraceSnapshot
+```
+
+### `NativeCompletionTimingSource`
+
+`interface`
+
+```ts
+interface NativeCompletionTimingSource
+```
+
+### `nativeCompletionWorkflowId`
+
+`function`
+
+```ts
+(executionId: string, prefix: string) => Promise<string>
 ```
 
 ### `NativeCompletionWorkflowOptions`
@@ -20655,7 +20807,7 @@ interface RevealSpanOptions
 
 ## `./rollout`
 
-Source: `src/rollout/index.ts` · depends on `signoff`, `turn-trace`
+Source: `src/rollout/index.ts` · depends on `chat-routes`, `signoff`, `turn-trace`
 
 ### `assignRolloutArm`
 
@@ -20772,7 +20924,7 @@ interface StageMeasurement
 
 ## `./rollout/cli`
 
-Source: `src/rollout/cli.ts` · depends on `signoff`, `turn-trace`
+Source: `src/rollout/cli.ts` · depends on `chat-routes`, `signoff`, `turn-trace`
 
 ### `readWranglerVar`
 
@@ -20801,7 +20953,7 @@ interface RolloutConfig
 
 ## `./rollout/d1`
 
-Source: `src/rollout/d1.ts` · depends on `signoff`, `turn-trace`
+Source: `src/rollout/d1.ts` · depends on `chat-routes`, `signoff`, `turn-trace`
 
 ### `createD1TurnTimingStore`
 
@@ -32814,7 +32966,7 @@ interface MemoryTurnStreamSocket
 `function` — Read a channel's active turn lock without changing it.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…
+(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: "workspace"; threadId?: string | undef…
 ```
 
 ### `pruneStaleThreads`
@@ -33116,7 +33268,7 @@ type TurnStreamUpgradeAuthorization
 
 ## `./turn-trace`
 
-Source: `src/turn-trace/index.ts`
+Source: `src/turn-trace/index.ts` · depends on `redact`
 
 ### `buildTurnTraceOtelSpans`
 
@@ -33252,6 +33404,22 @@ interface TracedModelFetchOptions
 
 ```ts
 readonly TurnSpanKind[]
+```
+
+### `TurnPhaseTiming`
+
+`interface` — Domain-named phases and concurrent work over the turn's existing clock and D1 counter.
+
+```ts
+interface TurnPhaseTiming
+```
+
+### `TurnPhaseTimingOptions`
+
+`interface`
+
+```ts
+interface TurnPhaseTimingOptions
 ```
 
 ### `TurnSpan`
@@ -37183,14 +37351,6 @@ interface MentionTextSegment
 
 ```ts
 interface MessageAttachmentsProps
-```
-
-### `mintThreadId`
-
-`function` — A thread id in the server's own format (32 lowercase hex), minted in the browser for a new chat's first turn: send it as both `threadId` and `newThread.id`, and the turn route's `createThread` option…
-
-```ts
-() => string
 ```
 
 ### `missingAnswerHint`

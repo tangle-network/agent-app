@@ -1,3 +1,4 @@
+import { turnPhaseTiming, type TurnPhaseTiming, type TurnPhaseTimingOptions } from './phase-timing'
 /**
  * One trace per agent turn: a root span for the turn's wall time and named
  * child spans for where that time went (admission, each model call, each tool
@@ -128,6 +129,8 @@ export interface TurnTrace {
   markFirstText(at?: number): void
   /** Mark the first reasoning, tool activity or answer output. Only the first call counts. */
   markFirstVisible(at?: number): void
+  /** Sequential phases and concurrent work share this turn's existing clock and query counter. */
+  timing(options: TurnPhaseTimingOptions): TurnPhaseTiming
   /** Read the current numbers without ending the trace. */
   summary(now?: number): TurnTraceSummary
   /** Read the spans recorded so far without ending the trace; an open span reads as ending at `now`. */
@@ -394,6 +397,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       firstTextAt = Math.max(startedAt, at ?? now())
       firstVisibleAt ??= firstTextAt
     },
+    timing: phaseOptions => turnPhaseTiming(trace, phaseOptions, now, options.d1QueryCounter),
     summary(at) {
       if (finished) return finished.summary
       const end = at ?? now()

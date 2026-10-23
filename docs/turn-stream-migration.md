@@ -36,7 +36,7 @@ Legacy v1 channel tokens remain valid for normal viewers and existing operations
 Viewer forwarders keep minting their existing channel token; never derive server control claims from public viewer query parameters.
 `createDurableTurnLock` opts in with `cancellationOf(args)` and requires the route's `turnStreamId`.
 The adapter persists that identity with the acquired lock and establishes its owner control connection before returning acquisition.
-`createChatTurnRoutes` passes the effective `args.signal` to `produce`, including dispatch-first producers; pass it to `createHybridTurnProducer`, Router calls and tool I/O.
+`createChatTurnRoutes` passes the effective `args.admissionSignal` to `produce`, including dispatch-first producers; pass it to `createHybridTurnProducer`, Router calls and tool I/O.
 An owner connection failure before admission releases only its acquired lock generation.
 Losing an active control connection aborts the signal with `turn_control_unavailable`; it cannot silently leave an uncancellable producer running.
 

@@ -16,8 +16,8 @@
  * sequential awaits in the same order.
  */
 
-import { and, asc, desc, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
-import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
+import { and, asc, desc, eq, getTableColumns, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
+import type { AnySQLiteColumn, BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import {
   runSqliteStatements,
   type SqliteBatchDatabase,
@@ -148,6 +148,10 @@ export interface ChatStore<TThread = ChatThreadRow, TMessage = ChatMessageRow> {
   /** Ordered oldest-first: `created_at`, then rowid (insertion order within a
    *  same-second burst — a user+assistant pair lands in one epoch second). */
   listMessages(threadId: string, options?: ListMessagesOptions): Promise<TMessage[]>
+  getMessage(id: string): Promise<TMessage | null>
+  /** Atomic JSON Merge Patch for a product-declared metadata column. Null removes keys;
+   * expected top-level fields fence the update against another attempt. Opaque values stay product-owned. */
+  patchMessageMetadata(id: string, mergePatch: Record<string, unknown>, expected?: { fields: Record<string, unknown> } | { snapshot: Record<string, unknown> }): Promise<TMessage | null>
   /** Inserts the message and bumps the thread's `updatedAt` in one batch so
    *  workspace recency sorts stay truthful. */
   appendMessage(input: AppendMessageInput): Promise<TMessage>
@@ -332,6 +336,26 @@ export function createChatStore<TTables extends ChatTables>(
       if (options?.limit !== undefined) query.limit(clampLimit(options.limit, 1, 1000))
       if (options?.offset !== undefined) query.offset(clampOffset(options.offset))
       return await query as TMessage[]
+    },
+
+    async getMessage(id) {
+      const [row] = await db.select().from(messages).where(eq(messages.id, id)).limit(1)
+      return (row as TMessage | undefined) ?? null
+    },
+
+    async patchMessageMetadata(id, mergePatch, expected) {
+      const metadata = (getTableColumns(tables.messages) as Record<string, AnySQLiteColumn>).metadata
+      if (!metadata) throw new Error('Chat metadata requires a product-declared metadata column')
+      const guards = Object.entries(expected && 'fields' in expected ? expected.fields : {}).map(([field, value]) => {
+        const encoded = JSON.stringify(value)
+        if (encoded === undefined) throw new Error('Expected chat metadata must be JSON')
+        return sql`json_extract(${metadata}, ${`$.${JSON.stringify(field)}`}) IS json_extract(${encoded}, '$')`
+      })
+      if (expected && 'snapshot' in expected) guards.push(sql`coalesce(${metadata}, '{}') = ${JSON.stringify(expected.snapshot)}`)
+      const [row] = await db.update(messages).set({
+        metadata: sql`json_patch(coalesce(${metadata}, '{}'), ${JSON.stringify(mergePatch)})`,
+      } as Partial<NewChatMessageRow>).where(and(eq(messages.id, id), ...guards)).returning()
+      return (row as TMessage | undefined) ?? null
     },
 
     async appendMessage(input) {

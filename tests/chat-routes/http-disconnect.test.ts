@@ -98,7 +98,7 @@ it('settles a SQLite-backed turn once when the browser disconnects 31 seconds be
       authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }),
       store: messageStore,
       turnStore: createD1TurnEventStore(d1),
-      incrementalPersistence: false,
+
       log: () => {},
       lifecycle: {
         onTurnStart: () => { lifecycle.push('start') },
