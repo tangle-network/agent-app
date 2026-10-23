@@ -139,7 +139,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
   }
 
   const durableLock = env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET
-    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, scopeOf: () => 'workspace',
+    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, locationHint: env.D1_REGION, scopeOf: () => 'workspace',
       onRefused: active => Response.json({ error: { code: 'workspace_turn_in_flight', message: `Execution ${active.executionId} in thread ${active.threadId} still owns this workspace. If observation was lost, the deployment operator must verify that exact backend execution stopped and use a fenced reconciliation adapter; elapsed time or another UUID is not recovery.`, executionId: active.executionId, threadId: active.threadId } }, { status: 409 }),
     })
     : null

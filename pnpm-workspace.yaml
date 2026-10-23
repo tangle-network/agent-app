@@ -23,6 +23,7 @@ allowBuilds:
   esbuild: true
   ffmpeg-static: false
   ssh2: false
+  workerd: true
 
 overrides:
   esbuild: 0.28.1

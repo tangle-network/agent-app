@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-59 exports.
+61 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -108,6 +108,14 @@ interface CreateDurableTurnLockOptions
 
 ```ts
 interface CreateTurnStreamUpgradeHandlerOptions
+```
+
+### `DEFAULT_TURN_LOCK_LOCATION_HINT`
+
+`const` — The default matches the application D1 region unless its binding descriptor names another region.
+
+```ts
+TurnStreamLocationHint
 ```
 
 ### `DurableTurnLock`
@@ -420,6 +428,14 @@ interface TurnStreamDOState
 
 ```ts
 interface TurnStreamEvent
+```
+
+### `TurnStreamLocationHint`
+
+`type` — Cloudflare placement hints.
+
+```ts
+type TurnStreamLocationHint
 ```
 
 ### `TurnStreamNamespaceLike`

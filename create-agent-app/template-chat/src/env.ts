@@ -6,7 +6,7 @@
  * `.dev.vars.example` for the full list with comments.
  */
 
-import type { TurnStreamNamespaceLike } from '@tangle-network/agent-app/turn-stream'
+import type { TurnStreamNamespaceLike, TurnStreamLocationHint } from '@tangle-network/agent-app/turn-stream'
 
 export interface AppEnv {
   /** Shared durable workspace single-flight lock, used by every chat entrypoint. */
@@ -16,6 +16,8 @@ export interface AppEnv {
   ASSETS?: { fetch(request: Request): Promise<Response> }
   /** D1 database — run `migrations/` against it before first boot. */
   DB: D1Database
+  /** Match the D1 primary region; used to place newly created lock channels. */
+  D1_REGION?: TurnStreamLocationHint
 
   /** Absolute origin better-auth serves from (e.g. http://localhost:8787). */
   BETTER_AUTH_URL: string

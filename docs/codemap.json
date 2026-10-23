@@ -3085,6 +3085,12 @@
           "doc": null
         },
         {
+          "name": "ChatTurnStoreBindings",
+          "kind": "interface",
+          "signature": "interface ChatTurnStoreBindings",
+          "doc": "One application binding descriptor, shared by chat admission and workspace prewarm."
+        },
+        {
           "name": "ChatTurnTextPartInput",
           "kind": "interface",
           "signature": "interface ChatTurnTextPartInput",
@@ -17257,10 +17263,12 @@
       "id": "./sandbox",
       "source": "src/sandbox/index.ts",
       "dependsOn": [
+        "chat-routes",
         "harness",
         "profile",
         "runtime",
         "tools",
+        "turn-stream",
         "turn-trace"
       ],
       "error": null,
@@ -25507,6 +25515,12 @@
           "doc": "Define options for creating a TURN stream upgrade handler including namespace, path, and authorization logic"
         },
         {
+          "name": "DEFAULT_TURN_LOCK_LOCATION_HINT",
+          "kind": "const",
+          "signature": "TurnStreamLocationHint",
+          "doc": "The default matches the application D1 region unless its binding descriptor names another region."
+        },
+        {
           "name": "DurableTurnLock",
           "kind": "interface",
           "signature": "interface DurableTurnLock",
@@ -25739,6 +25753,12 @@
           "kind": "interface",
           "signature": "interface TurnStreamEvent",
           "doc": "One event on a turn-stream channel."
+        },
+        {
+          "name": "TurnStreamLocationHint",
+          "kind": "type",
+          "signature": "type TurnStreamLocationHint",
+          "doc": "Cloudflare placement hints."
         },
         {
           "name": "TurnStreamNamespaceLike",
