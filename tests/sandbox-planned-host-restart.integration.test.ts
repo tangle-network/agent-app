@@ -21,7 +21,10 @@ async function boundary(test: RestartCase) {
       return json({ code, message: 'The sandbox host is restarting its agent; retry shortly.', retryUntil: Date.now() + 1_000 }, 503)
     }
     if (path === '/v1/sandboxes/restart-box') return json({
-      id: 'restart-box', status: 'running', connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/restart-box/runtime` },
+      id: 'restart-box', status: 'running',
+      filesystemIncarnationId: 'restart-fixture-incarnation',
+      filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
+      connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/restart-box/runtime` },
     })
     if (path.endsWith('/runtime/process/spawn')) {
       if (test.permanent || probes++ < (test.probe ?? 0)) return restarting(test.probeCode)
@@ -39,6 +42,7 @@ async function boundary(test: RestartCase) {
   const client = new Sandbox({ apiKey: 'local-restart-fixture', baseUrl })
   const box = await client.get('restart-box')
   if (!box) throw new Error('Fixture box missing')
+  expect(box.connection?.runtimeUrl, 'SDK accepted the real ready-incarnation connection').toBe(`${baseUrl}/v1/sandboxes/restart-box/runtime`)
   return { client, box, requests,
     close: async () => {
       server.closeAllConnections()
