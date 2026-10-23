@@ -20,6 +20,8 @@ GTM's [release phase split](https://github.com/tangle-network/gtm-agent/pull/189
 
 `release-runs-on` and `suites-runs-on` are JSON GitHub runner specifications. They accept either a label array or a runner-group object. A private runner group, native SQLite/browser prerequisites, QA leases and host credential capabilities remain app-owned admission requirements. The suite runner also hosts the light failure-reporting job; the shared workflow never selects a hosted runner for a private app.
 
+The native preflight retains the app's package manager. pnpm setup runs only for a caller with its root `pnpm-lock.yaml`; npm callers keep their existing frozen npm commands.
+
 `node-version-file` defaults to the app's `.nvmrc`. Preserve that owner rather than migrating its runtime during adoption. The YAML owns timeout defaults; use overrides only for the existing app's measured bounds.
 
 `release-env` carries only the public native settings explicitly allowed by the workflow. Credentials must never be placed in inputs. The named optional secrets in `workflow_call.secrets` are the accepted credential interface; pass only the existing secrets the app needs. Never use `secrets: inherit` or serialize all caller secrets.
