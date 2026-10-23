@@ -20,7 +20,7 @@ export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent'> & {
   onEvent?: (event: RouterTurnEvent) => void
 }
 
-export function createRouterTurnProducer(options: RouterTurnProducerOptions): ChatTurnRouteProducer & {
+export function createRouterTurnProducer(options: RouterTurnProducerOptions): Omit<ChatTurnRouteProducer, 'stream'> & {
   stream: AsyncGenerator<ProducerWireEvent, void, unknown>
 } {
   const queue: ProducerWireEvent[] = []
