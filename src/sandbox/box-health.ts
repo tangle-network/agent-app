@@ -6,30 +6,7 @@ import { sandboxEdgeFailed, sandboxRuntimeUrl, refreshRuntimeConnection } from '
 import { SANDBOX_BACKING_CONTAINER_MISSING_CODE, isLegacySandboxBackingContainerMissingMessage } from './diagnostics'
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxBoxBusyError, SandboxRecoveryFailedError } from './lifecycle-errors'
-import { plannedHostRestart, sandboxTransientBackoffMs } from './transient-failure'
-
-async function readDuringPlannedHostRestart<T>(
-  read: () => Promise<T>,
-  deadline: number,
-): Promise<{ value: T; waited: boolean }> {
-  let waited = false
-  for (;;) {
-    try {
-      return { value: await read(), waited }
-    } catch (error) {
-      if (!plannedHostRestart(error)) throw error
-      const hint = (error as { retryAfterMs?: unknown }).retryAfterMs
-      const delay = typeof hint === 'number' && Number.isFinite(hint) && hint > 0
-        ? hint : sandboxTransientBackoffMs(1)
-      // The existing liveness/resume budget bounds retries. Each SDK request
-      // settles under its own deadline before another begins. Preserve the refusal and never start a stop on
-      // expiry; its code, origin and endpoint remain available to the caller.
-      if (Date.now() + delay >= deadline) throw error
-      waited = true
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-}
+import { plannedHostRestart, readDuringPlannedHostRestart } from './transient-failure'
 
 // The SDK owns the exec deadline. Await settlement before starting recovery;
 // an application timeout race would leave the original request in flight.
