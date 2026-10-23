@@ -6,20 +6,7 @@ import { sandboxEdgeFailed, sandboxRuntimeUrl, refreshRuntimeConnection } from '
 import { SANDBOX_BACKING_CONTAINER_MISSING_CODE, isLegacySandboxBackingContainerMissingMessage } from './diagnostics'
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxBoxBusyError, SandboxRecoveryFailedError } from './lifecycle-errors'
-import { sandboxTransientBackoffMs } from './transient-failure'
-
-// Planned host-agent swaps leave the sandbox alive. Only the platform's typed
-// refusal is evidence to wait; an ordinary failed probe still gets recovery.
-function plannedHostRestart(error: unknown): boolean {
-  const seen = new Set<object>()
-  for (let depth = 0; error && typeof error === 'object' && depth < 8 && !seen.has(error); depth++) {
-    seen.add(error)
-    const cause = error as { code?: unknown; status?: unknown; cause?: unknown }
-    if (cause.code === 'HOST_AGENT_RESTARTING' && cause.status === 503) return true
-    error = cause.cause
-  }
-  return false
-}
+import { plannedHostRestart, sandboxTransientBackoffMs } from './transient-failure'
 
 async function readDuringPlannedHostRestart<T>(
   read: () => Promise<T>,

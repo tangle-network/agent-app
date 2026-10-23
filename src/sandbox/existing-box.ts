@@ -12,6 +12,7 @@ import {
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { type SandboxExistingBoxStage, SandboxEgressPolicyMismatchError } from './lifecycle-errors'
 import type { Harness } from '../harness/index'
+import { plannedHostRestart } from './transient-failure'
 
 export async function resolveWorkspaceRuntimeEnv(
   shell: SandboxRuntimeConfig,
@@ -170,9 +171,12 @@ export async function finalizeExistingBox(
   }
   const finalBox = written.value
   if (prefetch.runtimeEnv) {
-    // The same renewal, sent while the probe ran; its failure fails the reuse
-    // exactly as a renewal sent here would.
-    const renewed = await prefetch.runtimeEnv
+    // The probe can outlast the host swap that refused this earlier push.
+    // Refresh only that settled refusal; other failures remain authoritative.
+    let renewed = await prefetch.runtimeEnv
+    if (!renewed.succeeded && plannedHostRestart(renewed.error)) {
+      renewed = await pushRuntimeEnv(finalBox, runtimeEnv)
+    }
     if (!renewed.succeeded) throw renewed.error
   } else if (!prefetch.envDelivered && Object.keys(runtimeEnv).length > 0) {
     const renewed = await pushRuntimeEnv(finalBox, runtimeEnv)
@@ -249,11 +253,15 @@ async function assertExistingBoxEgress(
 ): Promise<void> {
   if (!desired) return
   let current: Awaited<ReturnType<SandboxInstance['egress']['get']>>
-  if (prefetched) {
-    const read = await prefetched
-    if (!read.succeeded) throw existingBoxEgressError('read', box, stage, name, read.error)
+  const read = prefetched ? await prefetched : undefined
+  if (read?.succeeded) {
     current = read.value
   } else {
+    if (read && !read.succeeded && !plannedHostRestart(read.error)) {
+      throw existingBoxEgressError('read', box, stage, name, read.error)
+    }
+    // Liveness has now settled. A prefetch refused during the host swap says
+    // nothing about its current policy, so read it before any credentials go.
     try {
       current = await box.egress.get()
     } catch (cause) {
