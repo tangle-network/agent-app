@@ -1,4 +1,5 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { NativeCompletionHandoffOptions, NativeTurnTimingFacts } from './native-turn-timing'
 import type { ChatMessageValues } from '../chat-store/core'
 import type { ChatTurnPrefetch, ChatTurnPrefetchIdentity } from './turn-prefetch'
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime/durable'
@@ -255,15 +256,19 @@ export interface ChatTurnProduceArgs<TContext> {
   userMessageInserted?: boolean
   /**
    * Transfer completion ownership to a product-owned durable runner. The
-   * product MUST first register that runner durably, then await this callback
-   * before dispatching native execution. Once it resolves, this route remains
-   * a live event projector only: it no longer writes or settles the assistant
+   * product MUST register that runner durably, then await this callback before
+   * dispatching native execution. When timing transfer is used, persist the initial
+   * timingFacts snapshot on the existing admission before registering that runner.
+   * A callback rejection after registration retains durable ownership. Once it
+   * resolves, this route remains a live event projector only: it no longer writes or settles the assistant
    * transcript, lifecycle hooks, lock, or replay-buffer status.
    *
    * Optional for source compatibility with synthetic producers. Every
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
-  handoffCompletion?: () => Promise<void>
+  handoffCompletion?: (options?: NativeCompletionHandoffOptions) => Promise<void>
+  /** Serializable observations only; snapshots never predict events after handoff. */
+  timingFacts?: () => NativeTurnTimingFacts
   /** What the route's `prefetch` read for this turn's admitted identity; set only when `prefetch` is configured. */
   prefetched?: Promise<unknown>
   /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with

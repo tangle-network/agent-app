@@ -30,6 +30,7 @@ export {
   recoverSandboxAssistantMessage,
 } from './completed-sandbox-turn'
 export * from './native-completion'
+export type { NativeTurnTimingFacts, NativeCompletionHandoffOptions } from './native-turn-timing'
 export * from './plan-follow-up'
 export * from './durable-projection'
 export * from './upload'

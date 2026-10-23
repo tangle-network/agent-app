@@ -77,11 +77,15 @@ An interrupted execution's event stream is replayed for its terminal result only
 A terminal receipt is bounded at 900 KiB: over it, long strings in tool payloads and reasoning are clipped with a marker and `receiptTruncated: true`, so a Workflow step result (1 MiB) and a D1 row (2 MB) always hold it.
 The answer text is kept whole unless it alone exceeds the budget.
 
-Register the Workflow before native dispatch, using stable session, execution, and replay identities.
-Then call `await args.handoffCompletion()` from the assembled route's producer.
+When using timing transfer, persist `args.timingFacts()` on the existing admission before registering the Workflow, using stable session, execution, and replay identities. The snapshot carries the original request epoch and lifecycle admission offset; it never predicts later visibility. Preserve the original served revision with this admission.
+Then call `await args.handoffCompletion({ persistTimingFacts })` from the assembled route's producer before native dispatch. The callback persists later first-visible/text observations on that same admission, including after it closes. Their durations remain relative to the lifecycle start. The route tracks these writes with `waitUntil` and flushes them when its live projection ends; it does not wait for a timing write before streaming each frame. A timing callback rejection after registration retains the Workflow's terminal authority and must prevent native dispatch.
+If the request isolate disappears before observing later output, those facts remain unknown. A Workflow poll time, replay-read time, or `registeredAt` is never a visibility timestamp.
 That handoff stops request-owned transcript writes, terminal hooks, replay status writes, and lock release.
 Live events can continue while the Workflow owns completion.
-The default route retains its existing behavior when no handoff occurs.
+Use the Workflow's optional `recordTiming(payload, finalReceipt, { settledAt })` callback for the canonical timing row. It runs in its own durable step after `settle` returns the final receipt, including any Vault reconciliation failure, and before buffer finalization and lock release. Use `createD1TurnTimingStore({ measuredFacts: false })` with explicit admission facts and `record(row, { throwOnError: true })`, so a database outage retries instead of checkpointing a missing row. Observation failures such as HTTP 403 never reach terminal recording.
+Later genuine visibility may race terminal insertion. Record the terminal row, reread the latest durable admission facts, then call `recordFacts(facts)`. A live facts callback first updates its admission, then calls that same method. It only fills NULL timing values on an existing row with the same stream id and request origin; it never inserts or changes the terminal verdict, model, lane, revision, settled duration, or settled-at epoch.
+For a failed late patch after admission persistence and after the Workflow timing checkpoint, supply the timing store's optional `readObservedFacts(selectedTurns)` port. The existing admission owner reads these bounded stream-id/origin pairs in indexed batches within D1's parameter limit. `measureRequestOrigin` fills NULL observations in memory only, validating the same identity and clock contract as `recordFacts`; no production read writes a database. Stored, recovered and unknown coverage remain separate, and admission-read failure is explicit.
+The default route retains its existing behavior when no handoff occurs. Existing hook-free `handoffCompletion()` callers need no timing wiring.
 
 ```ts
 await runNativeCompletionWorkflow({
