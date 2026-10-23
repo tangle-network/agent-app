@@ -169,7 +169,7 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(report.steps[0]?.attempts[0]?.output).toBe(payload)
     expect(existsSync(report.workspace)).toBe(false)
     expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
-    expect(result.stdout.length).toBeGreaterThan(payload.length)
+    expect(Buffer.byteLength(result.stdout)).toBe(Buffer.byteLength(`${formatSignoffReport(report)}\n`))
     expect(result.stdout).toBe(`${formatSignoffReport(report)}\n`)
   })
 
@@ -199,6 +199,7 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(result.status).toBe(2)
     expect(readdirSync(join(cacheDir, 'trees'))).toEqual([])
     expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+    expect(Buffer.byteLength(result.stderr)).toBe(Buffer.byteLength(`${message}\n`))
     expect(result.stderr).toBe(`${message}\n`)
   })
 })
