@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Sandbox } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
+import type { LoopMessage } from '../../src/runtime/loop'
 import { createHybridTurnProducer } from '../../src/chat-routes/hybrid-producer'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
 import { createChatTables } from '../../src/chat-store/schema'
@@ -32,7 +33,16 @@ it.each([
   { mode: 'anonymous', code: undefined },
   { mode: 'anonymous-repeat', code: undefined },
   { mode: 'id-collision', code: undefined },
+  { mode: 'history-collision', code: undefined },
+  { mode: 'continuation-collision', code: undefined },
 ] as const)('keeps Router answering and persists the typed computer warning: $mode', async ({ mode, code }) => {
+  const collisionHistory = mode === 'history-collision' || mode === 'continuation-collision'
+  const prior: LoopMessage[] = [
+    { role: 'user', content: 'Earlier document work.' },
+    { role: 'assistant', content: null, tool_calls: [{ id: 'sandbox_run-0', type: 'function',
+      function: { name: 'sandbox_run', arguments: JSON.stringify({ task: 'Earlier task.' }) } }] },
+    { role: 'tool', tool_call_id: 'sandbox_run-0', content: 'Earlier result.' },
+  ]
   let modelCalls = 0
   let boxReads = 0
   let executions = 0
@@ -63,7 +73,7 @@ it.each([
       modelCalls++
       const repeat = mode === 'anonymous-repeat' || mode === 'id-collision'
       const tool = mode !== 'plain' && modelCalls <= (repeat ? 2 : 1)
-      const id = mode === 'anonymous' || mode === 'anonymous-repeat' || (mode === 'id-collision' && modelCalls === 2)
+      const id = collisionHistory || mode === 'anonymous' || mode === 'anonymous-repeat' || (mode === 'id-collision' && modelCalls === 2)
         ? undefined : mode === 'id-collision' ? 'sandbox_run-1' : 'computer-call'
       const delta = tool
         ? { tool_calls: [{ index: 0, ...(id ? { id } : {}), function: { name: 'sandbox_run', arguments: JSON.stringify({ task: 'Inspect the requested document.' }) } }] }
@@ -90,6 +100,9 @@ it.each([
     produce: async () => {
       const producer = createHybridTurnProducer({ apiKey: 'local-router-fixture', baseUrl, model: 'fixture/requested',
         systemPrompt: 'Answer with the tools available.', userMessage: 'Help me understand the document.',
+        ...(mode === 'history-collision' ? { history: prior } : {}),
+        ...(mode === 'continuation-collision' ? { continueFrom: { messages: [...prior,
+          { role: 'user', content: 'Help me understand the document.' }], hops: 1, text: '' } } : {}),
         speculateOn: 'A question', box: {
           acquire: async () => {
             const box = await client.get('computer')
@@ -130,14 +143,19 @@ it.each([
     expect(boxReads > 0).toBe(mode !== 'plain')
     expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision')
     if (executions) {
-      const expectedCallIds = mode === 'anonymous-repeat' ? ['sandbox_run-0', 'sandbox_run-1']
+      const expectedCallIds = collisionHistory ? ['sandbox_run-0_']
+        : mode === 'anonymous-repeat' ? ['sandbox_run-0', 'sandbox_run-1']
         : mode === 'id-collision' ? ['sandbox_run-1', 'sandbox_run-1_']
         : [mode === 'anonymous' ? 'sandbox_run-0' : 'computer-call']
       expect(executedCallIds).toEqual(expectedCallIds)
       expect(parts.filter(part => part.type === 'tool').map(part => part.callID)).toEqual(expectedCallIds)
       const messages = requests.at(-1)!.messages as Array<{ role: string; tool_call_id?: string; tool_calls?: Array<{ id: string }> }>
-      expect(messages.filter(message => message.role === 'assistant' && message.tool_calls).flatMap(message => message.tool_calls!.map(call => call.id))).toEqual(expectedCallIds)
-      expect(messages.filter(message => message.role === 'tool').map(message => message.tool_call_id)).toEqual(expectedCallIds)
+      expect(messages.filter(message => message.role === 'assistant' && message.tool_calls).flatMap(message => message.tool_calls!.map(call => call.id))).toEqual([...(collisionHistory ? ['sandbox_run-0'] : []), ...expectedCallIds])
+      expect(messages.filter(message => message.role === 'tool').map(message => message.tool_call_id)).toEqual([...(collisionHistory ? ['sandbox_run-0'] : []), ...expectedCallIds])
+      if (collisionHistory) {
+        const initialMessages = requests[0]!.messages as Array<{ tool_calls?: Array<{ id: string }> }>
+        expect(initialMessages.some(message => message.tool_calls?.some(call => call.id === 'sandbox_run-0'))).toBe(true)
+      }
       for (const id of expectedCallIds) expect(wire).toContain(id)
     }
     expect(sqlite.prepare('SELECT status FROM turn_status').get()).toMatchObject({ status: 'complete' })
