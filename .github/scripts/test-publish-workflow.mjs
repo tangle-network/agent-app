@@ -38,19 +38,30 @@ const count = (value, pattern) => [...value.matchAll(pattern)].length
 
 check(!workflows.some(({ file }) => file === 'ci.yml'), 'ci.yml duplicates release verification on main')
 
-const jobs = new Map()
-let current
-for (const line of lines.slice(lines.indexOf('jobs:') + 1)) {
-  const match = /^  ([a-z0-9_]+):\s*$/.exec(line)
-  if (match) {
-    current = match[1]
-    jobs.set(current, [])
-  } else if (current) {
-    jobs.get(current).push(line)
+const readJobs = (workflow) => {
+  const workflowLines = workflow.split('\n')
+  const result = new Map()
+  let current
+  for (const line of workflowLines.slice(workflowLines.indexOf('jobs:') + 1)) {
+    const match = /^  ([a-z0-9_]+):\s*$/.exec(line)
+    if (match) {
+      current = match[1]
+      result.set(current, [])
+    } else if (current) {
+      result.get(current).push(line)
+    }
   }
+  return result
 }
+const jobs = readJobs(text)
+const producerJobs = readJobs(fs.readFileSync(path.join(workflowDirectory, 'prepare-publish.yml'), 'utf8'))
 const job = (name) => {
   check(jobs.has(name), `missing ${name} job`)
+  if (name === 'package_release') {
+    check(jobs.get(name).join('\n').includes('uses: tangle-network/agent-app/.github/workflows/prepare-publish.yml@main'), 'release producer is not bound to reviewed main')
+    check(producerJobs.has(name), 'release producer workflow is missing')
+    return producerJobs.get(name).join('\n')
+  }
   return jobs.get(name).join('\n')
 }
 const namedStep = (block, name) => {
@@ -105,10 +116,13 @@ const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
 )
 // The credential runner group admits the reviewed catalog deployment only at
 // main. Third-party actions and the package release controls stay immutable.
-const trustedCatalog = 'tangle-network/agent-app/.github/workflows/deploy-catalog.yml'
+const trustedControls = new Set([
+  'tangle-network/agent-app/.github/workflows/deploy-catalog.yml',
+  'tangle-network/agent-app/.github/workflows/prepare-publish.yml',
+])
 check(actionRefs.every(({ name, ref }) =>
-  (name === trustedCatalog && ref === 'main') || /^[0-9a-f]{40}$/.test(ref),
-), 'actions must be pinned; only the group-restricted catalog workflow follows main')
+  (trustedControls.has(name) && ref === 'main') || /^[0-9a-f]{40}$/.test(ref),
+), 'actions must be pinned; only group-restricted release/deploy controls follow main')
 for (const [name, pin] of Object.entries(pins)) {
   const refs = actionRefs.filter((action) => action.name === name)
   check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
@@ -152,7 +166,7 @@ for (const [name, command] of autoSteps) {
 for (const command of ['pnpm install --frozen-lockfile --ignore-scripts=false', 'pnpm run build']) {
   check(stepWithCommand(packageJob, command).includes("if: steps.release.outputs.mode == 'auto'"), 'artifact construction runs outside automatic preparation')
 }
-check(count(text, /npm pack "\$source"/g) === 1, 'npm pack does not run exactly once')
+check(count(packageJob, /npm pack "\$source"/g) === 1, 'npm pack does not run exactly once')
 check(
   packageJob.indexOf('- name: Prepare release manifests') < packageJob.indexOf('- name: Build release') &&
     packageJob.indexOf('- name: Build release') < packageJob.indexOf('- name: Pack and inspect exact tarballs') &&
