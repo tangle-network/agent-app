@@ -42,6 +42,8 @@ export interface RouterTurnTool {
 
 /** What a running tool gets besides its arguments. */
 export interface RouterTurnToolContext {
+  /** The effective turn cancellation signal. Tools must pass it to cancellable I/O. */
+  signal?: AbortSignal
   /**
    * Report a typed side event while the tool runs (a graph edit, a file written, a
    * progress step). It streams at once as a `tool_event` and is recorded in the
@@ -560,6 +562,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           const result = await tool.run(call.args, {
             emit: emitEvent,
             userMessage: currentUserMessage,
+            ...(signal ? { signal } : {}),
             ...(trace && toolSpan ? { trace, span: toolSpan } : {}),
           })
           toolSpan?.end({ 'tool.ok': true })

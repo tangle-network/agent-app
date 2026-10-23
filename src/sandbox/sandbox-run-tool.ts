@@ -34,6 +34,7 @@ export class SandboxRunError extends Error {
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
+  signal?: AbortSignal
   /** The engine-resolved member request, including checkpoint continuation. */
   userMessage?: string
   emit(kind: string, data?: unknown): void
@@ -125,7 +126,8 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
         return fail('invalid_arguments', `task must be 1 to ${TASK_LIMIT} characters`)
       }
       const started = Date.now()
-      const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])])
+      const signal = AbortSignal.any([AbortSignal.timeout(timeoutMs),
+        ...(options.signal ? [options.signal] : []), ...(context?.signal ? [context.signal] : [])])
       if (options.warm) await options.warm.leases.turn(options.warm.key).catch(() => {})
       // A product's box() may not honour the signal either (a hung provision); the cap still holds.
       const capped = <T,>(work: Promise<T>) => Promise.race([work, new Promise<never>((_, reject) => {
@@ -140,7 +142,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       } catch (error) {
         claim?.end(undefined, error instanceof SandboxRunError ? error.code : 'sandbox_unavailable')
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
-        return fail('sandbox_unavailable', 'The sandbox for this workspace could not start, so this work was not done.', error)
+        return fail('sandbox_unavailable', 'The workspace computer could not be acquired. Its availability could not be confirmed.', error)
       }
       emit('box_ready', { ms: Date.now() - started })
       let answer: string
@@ -156,10 +158,10 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {
-        const timedOut = signal.aborted && !options.signal?.aborted
+        const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
         return fail('sandbox_failed', timedOut
-          ? `The sandbox did not finish within ${Math.round(timeoutMs / 1000)} s, so this work was not done.`
-          : 'The sandbox run failed, so this work was not done.', error)
+          ? `The computer step did not return an answer within ${Math.round(timeoutMs / 1000)} s. Its completion could not be confirmed.`
+          : 'The computer step failed to return an answer. Its completion could not be confirmed.', error)
       }
       if (!answer.trim()) return fail('sandbox_empty', 'The sandbox finished without an answer.')
       return { answer, ms: Date.now() - started }

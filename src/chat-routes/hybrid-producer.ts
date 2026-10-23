@@ -32,6 +32,7 @@
  * run are recorded under the turn's `trace` when the route gives one.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
+import { noticePart } from '../interactions/contract'
 import type { RouterTurnTool } from '../runtime/router-turn'
 import {
   createEscalationSpeculator,
@@ -44,6 +45,7 @@ import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
+import type { ProducerNoticeEvent } from './wire'
 
 // The lead-in covers every tool, not only sandbox_run: on Legal's Router lane (2026-10-20) the model streamed a
 // submit_proposal payload for 45 s before its first word, so first text came at 54.9 s after a first token at 3.8 s.
@@ -184,6 +186,11 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   })
 
   let settled = false
+  const warnings = new Map<string, ProducerNoticeEvent>()
+  const withWarnings = (parts: Array<Record<string, unknown>>) => parts.flatMap(part => {
+    const warning = warnings.get(String(part.callID ?? part.id ?? ''))
+    return warning ? [part, noticePart(warning.noticeKind, warning.id, warning.text, warning.code)] : [part]
+  })
   const settle = async () => {
     if (settled) return
     settled = true
@@ -197,10 +204,27 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
 
   return {
     ...producer,
+    assistantParts: () => withWarnings(producer.assistantParts?.() ?? []),
+    draftParts: () => withWarnings(producer.draftParts?.() ?? []),
     stream: (async function* () {
       let finished = false
       try {
-        for await (const event of producer.stream) yield event
+        for await (const event of producer.stream) {
+          yield event
+          if (event.type !== 'tool_result' || event.toolName !== sandboxRun.name || event.outcome.ok || stop.aborted) continue
+          const code = event.outcome.code
+          if (code !== 'sandbox_unavailable' && code !== 'sandbox_failed' && code !== 'sandbox_empty') continue
+          // This is a visible, persisted fact, independent of what the model says next. A failed observation
+          // does not prove remote work stopped or that its side effects did not happen.
+          const warning: ProducerNoticeEvent = {
+            type: 'notice', noticeKind: 'warning', id: `sandbox-warning:${event.toolCallId}`, code,
+            text: code === 'sandbox_unavailable'
+              ? 'The workspace computer is unavailable. I can continue with work that does not need it.'
+              : 'The computer step did not return a confirmed answer. I can continue with work that does not need it.',
+          }
+          warnings.set(event.toolCallId, warning)
+          yield warning
+        }
         finished = true
       } finally {
         // The route stopped reading this turn (a caller that cancels on disconnect): stop the engine and its box call.
