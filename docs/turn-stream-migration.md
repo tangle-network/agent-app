@@ -50,6 +50,12 @@ Close the connection before normal cooperative release; any release still receiv
 
 The product authorizes Stop with its existing workspace and thread RBAC, reads the actual active lock, and calls
 `requestDurableTurnCancellation(namespace, identity, auth)`.
+Use `createChatTurnRoutes`' existing `cancel` target for the public endpoint: return an optional
+`control: { request(capturedMetadata) }` capability bound to the server-captured exact owner.
+The shared cancellation owner performs authorization and dispatch-token validation before invoking it.
+The capability returns `{ requested }`; a stale target receives the existing conflict response, while acceptance reports `cancellationRequested: true`.
+Acceptance never invokes native interruption or `markStopped`; the existing execution/child completion owner confirms the outcome after reconciliation.
+Turns with an acquired durable control connection use that signal and skip the legacy metadata polling observer.
 The DO persists cancellation before broadcasting it, and an owner that connects later receives the retained request.
 `requested: true` confirms persisted intent, not remote completion.
 Stop aborts the effective signal with `turn_cancel_requested`; Router cancellation retains the existing terminal error behavior.

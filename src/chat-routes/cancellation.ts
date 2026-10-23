@@ -29,12 +29,23 @@ export interface ChatTurnCancelSource {
   }
 }
 
+/** Acknowledges durable intent only; the execution owner still reconciles actual completion and side effects. */
+export interface ChatTurnCancelControlResult {
+  requested: boolean
+}
+
 /** Application fields are projected once; the shared owner never infers OAuth or source-key authority. */
 export interface ChatTurnCancelTarget {
   capturedMetadata: Record<string, unknown>
   status: string | undefined
   dispatchToken?: string
   requiresDispatchToken: boolean
+  /** Server-captured exact owner, never coordinates supplied by the caller.
+   * Called after authorization and dispatch-token checks. A positive request
+   * acknowledges intent; it must not mark native work stopped. */
+  control?: {
+    request(capturedMetadata: Record<string, unknown>): Promise<ChatTurnCancelControlResult>
+  }
   native?: {
     state: string | undefined
     sandboxId?: string
@@ -43,7 +54,8 @@ export interface ChatTurnCancelTarget {
     /** Resolve the original authorized box only after the dispatch token and receipt are validated. */
     source(): Promise<ChatTurnCancelSource | null>
   }
-  /** Compare the WHOLE captured record atomically, then merge the stopped fields. False changes nothing. */
+  /** Compare the WHOLE captured record atomically, then merge the stopped fields. False changes nothing.
+   * A requested-only control target never calls this; the execution owner confirms its terminal outcome. */
   markStopped(capturedMetadata: Record<string, unknown>, stoppedAt: string): Promise<boolean>
 }
 
@@ -93,6 +105,10 @@ export async function cancelChatTurn<TContext>(request: Request, options: {
       return targetChanged()
     }
     if (target.status === 'stopped' || target.status === 'answered') return success(false)
+    if (target.control) {
+      const intent = await target.control.request(target.capturedMetadata)
+      return intent.requested ? Response.json({ succeeded: true, sandboxInterrupted: false, cancellationRequested: true }) : targetChanged()
+    }
     const markStopped = async () => await target.markStopped(target.capturedMetadata, new Date().toISOString())
       ? null : stateChanged()
     if (!target.native) return await markStopped() ?? success(false)

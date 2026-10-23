@@ -317,7 +317,8 @@ export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
    *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
   admitted?: Promise<ChatTurnProduceArgs<TContext, TResource>>
-  /** Aborts on confirmed product Stop/supersession or an opted-in durable lock's authenticated Stop.
+  /** Effective execution signal: product Stop/supersession, opted-in durable Stop/control loss,
+   *  and optional request-disconnect cancellation.
    *  A fresh Router backend also aborts on admission refusal or when the route stops reading it.
    *  Pass it to producer I/O; Router/Sandbox option data binds it automatically.
    *  Early Router handoff waits for `admitted`. */

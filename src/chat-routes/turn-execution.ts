@@ -722,7 +722,9 @@ function createTurnEngine<TContext, TResource>(
             yield* state.producer.stream
           }
           let source: AsyncIterable<ChatRouteEvent> = producerStream()
-          if (options.cancel && state.cancellationAbort) {
+          // A durable owner connection already carries exact authenticated Stop.
+          // Keep metadata observation only for existing non-adopting targets.
+          if (options.cancel && state.cancellationAbort && !state.closeCancellation) {
             source = observeTurnCancellation(source, produceArgs, options.cancel, state.cancellationAbort)
           }
           if (ctx?.cancelOnDisconnect) {

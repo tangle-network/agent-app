@@ -31,7 +31,7 @@ interface Runtime {
   dispatchFetch(url: string, init?: RequestInit): Promise<Response>
   getD1Database(binding: string, workerName: string): Promise<{
     exec(sql: string): Promise<unknown>
-    prepare(sql: string): { all<T>(): Promise<{ results: T[] }> }
+    prepare(sql: string): { all<T>(): Promise<{ results: T[] }>; bind(...values: unknown[]): { all<T>(): Promise<{ results: T[] }> } }
   }>
   dispose(): Promise<void>
 }
@@ -55,7 +55,7 @@ async function bounded<T>(promise: Promise<T>, label: string): Promise<T> {
   })]) } finally { clearTimeout(timer) }
 }
 function modelCase() {
-  return { entered: deferred<void>(), aborted: deferred<void>(), settling: deferred<ServerResponse>(), released: deferred<void>(),
+  return { entered: deferred<void>(), admitted: deferred<void>(), aborted: deferred<void>(), settling: deferred<ServerResponse>(), released: deferred<void>(),
     releases: 0, releaseSignalAborted: undefined as boolean | undefined, complete: false }
 }
 let active = modelCase()
@@ -71,6 +71,7 @@ const peer = createServer((request, response) => {
       return
     }
     if (path === '/settlement') { active.settling.resolve(response); return }
+    if (path === '/admitted') { active.admitted.resolve(); response.end('admitted'); return }
     if (path === '/released') {
       active.releases++; active.releaseSignalAborted = (JSON.parse(body) as { aborted: boolean }).aborted
       active.released.resolve(); response.end('released'); return
@@ -103,9 +104,9 @@ function start() {
 let runtime = start()
 const identity = (name: string): TurnCancellationIdentity => ({ workspaceId: 'workspace', threadId: name, scope: 'thread',
   executionId: `execution-${name}`, lockId: `lock-${name}`, turnStreamId: `stream-${name}` })
-async function request(path: string, input: unknown, authorized = true) {
+async function request(path: string, input: unknown, authorized: boolean | string = true) {
   return runtime.dispatchFetch(`http://fixture.test${path}`, { method: 'POST', headers: {
-    'content-type': 'application/json', ...(authorized ? { Authorization: 'Bearer fixture-authorized-member' } : {}),
+    'content-type': 'application/json', ...(authorized ? { Authorization: `Bearer ${typeof authorized === 'string' ? authorized : 'fixture-authorized-member'}` } : {}),
   }, body: JSON.stringify(input) })
 }
 async function json<T>(path: string, input: unknown): Promise<T> {
@@ -123,6 +124,7 @@ async function acquire(input: TurnCancellationIdentity, query = '') {
 try {
   let database = await runtime.getD1Database('CHAT', 'stop-fixture')
   await database.exec('CREATE TABLE messages(id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, parts TEXT);\nCREATE TABLE effects(turn_id TEXT, code TEXT);\nCREATE TABLE owner_evidence(workspace_id TEXT, thread_id TEXT, scope TEXT, execution_id TEXT, lock_id TEXT, turn_stream_id TEXT PRIMARY KEY, status TEXT);\nCREATE TABLE child_holds(execution_id TEXT PRIMARY KEY, lock_id TEXT, turn_stream_id TEXT, status TEXT);')
+  await database.exec("CREATE TABLE members(token TEXT PRIMARY KEY, user_id TEXT, workspace_id TEXT, role TEXT);\nINSERT INTO members VALUES ('fixture-authorized-member','member','workspace','editor'),('viewer-member','viewer','workspace','viewer'),('foreign-editor','foreign','other-workspace','editor');\nCREATE TABLE threads(id TEXT PRIMARY KEY, workspace_id TEXT);\nINSERT INTO threads VALUES ('route-stop','workspace'),('route-transport-loss','workspace'),('route-external-release','workspace'),('route-complete','workspace');\nCREATE TABLE control_targets(thread_id TEXT PRIMARY KEY, client_turn_id TEXT, metadata TEXT);\nCREATE TABLE target_reads(thread_id TEXT, kind TEXT);\nCREATE TABLE forbidden_effects(kind TEXT);")
   const replay = identity('replay')
   await acquire(replay)
   assert.deepEqual(await json('/stop', replay), { requested: true })
@@ -271,22 +273,46 @@ try {
     active = modelCase()
     active.complete = mode === 'complete'
     const thread = `route-${mode}`
-    const response = await bounded(request('/turn', { threadId: thread, content: 'Read my request.' }), 'route response')
+    const clientTurnId = `client-${thread}`
+    const response = await bounded(request('/turn', { threadId: thread, turnId: clientTurnId, content: 'Read my request.' }), 'route response')
     assert.equal(response.status, 200)
     const wire = response.text()
     await bounded(active.entered.promise, 'real Router model request')
+    await bounded(active.admitted.promise, 'actual lock/control and captured target registration')
     const lock = await peek(identity(thread))
     assert(lock?.cancellation)
     const owner: TurnCancellationIdentity = { ...lock, turnStreamId: lock.cancellation.turnStreamId }
+    const readTarget = async () => {
+      const rows = await database.prepare('SELECT metadata FROM control_targets WHERE thread_id = ?').bind(thread).all<{ metadata: string }>()
+      assert(rows.results[0], 'Admission must persist the exact captured target before its output commits')
+      return JSON.parse(rows.results[0].metadata) as TurnCancellationIdentity & { dispatchToken: string; responseStatus: string }
+    }
+    const target = await readTarget()
+    assert.equal(target.lockId, owner.lockId)
+    assert.equal(target.executionId, owner.executionId)
+    assert.equal(target.turnStreamId, owner.turnStreamId)
+    const stopRequest = { threadId: thread, turnId: clientTurnId, cancellationToken: target.dispatchToken,
+      // A caller's coordinates are not target authority; the existing target owner must ignore these.
+      workspaceId: 'forged-workspace', executionId: 'forged-execution', lockId: 'forged-lock', turnStreamId: 'forged-stream' }
     const successor = { ...owner, executionId: 'external-successor', lockId: 'external-successor-lock', turnStreamId: 'external-successor-stream' }
     if (mode === 'stop') {
-      assert.deepEqual(await json('/stop', owner), { requested: true })
-      assert.deepEqual(await json('/stop', owner), { requested: true }, 'Repeated Stop is idempotent')
+      assert.equal((await request('/cancel', stopRequest, false)).status, 401)
+      assert.equal((await request('/cancel', stopRequest, 'viewer-member')).status, 403)
+      assert.equal((await request('/cancel', stopRequest, 'foreign-editor')).status, 403)
+      assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE thread_id = ?').bind(thread).all()).results.length, 0,
+        'Shared authorization must refuse callers before resolving their target')
+      assert.equal((await request('/cancel', { ...stopRequest, cancellationToken: 'old-dispatch' })).status, 409)
+      assert.equal((await peek(owner))?.cancellation?.requestedAt, undefined)
+      assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true })
+      assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true }, 'Repeated Stop is idempotent')
+      assert.equal((await readTarget()).responseStatus, 'running', 'Intent is not confirmed native completion or stopped metadata')
       assert.deepEqual(await json('/legacy-interrupt', owner), { released: false }, 'Legacy interrupt cannot release a cancellable producer early')
     } else if (mode === 'transport-loss') await json('/close', owner)
     else if (mode === 'external-release') {
       assert.deepEqual(await json('/release', owner), { released: true })
       await acquire(successor)
+      assert.equal((await request('/cancel', stopRequest)).status, 409, 'The captured old target cannot request Stop for its successor')
+      assert.equal((await peek(successor))?.cancellation?.requestedAt, undefined)
     }
     if (mode !== 'complete') await bounded(active.aborted.promise, 'effective signal closes actual producer HTTP I/O')
     const settlement = await bounded(active.settling.promise, 'terminal lifecycle effect')
@@ -307,6 +333,11 @@ try {
     const effects = await database.prepare('SELECT code FROM effects ORDER BY rowid').all<{ code: string }>()
     assert.equal(effects.results.length, ++expectedEffects, 'Exactly one terminal effect per route')
     assert.equal(effects.results.at(-1)?.code, mode === 'complete' ? 'complete' : mode === 'stop' ? 'turn_cancel_requested' : 'turn_control_unavailable')
+    assert.equal((await readTarget()).responseStatus, mode === 'complete' ? 'answered' : 'error')
+    assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE kind = ?').bind('observation').all()).results.length, 0,
+      'Durable control cannot add a metadata polling observer')
+    assert.equal((await database.prepare('SELECT kind FROM forbidden_effects').all()).results.length, 0,
+      'A requested-only control target must never invoke stopped metadata CAS')
     checks.push(`${mode}: actual producer I/O, terminal status, one settlement/release and exact successor ownership`)
   }
   console.log(JSON.stringify({ checks, consumerRoot,

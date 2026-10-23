@@ -214,7 +214,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
     assistantParts: snapshot,
     draftParts: snapshot,
     usage,
-    get model() { return outcome?.servedModel ?? options.model },
+    get model() { return outcome?.servedModel ?? undefined },
     modelAttribution: () => ({
       requestedModel: options.model,
       ...(outcome?.servedModel ? { servedModel: outcome.servedModel } : {}),
