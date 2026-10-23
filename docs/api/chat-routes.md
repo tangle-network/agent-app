@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-303 exports.
+304 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -756,6 +756,14 @@ interface ChatTurnRoutes
 
 ```ts
 type ChatTurnSandboxBackend
+```
+
+### `ChatTurnStoreBindings`
+
+`interface` — One application binding descriptor, shared by chat admission and workspace prewarm.
+
+```ts
+interface ChatTurnStoreBindings
 ```
 
 ### `ChatTurnTextPartInput`

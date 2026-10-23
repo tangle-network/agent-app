@@ -56,6 +56,37 @@ handoff or workspace-wide single-flight supplies its existing `turnLock`;
 retain the scaffold's backend-terminal ownership check when adapting that path.
 The buffer serves live reconnect; message storage serves durable history.
 
+### Prewarm the same lock before send
+
+Pass the same `turnStore` binding descriptor to `createWorkspacePrewarmRoute`
+from `/sandbox`. Its `region` names the app's D1 region and controls the first
+placement of new lock channels. The shared default is ENAM; set another region
+once on the descriptor for a D1 primary elsewhere. A location hint cannot move
+existing objects, and no channel ID changes.
+
+The prewarm authorizer returns `workspaceId` only after verifying the member can
+start a turn in that workspace. Request-body identity is ignored. The route adds
+`turn_lock` as a keyed step on page-open, composer-focus and heartbeat; products
+supply no local lock-warm step. The step calls the same lock factory's `warm`,
+never acquires or releases a lock, and runs alongside existing catalog, billing
+and box work. A box failure does not discard a successful lock receipt.
+
+```ts
+const prewarm = createWorkspacePrewarmRoute({
+  turnStore, // the descriptor also passed to createChatTurnRoutes
+  authorize: authorizeWorkspaceWarm,
+})
+// An allowed authorization includes { workspaceId, key, warm } or { workspaceId, steps }.
+```
+
+Apply `WARM_RECEIPT_TABLE_DDL` from `/sandbox` through the product migration runner
+before adoption. Receipts default to the descriptor's D1 binding; an explicit
+`receipts` store still wins. An unexpired receipt avoids another DO request;
+`warm.turn_lock` in `Server-Timing` reports hit/miss/joined/failed. Its short TTL
+keeps the readiness claim below the DO idle-eviction window. This is an
+optimization: send still performs the authenticated single-flight acquire.
+
+
 Mount `routes.replay(request, {turnId})`, `routes.running(request)`, and configured
 `routes.interactions.list/answer` handlers as in the scaffold Worker. Replay
 handles are separate from client message identifiers. A deliberate retry keeps

@@ -1,4 +1,5 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { ChatTurnStoreBindings } from './route-storage'
 import type { NativeCompletionHandoffOptions, NativeTurnTimingFacts } from './native-turn-timing'
 import type { ChatMessageValues } from '../chat-store/core'
 import type { ChatTurnPrefetch, ChatTurnPrefetchIdentity } from './turn-prefetch'
@@ -9,7 +10,7 @@ import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import type { ModelPolicy } from '../policy-filters/index'
 import type { PersistedChatMessageForTurn, TurnEventStore } from '../stream/index'
 import type { D1LikeForTurns } from '../stream/turn-buffer'
-import type { TurnStreamAuth, TurnStreamNamespaceLike } from '../turn-stream/adapters'
+import type { TurnStreamAuth } from '../turn-stream/adapters'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
 import type { TurnRoutePhase } from './turn-progress'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
@@ -574,10 +575,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  `createDurableObjectTurnEventStore(env.TURN_STREAM_DO)` in production,
    *  `createMemoryTurnEventStore()` in tests). Wired by default — every turn
    *  is buffered and replayable. */
-  turnStore: TurnEventStore | {
-    db: D1LikeForTurns
-    lock: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth }
-  }
+  turnStore: TurnEventStore | ChatTurnStoreBindings
   /** Build the turn stream after admission, or declare its execution backends.
    * Router calls start before the lock by default, after authorize has verified
    * identity/access. The model service enforces spend before paying a provider.

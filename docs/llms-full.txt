@@ -3927,6 +3927,14 @@ interface ChatTurnRoutes
 type ChatTurnSandboxBackend
 ```
 
+### `ChatTurnStoreBindings`
+
+`interface` — One application binding descriptor, shared by chat admission and workspace prewarm.
+
+```ts
+interface ChatTurnStoreBindings
+```
+
 ### `ChatTurnTextPartInput`
 
 `interface` — Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`).
@@ -22205,7 +22213,7 @@ interface RuntimeTelemetryTruncation
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · depends on `harness`, `profile`, `runtime`, `tools`, `turn-trace`
+Source: `src/sandbox/index.ts` · depends on `chat-routes`, `harness`, `profile`, `runtime`, `tools`, `turn-stream`, `turn-trace`
 
 ### `adaptSandboxStream`
 
@@ -32905,6 +32913,14 @@ interface CreateDurableTurnLockOptions
 interface CreateTurnStreamUpgradeHandlerOptions
 ```
 
+### `DEFAULT_TURN_LOCK_LOCATION_HINT`
+
+`const` — The default matches the application D1 region unless its binding descriptor names another region.
+
+```ts
+TurnStreamLocationHint
+```
+
 ### `DurableTurnLock`
 
 `interface` — The stored single-flight lock.
@@ -33215,6 +33231,14 @@ interface TurnStreamDOState
 
 ```ts
 interface TurnStreamEvent
+```
+
+### `TurnStreamLocationHint`
+
+`type` — Cloudflare placement hints.
+
+```ts
+type TurnStreamLocationHint
 ```
 
 ### `TurnStreamNamespaceLike`

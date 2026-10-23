@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.63.2",
+  "version": "0.63.3",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -856,7 +856,8 @@
     "agent-eval-0204": "npm:@tangle-network/agent-eval@0.204.0",
     "agent-eval-0211": "npm:@tangle-network/agent-eval@0.211.2",
     "agent-eval-0217": "npm:@tangle-network/agent-eval@0.217.1",
-    "agent-eval-0218": "npm:@tangle-network/agent-eval@0.218.1"
+    "agent-eval-0218": "npm:@tangle-network/agent-eval@0.218.1",
+    "wrangler": "4.127.1"
   },
   "peerDependencies": {
     "@better-auth/oauth-provider": ">=1.7.2",

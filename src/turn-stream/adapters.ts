@@ -32,6 +32,12 @@ export interface TurnStreamStubLike {
   fetch(input: Request | string, init?: RequestInit): Promise<Response>
 }
 
+/** Cloudflare placement hints. A hint affects only a channel's first creation, never an existing object's location. */
+export type TurnStreamLocationHint = 'wnam' | 'enam' | 'sam' | 'weur' | 'eeur' | 'apac' | 'apac-ne' | 'apac-se' | 'oc' | 'afr' | 'me'
+
+/** The default matches the application D1 region unless its binding descriptor names another region. */
+export const DEFAULT_TURN_LOCK_LOCATION_HINT: TurnStreamLocationHint = 'enam'
+
 /** The surface of `DurableObjectNamespace` the adapters use. */
 export interface TurnStreamNamespaceLike {
   idFromName(name: string): unknown
@@ -305,6 +311,8 @@ export type TurnLockSeamResult =
 
 /** Define options for creating a durable turn lock with customizable scope and identification methods */
 export interface CreateDurableTurnLockOptions<TContext> {
+  /** New channels use this hint; existing channel IDs and locations are preserved. */
+  locationHint?: TurnStreamLocationHint
   namespace: TurnStreamNamespaceLike
   /** Capability tokens for the DO; pass the worker's
    *  `env.TURN_STREAM_AUTH_SECRET`. The DO validates every request. */
@@ -371,11 +379,17 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
   release(handle: unknown): Promise<void>
   warm(target: { tenantId: string; threadId?: string }): Promise<void>
 } {
+  const namespace: TurnStreamNamespaceLike = {
+    idFromName: name => options.namespace.idFromName(name),
+    get: (id, init) => options.namespace.get(id, {
+      ...init, locationHint: options.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT,
+    }),
+  }
   return {
     // Every lock lives on the workspace channel, so this wakes that object
     // (evicted after idle) before the turn's acquire reaches it.
     async warm(target) {
-      await peekDurableTurnLock(options.namespace, target.threadId
+      await peekDurableTurnLock(namespace, target.threadId
         ? { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }
         : { workspaceId: target.tenantId, scope: 'workspace' }, options.auth)
     },
@@ -396,13 +410,13 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
         ...(cancellable ? { cancellation: { turnStreamId: args.turnStreamId! } } : {}),
       }
 
-      let acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
+      let acquired = await acquireDurableTurnLock(namespace, input, options.auth)
       let diagnostics: Record<string, unknown> | undefined
       if (!acquired.acquired && options.reconcile) {
         const reconciled = await options.reconcile(args, acquired.active)
         diagnostics = reconciled.diagnostics
         if (reconciled.released) {
-          acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
+          acquired = await acquireDurableTurnLock(namespace, input, options.auth)
         }
       }
       if (!acquired.acquired) {
@@ -431,7 +445,7 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
     },
     async release(handle) {
       if (!handle) return
-      await releaseDurableTurnLock(options.namespace, handle as TurnLockReleaseInput, options.auth)
+      await releaseDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth)
     },
   }
 }

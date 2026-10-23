@@ -239,20 +239,27 @@ export function createHybridLane(env: AppEnv) {
 
 /**
  * Warm the open workspace's box (`POST /api/chat/prewarm`): the shared route
- * behind `AgentWorkspaceLayout`'s `prewarm`. The default lane answers on the
- * Router and starts the box only when a turn needs it, so with a Router key a
- * warm on open is declined and the speculator starts the box instead.
+ * behind `AgentWorkspaceLayout`'s `prewarm`. Every configured lane wakes its
+ * workspace lock. The Router lane leaves the box to its existing speculator;
+ * it warms only the lock on open/focus, with no paid provisioning.
  */
 export function createPrewarmRoute(env: AppEnv, requireUserId: (request: Request) => Promise<string | null>) {
   return createWorkspacePrewarmRoute<void>({
+    ...(env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET ? { turnStore: {
+      db: env.DB, region: env.D1_REGION,
+      lock: { namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET } },
+    } } : {}),
     authorize: async ({ request }) => {
       const userId = await requireUserId(request)
       if (!userId) return { status: 'denied', response: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
-      if (env.TANGLE_API_KEY?.trim()) return { status: 'declined', reason: 'router_lane' }
-      if (!env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) return { status: 'declined', reason: 'no_sandbox' }
+      if (!env.TURN_STREAM || !env.TURN_STREAM_AUTH_SECRET) return { status: 'declined', reason: 'lock_not_configured' }
+      if (env.TANGLE_API_KEY?.trim() || !env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) {
+        return { status: 'allowed', workspaceId: userId, steps: [] }
+      }
       const scope = { workspaceId: userId, userId }
       return {
         status: 'allowed',
+        workspaceId: scope.workspaceId,
         key: scope.workspaceId,
         warm: async () => {
           const prewarmer = createSandboxPrewarmer(createSandboxShell(env), {
