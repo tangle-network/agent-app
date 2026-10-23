@@ -1,6 +1,9 @@
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
+const lockPrewarmProof = 'tests/lock-prewarm-workers.integration.test.ts'
+const excluded = ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**', 'create-agent-app/template-chat/**']
+
 export default defineConfig({
   test: {
     // The example imports the published subpath. Resolve it to this checkout's
@@ -14,8 +17,18 @@ export default defineConfig({
     // published `@tangle-network/agent-app`, absent in this repo's module
     // graph). The scaffolders themselves are exercised by
     // `tests/create-agent-app.test.ts` / `tests/create-agent-app-chat.test.ts`.
-    include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
-    exclude: ['**/node_modules/**', '**/dist/**', 'create-agent-app/template/**', 'create-agent-app/template-chat/**'],
+    projects: [
+      { extends: true, test: {
+        name: 'main', include: ['tests/**/*.test.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],
+        exclude: [...excluded, lockPrewarmProof],
+      } },
+      // A wall-clock latency proof must run without concurrent test files. Keep
+      // its <100ms assertion and real workerd path; do not relax the target.
+      { extends: true, test: {
+        name: 'lock-prewarm', include: [lockPrewarmProof], exclude: excluded,
+        fileParallelism: false, sequence: { groupOrder: 1 },
+      } },
+    ],
     // Unmount @testing-library React trees between tests (this repo doesn't run
     // with `globals: true`, so RTL's auto-cleanup hook isn't registered).
     setupFiles: ['./src/test-setup.ts'],
