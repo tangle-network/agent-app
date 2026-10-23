@@ -32,6 +32,7 @@ Use the existing lock and authenticated control transport for a Router turn that
 The existing `mintTurnStreamToken` and `verifyTurnStreamToken` accept optional `TurnStreamTokenClaims` after their existing clock/lifetime arguments.
 Claims bind `purpose` (`turn-control`, `turn-cancel` or `turn-recovery`) and the exact owner identity under the same secret and existing token lifetime.
 The shared adapters mint these server capabilities; the DO verifies the expected purpose and identity before registering control or acting on Stop/recovery.
+Purpose capabilities authorize only their matching control upgrade, cancellation request or exact recovery request. They cannot authorize legacy channel mutations, viewer upgrades or product extension routes.
 Legacy v1 channel tokens remain valid for normal viewers and existing operations, but cannot act as owner control, Stop or recovery authority even with exact known owner coordinates.
 Viewer forwarders keep minting their existing channel token; never derive server control claims from public viewer query parameters.
 `createDurableTurnLock` opts in with `cancellationOf(args)` and requires the route's `turnStreamId`.
@@ -67,6 +68,7 @@ Existing lock expiry and stale reconciliation remain the crash recovery owners; 
 The existing product `shouldDeferLockRelease` hook also vetoes expiry deletion while an actual registered child/persistence obligation remains.
 It reads the product's durable ownership without recursively loading the active lock; unknown obligations stay held and read errors cannot silently become absence.
 This does not rewrite `expiresAt`: after the obligation clears, the next existing read or prune can reclaim the expired lock.
+An external ownership read is followed by a fresh lock-generation check before expiry deletion. Acquiring a thread lock rechecks its target after pruning other threads, so a competing acquire during a product ownership read cannot be overwritten.
 An old execution, stream or lock generation cannot cancel its successor.
 Keep native completion Workflows, subscription lanes and durable jobs on their existing cancellation owner by omitting this opt-in.
 

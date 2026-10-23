@@ -59,10 +59,20 @@ function modelCase() {
 }
 let active = modelCase()
 let nativeProbes = 0
+const deferrals = new Map<string, { entered: ReturnType<typeof deferred<void>>; response: ReturnType<typeof deferred<void>>; claimed: boolean }>()
 const peer = createServer((request, response) => {
   const path = new URL(request.url!, 'http://localhost').pathname
   let body = ''
   request.setEncoding('utf8').on('data', chunk => { body += chunk }).on('end', () => {
+    if (path === '/deferral') {
+      const executionId = new URL(request.url!, 'http://localhost').searchParams.get('executionId')!
+      const barrier = deferrals.get(executionId)
+      if (barrier && !barrier.claimed) {
+        barrier.claimed = true; barrier.entered.resolve()
+        void barrier.response.promise.then(() => response.end(JSON.stringify({ defer: false })))
+      } else response.end(JSON.stringify({ defer: false }))
+      return
+    }
     if (path === '/native-probe' || path === '/native-session-probe') {
       nativeProbes++
       response.writeHead(200, { 'content-type': 'application/json' })
@@ -92,7 +102,8 @@ function start() {
     d1Persist: resolve(directory, 'sqlite'), workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
       compatibilityFlags, scriptPath: bundlePath, modulesRoot: bundleDirectory,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
-        ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream']]
+        ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream'],
+        ['BARRIER_TURNS', 'BarrierTurnStream']]
         .map(([binding, className]) => [binding, { className, useSQLite: true }])),
       d1Databases: { CHAT: 'chat' }, bindings: { MODEL_URL: modelUrl, TURN_STREAM_AUTH_SECRET: 'isolated-local-durable-stop-fixture-secret' },
     }] }))
@@ -200,6 +211,47 @@ try {
   await json('/release?short=1', afterExpiry)
   checks.push('existing lock expiry admits a successor after a cancelled owner crashes')
 
+  const pruneTrigger = identity('prune-external-read')
+  await acquire(pruneTrigger, '?barrier=1')
+  await delay(1100)
+  const pruneBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
+  deferrals.set(pruneTrigger.executionId, pruneBarrier)
+  const competing = identity('competing-target')
+  const firstAcquire = json<{ acquired: boolean }>('/lock?barrier=1', competing)
+  void firstAcquire.catch(() => {})
+  try {
+    await bounded(pruneBarrier.entered.promise, 'expired other-thread ownership read')
+    const winner = { ...competing, executionId: 'competing-winner', lockId: 'competing-winner-lock', turnStreamId: 'competing-winner-stream' }
+    await acquire(winner, '?barrier=1')
+    pruneBarrier.response.resolve()
+    assert.equal((await firstAcquire).acquired, false, 'An acquire delayed by other-thread pruning cannot overwrite the winning owner')
+    assert.equal((await peek(winner, '?barrier=1'))?.lockId, winner.lockId)
+    await json('/release?barrier=1', winner)
+  } finally { pruneBarrier.response.resolve(); deferrals.delete(pruneTrigger.executionId) }
+  checks.push('external pruning read admits exactly one competing target owner without overwriting its generation')
+
+  const delayedExpiry = identity('delayed-expiry-read')
+  await acquire(delayedExpiry, '?barrier=1')
+  await delay(1100)
+  const expiryBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
+  deferrals.set(delayedExpiry.executionId, expiryBarrier)
+  const delayedRead = peek(delayedExpiry, '?barrier=1')
+  void delayedRead.catch(() => {})
+  try {
+    await bounded(expiryBarrier.entered.promise, 'old generation expiry observation')
+    assert.equal(await peek(delayedExpiry, '?barrier=1'), null)
+    // The public adapter permits explicitly reused ids. The lease generation,
+    // rather than only those ids, must fence a delayed expiry observation.
+    await acquire(delayedExpiry, '?barrier=1')
+    const successorStart = (await peek(delayedExpiry, '?barrier=1'))!.startedAt
+    await delay(1100)
+    expiryBarrier.response.resolve()
+    assert.equal((await delayedRead)?.startedAt, successorStart, 'A delayed expiry verdict cannot delete a successor lease with reused identity')
+    assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock?barrier=1', delayedExpiry)).active.startedAt, successorStart)
+    assert.equal(await peek(delayedExpiry, '?barrier=1'), null, 'A fresh observation may reclaim the now-expired successor')
+  } finally { expiryBarrier.response.resolve(); deferrals.delete(delayedExpiry.executionId) }
+  checks.push('delayed expiry cannot delete a successor lease even when caller ids are reused')
+
   const heldAcrossExpiry = identity('child-across-expiry')
   const heldQuery = '?deferred=1&short=1'
   await acquire(heldAcrossExpiry, heldQuery)
@@ -295,6 +347,18 @@ try {
   assert.deepEqual(await json('/observe', authority), { aborted: true })
   await json('/release', authority)
   checks.push('server purpose and exact identity claims separate owner control, Stop and recovery from legacy viewer capabilities')
+
+  for (const purpose of ['turn-control', 'turn-cancel', 'turn-recovery']) {
+    const scoped = identity(`purpose-${purpose}`)
+    await acquire(scoped)
+    for (const operation of ['acquire', 'release', 'interrupt', 'status', 'product', 'viewer']) {
+      assert.deepEqual(await json(`/purpose-capability?purpose=${purpose}&operation=${operation}`, scoped), { status: 401 },
+        'A purpose-bound capability cannot authorize a legacy channel operation')
+      assert.equal((await peek(scoped))?.lockId, scoped.lockId)
+    }
+    await json('/release', scoped)
+  }
+  checks.push('all three purpose capabilities reject six legacy mutation, product and viewer operations without changing ownership')
 
   let expectedEffects = 0
   for (const mode of ['stop', 'transport-loss', 'external-release', 'complete'] as const) {

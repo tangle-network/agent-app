@@ -3,7 +3,7 @@ import { TurnStreamDO, type TurnStreamDOState } from '../../src/turn-stream/do'
 import { acquireDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock, createDurableTurnLock,
   createDurableObjectTurnEventStore, releaseInterruptedDurableTurnLock, reconcileStaleDurableTurnLock, type TurnStreamNamespaceLike } from '../../src/turn-stream/adapters'
 import { connectDurableTurnCancellation, requestDurableTurnCancellation, type TurnCancellationIdentity } from '../../src/turn-stream/cancellation'
-import { mintTurnStreamToken, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, turnLockStorageKey } from '../../src/turn-stream/core'
+import { mintTurnStreamToken, TURN_STREAM_PATHS, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, turnLockStorageKey, type TurnStreamTokenClaims } from '../../src/turn-stream/core'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
 import type { ChatTurnMessageStore } from '../../src/chat-routes/turn-route-contracts'
 import type { StaleTurnLockOwnerProbeResult } from '../../src/chat-routes/stale-turn-lock'
@@ -17,6 +17,7 @@ interface Env {
   OUTAGE_TURNS: TurnStreamNamespaceLike
   DEFERRED_TURNS: TurnStreamNamespaceLike
   SHORT_DEFERRED_TURNS: TurnStreamNamespaceLike
+  BARRIER_TURNS: TurnStreamNamespaceLike
   CHAT: { prepare(sql: string): Statement }
   TURN_STREAM_AUTH_SECRET: string
   MODEL_URL: string
@@ -58,6 +59,15 @@ export class DeferredTurnStream extends FixtureTurnStream {
 }
 export class ShortDeferredTurnStream extends DeferredTurnStream {
   constructor(state: TurnStreamDOState, env: Env) { super(state, env, { lockTtlMs: 1000 }) }
+}
+
+/** A real external ownership read deliberately held by the local HTTP peer. */
+export class BarrierTurnStream extends FixtureTurnStream {
+  constructor(state: TurnStreamDOState, env: Env) { super(state, env, { lockTtlMs: 1000 }) }
+  protected async shouldDeferLockRelease(executionId: string) {
+    const response = await fetch(`${(this.env as Env).MODEL_URL}/deferral?executionId=${encodeURIComponent(executionId)}`)
+    return (await response.json() as { defer: boolean }).defer
+  }
 }
 
 async function verifyViewerAuthority(namespace: TurnStreamNamespaceLike, input: TurnCancellationIdentity, env: Env, path: string) {
@@ -204,7 +214,8 @@ export default {
     if (url.pathname === '/cancel') return routes(env).cancel(request)
     // Remaining endpoints expose only isolated integration protocol boundaries.
     if (request.headers.get('Authorization') !== 'Bearer fixture-authorized-member') return new Response('Unauthorized', { status: 401 })
-    const namespace = url.searchParams.get('deferred') === '1' && url.searchParams.get('short') === '1' ? env.SHORT_DEFERRED_TURNS
+    const namespace = url.searchParams.has('barrier') ? env.BARRIER_TURNS
+      : url.searchParams.get('deferred') === '1' && url.searchParams.get('short') === '1' ? env.SHORT_DEFERRED_TURNS
       : url.searchParams.get('deferred') === '1' ? env.DEFERRED_TURNS
       : url.searchParams.get('short') === '1' ? env.SHORT_TURNS
       : url.searchParams.get('outage') === '1' ? env.OUTAGE_TURNS : env.TURNS
@@ -212,6 +223,21 @@ export default {
       ownerStatus?: 'live' | 'abandoned' | 'unknown'; childStatus?: 'pending' | 'unknown' | 'read-error'
     }
     const auth = { secret: env.TURN_STREAM_AUTH_SECRET }
+    if (url.pathname === '/purpose-capability') {
+      const purpose = url.searchParams.get('purpose') as TurnStreamTokenClaims['purpose']
+      const operation = url.searchParams.get('operation')!
+      const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
+      const token = await mintTurnStreamToken(key, auth.secret, undefined, undefined, { purpose, identity: input })
+      const paths: Record<string, string> = { acquire: TURN_STREAM_PATHS.lockAcquire, release: TURN_STREAM_PATHS.lockRelease,
+        interrupt: TURN_STREAM_PATHS.lockReleaseInterrupted, status: TURN_STREAM_PATHS.turnStatusSet, product: '/fixture/raw-lock' }
+      const target = new URL(`https://fixture.internal${paths[operation] ?? '/'}`)
+      const headers: Record<string, string> = { [TURN_STREAM_TOKEN_HEADER]: token }
+      if (operation === 'viewer') { headers.Upgrade = 'websocket'; target.searchParams.set('sessionId', input.threadId) }
+      const response = await namespace.get(namespace.idFromName(key)).fetch(target.href, { method: operation === 'viewer' ? 'GET' : 'POST', headers,
+        ...(operation === 'viewer' ? {} : { body: JSON.stringify({ ...input, interruptedAt: Date.now(), turnId: input.turnStreamId, status: 'complete' }) }) }) as Response & { webSocket?: WebSocket & { accept(): void } }
+      response.webSocket?.accept(); response.webSocket?.close(1000, 'Capability checked')
+      return Response.json({ status: response.status })
+    }
     if (['/viewer', '/viewer-control', '/wrong-identity-control', '/wrong-purpose-control'].includes(url.pathname)) {
       return verifyViewerAuthority(namespace, input, env, url.pathname)
     }
