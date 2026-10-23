@@ -55,12 +55,19 @@ export function peakConcurrency(steps: readonly SignoffStepResult[]): number {
 
 export function formatSignoffReport(report: SignoffReport): string {
   const lines: string[] = []
-  const verdict = report.ok ? 'SIGN-OFF PASSED' : 'SIGN-OFF FAILED'
+  const scope = report.phase && report.phase !== 'all' ? `${report.phase.toUpperCase()} ` : ''
+  const verdict = `${scope}SIGN-OFF ${report.ok ? 'PASSED' : 'FAILED'}`
   lines.push(BAR, `${verdict} — ${report.repo.branch} @ ${report.repo.head.slice(0, 12)}`, BAR, '')
 
   lines.push('subject')
   lines.push(`  repo        ${report.repo.root}`)
   lines.push(`  source      ${report.repo.source}${report.repo.dirty ? ' (working tree carries uncommitted work)' : ''}`)
+  if (scope) {
+    lines.push(`  phase       ${report.phase} (partial; not full sign-off)`)
+    lines.push(`  requested   ${report.selection?.requested.join(', ')}`)
+    lines.push(`  prerequisites ${report.selection?.prerequisites.join(', ') || '(none)'}`)
+    lines.push(`  excluded    ${report.selection?.excluded.join(', ') || '(none)'}`)
+  }
   if (report.repo.diffSha256) lines.push(`  patch       sha256:${report.repo.diffSha256.slice(0, 16)}`)
   if (report.repo.untrackedFiles.length > 0) {
     lines.push(`  untracked   ${report.repo.untrackedFiles.length} file(s) copied in`)
@@ -147,8 +154,9 @@ export function formatSignoffReport(report: SignoffReport): string {
 /** One line for a commit message, a PR comment, or a chat handoff. */
 export function formatSignoffLine(report: SignoffReport): string {
   const passed = report.steps.filter((step) => step.status === 'passed').length
+  const scope = report.phase && report.phase !== 'all' ? `${report.phase.toUpperCase()} ` : ''
   return (
-    `${report.ok ? 'signoff PASS' : 'signoff FAIL'} ${report.repo.head.slice(0, 12)} — ` +
+    `signoff ${scope}${report.ok ? 'PASS' : 'FAIL'} ${report.repo.head.slice(0, 12)} — ` +
     `${passed}/${report.steps.length} steps, ${ms(report.wallClockMs)} wall ` +
     `(${ms(report.serialMs)} serial), seed ${report.seedBase}, ` +
     `${report.install.cacheHit ? 'warm' : 'cold'} store, clean install`

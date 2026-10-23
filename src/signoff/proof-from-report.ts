@@ -62,6 +62,9 @@ function seedsFromReport(report: SignoffReport): Record<string, string | number>
 
 export function proofFromSignoffReport(input: ProofFromReportInput): SignoffProof {
   const { report } = input
+  if (report.phase !== undefined && report.phase !== 'all') {
+    throw new Error(`signoff: partial phase ${report.phase} cannot issue a full sign-off proof`)
+  }
   const repoDir = input.repoDir ?? report.repo.root
 
   // HEAD moving during a run makes every later claim ambiguous — the checks ran

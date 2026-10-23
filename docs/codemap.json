@@ -3152,7 +3152,7 @@
         {
           "name": "createRouterTurnProducer",
           "kind": "function",
-          "signature": "(options: RouterTurnProducerOptions) => ChatTurnRouteProducer",
+          "signature": "(options: RouterTurnProducerOptions) => Omit<ChatTurnRouteProducer, \"stream\"> & { stream: AsyncGenerator<ProducerWireEv…",
           "doc": null
         },
         {
@@ -3552,6 +3552,12 @@
           "doc": "Product persistence for the one admission that authorizes this observer."
         },
         {
+          "name": "NativeCompletionHandoffOptions",
+          "kind": "interface",
+          "signature": "interface NativeCompletionHandoffOptions",
+          "doc": null
+        },
+        {
           "name": "NativeCompletionObservation",
           "kind": "type",
           "signature": "type NativeCompletionObservation",
@@ -3580,6 +3586,12 @@
           "kind": "interface",
           "signature": "interface NativeCompletionTurnReceipt",
           "doc": "One exact turn receipt before an admission's ordered aggregate."
+        },
+        {
+          "name": "NativeTurnTimingFacts",
+          "kind": "interface",
+          "signature": "interface NativeTurnTimingFacts",
+          "doc": "Serializable route observations for an admission that transfers terminal authority to a durable native owner."
         },
         {
           "name": "normalizeChatPromptForSandbox",
@@ -16170,7 +16182,7 @@
         {
           "name": "createD1TurnTimingStore",
           "kind": "function",
-          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…",
+          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; readObservedFa…",
           "doc": null
         },
         {
@@ -16184,6 +16196,12 @@
           "kind": "const",
           "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;\"",
           "doc": "Apply once through the product migration runner to existing tables; historical rows stay NULL."
+        },
+        {
+          "name": "ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;\"",
+          "doc": "Additive upgrade for a table created before durable native timing transfer."
         },
         {
           "name": "ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL",
@@ -20821,6 +20839,18 @@
       "error": null,
       "exports": [
         {
+          "name": "CachePruneOptions",
+          "kind": "interface",
+          "signature": "interface CachePruneOptions",
+          "doc": null
+        },
+        {
+          "name": "CachePruneResult",
+          "kind": "interface",
+          "signature": "interface CachePruneResult",
+          "doc": null
+        },
+        {
           "name": "CdpResponseSource",
           "kind": "interface",
           "signature": "interface CdpResponseSource",
@@ -21019,6 +21049,12 @@
           "doc": null
         },
         {
+          "name": "pruneSignoffCache",
+          "kind": "function",
+          "signature": "(cacheDir: string, options?: CachePruneOptions) => Promise<CachePruneResult>",
+          "doc": "Bound idle trees and stores by age first, then allocated physical bytes."
+        },
+        {
           "name": "QUIET_CHROMIUM_ARGS",
           "kind": "const",
           "signature": "readonly string[]",
@@ -21163,6 +21199,12 @@
           "doc": "The hermetic install that precedes every step."
         },
         {
+          "name": "SignoffPhase",
+          "kind": "type",
+          "signature": "type SignoffPhase",
+          "doc": null
+        },
+        {
           "name": "SignoffRepoFacts",
           "kind": "interface",
           "signature": "interface SignoffRepoFacts",
@@ -21173,6 +21215,12 @@
           "kind": "interface",
           "signature": "interface SignoffReport",
           "doc": null
+        },
+        {
+          "name": "SignoffSelection",
+          "kind": "interface",
+          "signature": "interface SignoffSelection",
+          "doc": "Declared scope, including dependency steps brought into a partial run."
         },
         {
           "name": "SignoffShuffleSpec",
