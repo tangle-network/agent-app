@@ -10,7 +10,7 @@
  * out, since the time it went live.
  *
  * By default `record` fills what the product's row leaves out from what the chat route measured for the same
- * `turnId` (its `turnStreamId`): `admissionMs`, `firstVisibleMs`, `firstTextMs` and the served `model`, on every
+ * `turnId` (its `turnStreamId`): `admissionMs`, `firstVisibleMs`, `firstTextMs`, the served `model` and readable failure, on every
  * lane. It writes only the columns the table has (read once per isolate with `PRAGMA table_info`), so a table that
  * predates a migration keeps recording the columns it has instead of losing the row. `revision`, `arm` and
  * `variant` are the product's and are written when the row carries them. Pass `measuredFacts: false` to write
@@ -88,6 +88,7 @@ export interface TurnTimingRow {
   firstVisibleMs?: number
   settledMs: number
   failed: boolean
+  /** Defaults to the route's terminal code and redacted explanation. Empty or object-coerced strings use that evidence too. */
   failureCode?: string
   /** Epoch ms; defaults to now. */
   at?: number
@@ -152,11 +153,14 @@ export function createD1TurnTimingStore(options: {
       try {
         // Read before any await: the facts belong to the request that is settling this turn.
         const measured = options.measuredFacts === false ? undefined : measuredTurnFacts(row.turnId)
+        const productFailure = row.failureCode?.trim()
         const values: Record<RecordColumn, unknown> = {
           turn_id: row.turnId, rollout: row.rollout, workspace_id: row.workspaceId, lane: row.lane,
           first_visible_ms: roundOrNull(row.firstVisibleMs ?? measured?.firstVisibleMs),
           first_text_ms: roundOrNull(row.firstTextMs ?? measured?.firstTextMs),
-          settled_ms: Math.round(row.settledMs), failed: row.failed ? 1 : 0, failure_code: row.failureCode ?? null,
+          settled_ms: Math.round(row.settledMs), failed: row.failed ? 1 : 0,
+          failure_code: productFailure && productFailure !== '[object Object]'
+            ? row.failureCode : measured?.failureCode ?? row.failureCode ?? null,
           at: row.at ?? now(), admission_ms: roundOrNull(row.admissionMs ?? measured?.admissionMs),
           model: row.model ?? measured?.model ?? null, revision: row.revision ?? null, arm: row.arm ?? null,
           variant: row.variant ?? null,

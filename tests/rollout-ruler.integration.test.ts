@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { build } from 'tsup'
 import { expect, it } from 'vitest'
-import { createChatTurnRoutes, type ChatTurnMessageStore } from '../src/chat-routes/index'
+import { createChatTurnRoutes, createSandboxChatProducer, type ChatTurnMessageStore } from '../src/chat-routes/index'
 import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_SCHEMA_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL, type D1LikeForRollout } from '../src/rollout/d1'
 import { assignRolloutArm, decideRollout } from '../src/rollout/index'
 import { createMemoryTurnEventStore } from '../src/stream/index'
@@ -234,4 +234,41 @@ it('a product writer that omits timing still records first visible, admission an
     expect(optedOut.prepare('SELECT admission_ms, first_visible_ms, model FROM rollout_turn_timing').get())
       .toEqual({ admission_ms: null, first_visible_ms: null, model: null })
   } finally { full.close(); legacy.close(); optedOut.close() }
+})
+
+it.each([undefined, '', '[object Object]', 'product.refused'])('records the sandbox failure through the route lifecycle and real timing table (product code=%s)', async failureCode => {
+  const sqlite = new Database(':memory:')
+  sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) } })
+  const pending: Promise<unknown>[] = []
+  const routes = createChatTurnRoutes({
+    projectId: 'failure-default',
+    store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } },
+    turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }),
+    produce: () => createSandboxChatProducer({ errorNotice: true, events: (async function* () {
+      yield { type: 'error', data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the delegated key allow-list.' } }
+    })() }),
+    lifecycle: { onTurnError: info => timing.record({
+      turnId: info.turnStreamId, rollout: 'reliability', workspaceId: 'workspace', lane: 'sandbox',
+      settledMs: info.durationMs, failed: true, ...(failureCode === undefined ? {} : { failureCode }),
+    }) },
+  })
+  try {
+    const response = await routes.turn(new Request('https://app.test/api/chat', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: 'thread', content: 'Continue.' }) }),
+    { waitUntil: promise => { pending.push(promise) } })
+    const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line))
+    await Promise.all(pending)
+    expect(events.find(event => event.type === 'session.run.failed')?.data.code).toBe('MODEL_REFUSED')
+    expect(events.some(event => event.type === 'session.run.completed')).toBe(false)
+    expect(sqlite.prepare('SELECT failed, failure_code FROM rollout_turn_timing').get()).toEqual({
+      failed: 1,
+      failure_code: failureCode === 'product.refused' ? failureCode
+        : 'MODEL_REFUSED: The selected model is outside the delegated key allow-list.',
+    })
+  } finally { sqlite.close() }
 })

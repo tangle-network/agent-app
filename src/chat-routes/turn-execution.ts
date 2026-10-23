@@ -11,6 +11,7 @@ import {
 import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
 import { noteMeasuredTurnFacts } from '../turn-trace/turn-facts'
+import { redactErrorMessage } from '../redact/index'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
@@ -77,13 +78,18 @@ function modelAttributionFields(attribution: ChatTurnModelAttribution | undefine
 function settledTurnTiming(turnStreamId: string, at: {
   requestAt: number; startedAt: number; firstVisibleAt?: number
   firstTextAt?: number; model?: string
+  failure?: { data?: Record<string, unknown>; error: unknown }
 }, trace: TurnTraceSummary) {
   const measured = {
     admissionMs: at.startedAt - at.requestAt,
     ...(at.firstVisibleAt === undefined ? {} : { firstVisibleMs: at.firstVisibleAt - at.startedAt }),
     ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
   }
-  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}) })
+  const reason = at.failure ? failureReasonOf(at.failure.data) ?? redactErrorMessage(at.failure.error, 'chat turn failed') : undefined
+  const code = at.failure ? failureCodeOf(at.failure.data) : undefined
+  const failureCode = reason ? redactErrorMessage(code && !reason.startsWith(code) ? `${code}: ${reason}` : reason) : undefined
+  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}),
+    ...(failureCode ? { failureCode } : {}) })
   return { ...measured, trace }
 }
 
@@ -583,7 +589,8 @@ function createTurnSettlement<TContext>(
     const durationMs = Date.now() - state.turnStartedAtMs
     const timing = settledTurnTiming(turnStreamId, {
       requestAt: trace.startedAt, startedAt: state.turnStartedAtMs,
-      firstVisibleAt: state.firstVisibleAtMs, firstTextAt: state.firstTextAtMs, model: state.producer?.model
+      firstVisibleAt: state.firstVisibleAtMs, firstTextAt: state.firstTextAtMs, model: state.producer?.model,
+      failure: failed ? { data: state.lastFailureData, error: terminalError } : undefined,
     }, snapshot.summary)
     try {
       if (!lifecycle) {
