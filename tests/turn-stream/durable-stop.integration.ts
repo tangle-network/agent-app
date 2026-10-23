@@ -90,7 +90,7 @@ let modelUrl = ''
 function start() {
   return new Miniflare(convertV4MiniflareOptions({ durableObjectsPersist: resolve(directory, 'objects'),
     d1Persist: resolve(directory, 'sqlite'), workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
-      compatibilityFlags, scriptPath: bundlePath,
+      compatibilityFlags, scriptPath: bundlePath, modulesRoot: bundleDirectory,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
         ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream']]
         .map(([binding, className]) => [binding, { className, useSQLite: true }])),
