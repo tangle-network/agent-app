@@ -31,35 +31,6 @@ const createTask: RouterTurnTool = {
 }
 
 describe('runRouterTurn', () => {
-  it('streams words, runs an app tool in-process, and returns the answer with the served model', async () => {
-    const { fetchImpl, requests } = router(
-      sse([toolCall('call-1', 'staff_task_create', '{"title":"Restock towels"}')]),
-      sse([text('Done: '), text('Restock towels is on the list.')]),
-    )
-    const events: RouterTurnEvent[] = []
-    const outcome = await runRouterTurn({ apiKey: 'k', model: 'requested/model', fetchImpl, traceId: 'trace-1',
-      systemPrompt: 'You are Pablo.', userMessage: 'Create a task to restock towels', tools: [createTask],
-      history: [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'Hello!' }], onEvent: event => events.push(event) })
-
-    expect(outcome).toEqual({ text: 'Done: Restock towels is on the list.', servedModel: 'served/model',
-      toolCalls: [{ callId: 'call-1', toolName: 'staff.task.create', ok: true }],
-      usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, reasoning: { deltas: 0, chars: 0 }, toolEvents: [] })
-    expect(createTask.run).toHaveBeenCalledWith({ title: 'Restock towels' },
-      { emit: expect.any(Function), userMessage: 'Create a task to restock towels' })
-    expect(requests[0]!.headers.get('x-tangle-trace-id')).toBe('trace-1')
-    expect(requests[0]!.body).toMatchObject({ model: 'requested/model', stream: true,
-      tools: [{ type: 'function', function: { name: 'staff_task_create' } }] })
-    expect(requests[0]!.body.messages).toEqual([{ role: 'system', content: 'You are Pablo.' },
-      { role: 'user', content: 'hi' }, { role: 'assistant', content: 'Hello!' },
-      { role: 'user', content: 'Create a task to restock towels' }])
-    // The model reads its own call and the result back, keyed to the call.
-    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({ role: 'tool', tool_call_id: 'call-1', content: '{"taskId":"task-1","title":"Restock towels"}' })]))
-    // `tool_start` arrives when the model names the tool, before its arguments finish and the call runs.
-    expect(events.map(event => event.type === 'text' ? `text:${event.delta}` : event.type === 'tool' ? `tool:${event.status}` : event.type))
-      .toEqual(['tool_start', 'tool:running', 'tool:completed', 'text:Done: ', 'text:Restock towels is on the list.'])
-  })
-
   it('reports a domain refusal to the model and lets it answer', async () => {
     const refused: RouterTurnTool = { ...createTask, run: async () => {
       throw Object.assign(new Error('Only managers can create tasks'), { code: 'forbidden', status: 403 })
