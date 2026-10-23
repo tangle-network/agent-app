@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -21,8 +21,11 @@ const consumer = createRequire(resolve(consumerRoot, 'package.json'))
 const appPackage = consumer('./package.json') as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
 assert(appPackage.dependencies?.wrangler ?? appPackage.devDependencies?.wrangler, 'Consumer must declare Wrangler')
 const wrangler = createRequire(consumer.resolve('wrangler/package.json'))
-const compatibilityDate = readFileSync(resolve(consumerRoot, 'wrangler.toml'), 'utf8').match(/^compatibility_date\s*=\s*"([^"]+)"/m)?.[1]
-assert(compatibilityDate, 'Consumer Wrangler config must name its compatibility date')
+const productionConfig = readFileSync(resolve(consumerRoot, 'wrangler.toml'), 'utf8')
+const compatibilityDate = productionConfig.match(/^compatibility_date\s*=\s*"([^"]+)"/m)?.[1]
+const flags = productionConfig.match(/^compatibility_flags\s*=\s*\[([\s\S]*?)\]/m)?.[1]
+assert(compatibilityDate && flags, 'Consumer Wrangler config must name its compatibility date and flags')
+const compatibilityFlags = [...flags.matchAll(/"([^"]+)"/g)].map(match => match[1]!)
 const { Miniflare, convertV4MiniflareOptions } = wrangler('miniflare') as {
   convertV4MiniflareOptions(options: Record<string, unknown>): Record<string, unknown>
   Miniflare: new (options: Record<string, unknown>) => Runtime
@@ -35,13 +38,9 @@ interface Runtime {
   }>
   dispose(): Promise<void>
 }
-const { build } = wrangler('esbuild') as { build(options: Record<string, unknown>): Promise<{ outputFiles: Array<{ text: string }> }> }
-const bundle = await build({ entryPoints: [fileURLToPath(new URL('./durable-stop.worker.ts', import.meta.url))],
-  bundle: true, write: false, format: 'esm', platform: 'neutral', target: 'es2022',
-  conditions: ['workerd', 'worker', 'browser'], mainFields: ['module', 'main'], external: ['node:*'],
-  nodePaths: [resolve(consumerRoot, 'node_modules')], logLevel: 'silent' })
-assert.equal(bundle.outputFiles.length, 1)
 const directory = mkdtempSync(resolve(tmpdir(), 'agent-app-durable-stop-'))
+const bundleDirectory = resolve(directory, 'bundle')
+const bundlePath = resolve(bundleDirectory, 'durable-stop.worker.js')
 const checks: string[] = []
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -91,7 +90,7 @@ let modelUrl = ''
 function start() {
   return new Miniflare(convertV4MiniflareOptions({ durableObjectsPersist: resolve(directory, 'objects'),
     d1Persist: resolve(directory, 'sqlite'), workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
-      compatibilityFlags: ['nodejs_compat'], script: bundle.outputFiles[0]!.text,
+      compatibilityFlags, scriptPath: bundlePath,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
         ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream']]
         .map(([binding, className]) => [binding, { className, useSQLite: true }])),
@@ -133,6 +132,16 @@ async function acquire(input: TurnCancellationIdentity, query = '') {
 }
 let primaryFailed = false
 try {
+  // The consuming app's Wrangler owns Node compatibility, including bare
+  // builtin imports. Its dry-run build is also the maintained test harness's
+  // prebuilt-worker path; it performs no upload or production resource access.
+  const configPath = resolve(directory, 'wrangler.json')
+  writeFileSync(configPath, JSON.stringify({ name: 'stop-fixture',
+    main: fileURLToPath(new URL('./durable-stop.worker.ts', import.meta.url)),
+    compatibility_date: compatibilityDate, compatibility_flags: compatibilityFlags, send_metrics: false }))
+  execFileSync(process.execPath, [consumer.resolve('wrangler'), 'deploy', '--dry-run',
+    '--config', configPath, '--outdir', bundleDirectory], { cwd: directory,
+    env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, timeout: 60_000, encoding: 'utf8', stdio: 'pipe' })
   await new Promise<void>((ready, reject) => {
     peer.once('error', reject)
     peer.listen(0, '127.0.0.1', () => { peer.removeListener('error', reject); ready() })
@@ -366,7 +375,8 @@ try {
     consumerRevision: execFileSync('git', ['-C', consumerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     consumerLockSha256: createHash('sha256').update(readFileSync(resolve(consumerRoot, 'pnpm-lock.yaml'))).digest('hex'),
     miniflareEntry: realpathSync(wrangler.resolve('miniflare')), wranglerEntry: dirname(consumer.resolve('wrangler/package.json')),
-    compatibilityDate, actualDO: true, actualSQLite: true, actualRouterHTTP: true, paidCalls: 0 }))
+    compatibilityDate, compatibilityFlags, builder: 'consumer-wrangler-dry-run',
+    actualDO: true, actualSQLite: true, actualRouterHTTP: true, paidCalls: 0 }))
 } catch (error) {
   primaryFailed = true
   throw error
