@@ -69,10 +69,21 @@ it('uses range indexes without a temporary sort for all-lane and selected-lane r
         expect(plans).toHaveLength(2)
         for (const [index, plan] of plans.entries()) {
           const details = plan.details.join('\n')
-          expect(details).toContain(lane ? 'rollout_turn_timing_by_lane_request_origin' : 'rollout_turn_timing_by_request_origin')
           expect(details).not.toContain('TEMP B-TREE')
-          expect(details).toMatch(index === 0 ? /request_received_at>\? AND request_received_at<\?/ : /request_received_at=\? AND at>\? AND at<\?/)
+          if (index === 0) {
+            expect(details).toMatch(/USING (?:COVERING )?INDEX rollout_turn_timing_by_(?:lane_)?request_origin \(/)
+            expect(details).toMatch(/rollout=\?.*request_received_at>\? AND request_received_at<\?/)
+          } else if (/INDEX rollout_turn_timing_by_lane \(/.test(details)) {
+            // SQLite may prefer the existing lane/settlement index for this
+            // NULL-origin bucket; both plans bound the actual settlement range.
+            expect(lane).toBeDefined()
+            expect(details).toMatch(/rollout=\? AND lane=\? AND at>\? AND at<\?/)
+          } else {
+            expect(details).toMatch(/USING (?:COVERING )?INDEX rollout_turn_timing_by_(?:lane_)?request_origin \(/)
+            expect(details).toMatch(/request_received_at=\? AND at>\? AND at<\?/)
+          }
           expect(plan.sql).not.toContain('? IS NULL')
+          expect(plan.sql.includes('lane = ?')).toBe(lane !== undefined)
           if (revision === 'release') expect(plan.sql).toContain('revision = ?')
           if (revision === null) expect(plan.sql).toContain("(revision IS NULL OR revision = '')")
         }
