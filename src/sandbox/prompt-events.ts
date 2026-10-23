@@ -67,6 +67,7 @@ export async function* detachedSandboxPromptEvents(
     throw new Error('streamSandboxPrompt detach requires stable sessionId and executionId')
   }
 
+  options.signal?.throwIfAborted()
   const lastEventId = options.lastEventId?.trim() || undefined
   const turnId = options.turnId?.trim() || executionId
   // A cursor is already proof that this execution was admitted. Re-dispatching
@@ -91,6 +92,9 @@ export async function* detachedSandboxPromptEvents(
         ...(options.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
         ...(options.trace ? { traceId: options.trace.traceId } : {}),
       } as DispatchPromptOptions)
+  // An admission already sent must settle before observation ends. Its product
+  // owner can fence an accepted native run; an aborted read is never no-send proof.
+  options.signal?.throwIfAborted()
   const admittedExecutionId = admission?.executionId ?? executionId
   if (!admittedExecutionId) {
     throw new Error(`detached Sandbox dispatch for ${sessionId} returned no executionId`)
