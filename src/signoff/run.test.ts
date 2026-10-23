@@ -8,6 +8,9 @@ import { build } from 'tsup'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { formatSignoffLine, formatSignoffReport, peakConcurrency } from './report'
 import { runSignoff } from './run'
+import { loadSignoffConfig } from './config'
+import { proofFromSignoffReport } from './proof-from-report'
+import { pruneSignoffCache } from './cache'
 import type { SignoffReport } from './types'
 
 /**
@@ -153,6 +156,106 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     ])
     return { status, stdout, stderr }
   }
+
+  it('selects explicit phases with prerequisites and hands the checked artifact to native release', async () => {
+    const repo = fixtureRepo({ steps: `[
+      { name: 'artifact', phase: 'release', run: 'node build.mjs' },
+      { name: 'inspect', phase: 'release', needs: ['artifact'], run: 'node consume.mjs release' },
+      { name: 'exercise', phase: 'suites', needs: ['artifact'], run: 'node consume.mjs suites' }
+    ]` })
+    writeFileSync(join(repo, 'build.mjs'), "import {mkdirSync,writeFileSync} from 'node:fs'; mkdirSync('out',{recursive:true}); writeFileSync('out/artifact','checked');\n")
+    writeFileSync(join(repo, 'consume.mjs'), "import {readFileSync} from 'node:fs'; if(readFileSync('out/artifact','utf8')!=='checked') throw Error('stale artifact'); console.log(process.argv[2]);\n")
+    git(['add', '.'], repo)
+    git(['commit', '--quiet', '-m', 'artifact consumer'], repo)
+    mkdirSync(join(repo, 'out'))
+    writeFileSync(join(repo, 'out/artifact'), 'stale caller artifact')
+    const cacheDir = temp('signoff-phase-cache-')
+    const reports = temp('signoff-phase-reports-')
+    for (const phase of ['all', 'release', 'suites'] as const) {
+      const json = join(reports, `${phase}.json`)
+      const result = await runCli([repo, '--source', 'head', '--phase', phase, '--keep-workspace', '--quiet', '--cache-dir', cacheDir, '--json', json])
+      expect(result.status, result.stderr).toBe(0)
+      const report = JSON.parse(readFileSync(json, 'utf8')) as SignoffReport
+      expect(report.phase).toBe(phase)
+      expect(report.workspaceRetained).toBe(true)
+      expect(readFileSync(join(repo, 'out/artifact'), 'utf8')).toBe('stale caller artifact')
+      const handoff = spawnSync(process.execPath, ['consume.mjs', 'native-release'], { cwd: report.workspace, encoding: 'utf8' })
+      expect(handoff.status, handoff.stderr).toBe(0)
+      expect(spawnSync('git', ['rev-parse', 'HEAD'], {cwd: report.workspace, encoding: 'utf8'}).stdout.trim()).toBe(report.repo.head)
+      const loaded = await loadSignoffConfig({ repoRoot: repo, phase })
+      if (phase === 'all') {
+        expect(result.stdout).toMatch(/^signoff PASS /)
+        expect(report.steps.map(s => s.name)).toContain('exercise')
+      } else {
+        expect(result.stdout).toMatch(new RegExp(`^signoff ${phase.toUpperCase()} PASS `))
+        expect(report.reproduce).toContain(`--phase ${phase}`)
+        expect(report.selection).toEqual(loaded.selection)
+        expect(() => proofFromSignoffReport({ report, repo: 'agent-app', declaredRequired: [] })).toThrow(/partial|phase/i)
+        const names = report.steps.map(s => s.name)
+        if (phase === 'release') expect(names).not.toContain('exercise')
+        else {
+          expect(names).toEqual(['artifact', 'exercise'])
+          expect(report.selection?.prerequisites).toEqual(['artifact'])
+          expect(report.selection?.excluded).toEqual(['inspect'])
+        }
+      }
+      // Same lifecycle the native release adapter uses for its dedicated cache.
+      await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })
+      expect(existsSync(report.workspace)).toBe(false)
+      expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+    }
+  })
+
+  it('refuses unsafe partial configs before install and keeps legacy full runs working', async () => {
+    const variants = [
+      { steps: `[{name:'old',run:'node -e ""'}]`, phase: 'release', error: /classif|phase/i },
+      { steps: `[{name:'only',phase:'release',run:'node -e ""'}]`, phase: 'suites', error: /no.*suites|empty/i },
+      { steps: `[{name:'s',phase:'suites',run:'node -e ""'},{name:'r',phase:'release',needs:['s'],run:'node -e ""'}]`, phase: 'release', error: /release.*suites/i },
+      { steps: `[{name:'r',phase:'release',needs:['absent'],run:'node -e ""'}]`, phase: 'release', error: /absent/ },
+      { steps: `[{name:'r',phase:'release',run:'node -e ""'}]`, phase: 'typo', error: /phase/i },
+    ]
+    for (const variant of variants) {
+      const marker = join(temp('signoff-phase-install-'), 'installed')
+      const repo = fixtureRepo({ steps: variant.steps, install: `node -e ${JSON.stringify(`require('fs').writeFileSync(${JSON.stringify(marker)},'ran')`)}` })
+      const cache = temp('signoff-phase-refusal-')
+      const result = await runCli([repo, '--source', 'head', '--phase', variant.phase, '--cache-dir', cache])
+      expect(result.status).toBe(2)
+      expect(result.stderr).toMatch(variant.error)
+      expect(existsSync(marker)).toBe(false)
+      expect(readdirSync(join(cache, 'active'))).toEqual([])
+    }
+    const repo = fixtureRepo({ steps: `[{name:'legacy',run:'node -e ""'}]` })
+    const result = await runCli([repo, '--source', 'head', '--quiet', '--cache-dir', temp('signoff-phase-legacy-')])
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toMatch(/^signoff PASS /)
+  })
+
+  it('keeps Node policy on partial runs and reserves built-in defaults for full/release', async () => {
+    const repo = fixtureRepo({ steps: `[
+      {name:'qualify',phase:'release',run:'node -e ""'},
+      {name:'exercise',phase:'suites',run:'node -e ""'}
+    ]` })
+    const cacheDir = temp('signoff-phase-policy-')
+    // No Wrangler or built bundle installed. The full/release default check must
+    // still run and fail; suites must execute without demanding those artifacts.
+    writeFileSync(join(repo, 'wrangler.toml'), 'name = "fixture"\nmain = "missing-worker.mjs"\ncompatibility_date = "2020-01-01"\n')
+    git(['add', '.'], repo)
+    git(['commit', '--quiet', '-m', 'worker policy'], repo)
+    for (const phase of ['all', 'release', 'suites']) {
+      const result = await runCli([repo, '--source', 'head', '--phase', phase, '--cache-dir', cacheDir])
+      expect(result.status, result.stderr).toBe(phase === 'suites' ? 0 : 1)
+      if (phase === 'suites') expect(result.stdout).not.toContain('worker defaults')
+      else expect(result.stdout).toContain('worker defaults')
+    }
+    writeFileSync(join(repo, '.nvmrc'), '999\n')
+    git(['add', '.nvmrc'], repo)
+    git(['commit', '--quiet', '-m', 'incompatible runtime'], repo)
+    for (const phase of ['release', 'suites']) {
+      const result = await runCli([repo, '--source', 'head', '--phase', phase, '--cache-dir', cacheDir])
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('pins Node 999')
+    }
+  })
 
   it('delivers the complete large failure report and exits despite a config timer', async () => {
     const repo = fixtureRepo({
