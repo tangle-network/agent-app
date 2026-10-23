@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-280 exports.
+282 exports.
 
 ### `adaptSandboxStream`
 
@@ -782,6 +782,14 @@ type Outcome
 type PeekWorkspaceSandboxOutcome
 ```
 
+### `plannedHostRestart`
+
+`function` — A planned host-agent swap leaves the sandbox alive; an ordinary probe failure is not that evidence.
+
+```ts
+(error: unknown) => boolean
+```
+
 ### `predictColdArrival`
 
 `function` — Chance of at least one cold arrival in `[at, at + windowMs)`.
@@ -924,6 +932,14 @@ interface ProvisionProfileSection
 
 ```ts
 readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
+```
+
+### `readDuringPlannedHostRestart`
+
+`function` — Wait only for the platform typed planned-restart signal, within the caller budget.
+
+```ts
+<T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>
 ```
 
 ### `readSandboxBinaryBytes`
