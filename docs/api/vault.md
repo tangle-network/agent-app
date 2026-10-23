@@ -120,7 +120,7 @@ type VaultOperationPhase
 
 ### `VaultPane`
 
-`function` — Browse and edit files in the available pane width.
+`function`
 
 ```ts
 ForwardRefExoticComponent<VaultPaneProps & RefAttributes<VaultPaneHandle>>

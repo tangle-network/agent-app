@@ -170,8 +170,7 @@ function useCommitCommand(
     [stack, onApplyOperations, canWrite, setError],
   )
 }
-
-export function DesignCanvas({
+function useDesignCanvasViewState({
   document: initialDocument,
   rev: initialRev,
   canWrite,
@@ -258,162 +257,10 @@ export function DesignCanvas({
     },
     [stack, editorState.selectedElementIds],
   )
-
-  // ---------------------------------------------------------------------------
-  // Element commands
-  // ---------------------------------------------------------------------------
-
-  const handleSetAttrs = useCallback(
-    (elementId: string, attrs: SceneAttrsPatch) => {
-      const page = requirePage(editorState.document, editorState.activePageId)
-      // findElement searches group children; page.elements.find misses nested elements.
-      const found = findElement(page, elementId)
-      if (!found) return
-      if (found.element.locked) return
-      const priorAttrs: SceneAttrsPatch = Object.fromEntries(
-        Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
-      ) as SceneAttrsPatch
-      commit(
-        setAttrsCommand({
-          pageId: editorState.activePageId,
-          elementId,
-          attrs,
-          priorAttrs,
-        }),
-      )
-    },
-    [commit, editorState.activePageId, editorState.document],
-  )
-
-  const handleMultiSetAttrs = useCallback(
-    (patches: Array<{ elementId: string; attrs: SceneAttrsPatch }>) => {
-      const page = requirePage(editorState.document, editorState.activePageId)
-      const entries = patches.flatMap(({ elementId, attrs }) => {
-        const found = findElement(page, elementId)
-        // Skip elements that are missing (concurrent delete) or locked.
-        if (!found || found.element.locked) return []
-        const priorAttrs = Object.fromEntries(
-          Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
-        ) as SceneAttrsPatch
-        return [{ pageId: editorState.activePageId, elementId, attrs, priorAttrs }]
-      })
-      if (entries.length === 0) return
-      commit(multiSetAttrsCommand(entries))
-    },
-    [commit, editorState.activePageId, editorState.document],
-  )
-
-  const handleReorder = useCallback(
-    (elementId: string, toIndex: number, ownerLength: number, direction: 'front' | 'back' | 'forward' | 'backward') => {
-      const page = requirePage(editorState.document, editorState.activePageId)
-      // findElement searches group children so nested elements are reorderable.
-      const found = findElement(page, elementId)
-      if (!found) return
-      const currentIndex = found.index
-      const target =
-        direction === 'front'
-          ? topIndex(ownerLength)
-          : direction === 'back'
-            ? 0
-            : direction === 'forward'
-              ? indexForward(currentIndex, ownerLength)
-              : indexBackward(currentIndex)
-      const clamped = clampIndex(target, ownerLength)
-      if (clamped === currentIndex) return
-      commit(reorderElementCommand({ pageId: editorState.activePageId, elementId, toIndex: clamped }))
-    },
-    [commit, editorState.activePageId, editorState.document],
-  )
-
-  const handleDelete = useCallback(
-    (elementIds: string[]) => {
-      for (const elementId of elementIds) {
-        commit(
-          deleteElementCommand({
-            document: editorState.document,
-            pageId: editorState.activePageId,
-            elementId,
-          }),
-        )
-      }
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  const handleGroup = useCallback(
-    (elementIds: string[]) => {
-      commit(
-        groupElementsCommand({
-          document: editorState.document,
-          pageId: editorState.activePageId,
-          elementIds,
-          groupId: mintId(),
-        }),
-      )
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  const handleUngroup = useCallback(
-    (groupId: string) => {
-      commit(ungroupElementCommand({ document: editorState.document, pageId: editorState.activePageId, groupId }))
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  const handleBindSlot = useCallback(
-    (elementId: string, slot: string | null) => {
-      commit(bindSlotCommand({ document: editorState.document, pageId: editorState.activePageId, elementId, slot }))
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  // ---------------------------------------------------------------------------
-  // Page commands
-  // ---------------------------------------------------------------------------
-
-  const handleSetPageProps = useCallback(
-    (props: { name?: string; width?: number; height?: number; background?: string; bleed?: PageBleed | null }) => {
-      commit(setPagePropsCommand({ document: editorState.document, pageId: editorState.activePageId, props }))
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  const handleSetPageGuides = useCallback(
-    (guides: { vertical: number[]; horizontal: number[] }) => {
-      commit(setPageGuidesCommand({ document: editorState.document, pageId: editorState.activePageId, guides }))
-    },
-    [commit, editorState.document, editorState.activePageId],
-  )
-
-  const handleAddPage = useCallback(() => {
-    const pageId = mintId()
-    commit(addPageCommand({ pageId }))
-    setActivePage(pageId)
-  }, [commit, setActivePage])
-
-  const handleDuplicatePage = useCallback(
-    (sourcePageId: string) => {
-      const pageId = mintId()
-      commit(duplicatePageCommand({ document: editorState.document, sourcePageId, pageId }))
-      setActivePage(pageId)
-    },
-    [commit, editorState.document, setActivePage],
-  )
-
-  const handleDeletePage = useCallback(
-    (pageId: string) => {
-      commit(deletePageCommand({ document: editorState.document, pageId }))
-    },
-    [commit, editorState.document],
-  )
-
-  const handleReorderPage = useCallback(
-    (pageId: string, toIndex: number) => {
-      commit(reorderPageCommand({ pageId, toIndex }))
-    },
-    [commit],
-  )
+  const { handleSetAttrs, handleMultiSetAttrs, handleReorder, handleDelete, handleGroup,
+    handleUngroup, handleBindSlot, handleSetPageProps, handleSetPageGuides, handleAddPage,
+    handleDuplicatePage, handleDeletePage, handleReorderPage } = useDesignCanvasCommands({ editorState,
+    commit, setActivePage })
 
   // ---------------------------------------------------------------------------
   // Undo / redo
@@ -516,6 +363,26 @@ export function DesignCanvas({
   }, [activePage, editorState.selectedElementIds])
 
   const review = mode === 'review'
+ return { activePage, className, editorState, renderSidePanel, review, selectedElements, canWrite,
+   mode, stack, handleUndo, handleRedo, handleSetAttrs, handleSetPageProps, handleSetPageGuides,
+   handleReorder, handleGroup, handleUngroup, handleDelete, handleBindSlot, pageSizeLabel,
+   enableBleedLabel, onExport, exportDefaults, exportRef, commitError, setCommitError,
+   renderWorkspace, fitRef, fitOnMount, onReady, render, showEmptyState, onAskAgent, setZoom, setPan,
+   setSelectedElements, renderThumbnail, setActivePage, handleAddPage, handleDuplicatePage,
+   handleDeletePage, handleReorderPage, fitLabel, renderAgentPanel }
+}
+type DesignCanvasViewState = ReturnType<typeof useDesignCanvasViewState>
+export function DesignCanvas(props: DesignCanvasFullProps) {
+ const view = useDesignCanvasViewState(props)
+ return <DesignCanvasView {...view} />
+}
+function DesignCanvasView({ activePage, className, editorState, renderSidePanel, review,
+  selectedElements, canWrite, mode, stack, handleUndo, handleRedo, handleSetAttrs,
+  handleSetPageProps, handleSetPageGuides, handleReorder, handleGroup, handleUngroup, handleDelete,
+  handleBindSlot, pageSizeLabel, enableBleedLabel, onExport, exportDefaults, exportRef, commitError,
+  setCommitError, renderWorkspace, fitRef, fitOnMount, onReady, render, showEmptyState, onAskAgent,
+  setZoom, setPan, setSelectedElements, renderThumbnail, setActivePage, handleAddPage,
+  handleDuplicatePage, handleDeletePage, handleReorderPage, fitLabel, renderAgentPanel }: DesignCanvasViewState) {
 
   if (!activePage) {
     return (
@@ -733,4 +600,171 @@ export function DesignCanvas({
           that want it standalone can render LayersPanel directly. */}
     </div>
   )
+
+}
+
+
+
+function useDesignCanvasCommands({ editorState, commit,
+  setActivePage }: { editorState: ReturnType<ReturnType<typeof createSceneCommandStack>['getState']>;
+  commit: (command: SceneCommand) => void; setActivePage: (pageId: string) => void }) {
+
+  // ---------------------------------------------------------------------------
+  // Element commands
+  // ---------------------------------------------------------------------------
+
+  const handleSetAttrs = useCallback(
+    (elementId: string, attrs: SceneAttrsPatch) => {
+      const page = requirePage(editorState.document, editorState.activePageId)
+      // findElement searches group children; page.elements.find misses nested elements.
+      const found = findElement(page, elementId)
+      if (!found) return
+      if (found.element.locked) return
+      const priorAttrs: SceneAttrsPatch = Object.fromEntries(
+        Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
+      ) as SceneAttrsPatch
+      commit(
+        setAttrsCommand({
+          pageId: editorState.activePageId,
+          elementId,
+          attrs,
+          priorAttrs,
+        }),
+      )
+    },
+    [commit, editorState.activePageId, editorState.document],
+  )
+
+  const handleMultiSetAttrs = useCallback(
+    (patches: Array<{ elementId: string; attrs: SceneAttrsPatch }>) => {
+      const page = requirePage(editorState.document, editorState.activePageId)
+      const entries = patches.flatMap(({ elementId, attrs }) => {
+        const found = findElement(page, elementId)
+        // Skip elements that are missing (concurrent delete) or locked.
+        if (!found || found.element.locked) return []
+        const priorAttrs = Object.fromEntries(
+          Object.keys(attrs).map((k) => [k, (found.element as unknown as Record<string, unknown>)[k]]),
+        ) as SceneAttrsPatch
+        return [{ pageId: editorState.activePageId, elementId, attrs, priorAttrs }]
+      })
+      if (entries.length === 0) return
+      commit(multiSetAttrsCommand(entries))
+    },
+    [commit, editorState.activePageId, editorState.document],
+  )
+
+  const handleReorder = useCallback(
+    (elementId: string, toIndex: number, ownerLength: number, direction: 'front' | 'back' | 'forward' | 'backward') => {
+      const page = requirePage(editorState.document, editorState.activePageId)
+      // findElement searches group children so nested elements are reorderable.
+      const found = findElement(page, elementId)
+      if (!found) return
+      const currentIndex = found.index
+      const target =
+        direction === 'front'
+          ? topIndex(ownerLength)
+          : direction === 'back'
+            ? 0
+            : direction === 'forward'
+              ? indexForward(currentIndex, ownerLength)
+              : indexBackward(currentIndex)
+      const clamped = clampIndex(target, ownerLength)
+      if (clamped === currentIndex) return
+      commit(reorderElementCommand({ pageId: editorState.activePageId, elementId, toIndex: clamped }))
+    },
+    [commit, editorState.activePageId, editorState.document],
+  )
+
+  const handleDelete = useCallback(
+    (elementIds: string[]) => {
+      for (const elementId of elementIds) {
+        commit(
+          deleteElementCommand({
+            document: editorState.document,
+            pageId: editorState.activePageId,
+            elementId,
+          }),
+        )
+      }
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  const handleGroup = useCallback(
+    (elementIds: string[]) => {
+      commit(
+        groupElementsCommand({
+          document: editorState.document,
+          pageId: editorState.activePageId,
+          elementIds,
+          groupId: mintId(),
+        }),
+      )
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  const handleUngroup = useCallback(
+    (groupId: string) => {
+      commit(ungroupElementCommand({ document: editorState.document, pageId: editorState.activePageId, groupId }))
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  const handleBindSlot = useCallback(
+    (elementId: string, slot: string | null) => {
+      commit(bindSlotCommand({ document: editorState.document, pageId: editorState.activePageId, elementId, slot }))
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  // ---------------------------------------------------------------------------
+  // Page commands
+  // ---------------------------------------------------------------------------
+
+  const handleSetPageProps = useCallback(
+    (props: { name?: string; width?: number; height?: number; background?: string; bleed?: PageBleed | null }) => {
+      commit(setPagePropsCommand({ document: editorState.document, pageId: editorState.activePageId, props }))
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  const handleSetPageGuides = useCallback(
+    (guides: { vertical: number[]; horizontal: number[] }) => {
+      commit(setPageGuidesCommand({ document: editorState.document, pageId: editorState.activePageId, guides }))
+    },
+    [commit, editorState.document, editorState.activePageId],
+  )
+
+  const handleAddPage = useCallback(() => {
+    const pageId = mintId()
+    commit(addPageCommand({ pageId }))
+    setActivePage(pageId)
+  }, [commit, setActivePage])
+
+  const handleDuplicatePage = useCallback(
+    (sourcePageId: string) => {
+      const pageId = mintId()
+      commit(duplicatePageCommand({ document: editorState.document, sourcePageId, pageId }))
+      setActivePage(pageId)
+    },
+    [commit, editorState.document, setActivePage],
+  )
+
+  const handleDeletePage = useCallback(
+    (pageId: string) => {
+      commit(deletePageCommand({ document: editorState.document, pageId }))
+    },
+    [commit, editorState.document],
+  )
+
+  const handleReorderPage = useCallback(
+    (pageId: string, toIndex: number) => {
+      commit(reorderPageCommand({ pageId, toIndex }))
+    },
+    [commit],
+  )
+  return { handleSetAttrs, handleMultiSetAttrs, handleReorder, handleDelete, handleGroup,
+    handleUngroup, handleBindSlot, handleSetPageProps, handleSetPageGuides, handleAddPage,
+    handleDuplicatePage, handleDeletePage, handleReorderPage }
 }

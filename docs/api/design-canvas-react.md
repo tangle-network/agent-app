@@ -182,6 +182,14 @@ interface CanvasEmptyStateProps
 interface CanvasInsertPanelProps
 ```
 
+### `CanvasSnapResult`
+
+`interface` — Define the result of a snap operation including coordinates and active snap lines
+
+```ts
+interface CanvasSnapResult
+```
+
 ### `centeredPosition`
 
 `function` — Top-left position that centers a (width, height) box on the page.
@@ -267,7 +275,7 @@ interface DeletePageInput
 `function`
 
 ```ts
-({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange, renderAgentPanel,…
+(props: DesignCanvasFullProps) => Element
 ```
 
 ### `DesignCanvasChromeLazy`
@@ -275,7 +283,7 @@ interface DeletePageInput
 `function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
+LazyExoticComponent<(props: DesignCanvasFullProps) => Element>
 ```
 
 ### `DesignCanvasEditor`
@@ -910,14 +918,6 @@ interface SetPagePropsInput
 interface SnapEngine
 ```
 
-### `SnapResult`
-
-`interface` — Define the result of a snap operation including coordinates and active snap lines
-
-```ts
-interface SnapResult
-```
-
 ### `SnapTarget`
 
 `interface` — Define a target position and kind for snapping elements on a page
@@ -1003,7 +1003,7 @@ interface UngroupElementInput
 `function`
 
 ```ts
-({ canWrite, onApplyOperations, onSelectionChange, className, stack, activePage, onFitRef, onExport, onExportRef, fitOn…
+(props: WorkspaceViewProps) => Element
 ```
 
 ### `WorkspaceViewProps`

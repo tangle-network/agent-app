@@ -376,11 +376,7 @@ async function* streamChatCompletions(
   attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
   headers?: Record<string, string>,
 ): AsyncIterable<OpenAIStreamChunk> {
-  const res = await doFetch(url, {
-    method: 'POST',
-    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(body),
-  })
+  const res = await postOpenAIEventStream(doFetch, url, apiKey, body, headers)
   if (!res.ok || !res.body) throw await httpFailure(res, 'stream')
   // Served-model attribution, fired at most once, as early as it is knowable.
   //
@@ -407,20 +403,7 @@ async function* streamChatCompletions(
     const served = servedFromHeader(res, attribution.requestedModel)
     if (served) report(served)
   }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') return
+  for await (const data of readOpenAISseFrames(res.body)) {
       let chunk: OpenAIStreamChunk
       try {
         chunk = JSON.parse(data) as OpenAIStreamChunk
@@ -435,7 +418,7 @@ async function* streamChatCompletions(
       // A failure inside a 200 stream ends the call by name instead of reading as a blank answer.
       if (chunk.error) throw streamFailure(chunk.error)
       yield chunk
-    }
+
   }
 }
 
@@ -539,11 +522,7 @@ async function* streamResponses(
   attribution?: { requestedModel: string; report: (served: OpenAICompatServedModel) => void },
   headers?: Record<string, string>,
 ): AsyncIterable<OpenAIStreamChunk> {
-  const res = await doFetch(url, {
-    method: 'POST',
-    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(body),
-  })
+  const res = await postOpenAIEventStream(doFetch, url, apiKey, body, headers)
   if (!res.ok || !res.body) throw await httpFailure(res, 'responses')
   let reported = false
   const report = (served: OpenAICompatServedModel) => {
@@ -555,21 +534,8 @@ async function* streamResponses(
     const served = servedFromHeader(res, attribution.requestedModel)
     if (served) report(served)
   }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
   let lastSummary: string | null = null
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') return
+  for await (const data of readOpenAISseFrames(res.body)) {
       let event: ResponsesEvent
       try {
         event = JSON.parse(data) as ResponsesEvent
@@ -617,6 +583,37 @@ async function* streamResponses(
         default:
           break
       }
+
+  }
+}
+
+
+/** The common framing used by both OpenAI SSE protocols; payload parsing stays with each protocol. */
+async function* readOpenAISseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const data = trimmed.slice(5).trim()
+      if (data === '[DONE]') return
+      yield data
     }
   }
+}
+
+
+function postOpenAIEventStream(doFetch: typeof fetch, url: string, apiKey: string, body: Record<string, unknown>, headers?: Record<string, string>): Promise<Response> {
+  return doFetch(url, {
+    method: 'POST',
+    headers: { ...headers, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+    body: JSON.stringify(body),
+  })
 }

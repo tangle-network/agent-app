@@ -33,6 +33,7 @@ export type AppAuthColumnMap<K extends PropertyKey> = { [P in K]: AnySQLiteColum
 export interface CreateAppAuthTablesOptions<
   S extends AppAuthSessionColumns,
   U extends AppAuthUserColumns = Record<never, never>,
+  I extends boolean = true,
 > {
   /** Columns the product adds to the session row. Default none. */
   sessionColumns?: S
@@ -40,12 +41,14 @@ export interface CreateAppAuthTablesOptions<
   userColumns?: U
   /** Indexes the product's `user` table carries. Default none. */
   userIndexes?: (table: AppAuthColumnMap<keyof ReturnType<typeof baseUserColumns> | keyof U>) => SQLiteTableExtraConfigValue[]
+  /** Omit the issuer column and its unique index for already-migrated accounts without one. */
+  accountIssuer?: I
   /** Indexes the product's `account` table carries besides the issuer/account one. Default none. */
-  accountIndexes?: (table: AppAuthColumnMap<keyof ReturnType<typeof accountColumns>>) => SQLiteTableExtraConfigValue[]
+  accountIndexes?: (table: AppAuthColumnMap<keyof AppAuthAccountColumns<I>>) => SQLiteTableExtraConfigValue[]
   /** Name of the unique (issuer, accountId) index. Default `account_issuer_account_id_unique`. */
-  accountIssuerIndexName?: string
+  accountIssuerIndexName?: I extends false ? never : string
   /** Default for `account.issuer`; null declares none. Default `local:credential`. */
-  accountIssuerDefault?: string | null
+  accountIssuerDefault?: I extends false ? never : string | null
 }
 
 const createdAt = () => integer('createdAt', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
@@ -112,12 +115,25 @@ export type AppAuthUsersTable<U extends AppAuthUserColumns = Record<never, never
   dialect: 'sqlite'
 }>
 
+type AppAuthAccountColumns<I extends boolean> = I extends false
+  ? Omit<ReturnType<typeof accountColumns>, 'issuer'>
+  : ReturnType<typeof accountColumns>
+
+/** The `account` table, preserving whether this product migrated an issuer column. */
+export type AppAuthAccountsTable<I extends boolean = true> = SQLiteTableWithColumns<{
+  name: 'account'
+  schema: undefined
+  columns: BuildColumns<'account', AppAuthAccountColumns<I> & ReturnType<typeof timestampColumns>, 'sqlite'>
+  dialect: 'sqlite'
+}>
+
 /** Build the better-auth `user`, `session`, `account` and `verification` tables. */
 export function createAppAuthTables<
   S extends AppAuthSessionColumns = Record<never, never>,
   U extends AppAuthUserColumns = Record<never, never>,
+  I extends boolean = true,
 >(
-  options: CreateAppAuthTablesOptions<S, U> = {},
+  options: CreateAppAuthTablesOptions<S, U, I> = {},
 ) {
   // The generic spread cannot be inferred through sqliteTable; the declared type is the same build.
   const users = sqliteTable('user', {
@@ -137,13 +153,19 @@ export function createAppAuthTables<
 
   const account = accountColumns(options.accountIssuerDefault === undefined ? 'local:credential' : options.accountIssuerDefault)
   account.userId.references(() => users.id, { onDelete: 'cascade' })
+  // Keep the existing column order; the generic table type follows this runtime schema choice.
+  const withoutIssuer = { ...account }
+  delete (withoutIssuer as Partial<typeof account>).issuer
   const accounts = sqliteTable('account', {
-    ...account,
+    ...(options.accountIssuer === false ? withoutIssuer : account),
     ...timestampColumns(),
   }, (table) => [
-    uniqueIndex(options.accountIssuerIndexName ?? 'account_issuer_account_id_unique').on(table.issuer, table.accountId),
+    ...(options.accountIssuer === false ? [] : [
+      uniqueIndex(options.accountIssuerIndexName ?? 'account_issuer_account_id_unique')
+        .on(table.issuer, table.accountId),
+    ]),
     ...(options.accountIndexes?.(table as never) ?? []),
-  ])
+  ]) as unknown as AppAuthAccountsTable<I>
 
   const verifications = sqliteTable('verification', {
     id: text('id').primaryKey(),
@@ -161,4 +183,5 @@ export function createAppAuthTables<
 export type AppAuthTables<
   S extends AppAuthSessionColumns = Record<never, never>,
   U extends AppAuthUserColumns = Record<never, never>,
-> = ReturnType<typeof createAppAuthTables<S, U>>
+  I extends boolean = true,
+> = ReturnType<typeof createAppAuthTables<S, U, I>>

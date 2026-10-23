@@ -23,7 +23,6 @@ import type {
   BrandKit,
   BrandLogoCandidate,
   ExtractBrandKitOptions,
-  FetchLike,
 } from './types'
 
 const DEFAULT_TIMEOUT_MS = 15000
@@ -560,7 +559,7 @@ export async function extractBrandKit(
 
   let html = providedHtml
   if (html === undefined) {
-    const doFetch: FetchLike | undefined =
+    const doFetch: ExtractBrandKitOptions['fetchImpl'] =
       fetchImpl ?? (typeof globalThis.fetch === 'function'
         ? (u, init) => globalThis.fetch(u, init as RequestInit)
         : undefined)

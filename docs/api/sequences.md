@@ -4,7 +4,7 @@
 
 Source: `src/sequences/index.ts`
 
-111 exports.
+113 exports.
 
 ### `AddCaptionOperation`
 
@@ -620,6 +620,22 @@ type SequenceMediaKind
 
 ```ts
 interface SequenceMeta
+```
+
+### `sequenceMetaFromRow`
+
+`function` — Project persisted sequence fields without importing the optional Drizzle peer.
+
+```ts
+(row: SequenceMetaRow) => SequenceMeta
+```
+
+### `SequenceMetaRow`
+
+`type` — A persisted sequence's public fields, independent of its database driver.
+
+```ts
+type SequenceMetaRow
 ```
 
 ### `SequenceOperation`

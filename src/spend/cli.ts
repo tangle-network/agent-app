@@ -12,7 +12,7 @@
  * Exits 1 on any finding, 0 when clean, 2 on a usage or config error. It never
  * disputes, refunds, or writes anything; the output is evidence a human acts on.
  */
-import { SpendUsageError, USAGE, loadSpendConfig, parseSpendArgs } from './cli-args'
+import { SpendUsageError, SPEND_USAGE, loadSpendConfig, parseSpendArgs } from './cli-args'
 import { reconcileSpend } from './reconcile'
 import { formatSpendReport, spendReportToJson } from './report'
 import type { SpendCheckId } from './types'
@@ -37,7 +37,7 @@ try {
   process.exit(await main())
 } catch (err) {
   if (err instanceof SpendUsageError) {
-    process.stderr.write(`${err.message === 'help' ? '' : `${err.message}\n\n`}${USAGE}\n`)
+    process.stderr.write(`${err.message === 'help' ? '' : `${err.message}\n\n`}${SPEND_USAGE}\n`)
     process.exit(2)
   }
   process.stderr.write(

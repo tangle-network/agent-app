@@ -4,15 +4,7 @@
 
 Source: `src/signoff/cli.ts`
 
-2 exports.
-
-### `parseArgs`
-
-`function`
-
-```ts
-(argv: readonly string[]) => ParsedArgs
-```
+1 export.
 
 ### `runSignoffCli`
 

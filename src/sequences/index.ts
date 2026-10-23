@@ -18,3 +18,5 @@ export * from './captions'
 export * from './mcp-tools'
 export * from './mcp-handler'
 export * from './mcp-entry'
+
+export * from './row-mapping'

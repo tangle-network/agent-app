@@ -19,7 +19,7 @@ interface ArchivableBox
 `function`
 
 ```ts
-(options: ExportEngineOptions) => { archiveKey: (workspaceId: string, id: string) => string; list(workspaceId: string):…
+(options: ExportEngineOptions) => { progress(job: ExportJob): Omit<ExportProgress, "downloadUrl" | "downloadExpiresAt">…
 ```
 
 ### `createMemoryExportStorage`

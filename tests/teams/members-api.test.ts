@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createTeamTables } from '../../src/teams/drizzle/schema'
 import { createWorkspaceAccess } from '../../src/teams/drizzle/access'
-import { createMembersApi, SeatLimitError, type MemberSyncSeam } from '../../src/teams/members-api'
+import { createMembersApi, SeatLimitError, type MemberSyncCallbacks } from '../../src/teams/members-api'
 import { openDatabase, usersTable, workspacesTable } from './db-helper'
 
 const tables = createTeamTables({ userTable: usersTable, workspaceTable: workspacesTable })
@@ -26,7 +26,7 @@ async function seed() {
   return { db, org: org!, existingOrgMember: existingOrgMember!, access }
 }
 
-function api(deps: Awaited<ReturnType<typeof seed>>, extra: { enforceSeat?: any; memberSyncSeam?: MemberSyncSeam } = {}) {
+function api(deps: Awaited<ReturnType<typeof seed>>, extra: { enforceSeat?: any; memberSyncSeam?: MemberSyncCallbacks } = {}) {
   return createMembersApi({
     db: deps.db,
     tables,
@@ -120,7 +120,7 @@ describe('acceptInvite + memberSyncSeam.add', () => {
     const { inviteToken } = await invite.json() as { inviteToken: string }
 
     const adds: any[] = []
-    const seam: MemberSyncSeam = { add: (input) => { adds.push(input) } }
+    const seam: MemberSyncCallbacks = { add: (input) => { adds.push(input) } }
     const res = await api(deps, { memberSyncSeam: seam }).acceptInvite({ token: inviteToken, actor: { id: 'invitee-1', email: 'invitee@x.com' } })
     expect(res.status).toBe(200)
     const body = await res.json() as { workspaceId: string; role: string }
@@ -166,7 +166,7 @@ describe('updateMemberRole + memberSyncSeam.role', () => {
 
     const [memberRow] = await deps.db.select().from(tables.workspaceMembers)
     const roles: any[] = []
-    const seam: MemberSyncSeam = { role: (input) => { roles.push(input) } }
+    const seam: MemberSyncCallbacks = { role: (input) => { roles.push(input) } }
     const res = await api(deps, { memberSyncSeam: seam }).updateMemberRole({ workspaceId: 'ws-1', actor: ownerActor, memberId: memberRow!.id, role: 'admin' })
     expect(res.status).toBe(200)
     await flushMicrotasks()
@@ -190,7 +190,7 @@ describe('removeMember + memberSyncSeam.remove', () => {
     const [memberRow] = await deps.db.select().from(tables.workspaceMembers)
 
     const removes: any[] = []
-    const seam: MemberSyncSeam = { remove: (input) => { removes.push(input) } }
+    const seam: MemberSyncCallbacks = { remove: (input) => { removes.push(input) } }
     const res = await api(deps, { memberSyncSeam: seam }).removeMember({ workspaceId: 'ws-1', actor: ownerActor, memberId: memberRow!.id })
     expect(res.status).toBe(200)
     await flushMicrotasks()
@@ -207,7 +207,7 @@ describe('removeMember + memberSyncSeam.remove', () => {
     await api(deps).acceptInvite({ token: inviteToken, actor: { id: 'm3', email: 'm3@x.com' } })
     const [memberRow] = await deps.db.select().from(tables.workspaceMembers)
 
-    const seam: MemberSyncSeam = { remove: () => { throw new Error('sandbox down') } }
+    const seam: MemberSyncCallbacks = { remove: () => { throw new Error('sandbox down') } }
     const res = await api(deps, { memberSyncSeam: seam }).removeMember({ workspaceId: 'ws-1', actor: ownerActor, memberId: memberRow!.id })
     expect(res.status).toBe(200)
     const remaining = await deps.db.select().from(tables.workspaceMembers)

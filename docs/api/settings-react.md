@@ -115,7 +115,7 @@ interface MembersSectionProps
 `function` — The typed failure behind a rejected settings write (or a mutation's `failed` state), when it carries one.
 
 ```ts
-(outcome: Pick<MutationRejected, "error" | "message">) => SettingFailure
+(outcome: Pick<MutationRejected, "message" | "error">) => SettingFailure
 ```
 
 ### `SettingFailure`

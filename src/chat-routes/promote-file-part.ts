@@ -35,6 +35,7 @@ import {
   type WriteAttachmentFn,
 } from './attachment-store'
 import {
+  logAttachmentStorageError,
   inspectAtomicAttachmentWriteResult,
   inspectLegacyAttachmentWriteResult,
 } from './attachment-write-safety'
@@ -227,23 +228,7 @@ function defaultBuildAttachmentPath(args: AttachmentPathArgs): string {
 
 type PromoteFilePartLogger = Pick<Console, 'error'>
 
-function logPromotionStorageError(
-  logger: PromoteFilePartLogger,
-  message: string,
-  fields: Record<string, unknown>,
-): void {
-  try {
-    const safeFields = Object.fromEntries(
-      Object.entries(fields).map(([key, value]) => [
-        key,
-        typeof value === 'string' ? redactErrorMessage(value) : value,
-      ]),
-    )
-    logger.error(message, safeFields)
-  } catch {
-    // Logging must not turn a typed storage failure into a thrown response.
-  }
-}
+
 
 async function compensatePromotionWrite(
   writer: AtomicAttachmentWriter,
@@ -358,7 +343,7 @@ export async function promoteAgentFilePart(
     const date = now().toISOString().split('T')[0] ?? ''
     logicalPath = buildAttachmentPath({ filename, hash8: digest, date, mediaType, kind })
   } catch (error) {
-    logPromotionStorageError(logger, '[promote-file-part] path planning failed', {
+    logAttachmentStorageError(logger, '[promote-file-part] path planning failed', {
       error: redactErrorMessage(error),
     })
     return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
@@ -375,7 +360,7 @@ export async function promoteAgentFilePart(
       })
     } catch (error) {
       const reason = redactErrorMessage(error)
-      logPromotionStorageError(logger, '[promote-file-part] legacy writer failed', {
+      logAttachmentStorageError(logger, '[promote-file-part] legacy writer failed', {
         path: logicalPath,
         error: reason,
       })
@@ -383,14 +368,14 @@ export async function promoteAgentFilePart(
     }
     const result = inspectLegacyAttachmentWriteResult(written)
     if (!result) {
-      logPromotionStorageError(logger, '[promote-file-part] legacy writer returned an invalid result', {
+      logAttachmentStorageError(logger, '[promote-file-part] legacy writer returned an invalid result', {
         path: logicalPath,
       })
       return { succeeded: false, filename, reason: ATTACHMENT_STORAGE_FAILURE_MESSAGE }
     }
     if (!result.ok) {
       const reason = redactErrorMessage(result.reason)
-      logPromotionStorageError(logger, '[promote-file-part] legacy write rejected', {
+      logAttachmentStorageError(logger, '[promote-file-part] legacy write rejected', {
         path: logicalPath,
         error: reason,
       })
@@ -415,7 +400,7 @@ export async function promoteAgentFilePart(
     ownershipId = createWriteId!()
     path = immutableAttachmentPath(logicalPath, ownershipId)
   } catch (error) {
-    logPromotionStorageError(logger, '[promote-file-part] could not allocate ownership key', {
+    logAttachmentStorageError(logger, '[promote-file-part] could not allocate ownership key', {
       path: logicalPath,
       error: redactErrorMessage(error),
     })
@@ -442,7 +427,7 @@ export async function promoteAgentFilePart(
     } catch (error) {
       abortError = error
     }
-    logPromotionStorageError(logger, '[promote-file-part] write failed', {
+    logAttachmentStorageError(logger, '[promote-file-part] write failed', {
       path,
       ownershipId: ownership.id,
       error: redactErrorMessage(err),
@@ -458,7 +443,7 @@ export async function promoteAgentFilePart(
     } catch (error) {
       abortError = error
     }
-    logPromotionStorageError(logger, '[promote-file-part] writer returned a mismatched ownership receipt', {
+    logAttachmentStorageError(logger, '[promote-file-part] writer returned a mismatched ownership receipt', {
       path,
       ownershipId: ownership.id,
       ...(abortError === undefined ? {} : { abortError: redactErrorMessage(abortError) }),
@@ -472,7 +457,7 @@ export async function promoteAgentFilePart(
       ownership,
       result.receipt,
     )
-    logPromotionStorageError(logger, '[promote-file-part] write rejected', {
+    logAttachmentStorageError(logger, '[promote-file-part] write rejected', {
       path,
       ownershipId: ownership.id,
       error: redactErrorMessage(result.reason),

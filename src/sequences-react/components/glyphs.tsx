@@ -4,19 +4,8 @@
  * the editor needs are inlined with lucide-equivalent path data.
  */
 
-interface GlyphProps {
-  className?: string
-}
-
-function glyph(paths: React.ReactNode) {
-  return function Glyph({ className }: GlyphProps) {
-    return (
-      <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        {paths}
-      </svg>
-    )
-  }
-}
+import { createEditorGlyph as glyph } from '../../web-react/editor-glyphs'
+export { UndoGlyph, RedoGlyph, LockGlyph, PlusGlyph, MinusGlyph, MagnetGlyph } from '../../web-react/editor-glyphs'
 
 export const FilmGlyph = glyph(
   <>
@@ -51,13 +40,6 @@ export const AgentGlyph = glyph(
   </>,
 )
 
-export const LockGlyph = glyph(
-  <>
-    <rect x="5" y="11" width="14" height="10" rx="2" />
-    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-  </>,
-)
-
 export const MutedGlyph = glyph(
   <>
     <path d="M11 5 6 9H2v6h4l5 4z" />
@@ -71,21 +53,6 @@ export const PlayGlyph = glyph(
 
 export const PauseGlyph = glyph(
   <path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor" stroke="none" />,
-)
-
-export const UndoGlyph = glyph(
-  <path d="M3 7v6h6M3 13a9 9 0 1 0 3-7.7" />,
-)
-
-export const RedoGlyph = glyph(
-  <path d="M21 7v6h-6M21 13a9 9 0 1 1-3-7.7" />,
-)
-
-export const MagnetGlyph = glyph(
-  <>
-    <path d="m6 15-4-4 6.75-6.77a7.79 7.79 0 0 1 11 11L13 22l-4-4 6.39-6.36a2.14 2.14 0 0 0-3-3z" />
-    <path d="m5 8 4 4M12 15l4 4" />
-  </>,
 )
 
 export const ScissorsGlyph = glyph(
@@ -109,6 +76,3 @@ export const ExportGlyph = glyph(
     <path d="M12 3v12M8 7l4-4 4 4" />
   </>,
 )
-
-export const PlusGlyph = glyph(<path d="M12 5v14M5 12h14" />)
-export const MinusGlyph = glyph(<path d="M5 12h14" />)

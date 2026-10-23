@@ -5,7 +5,7 @@
  * live stream OR any historical turn replayed from a TurnEventStore can be
  * reconstructed into a span trace: pipeline overhead, model segments (with
  * thinking TTFT), tool executions, token usage, and cost. Renderers turn
- * traces and multi-run samples into ASCII waterfalls and histograms — the
+ * traces into ASCII waterfalls — the
  * default artifact for "how did this run actually behave" questions across
  * evals, hill-climbs, and production debugging.
  *
@@ -161,50 +161,5 @@ export function renderWaterfall(trace: FlowTrace, opts?: { width?: number }): st
   lines.push(
     `${fmtS(trace.totalMs).padStart(7)} ── total · ${trace.promptTokens}p + ${trace.completionTokens}c tok · ${trace.toolCalls} tool calls${cost}`,
   )
-  return lines.join('\n')
-}
-
-/** Summarize key statistics of a numerical distribution including count, min, percentiles, and max */
-export interface DistributionSummary {
-  n: number
-  min: number
-  p50: number
-  p90: number
-  max: number
-}
-
-/** Summarize numeric values into a distribution summary including count, min, median, 90th percentile, and max */
-export function summarize(values: number[]): DistributionSummary {
-  const sorted = [...values].sort((a, b) => a - b)
-  const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0
-  return { n: sorted.length, min: sorted[0] ?? 0, p50: q(0.5), p90: q(0.9), max: sorted[sorted.length - 1] ?? 0 }
-}
-
-/** ASCII histogram for multi-run samples (eval latencies, costs, scores). */
-export function renderHistogram(
-  values: number[],
-  opts?: { buckets?: number; width?: number; unit?: string; format?: (v: number) => string },
-): string {
-  if (!values.length) return '(no samples)'
-  const buckets = opts?.buckets ?? 6
-  const width = opts?.width ?? 24
-  const fmt = opts?.format ?? ((v: number) => `${Math.round(v)}${opts?.unit ?? ''}`)
-  const s = summarize(values)
-  const lo = s.min
-  const hi = s.max === s.min ? s.min + 1 : s.max
-  const counts = new Array<number>(buckets).fill(0)
-  for (const v of values) {
-    counts[Math.min(buckets - 1, Math.floor(((v - lo) / (hi - lo)) * buckets))]!++
-  }
-  const maxCount = Math.max(...counts)
-  const lines = [
-    `n=${s.n}  min=${fmt(s.min)}  p50=${fmt(s.p50)}  p90=${fmt(s.p90)}  max=${fmt(s.max)}`,
-  ]
-  for (let i = 0; i < buckets; i++) {
-    const a = lo + ((hi - lo) * i) / buckets
-    const b = lo + ((hi - lo) * (i + 1)) / buckets
-    const bar = '█'.repeat(Math.max(counts[i]! > 0 ? 1 : 0, Math.round((counts[i]! / maxCount) * width)))
-    lines.push(`${fmt(a).padStart(8)}-${fmt(b).padEnd(8)} ${bar} ${counts[i]}`)
-  }
   return lines.join('\n')
 }

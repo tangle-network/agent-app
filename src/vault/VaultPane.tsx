@@ -1,3 +1,9 @@
+import { retryVaultTreeRefresh, completeVaultPendingOpen, finishVaultPendingOpen, commitVaultPath,
+  reportVaultOperationFailure, refreshVaultTree, openVaultFile, discardVaultDraft, showVaultRichMode,
+  showVaultSourceMode, changeVaultSource, changeVaultRichDraft, saveVaultFile, createVaultFile,
+  deleteVaultFile, restoreVaultRevision, readVaultSelectedFile, reconcileVaultSelectedFile,
+  type VaultPendingNavigation, type VaultPendingOpen, type VaultTreeRefreshContext,
+    type VaultTreeFailureState, type VaultSaveScope } from './VaultPaneOperations'
 /**
  * The shared 3-pane vault: tree | artifact viewer | optional agent dock. This is
  * shell mechanism — selection, the dirty-guard + pending-nav state machine,
@@ -34,40 +40,11 @@ const IDENTITY_CODEC: VaultMarkdownCodec = {
   serialize: (parts) => (typeof parts === 'string' ? parts : String(parts ?? '')),
 }
 
-type PendingNav = { path: string; request?: PendingOpen } | null
-type PendingOpen = {
-  path: string
-  fromPath: string | null
-  resolve: (opened: boolean) => void
-  loaded: boolean
-  selected: boolean
-}
 
-interface TreeRefreshContext {
-  operation: Extract<VaultOperation, 'list' | 'create' | 'delete'>
-  phase: VaultOperationPhase
-  path?: string
-  selectAfterRecovery?: string
-}
-
-interface TreeFailureState {
-  failure: VaultOperationFailure
-  context: TreeRefreshContext
-}
-
-const LIST_CONTEXT: TreeRefreshContext = { operation: 'list', phase: 'operation' }
 
 /** How many recent files the empty document pane offers. */
 const RECENT_SHOWN = 5
-
-/**
- * Browse and edit files in the available pane width.
- * Below 60rem, Files and the selected document share one pane, so an open
- * document gets the whole width: beside a 23rem tree, a narrower pane left a
- * GTM call sheet's table about 385px and hid its third column.
- * Switching panes keeps the editor mounted and preserves unsaved changes.
- */
-export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function VaultPane(props, ref) {
+function useVaultPaneViewState(props: VaultPaneProps, ref: import('react').ForwardedRef<VaultPaneHandle>) {
   const {
     port,
     renderTree,
@@ -105,7 +82,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const [tree, setTree] = useState<VaultTreeNode[]>([])
   const [treeLoading, setTreeLoading] = useState(true)
   const [treeLoaded, setTreeLoaded] = useState(false)
-  const [treeError, setTreeError] = useState<TreeFailureState | null>(null)
+  const [treeError, setTreeError] = useState<VaultTreeFailureState | null>(null)
   const [internalPath, setInternalPath] = useState<string | null>(null)
   const selectedPath = controlled ? (controlledPath ?? null) : internalPath
   const [filesOpen, setFilesOpen] = useState(false)
@@ -119,29 +96,11 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   useEffect(() => {
     setFilesOpen(false)
   }, [selectedPath])
-
-  const showDocument = useCallback(() => {
-    const focused = document.activeElement
-    setFilesOpen(false)
-    requestAnimationFrame(() => {
-      if (document.activeElement === focused || document.activeElement === document.body) {
-        documentRef.current?.focus({ preventScroll: true })
-      }
-    })
-  }, [])
-
-  const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null)
-  const [displayReadyPath, setDisplayReadyPath] = useState<string | null>(null)
-  const [fileLoading, setFileLoading] = useState(false)
-  const [readError, setReadError] = useState<string | null>(null)
-  const [reloadNonce, setReloadNonce] = useState(0)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<VaultOperationFailure | null>(null)
-
-  const [editorMode, setEditorMode] = useState<VaultEditorMode>('rich')
-  const [richDraft, setRichDraft] = useState<VaultRichParts>('')
-  const [sourceDraft, setSourceDraft] = useState('')
-  const [isDirty, setIsDirty] = useState(false)
+  const { showDocument } = useVaultDocumentFocus({ setFilesOpen, documentRef })
+  const { selectedFile, setSelectedFile, displayReadyPath, setDisplayReadyPath, fileLoading,
+    setFileLoading, readError, setReadError, reloadNonce, setReloadNonce, saving, setSaving, saveError,
+    setSaveError, editorMode, setEditorMode, richDraft, setRichDraft, sourceDraft, setSourceDraft,
+    isDirty, setIsDirty } = useVaultDocumentState()
 
   const [createOpen, setCreateOpen] = useState(false)
   const [newPath, setNewPath] = useState('')
@@ -157,7 +116,7 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   // opens IN the document pane instead, behind a path-bar toggle. Measured, not
   // a media query: the pane is often a drawer or a split inside a wide window.
   const { rootRef, dockInline } = useVaultDockPlacement(renderDock)
-  const [pendingNav, setPendingNav] = useState<PendingNav>(null)
+  const [pendingNav, setPendingNav] = useState<VaultPendingNavigation>(null)
   const [folderPath, setFolderPath] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
 
@@ -188,119 +147,25 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const loadedPathRef = useRef<string | null>(null)
   const onOperationErrorRef = useRef(onOperationError)
   onOperationErrorRef.current = onOperationError
-  const pendingOpenRef = useRef<PendingOpen | null>(null)
+  const pendingOpenRef = useRef<VaultPendingOpen | null>(null)
   const previousPortRef = useRef(port)
-
-  const finishPendingOpen = useCallback((opened: boolean, clearNavigation = true) => {
-    const pending = pendingOpenRef.current
-    if (!pending) return
-    pendingOpenRef.current = null
-    if (!opened && clearNavigation) {
-      setPendingNav((current) => current?.request === pending ? null : current)
-    }
-    pending.resolve(opened)
-  }, [])
-
-  useEffect(() => () => finishPendingOpen(false, false), [finishPendingOpen])
-
-  useEffect(() => {
-    if (previousPortRef.current !== port) finishPendingOpen(false)
-    previousPortRef.current = port
-  }, [port, finishPendingOpen])
-
-  useEffect(() => {
-    const pending = pendingOpenRef.current
-    if (!pending) return
-    if (selectedPath === pending.path) pending.selected = true
-    else if (pending.selected || selectedPath !== pending.fromPath) finishPendingOpen(false)
-  }, [selectedPath, finishPendingOpen])
-
-  const treePaths = useMemo(
-    () => collectTreePaths(tree, { files: new Set<string>(), directories: new Set<string>() }),
-    [tree],
-  )
-  const resolvedSelectedPath = useMemo(() => {
-    if (!selectedPath) return null
-    const listed = resolveTreePath(selectedPath, treePaths)
-    if (listed?.type === 'directory') return null
-    // A committed file can be readable before an older tree snapshot lists it.
-    // The data port owns validation and missing-file errors for explicit paths.
-    return listed?.path ?? selectedPath
-  }, [selectedPath, treePaths])
-  // The clicked folder, resolved against the CURRENT tree — a folder that a
-  // refresh removed stops being the active one on its own, so neither the
-  // search scope nor the create target can point at a directory that is gone.
-  const activeFolderNode = useMemo(
-    () => (folderPath ? findDirectory(tree, folderPath) : null),
-    [tree, folderPath],
-  )
-  const activeFolder = activeFolderNode?.path ?? null
-  const treeRoot = useMemo<VaultTreeNode>(
-    () => ({ name: label, path: '', type: 'directory', children: tree }),
-    [tree, label],
-  )
-  const { query, onQueryChange, visibleRoot, canSearchContent, contentResults, retry: retryContentSearch } = useVaultSearch({ port, treeRoot })
+  const { finishPendingOpen } = useVaultPendingOpenCompletion({ pendingOpenRef, setPendingNav, previousPortRef, port, selectedPath })
+  const { treePaths, resolvedSelectedPath, activeFolderNode, activeFolder, treeRoot, query,
+    onQueryChange, visibleRoot, canSearchContent, contentResults,
+    retryContentSearch } = useVaultTreeProjection({ tree, selectedPath, folderPath, label, port })
 
   const commitPath = useCallback(
-    (next: string | null) => {
-      if (controlled) {
-        const decision: unknown = onSelectedPathChange?.(next)
-        return decision !== false
-      }
-      setInternalPath(next)
-      onSelectedPathChange?.(next)
-      return true
-    },
+    (next: string | null) => commitVaultPath(next, { controlled, onSelectedPathChange, setInternalPath }),
     [controlled, onSelectedPathChange],
   )
 
-  const reportFailure = useCallback((
-    operation: VaultOperation,
-    phase: VaultOperationPhase,
-    error: unknown,
-    fallback: string,
-    path?: string,
-  ): VaultOperationFailure => {
-    const failure: VaultOperationFailure = {
-      operation,
-      phase,
-      path,
-      message: operationMessage(error, fallback),
-      cause: error,
-    }
-    try {
-      onOperationErrorRef.current?.(failure)
-    } catch (callbackError) {
-      console.error('Vault onOperationError callback failed:', callbackError)
-    }
-    return failure
-  }, [])
+  const reportFailure = useCallback((operation: VaultOperation, phase: VaultOperationPhase,
+    error: unknown, fallback: string, path?: string) => reportVaultOperationFailure(operation, phase,
+    error, fallback, path, { onOperationErrorRef }), [])
 
-  const refresh = useCallback(async (context: TreeRefreshContext = LIST_CONTEXT): Promise<boolean> => {
-    const request = ++treeRequestRef.current
-    setTreeLoading(true)
-    setTreeError(null)
-    try {
-      const nextTree = await port.listTree()
-      if (request !== treeRequestRef.current) return false
-      setTree(nextTree)
-      setTreeLoaded(true)
-      return true
-    } catch (error) {
-      if (request !== treeRequestRef.current) return false
-      const failure = reportFailure(
-        context.operation,
-        context.phase,
-        error,
-        `Failed to load ${label}`,
-        context.path,
-      )
-      setTreeError({ failure, context })
-      return false
-    } finally {
-      if (request === treeRequestRef.current) setTreeLoading(false)
-    }
-  }, [port, reportFailure, label])
+  const refresh = useCallback((context?: VaultTreeRefreshContext) => refreshVaultTree(context,
+    { treeRequestRef, setTreeLoading, setTreeError, port, setTree, setTreeLoaded, reportFailure,
+    label }), [port, reportFailure, label])
 
   useEffect(() => {
     setTree([])
@@ -314,149 +179,29 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
     return () => { treeRequestRef.current += 1 }
   }, [refresh, refreshKey])
 
-  const retryTree = useCallback(async () => {
-    if (!treeError) return
-    const { context } = treeError
-    const recovered = await refresh(context)
-    if (recovered && context.selectAfterRecovery) commitPath(context.selectAfterRecovery)
-  }, [treeError, refresh, commitPath])
+  const retryTree = useCallback(() => retryVaultTreeRefresh({ treeError, refresh, commitPath }), [treeError, refresh, commitPath])
 
-  useEffect(() => {
-    if (!selectedPath) {
-      setSelectedFile(null)
-      setFileLoading(false)
-      setReadError(null)
-      loadedPathRef.current = null
-      return
-    }
-    // An external path can be read after listing fails; the data port still validates access.
-    const explicitOpenAfterTreeError = !!treeError && pendingOpenRef.current?.path === selectedPath
-    if (treeLoading || (!treeLoaded && !explicitOpenAfterTreeError) || isDirty || saving) return
-    if (!resolvedSelectedPath) {
-      finishPendingOpen(false)
-      commitPath(null)
-      setSelectedFile(null)
-      setFileLoading(false)
-      setReadError(null)
-      loadedPathRef.current = null
-      return
-    }
-    let cancelled = false
-    const path = resolvedSelectedPath
-    if (path !== selectedPath) commitPath(path)
-    setFileLoading(true)
-    setReadError(null)
-    void (async () => {
-      try {
-        const file = await port.readFile(path)
-        if (file.path !== path) throw new Error(`Vault returned ${file.path} for ${path}`)
-        if (!cancelled && !dirtyRef.current) {
-          const pending = pendingOpenRef.current
-          if (pending?.path === path) pending.loaded = true
-          setSelectedFile(file)
-        } else if (!cancelled && pendingOpenRef.current?.path === path) {
-          finishPendingOpen(false)
-        }
-      } catch (err) {
-        // Surface read failures instead of making them indistinguishable from
-        // the intentionally empty "no file selected" state.
-        if (!cancelled) {
-          if (pendingOpenRef.current?.path === path) finishPendingOpen(false)
-          const failure = reportFailure('read', 'operation', err, 'Failed to read file', path)
-          setSelectedFile((current) => current?.path === path ? current : null)
-          setReadError(failure.message)
-        }
-      } finally {
-        if (!cancelled) setFileLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [port, selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, treeError, isDirty, saving, reloadNonce, commitPath, reportFailure, finishPendingOpen])
+  useEffect(() => readVaultSelectedFile({ selectedPath, setSelectedFile, setFileLoading,
+    setReadError, loadedPathRef, treeError, pendingOpenRef, treeLoading, treeLoaded, isDirty, saving,
+    resolvedSelectedPath, finishPendingOpen, commitPath, port, dirtyRef, reportFailure }), [port,
+    selectedPath, resolvedSelectedPath, treeLoading, treeLoaded, treeError, isDirty, saving,
+    reloadNonce, commitPath, reportFailure, finishPendingOpen])
 
-  useEffect(() => {
-    if (!selectedFile) {
-      loadedPathRef.current = null
-      setDisplayReadyPath(null)
-      savedContentRef.current = ''
-      draftContentRef.current = ''
-      setRichDraft('')
-      setSourceDraft('')
-      setEditorMode('rich')
-      setIsDirty(false)
-      setSaveError(null)
-      return
-    }
-    // A completed write advances the persisted baseline, but must not replace
-    // edits typed while that write was in flight with its older submitted text.
-    if (savedResultRef.current === selectedFile) {
-      savedResultRef.current = null
-      return
-    }
-    const pathChanged = loadedPathRef.current !== selectedFile.path
-    loadedPathRef.current = selectedFile.path
-    setDisplayReadyPath(selectedFile.path)
-    savedContentRef.current = selectedFile.content
-    draftContentRef.current = selectedFile.content
-    setRichDraft(activeCodec.parse(selectedFile.content))
-    setSourceDraft(selectedFile.content)
-    if (pathChanged) setEditorMode('rich')
-    setIsDirty(false)
-    setSaveError(null)
-    setDockOpen(false)
-  }, [selectedFile?.path, selectedFile?.content, activeCodec])
+  useEffect(() => reconcileVaultSelectedFile({ selectedFile, loadedPathRef, setDisplayReadyPath,
+    savedContentRef, draftContentRef, setRichDraft, setSourceDraft, setEditorMode, setIsDirty,
+    setSaveError, savedResultRef, activeCodec, setDockOpen }), [selectedFile?.path,
+    selectedFile?.content, activeCodec])
 
-  useEffect(() => {
-    const pending = pendingOpenRef.current
-    if (
-      pending?.loaded &&
-      pending.path === selectedPath &&
-      selectedFile?.path === pending.path &&
-      displayReadyPath === pending.path &&
-      sourceDraft === selectedFile.content &&
-      !fileLoading
-    ) {
-      finishPendingOpen(true)
-    }
-  }, [selectedPath, selectedFile, displayReadyPath, sourceDraft, fileLoading, finishPendingOpen])
+  useEffect(() => completeVaultPendingOpen({ pendingOpenRef, selectedPath, selectedFile,
+    displayReadyPath, sourceDraft, fileLoading, finishPendingOpen }), [selectedPath, selectedFile,
+    displayReadyPath, sourceDraft, fileLoading, finishPendingOpen])
 
-  const guardedOpen = useCallback((rawPath: string, resolve?: (opened: boolean) => void) => {
-    const target = resolveTreePath(rawPath, treePaths)
-    if (!rawPath.trim() || target?.type === 'directory') {
-      resolve?.(false)
-      return
-    }
-    const path = target?.path ?? rawPath
-    finishPendingOpen(false)
-    setPendingNav(null)
-    if (path === selectedPath && selectedFile?.path === path && displayReadyPath === path) {
-      showDocument()
-      resolve?.(true)
-      return
-    }
-    if (resolve) {
-      const pending: PendingOpen = {
-        path,
-        fromPath: selectedPath,
-        resolve,
-        loaded: false,
-        selected: path === selectedPath,
-      }
-      pendingOpenRef.current = pending
-    }
-    if (path === selectedPath) {
-      showDocument()
-      if (!fileLoading && (readError || (treeError && !treeLoaded))) setReloadNonce((nonce) => nonce + 1)
-      return
-    }
-    if (isDirty) {
-      setPendingNav({ path, request: resolve ? pendingOpenRef.current ?? undefined : undefined })
-      return
-    }
-    showDocument()
-    if (commitPath(path) === false) finishPendingOpen(false)
-  }, [finishPendingOpen, treePaths, selectedPath, selectedFile, displayReadyPath, fileLoading, showDocument, readError, treeError, treeLoaded, isDirty, commitPath])
+  const guardedOpen = useCallback((rawPath: string,
+    resolve?: (opened: boolean) => void) => openVaultFile(rawPath, resolve, { treePaths,
+    finishPendingOpen, setPendingNav, selectedPath, selectedFile, displayReadyPath, showDocument,
+    pendingOpenRef, fileLoading, readError, treeError, treeLoaded, setReloadNonce, isDirty,
+    commitPath }), [finishPendingOpen, treePaths, selectedPath, selectedFile, displayReadyPath,
+    fileLoading, showDocument, readError, treeError, treeLoaded, isDirty, commitPath])
 
   useImperativeHandle(ref, () => ({
     openFile: (path) => new Promise<boolean>((resolve) => guardedOpen(path, resolve)),
@@ -492,156 +237,22 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }
   const handleTreeSelect = useCallback((path: string) => selectFileRef.current(path), [])
 
-  const confirmDiscard = useCallback(() => {
-    const nav = pendingNav
-    setPendingNav(null)
-    if (!nav) return
-    if (nav.request && pendingOpenRef.current !== nav.request) return
-    if (!commitPath(nav.path)) {
-      finishPendingOpen(false)
-      return
-    }
-    setIsDirty(false)
-    showDocument()
-  }, [pendingNav, commitPath, showDocument, finishPendingOpen])
+  const confirmDiscard = useCallback(() => discardVaultDraft({ pendingNav, setPendingNav,
+    pendingOpenRef, commitPath, finishPendingOpen, setIsDirty, showDocument }), [pendingNav,
+    commitPath, showDocument, finishPendingOpen])
+  const { showRichMode, showSourceMode, onSourceChange, onRichChange,
+    saveCurrent } = useVaultDraftEditing({ setEditorMode, activeCodec, sourceDraft, draftContentRef,
+    dirtyRef, savedContentRef, editorModeRef, setRichDraft, setIsDirty, isDirty, richDraft,
+    setSourceDraft, mountedRef, saveScopeRef, saveScopeKey, selectedFile, port, saveRequestRef,
+    setSaving, setSaveError, savedResultRef, setSelectedFile, reportFailure, loadedPathRef })
 
-  const showRichMode = useCallback(() => {
-    setEditorMode((mode) => {
-      if (mode === 'rich') return mode
-      const rich = activeCodec.parse(sourceDraft)
-      const content = activeCodec.serialize(rich)
-      draftContentRef.current = content
-      dirtyRef.current = content !== savedContentRef.current
-      editorModeRef.current = 'rich'
-      setRichDraft(rich)
-      setIsDirty(dirtyRef.current)
-      return 'rich'
-    })
-  }, [activeCodec, sourceDraft])
+  const handleCreate = useCallback(() => createVaultFile({ newPath, setCreating, setCreateError,
+    port, setCreateOpen, setNewPath, refresh, commitPath, reportFailure }), [newPath, port, refresh,
+    commitPath, reportFailure])
 
-  const showSourceMode = useCallback(() => {
-    setEditorMode((mode) => {
-      if (mode === 'source') return mode
-      const content = isDirty ? activeCodec.serialize(richDraft) : savedContentRef.current
-      draftContentRef.current = content
-      dirtyRef.current = content !== savedContentRef.current
-      editorModeRef.current = 'source'
-      setSourceDraft(content)
-      setIsDirty(dirtyRef.current)
-      return 'source'
-    })
-  }, [activeCodec, isDirty, richDraft])
-
-  const onSourceChange = useCallback((next: string) => {
-    if (!mountedRef.current || editorModeRef.current !== 'source' || saveScopeRef.current.key !== saveScopeKey
-      || !saveScopeRef.current.canWrite || saveScopeRef.current.historyOpen) return
-    draftContentRef.current = next
-    dirtyRef.current = next !== savedContentRef.current
-    setSourceDraft(next)
-    setIsDirty(dirtyRef.current)
-  }, [saveScopeKey])
-
-  const onRichChange = useCallback((next: VaultRichParts) => {
-    if (!mountedRef.current || editorModeRef.current !== 'rich' || saveScopeRef.current.key !== saveScopeKey
-      || !saveScopeRef.current.canWrite || saveScopeRef.current.historyOpen) return
-    draftContentRef.current = activeCodec.serialize(next)
-    dirtyRef.current = draftContentRef.current !== savedContentRef.current
-    setRichDraft(next)
-    setIsDirty(dirtyRef.current)
-  }, [activeCodec, saveScopeKey])
-
-  const saveCurrent = useCallback(async () => {
-    const scope = saveScopeRef.current
-    if (!mountedRef.current || !selectedFile || !scope.canWrite || scope.historyOpen || !dirtyRef.current
-      || scope.key !== saveScopeKey || scope.port !== port
-      || scope.path !== selectedFile.path || saveRequestRef.current) return
-    const content = draftContentRef.current
-    const request = {}
-    // Set before React renders: even retained callbacks or two synchronous
-    // clicks share one write. Disabled buttons are presentation, not admission.
-    saveRequestRef.current = request
-    const isCurrent = () => mountedRef.current && saveRequestRef.current === request
-      && saveScopeRef.current.key === saveScopeKey
-      && saveScopeRef.current.port === port
-      && saveScopeRef.current.path === selectedFile.path
-      && saveScopeRef.current.canWrite
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await port.writeFile(selectedFile.path, content)
-      if (!isCurrent()) return
-      savedContentRef.current = content
-      const savedFile = { ...selectedFile, content }
-      savedResultRef.current = savedFile
-      setSelectedFile(savedFile)
-      // The current draft can have moved on while persistence was pending.
-      const dirty = draftContentRef.current !== content
-      dirtyRef.current = dirty
-      setIsDirty(dirty)
-      if (!dirty) {
-        setSourceDraft(content)
-        setRichDraft(activeCodec.parse(content))
-      }
-    } catch (error) {
-      if (isCurrent()) setSaveError(reportFailure('save', 'operation', error, 'Failed to save file', selectedFile.path))
-    } finally {
-      if (saveRequestRef.current === request) {
-        saveRequestRef.current = null
-        // A controlled selection can replace this file while its write is
-        // pending. Release the old file's dirty barrier, never a newer draft.
-        if (saveScopeRef.current.path !== selectedFile.path
-          && loadedPathRef.current === selectedFile.path) {
-          dirtyRef.current = false
-          setIsDirty(false)
-        }
-        setSaving(false)
-      }
-    }
-  }, [selectedFile, activeCodec, port, reportFailure, saveScopeKey])
-
-  const handleCreate = useCallback(async () => {
-    const trimmed = newPath.trim()
-    // Same rule as the confirm button, enforced here too: the dialog can also be
-    // confirmed by keyboard, and a directory path is not a file to create.
-    if (!trimmed || !(trimmed.split('/').pop()?.trim())) return
-    setCreating(true)
-    setCreateError(null)
-    try {
-      const created = await port.createFile(trimmed)
-      setCreateOpen(false)
-      setNewPath('')
-      const refreshed = await refresh({
-        operation: 'create',
-        phase: 'post-mutation-refresh',
-        path: created,
-        selectAfterRecovery: created,
-      })
-      if (refreshed) commitPath(created)
-    } catch (error) {
-      setCreateError(reportFailure('create', 'operation', error, 'Failed to create file', trimmed))
-    } finally {
-      setCreating(false)
-    }
-  }, [newPath, port, refresh, commitPath, reportFailure])
-
-  const handleDelete = useCallback(async () => {
-    if (!selectedFile) return
-    const path = selectedFile.path
-    setDeleting(true)
-    setDeleteError(null)
-    try {
-      await port.deleteFile(path)
-      setDeleteOpen(false)
-      setIsDirty(false)
-      commitPath(null)
-      setSelectedFile(null)
-      await refresh({ operation: 'delete', phase: 'post-mutation-refresh', path })
-    } catch (error) {
-      setDeleteError(reportFailure('delete', 'operation', error, 'Failed to delete file', path))
-    } finally {
-      setDeleting(false)
-    }
-  }, [selectedFile, port, refresh, commitPath, reportFailure])
+  const handleDelete = useCallback(() => deleteVaultFile({ selectedFile, setDeleting,
+    setDeleteError, port, setDeleteOpen, setIsDirty, commitPath, setSelectedFile, refresh,
+    reportFailure }), [selectedFile, port, refresh, commitPath, reportFailure])
 
   // History belongs to the open file; another file starts with the document.
   const historyPath = selectedFile?.path ?? null
@@ -649,29 +260,9 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   const canShowHistory = typeof port.listRevisions === 'function' && typeof port.readRevision === 'function'
   const listRevisions = useCallback((path: string) => port.listRevisions!(path), [port])
   const readRevision = useCallback((path: string, id: string) => port.readRevision!(path, id), [port])
-  const restoreRevision = useCallback(async (content: string) => {
-    const scope = saveScopeRef.current
-    if (!mountedRef.current || !selectedFile || !scope.canWrite || !scope.historyOpen
-      || scope.key !== saveScopeKey || scope.port !== port || scope.path !== selectedFile.path
-      || dirtyRef.current || saveRequestRef.current) {
-      throw new Error('This file is no longer available to restore.')
-    }
-    const request = {}
-    saveRequestRef.current = request
-    setSaving(true)
-    try {
-      await port.writeFile(selectedFile.path, content)
-      if (!mountedRef.current || saveRequestRef.current !== request
-        || saveScopeRef.current.key !== saveScopeKey) return
-      setHistoryOpen(false)
-      setReloadNonce((n) => n + 1)
-    } finally {
-      if (saveRequestRef.current === request) {
-        saveRequestRef.current = null
-        setSaving(false)
-      }
-    }
-  }, [port, selectedFile, saveScopeKey])
+  const restoreRevision = useCallback((content: string) => restoreVaultRevision(content,
+    { saveScopeRef, mountedRef, selectedFile, saveScopeKey, port, dirtyRef, saveRequestRef, setSaving,
+    setHistoryOpen, setReloadNonce }), [port, selectedFile, saveScopeKey])
 
   // A file counts as opened once it is on screen, not when it is requested.
   // It is recorded in the commit that first shows it: `displayReadyPath` trails
@@ -706,6 +297,42 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
   }
 
   const cancelCreate = () => { setCreateOpen(false); setNewPath(''); setCreateError(null) }
+ return { treeLoaded, treeLoading, treeError, label, retryTree, noun, setTreeError, vaultEmpty,
+   trimmedQuery, treeEmptyState, canCreate, openCreate, nameMatches, contentResults, onQueryChange,
+   renderTree, visibleRoot, resolvedSelectedPath, handleTreeSelect, activeFolder, handleFolderToggle,
+   treeStateKey, guardedOpen, retryContentSearch, commitPath, setSelectedFile, rootRef, className,
+   selectedPath, showFiles, showFileList, showDocument, treeHeadingId, headerActions, refresh,
+   setFolderPath, query, canSearchContent, searchRef, documentRef, selectedFile, pathBarClassName,
+   canWrite, isMarkdownCapable, editorMode, showRichMode, showSourceMode, canShowHistory, historyOpen,
+   isDirty, setHistoryOpen, renderDock, persistentDock, dockInline, dockButtonLabel, dockOpen,
+   dockBlockedByDraft, dockLabel, dockToggleCfg, setDockOpen, onDownloadFile, canDelete,
+   setDeleteError, setDeleteOpen, fileActions, saveError, saveCurrent, setSaveError, readError,
+   setReloadNonce, setReadError, fileLoading, listRevisions, readRevision, renderArtifact,
+   activeCodec, restoreRevision, sourceDraft, saving, onSourceChange, richDraft, savedRichDraft,
+   onRichChange, emptyState, recentToOffer, createOpen, newPath, creating, createError, setNewPath,
+   handleCreate, cancelCreate, deleteOpen, deleting, handleDelete, deleteError, pendingNav,
+   confirmDiscard, finishPendingOpen, setPendingNav }
+}
+type VaultPaneViewState = ReturnType<typeof useVaultPaneViewState>
+export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function VaultPane(props, ref) {
+ const view = useVaultPaneViewState(props, ref)
+ return <VaultPaneView {...view} />
+})
+function VaultPaneView({ treeLoaded, treeLoading, treeError, label, retryTree, noun, setTreeError,
+  vaultEmpty, trimmedQuery, treeEmptyState, canCreate, openCreate, nameMatches, contentResults,
+  onQueryChange, renderTree, visibleRoot, resolvedSelectedPath, handleTreeSelect, activeFolder,
+  handleFolderToggle, treeStateKey, guardedOpen, retryContentSearch, commitPath, setSelectedFile,
+  rootRef, className, selectedPath, showFiles, showFileList, showDocument, treeHeadingId,
+  headerActions, refresh, setFolderPath, query, canSearchContent, searchRef, documentRef,
+  selectedFile, pathBarClassName, canWrite, isMarkdownCapable, editorMode, showRichMode,
+  showSourceMode, canShowHistory, historyOpen, isDirty, setHistoryOpen, renderDock, persistentDock,
+  dockInline, dockButtonLabel, dockOpen, dockBlockedByDraft, dockLabel, dockToggleCfg, setDockOpen,
+  onDownloadFile, canDelete, setDeleteError, setDeleteOpen, fileActions, saveError, saveCurrent,
+  setSaveError, readError, setReloadNonce, setReadError, fileLoading, listRevisions, readRevision,
+  renderArtifact, activeCodec, restoreRevision, sourceDraft, saving, onSourceChange, richDraft,
+  savedRichDraft, onRichChange, emptyState, recentToOffer, createOpen, newPath, creating,
+  createError, setNewPath, handleCreate, cancelCreate, deleteOpen, deleting, handleDelete,
+  deleteError, pendingNav, confirmDiscard, finishPendingOpen, setPendingNav }: VaultPaneViewState) {
 
   let treeContent: ReactNode
   if (!treeLoaded && (treeLoading || !treeError)) {
@@ -908,4 +535,142 @@ export const VaultPane = forwardRef<VaultPaneHandle, VaultPaneProps>(function Va
       </div>
     </EditorErrorBoundary>
   )
-})
+
+}
+
+
+function useVaultTreeProjection({ tree, selectedPath, folderPath, label,
+  port }: { tree: VaultTreeNode[]; selectedPath: string | null; folderPath: string | null;
+  label: string; port: VaultPaneProps['port'] }) {
+
+  const treePaths = useMemo(
+    () => collectTreePaths(tree, { files: new Set<string>(), directories: new Set<string>() }),
+    [tree],
+  )
+  const resolvedSelectedPath = useMemo(() => {
+    if (!selectedPath) return null
+    const listed = resolveTreePath(selectedPath, treePaths)
+    if (listed?.type === 'directory') return null
+    // A committed file can be readable before an older tree snapshot lists it.
+    // The data port owns validation and missing-file errors for explicit paths.
+    return listed?.path ?? selectedPath
+  }, [selectedPath, treePaths])
+  // The clicked folder, resolved against the CURRENT tree — a folder that a
+  // refresh removed stops being the active one on its own, so neither the
+  // search scope nor the create target can point at a directory that is gone.
+  const activeFolderNode = useMemo(
+    () => (folderPath ? findDirectory(tree, folderPath) : null),
+    [tree, folderPath],
+  )
+  const activeFolder = activeFolderNode?.path ?? null
+  const treeRoot = useMemo<VaultTreeNode>(
+    () => ({ name: label, path: '', type: 'directory', children: tree }),
+    [tree, label],
+  )
+  const { query, onQueryChange, visibleRoot, canSearchContent, contentResults, retry: retryContentSearch } = useVaultSearch({ port, treeRoot })
+  return { treePaths, resolvedSelectedPath, activeFolderNode, activeFolder, treeRoot, query,
+    onQueryChange, visibleRoot, canSearchContent, contentResults, retryContentSearch }
+}
+
+
+function useVaultDocumentFocus({ setFilesOpen, documentRef }: { setFilesOpen: (open: boolean) => void; documentRef: { current: HTMLDivElement | null } }) {
+
+  const showDocument = useCallback(() => {
+    const focused = document.activeElement
+    setFilesOpen(false)
+    requestAnimationFrame(() => {
+      if (document.activeElement === focused || document.activeElement === document.body) {
+        documentRef.current?.focus({ preventScroll: true })
+      }
+    })
+  }, [])
+  return { showDocument }
+}
+
+
+function useVaultPendingOpenCompletion({ pendingOpenRef, setPendingNav, previousPortRef, port,
+  selectedPath }: { previousPortRef: { current: VaultPaneProps['port'] };
+  port: VaultPaneProps['port']; selectedPath: string | null;
+  pendingOpenRef: { current: VaultPendingOpen | null }; setPendingNav: (value: VaultPendingNavigation | ((current: VaultPendingNavigation) => VaultPendingNavigation)) => void }) {
+
+  const finishPendingOpen = useCallback((opened: boolean,
+    clearNavigation = true) => finishVaultPendingOpen(opened, clearNavigation, { pendingOpenRef,
+    setPendingNav }), [])
+useEffect(() => () => finishPendingOpen(false, false), [finishPendingOpen])
+useEffect(() => {
+    if (previousPortRef.current !== port) finishPendingOpen(false)
+    previousPortRef.current = port
+  }, [port, finishPendingOpen])
+useEffect(() => {
+    const pending = pendingOpenRef.current
+    if (!pending) return
+    if (selectedPath === pending.path) pending.selected = true
+    else if (pending.selected || selectedPath !== pending.fromPath) finishPendingOpen(false)
+  }, [selectedPath, finishPendingOpen])
+  return { finishPendingOpen }
+}
+
+
+function useVaultDraftEditing({ setEditorMode, activeCodec, sourceDraft, draftContentRef, dirtyRef,
+  savedContentRef, editorModeRef, setRichDraft, setIsDirty, isDirty, richDraft, setSourceDraft,
+  mountedRef, saveScopeRef, saveScopeKey, selectedFile, port, saveRequestRef, setSaving,
+  setSaveError, savedResultRef, setSelectedFile, reportFailure,
+  loadedPathRef }: { setEditorMode: (value: VaultEditorMode | ((current: VaultEditorMode) => VaultEditorMode)) => void;
+  activeCodec: VaultMarkdownCodec; sourceDraft: string; draftContentRef: { current: string };
+  dirtyRef: { current: boolean }; savedContentRef: { current: string };
+  editorModeRef: { current: VaultEditorMode };
+  setRichDraft: (value: VaultRichParts | ((current: VaultRichParts) => VaultRichParts)) => void;
+  setIsDirty: (value: boolean | ((current: boolean) => boolean)) => void; isDirty: boolean;
+  richDraft: VaultRichParts; setSourceDraft: (value: string | ((current: string) => string)) => void;
+  mountedRef: { current: boolean }; saveScopeRef: { current: VaultSaveScope }; saveScopeKey: object;
+  selectedFile: VaultFile | null; port: VaultPaneProps['port'];
+  saveRequestRef: { current: object | null };
+  setSaving: (value: boolean | ((current: boolean) => boolean)) => void;
+  setSaveError: (value: VaultOperationFailure | null | ((current: VaultOperationFailure | null) => VaultOperationFailure | null)) => void;
+  savedResultRef: { current: VaultFile | null };
+  setSelectedFile: (value: VaultFile | null | ((current: VaultFile | null) => VaultFile | null)) => void; reportFailure: (operation: VaultOperation,
+  phase: VaultOperationPhase, error: unknown, fallback: string, path?: string) => VaultOperationFailure; loadedPathRef: { current: string | null } }) {
+
+  const showRichMode = useCallback(() => showVaultRichMode({ setEditorMode, activeCodec,
+    sourceDraft, draftContentRef, dirtyRef, savedContentRef, editorModeRef, setRichDraft,
+    setIsDirty }), [activeCodec, sourceDraft])
+
+  const showSourceMode = useCallback(() => showVaultSourceMode({ setEditorMode, isDirty,
+    activeCodec, richDraft, savedContentRef, draftContentRef, dirtyRef, editorModeRef, setSourceDraft,
+    setIsDirty }), [activeCodec, isDirty, richDraft])
+
+  const onSourceChange = useCallback((next: string) => changeVaultSource(next, { mountedRef,
+    editorModeRef, saveScopeRef, saveScopeKey, draftContentRef, dirtyRef, savedContentRef,
+    setSourceDraft, setIsDirty }), [saveScopeKey])
+
+  const onRichChange = useCallback((next: VaultRichParts) => changeVaultRichDraft(next,
+    { mountedRef, editorModeRef, saveScopeRef, saveScopeKey, draftContentRef, activeCodec, dirtyRef,
+    savedContentRef, setRichDraft, setIsDirty }), [activeCodec, saveScopeKey])
+
+  const saveCurrent = useCallback(() => saveVaultFile({ saveScopeRef, mountedRef, selectedFile,
+    dirtyRef, saveScopeKey, port, saveRequestRef, draftContentRef, setSaving, setSaveError,
+    savedContentRef, savedResultRef, setSelectedFile, setIsDirty, setSourceDraft, setRichDraft,
+    activeCodec, reportFailure, loadedPathRef }), [selectedFile, activeCodec, port, reportFailure, saveScopeKey])
+  return { showRichMode, showSourceMode, onSourceChange, onRichChange, saveCurrent }
+}
+
+
+function useVaultDocumentState() {
+
+  const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null)
+  const [displayReadyPath, setDisplayReadyPath] = useState<string | null>(null)
+  const [fileLoading, setFileLoading] = useState(false)
+  const [readError, setReadError] = useState<string | null>(null)
+  const [reloadNonce, setReloadNonce] = useState(0)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<VaultOperationFailure | null>(null)
+
+  const [editorMode, setEditorMode] = useState<VaultEditorMode>('rich')
+  const [richDraft, setRichDraft] = useState<VaultRichParts>('')
+  const [sourceDraft, setSourceDraft] = useState('')
+  const [isDirty, setIsDirty] = useState(false)
+  return { selectedFile, setSelectedFile, displayReadyPath, setDisplayReadyPath, fileLoading,
+    setFileLoading, readError, setReadError, reloadNonce, setReloadNonce, saving, setSaving, saveError,
+    setSaveError, editorMode, setEditorMode, richDraft, setRichDraft, sourceDraft, setSourceDraft,
+    isDirty, setIsDirty }
+}

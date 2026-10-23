@@ -69,7 +69,7 @@ export const MIN_IMAGE_COUNT = 1
 export const MAX_IMAGE_COUNT = 8
 
 /** Resolve a human-readable relative time string from a given date or return an empty string if null */
-export function relativeTime(date: Date | null): string {
+export function relativeTime(date: Date | string | null): string {
   if (!date) return ''
   const now = Date.now()
   const diff = now - new Date(date).getTime()

@@ -22,7 +22,7 @@ import {
 } from '@tangle-network/agent-interface'
 import {
   selectSessionHarness,
-  type HarnessAvailability as SelectionAvailability,
+  type SelectionAvailability,
   type SessionHarnessSelection,
   type SessionHarnessSelectionInput,
 } from './session-selection'

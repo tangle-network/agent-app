@@ -5,8 +5,11 @@ import { TurnStreamDO as SharedTurnStreamDO, TURN_STREAM_STORAGE_KEYS, type Dura
  * the actual backend execution. Elapsed time alone never proves it stopped.
  * Auth, atomic admission, fencing and release remain owned by the shared DO.
  */
-export class TurnStreamDO extends SharedTurnStreamDO {
+export class DetachedTurnStreamDO extends SharedTurnStreamDO {
   protected override async loadActiveLock(): Promise<DurableTurnLock | null> {
     return await this.state.storage.get<DurableTurnLock>(TURN_STREAM_STORAGE_KEYS.lock) ?? null
   }
 }
+
+// Preserve the generated Worker binding and its integration entrypoint.
+export { DetachedTurnStreamDO as TurnStreamDO }

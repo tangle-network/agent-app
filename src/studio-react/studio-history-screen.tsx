@@ -111,15 +111,14 @@ function skeletonCells(count: number, keyPrefix: string) {
 function hasOpenPopover(): boolean {
   return typeof document !== 'undefined' && document.querySelector(`[${POPOVER_SURFACE_ATTR}]`) !== null
 }
-
-export function StudioHistoryScreen({
+function useStudioHistoryScreenViewState({
   fetchPage,
   initialPage,
   onBack,
   actions,
   searchDebounceMs = 250,
   className,
-}: StudioHistoryScreenProps): JSX.Element {
+}: StudioHistoryScreenProps) {
   const playback = useStudioPlayback()
   const { stop } = playback
   const { toast } = useStudioToast()
@@ -269,8 +268,24 @@ export function StudioHistoryScreen({
         title: 'Your history is empty.',
         body: 'Everything you generate is kept here until you delete it.',
       }
+  return { className, selectMode, exitSelectMode, selected, batchDownload, actions, savePopover,
+    setSaveOpen, saveOpen, selectedRows, batchSave, savePending, setConfirmTargets, onBack, query,
+    setQuery, type, setType, history, rows, emptyCopy, isFiltered, clearFilters, setViewer,
+    toggleSelect, onSaved, sentinelRef, viewerRow, confirmTargets, confirmDelete }
+}
 
-  return (
+type StudioHistoryScreenViewState = ReturnType<typeof useStudioHistoryScreenViewState>
+
+export function StudioHistoryScreen(props: StudioHistoryScreenProps) {
+  const view = useStudioHistoryScreenViewState(props)
+  return <StudioHistoryScreenView {...view} />
+}
+
+function StudioHistoryScreenView({ className, selectMode, exitSelectMode, selected, batchDownload,
+  actions, savePopover, setSaveOpen, saveOpen, selectedRows, batchSave, savePending,
+  setConfirmTargets, onBack, query, setQuery, type, setType, history, rows, emptyCopy, isFiltered,
+  clearFilters, setViewer, toggleSelect, onSaved, sentinelRef, viewerRow, confirmTargets, confirmDelete }: StudioHistoryScreenViewState) {
+  return ((
     <div className={`studio-hist-wrap pb-[72px] ${className ?? ''}`}>
       {selectMode ? (
         <div className={BAR}>
@@ -434,5 +449,5 @@ export function StudioHistoryScreen({
         onCancel={() => setConfirmTargets(null)}
       />
     </div>
-  )
+  ))
 }

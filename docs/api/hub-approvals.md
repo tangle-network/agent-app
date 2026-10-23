@@ -195,7 +195,7 @@ interface HubPreviewMedia
 `function` — A held call in the owner's words, with the preview its integration renders.
 
 ```ts
-(item: Pick<HubApprovalItem, "input" | "providerId" | "actionPath" | "files" | "bundle" | "preview">) => HubActionPrese…
+(item: Pick<HubApprovalItem, "providerId" | "input" | "actionPath" | "files" | "bundle" | "preview">) => HubActionPrese…
 ```
 
 ### `splitHubActionPath`

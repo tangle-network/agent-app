@@ -27,6 +27,7 @@ export const UNBUILT_ENTRIES = [
   'src/stories/fixtures/**/*.ts',
   'src/stories/**/fixtures.ts',
   'tests/**/*.test.{ts,tsx}',
+  'tests/**/*.integration.ts',
 ]
 
 export default {

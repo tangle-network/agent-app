@@ -4,7 +4,7 @@
 
 Source: `src/brand-extraction/index.ts`
 
-19 exports.
+18 exports.
 
 ### `BrandColor`
 
@@ -116,14 +116,6 @@ interface DecidedPalette
 
 ```ts
 interface ExtractBrandKitOptions
-```
-
-### `FetchLike`
-
-`type` — Fetch boundary, injectable so callers (Workers, Node, tests) supply their own fetch and so tests can run fully offline against fixture HTML.
-
-```ts
-type FetchLike
 ```
 
 ### `luminance`

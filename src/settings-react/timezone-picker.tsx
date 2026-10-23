@@ -1,3 +1,4 @@
+import { bindSearchPickerNavigation } from '../web-react/focus-navigation'
 /**
  * A searchable timezone field: the same popover, search and keyboard model as
  * `ModelPicker`. Zones come from the browser's IANA list, grouped by region
@@ -179,34 +180,11 @@ export function TimezonePicker({ id, value, onChange, disabled = false, 'aria-de
   useEffect(() => {
     const panel = panelRef.current
     if (!expanded || !panel) return
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return
-      const input = inputRef.current
-      if (!input || !panel) return
-      const controls: HTMLElement[] = [input, ...panel.querySelectorAll<HTMLButtonElement>('button[data-zone]')]
-      const index = controls.indexOf(document.activeElement as HTMLElement)
-      if (index < 0) return
-      if (event.key === 'Tab') {
-        if ((event.shiftKey && index === 0) || (!event.shiftKey && index === controls.length - 1)) {
-          changeOpen(false)
-          triggerRef.current?.focus()
-          if (event.shiftKey) event.preventDefault()
-        }
-        return
-      }
-      let next: number
-      if (event.key === 'ArrowDown') next = (index + 1) % controls.length
-      else if (event.key === 'ArrowUp') next = (index - 1 + controls.length) % controls.length
-      else if (event.key === 'Enter' && index === 0 && controls.length > 1) {
-        event.preventDefault()
-        ;(controls[1] as HTMLButtonElement).click()
-        return
-      } else return
-      event.preventDefault()
-      controls[next]?.focus()
-    }
-    panel.addEventListener('keydown', onKeyDown)
-    return () => panel.removeEventListener('keydown', onKeyDown)
+    return bindSearchPickerNavigation({
+      panel, input: () => inputRef.current, trigger: () => triggerRef.current,
+      onClose: () => changeOpen(false), buttonSelector: 'button[data-zone]',
+      activateFirst: true,
+    })
   })
 
   const pick = (zone: string) => {

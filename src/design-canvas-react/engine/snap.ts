@@ -14,7 +14,7 @@
 
 import { elementAabb } from '../../design-canvas/model'
 import type { Bounds, SceneElement, ScenePage } from '../../design-canvas/model'
-import type { EditorSceneState, SnapEngine, SnapResult, SnapTarget, SnapTargetKind, SnapTargets } from '../contracts'
+import type { EditorSceneState, SnapEngine, CanvasSnapResult, SnapTarget, SnapTargetKind, SnapTargets } from '../contracts'
 
 /** Priority rank for tie-breaking: lower = higher priority (wins the tie). */
 const KIND_PRIORITY: Record<SnapTargetKind, number> = {
@@ -62,7 +62,7 @@ export function createSnapEngine(): SnapEngine {
       return { vertical, horizontal }
     },
 
-    apply(bounds: Bounds, targets: SnapTargets, thresholdPx: number, zoom: number): SnapResult {
+    apply(bounds: Bounds, targets: SnapTargets, thresholdPx: number, zoom: number): CanvasSnapResult {
       if (!Number.isFinite(zoom) || zoom <= 0) {
         throw new Error(`snap.apply: zoom must be a positive finite number, got ${zoom}`)
       }

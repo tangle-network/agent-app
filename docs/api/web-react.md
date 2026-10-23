@@ -88,10 +88,10 @@ interface AgentProfileChoicesProps
 
 ### `AgentProfileEditor`
 
-`function` — Controlled editor for the canonical profile.
+`function`
 
 ```ts
-({ value, onChange, disabled, className, config, allowedResourceKinds, filePathPrefix, allowExecutableFiles, requireGit…
+(props: AgentProfileEditorProps) => Element
 ```
 
 ### `AgentProfileEditorConfig`
@@ -451,7 +451,7 @@ interface ChatAttachmentPart
 `function`
 
 ```ts
-({ onSend, onSendParts, onSendFailed, sendFailureMessage, onCancel, isStreaming, disabled, sendDisabled, placeholder, v…
+(props: ChatComposerProps) => Element
 ```
 
 ### `ChatComposerProps`
@@ -1907,7 +1907,7 @@ interface InteractionPlanCardProps
 `function`
 
 ```ts
-({ interaction, canWrite, submitAnswer, onResolved, onLateAnswer, kindLabel, timeoutNote, renderMarkdown, declinable, c…
+(props: InteractionQuestionCardProps) => Element
 ```
 
 ### `InteractionQuestionCardProps`
@@ -2800,10 +2800,10 @@ interface ReasoningRowProps
 
 ### `RecordGrid`
 
-`function` — The shared editable record table.
+`function`
 
 ```ts
-({ columns, caption, state, empty, onCreate, onUpdate, onDelete, proposed, onAcceptRow, onRejectRow, onAcceptAll, onRej…
+(props: RecordGridProps) => Element
 ```
 
 ### `RecordGridBooleanColumn`
@@ -3336,10 +3336,10 @@ type SessionBulkAction
 
 ### `SessionHistoryPanel`
 
-`function` — The full session history: search, sort, cursor-paged rows with per-row actions, and the states in between (first-run empty, loading, no matches, error + retry).
+`function`
 
 ```ts
-({ history, hasAnySessions, query, onQueryChange, sort, onSortChange, hrefForSession, linkComponent: Link, respondingSe…
+(props: SessionHistoryPanelProps) => Element
 ```
 
 ### `SessionHistoryPanelProps`

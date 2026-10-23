@@ -79,7 +79,7 @@ import { BleedTrimOverlay } from './BleedTrimOverlay'
 import { normalizeMarquee } from './transform-math'
 import { elementAabb, findElement, boundsIntersect } from '../../design-canvas/model'
 import type { SceneElement, ScenePage, TextElement, Bounds } from '../../design-canvas/model'
-import type { SnapResult, SnapTarget, SceneCommand } from '../contracts'
+import type { CanvasSnapResult, SnapTarget, SceneCommand } from '../contracts'
 import { lightTheme, type CanvasRenderPalette } from '../../theme/theme'
 
 // ---------------------------------------------------------------------------
@@ -131,12 +131,7 @@ export interface WorkspaceViewProps {
    *  omitted that door is hidden — there is no agent surface to send them to. */
   onAskAgent?(): void
 }
-
-// ---------------------------------------------------------------------------
-// WorkspaceView — all interaction + Konva render; commits through shared stack
-// ---------------------------------------------------------------------------
-
-export function WorkspaceView({
+function useWorkspaceViewViewState({
   canWrite,
   onApplyOperations,
   onSelectionChange,
@@ -181,7 +176,7 @@ export function WorkspaceView({
   // Stores origin position AND AABB dimensions captured at drag start so
   // snap reference points (center, far edge) are correct for any element size.
   const dragOriginRef = useRef<Map<string, { x: number; y: number; width: number; height: number }>>(new Map())
-  const [activeSnap, setActiveSnap] = useState<SnapResult | null>(null)
+  const [activeSnap, setActiveSnap] = useState<CanvasSnapResult | null>(null)
   const [editingElementId, setEditingElementId] = useState<string | null>(null)
   const editingPreRef = useRef<string>('')
 
@@ -205,245 +200,16 @@ export function WorkspaceView({
       stack.rollback(command)
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Wheel zoom-to-cursor
-  // -------------------------------------------------------------------------
-
-  function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
-    e.preventDefault()
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const screenX = e.clientX - rect.left
-    const screenY = e.clientY - rect.top
-    const factor = Math.pow(ZOOM_FACTOR_WHEEL, e.deltaY)
-    const next = zoomPanMath.zoomAtPoint({ zoom, panX, panY }, factor, screenX, screenY)
-    stack.setView(next)
-  }
-
-  // -------------------------------------------------------------------------
-  // Pointer handlers
-  // -------------------------------------------------------------------------
-
-  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (e.button === 1 || spaceHeldRef.current) {
-      e.preventDefault()
-      ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
-      gestureRef.current = 'pan'
-      panOriginRef.current = { screenX: e.clientX, screenY: e.clientY, panX, panY }
-      return
-    }
-    if (e.button !== 0) return
-
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const screenX = e.clientX - rect.left
-    const screenY = e.clientY - rect.top
-    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
-
-    // Element-vs-empty-space is decided against the scene model in document
-    // space, not Konva's hit-graph canvas. The hit canvas misclassifies presses
-    // over elements (clip group, listening:false background, redraw lag right
-    // after a pan/zoom setView), which silently routed an element press into the
-    // marquee branch — the element drag never started. A model hit means: let
-    // Konva's draggable node begin the move; only empty space starts a marquee.
-    if (hitTestPoint(activePage, docPos.x, docPos.y) !== null) {
-      return
-    }
-
-    e.preventDefault()
-    ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
-    gestureRef.current = 'marquee'
-    const m: MarqueeState = { active: true, startDocX: docPos.x, startDocY: docPos.y, endDocX: docPos.x, endDocY: docPos.y }
-    marqueeRef.current = m
-    setMarquee(m)
-    stack.setView({ selectedElementIds: [] })
-  }
-
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const mode = gestureRef.current
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    if (mode === 'pan') {
-      const dx = e.clientX - panOriginRef.current.screenX
-      const dy = e.clientY - panOriginRef.current.screenY
-      stack.setView({ panX: panOriginRef.current.panX + dx, panY: panOriginRef.current.panY + dy })
-      return
-    }
-
-    if (mode === 'marquee') {
-      const screenX = e.clientX - rect.left
-      const screenY = e.clientY - rect.top
-      const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
-      const m: MarqueeState = { ...marqueeRef.current, active: true, endDocX: docPos.x, endDocY: docPos.y }
-      marqueeRef.current = m
-      setMarquee(m)
-      const normalized = normalizeMarquee(m.startDocX, m.startDocY, m.endDocX, m.endDocY)
-      const ids = marqueeSelect(activePage, normalized)
-      stack.setView({ selectedElementIds: ids })
-    }
-  }
-
-  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    gestureRef.current = 'idle'
-    setMarquee(NO_MARQUEE)
-    marqueeRef.current = NO_MARQUEE
-    setActiveSnap(null)
-    ;(e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId)
-  }
-
-  // -------------------------------------------------------------------------
-  // Element drag callbacks
-  // -------------------------------------------------------------------------
-
-  /** The preview and final drop use the same document/grid snap targets. */
-  function snapDragBounds(snapBounds: Bounds, draggingIds: string[]): SnapResult {
-    const targets = snapEngine.collectTargets(state, draggingIds)
-    if (gridEnabled) {
-      const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
-      const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
-      targets.vertical.push(...gt.vertical)
-      targets.horizontal.push(...gt.horizontal)
-    }
-    return snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
-  }
-
-  function handleElementDragStart(elementId: string) {
-    if (!canWrite) return
-    const ids = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
-    const origins = new Map<string, { x: number; y: number; width: number; height: number }>()
-    for (const id of ids) {
-      const found = findElement(activePage, id)
-      if (found) {
-        const aabb = elementAabb(found.element)
-        origins.set(id, { x: found.element.x, y: found.element.y, width: aabb.width, height: aabb.height })
-      }
-    }
-    dragOriginRef.current = origins
-    gestureRef.current = 'drag'
-    if (!selectedElementIds.includes(elementId)) {
-      stack.setView({ selectedElementIds: [elementId] })
-    }
-  }
-
-  function handleElementDragMove(elementId: string, dx: number, dy: number) {
-    if (!canWrite) return
-    const origin = dragOriginRef.current.get(elementId)
-    if (!origin) return
-    const dragging = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
-    const proposedX = origin.x + dx
-    const proposedY = origin.y + dy
-    // Use the actual element AABB dimensions so center and far-edge snap points
-    // are correct for elements of any size (not the former hardcoded 100×100).
-    const snapBounds = { x: proposedX, y: proposedY, width: origin.width, height: origin.height }
-
-    if (snapEnabled) {
-      const snapResult = snapDragBounds(snapBounds, dragging)
-      setActiveSnap(snapResult)
-    }
-  }
-
-  async function handleElementDragEnd(elementId: string, finalX: number, finalY: number) {
-    if (!canWrite) return
-    gestureRef.current = 'idle'
-    setActiveSnap(null)
-
-    const origin = dragOriginRef.current.get(elementId)
-    if (!origin) return
-
-    const draggingIds = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
-
-    // Re-run snapping for the drop position so the PERSISTED coordinates match the
-    // guide the user saw mid-drag. Without this the element lands at the raw
-    // pointer position and the snap line is purely cosmetic.
-    let snappedX = finalX
-    let snappedY = finalY
-    if (snapEnabled) {
-      const snapBounds = { x: finalX, y: finalY, width: origin.width, height: origin.height }
-      const snapResult = snapDragBounds(snapBounds, draggingIds)
-      snappedX = snapResult.x
-      snappedY = snapResult.y
-    }
-
-    const dx = snappedX - origin.x
-    const dy = snappedY - origin.y
-
-    if (draggingIds.length === 1) {
-      const el = findElement(activePage, elementId)?.element
-      if (!el) return
-      await persist(
-        setAttrsCommand({
-          pageId: activePageId,
-          elementId,
-          attrs: { x: snappedX, y: snappedY },
-          priorAttrs: { x: el.x, y: el.y },
-        }),
-      )
-    } else {
-      const entries: MultiSetAttrsEntry[] = []
-      for (const id of draggingIds) {
-        const el = findElement(activePage, id)?.element
-        const orig = dragOriginRef.current.get(id)
-        if (!el || !orig) continue
-        entries.push({
-          pageId: activePageId,
-          elementId: id,
-          attrs: { x: orig.x + dx, y: orig.y + dy },
-          priorAttrs: { x: orig.x, y: orig.y },
-        })
-      }
-      if (entries.length > 0) await persist(multiSetAttrsCommand(entries))
-    }
-
-    dragOriginRef.current = new Map()
-  }
-
-  // -------------------------------------------------------------------------
-  // Element interactions
-  // -------------------------------------------------------------------------
-
-  function handleElementClick(elementId: string) {
-    stack.setView({ selectedElementIds: [elementId] })
-  }
-
-  function handleElementDoubleClick(elementId: string) {
-    if (!canWrite) return
-    const found = findElement(activePage, elementId)
-    if (!found || found.element.kind !== 'text') return
-    editingPreRef.current = (found.element as TextElement).text
-    setEditingElementId(elementId)
-  }
-
-  async function handleTextCommit(text: string) {
-    const id = editingElementId
-    setEditingElementId(null)
-    if (!id || !canWrite) return
-    const found = findElement(activePage, id)
-    if (!found || found.element.kind !== 'text') return
-    if (text === editingPreRef.current) return
-    await persist(
-      setAttrsCommand({
-        pageId: activePageId,
-        elementId: id,
-        attrs: { text },
-        priorAttrs: { text: editingPreRef.current },
-      }),
-    )
-  }
-
-  function handleTextCancel() {
-    setEditingElementId(null)
-  }
-
-  // -------------------------------------------------------------------------
-  // Transformer end
-  // -------------------------------------------------------------------------
-
-  async function handleTransformEnd(entries: MultiSetAttrsEntry[]) {
-    if (!canWrite || entries.length === 0) return
-    await persist(multiSetAttrsCommand(entries))
-  }
+  const { handleWheel, handlePointerDown, handlePointerMove,
+    handlePointerUp } = createWorkspacePointerHandlers({ containerRef, zoomPanMath, zoom, panX, panY,
+    stack, spaceHeldRef, gestureRef, panOriginRef, activePage, marqueeRef, setMarquee, setActiveSnap })
+  const { snapDragBounds, handleElementDragStart, handleElementDragMove,
+    handleElementDragEnd } = createWorkspaceDragHandlers({ snapEngine, state, gridEnabled, zoom,
+    gridSize, activePage, canWrite, selectedElementIds, dragOriginRef, gestureRef, stack, snapEnabled,
+    setActiveSnap, persist, activePageId })
+  const { handleElementClick, handleElementDoubleClick, handleTextCommit, handleTextCancel,
+    handleTransformEnd } = createWorkspaceElementHandlers({ stack, canWrite, activePage, editingPreRef,
+    setEditingElementId, editingElementId, persist, activePageId })
 
   // -------------------------------------------------------------------------
   // Empty-state doors — both insert real content through the shared stack, so
@@ -600,12 +366,32 @@ export function WorkspaceView({
       (el) => pinned.has(el.id) || boundsIntersect(elementAabb(el), pageRect),
     )
   }, [activePage.elements, activePage.width, activePage.height, selectedElementIds, editingElementId])
+  return { className, containerRef, handleWheel, handlePointerDown, handlePointerMove,
+    handlePointerUp, handleKeyDown, handleKeyUp, spaceHeldRef, stageRef, containerSize, dpr,
+    gridEnabled, activePage, gridSize, zoom, panX, panY, render, visibleElements, selectedElementIds,
+    onElementClick, onElementDragStart, onElementDragMove, onElementDragEnd, onElementDoubleClick,
+    activeVerticalGuide, activeHorizontalGuide, selectedElements, canWrite, handleTransformEnd,
+    activePageId, showBleed, pageScreenX, pageScreenY, pageScreenW, pageScreenH, normalizedMarquee,
+    editingTextElement, handleTextCommit, handleTextCancel, showEmptyState, editingElementId,
+    handleStartTemplate, handleAddElement, onAskAgent }
+}
 
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
+type WorkspaceViewViewState = ReturnType<typeof useWorkspaceViewViewState>
 
-  return (
+export function WorkspaceView(props: WorkspaceViewProps) {
+  const view = useWorkspaceViewViewState(props)
+  return <WorkspaceViewView {...view} />
+}
+
+function WorkspaceViewView({ className, containerRef, handleWheel, handlePointerDown,
+  handlePointerMove, handlePointerUp, handleKeyDown, handleKeyUp, spaceHeldRef, stageRef,
+  containerSize, dpr, gridEnabled, activePage, gridSize, zoom, panX, panY, render, visibleElements,
+  selectedElementIds, onElementClick, onElementDragStart, onElementDragMove, onElementDragEnd,
+  onElementDoubleClick, activeVerticalGuide, activeHorizontalGuide, selectedElements, canWrite,
+  handleTransformEnd, activePageId, showBleed, pageScreenX, pageScreenY, pageScreenW, pageScreenH,
+  normalizedMarquee, editingTextElement, handleTextCommit, handleTextCancel, showEmptyState,
+  editingElementId, handleStartTemplate, handleAddElement, onAskAgent }: WorkspaceViewViewState) {
+  return ((
     <div
       // h-full w-full: the chrome's workspace slot (DesignCanvas) is a definite-
       // height flex box, so the root must fill it explicitly. Without it the div
@@ -777,8 +563,10 @@ export function WorkspaceView({
         />
       ) : null}
     </div>
-  )
+  ))
 }
+
+
 
 // ---------------------------------------------------------------------------
 // Workspace — standalone wrapper for bare embeds and tests (no chrome)
@@ -835,4 +623,279 @@ export function Workspace(props: DesignCanvasProps) {
       render={props.render}
     />
   )
+}
+
+
+function createWorkspacePointerHandlers({ containerRef, zoomPanMath, zoom, panX, panY, stack,
+  spaceHeldRef, gestureRef, panOriginRef, activePage, marqueeRef, setMarquee,
+  setActiveSnap }: { containerRef: { current: HTMLDivElement | null };
+  zoomPanMath: ReturnType<typeof createZoomPanMath>; zoom: number; panX: number; panY: number;
+  stack: WorkspaceViewProps['stack']; spaceHeldRef: { current: boolean };
+  gestureRef: { current: GestureMode }; panOriginRef: { current: { screenX: number; screenY: number;
+  panX: number; panY: number } }; activePage: WorkspaceViewProps['activePage'];
+  marqueeRef: { current: MarqueeState }; setMarquee: (marquee: MarqueeState) => void; setActiveSnap: (snap: CanvasSnapResult | null) => void }) {
+
+  // -------------------------------------------------------------------------
+  // Wheel zoom-to-cursor
+  // -------------------------------------------------------------------------
+
+  function handleWheel(e: React.WheelEvent<HTMLDivElement>) {
+    e.preventDefault()
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+    const factor = Math.pow(ZOOM_FACTOR_WHEEL, e.deltaY)
+    const next = zoomPanMath.zoomAtPoint({ zoom, panX, panY }, factor, screenX, screenY)
+    stack.setView(next)
+  }
+
+  // -------------------------------------------------------------------------
+  // Pointer handlers
+  // -------------------------------------------------------------------------
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button === 1 || spaceHeldRef.current) {
+      e.preventDefault()
+      ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+      gestureRef.current = 'pan'
+      panOriginRef.current = { screenX: e.clientX, screenY: e.clientY, panX, panY }
+      return
+    }
+    if (e.button !== 0) return
+
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const screenX = e.clientX - rect.left
+    const screenY = e.clientY - rect.top
+    const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
+
+    // Element-vs-empty-space is decided against the scene model in document
+    // space, not Konva's hit-graph canvas. The hit canvas misclassifies presses
+    // over elements (clip group, listening:false background, redraw lag right
+    // after a pan/zoom setView), which silently routed an element press into the
+    // marquee branch — the element drag never started. A model hit means: let
+    // Konva's draggable node begin the move; only empty space starts a marquee.
+    if (hitTestPoint(activePage, docPos.x, docPos.y) !== null) {
+      return
+    }
+
+    e.preventDefault()
+    ;(e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId)
+    gestureRef.current = 'marquee'
+    const m: MarqueeState = { active: true, startDocX: docPos.x, startDocY: docPos.y, endDocX: docPos.x, endDocY: docPos.y }
+    marqueeRef.current = m
+    setMarquee(m)
+    stack.setView({ selectedElementIds: [] })
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const mode = gestureRef.current
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    if (mode === 'pan') {
+      const dx = e.clientX - panOriginRef.current.screenX
+      const dy = e.clientY - panOriginRef.current.screenY
+      stack.setView({ panX: panOriginRef.current.panX + dx, panY: panOriginRef.current.panY + dy })
+      return
+    }
+
+    if (mode === 'marquee') {
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      const docPos = zoomPanMath.screenToDocument({ zoom, panX, panY }, screenX, screenY)
+      const m: MarqueeState = { ...marqueeRef.current, active: true, endDocX: docPos.x, endDocY: docPos.y }
+      marqueeRef.current = m
+      setMarquee(m)
+      const normalized = normalizeMarquee(m.startDocX, m.startDocY, m.endDocX, m.endDocY)
+      const ids = marqueeSelect(activePage, normalized)
+      stack.setView({ selectedElementIds: ids })
+    }
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    gestureRef.current = 'idle'
+    setMarquee(NO_MARQUEE)
+    marqueeRef.current = NO_MARQUEE
+    setActiveSnap(null)
+    ;(e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId)
+  }
+  return { handleWheel, handlePointerDown, handlePointerMove, handlePointerUp }
+}
+
+
+function createWorkspaceDragHandlers({ snapEngine, state, gridEnabled, zoom, gridSize, activePage,
+  canWrite, selectedElementIds, dragOriginRef, gestureRef, stack, snapEnabled, setActiveSnap,
+  persist, activePageId }: { snapEngine: ReturnType<typeof createSnapEngine>;
+  state: ReturnType<WorkspaceViewProps['stack']['getState']>; gridEnabled: boolean; zoom: number;
+  gridSize: number; activePage: WorkspaceViewProps['activePage']; canWrite: boolean;
+  selectedElementIds: string[]; dragOriginRef: { current: Map<string, { x: number; y: number;
+  width: number; height: number }> }; gestureRef: { current: GestureMode };
+  stack: WorkspaceViewProps['stack']; snapEnabled: boolean;
+  setActiveSnap: (snap: CanvasSnapResult | null) => void;
+  persist: (command: SceneCommand) => Promise<void>; activePageId: string }) {
+
+  // -------------------------------------------------------------------------
+  // Element drag callbacks
+  // -------------------------------------------------------------------------
+
+  /** The preview and final drop use the same document/grid snap targets. */
+  function snapDragBounds(snapBounds: Bounds, draggingIds: string[]): CanvasSnapResult {
+    const targets = snapEngine.collectTargets(state, draggingIds)
+    if (gridEnabled) {
+      const thresholdDoc = SNAP_THRESHOLD_SCREEN_PX / zoom
+      const gt = collectGridTargets(snapBounds, gridSize, activePage, thresholdDoc)
+      targets.vertical.push(...gt.vertical)
+      targets.horizontal.push(...gt.horizontal)
+    }
+    return snapEngine.apply(snapBounds, targets, SNAP_THRESHOLD_SCREEN_PX, zoom)
+  }
+
+  function handleElementDragStart(elementId: string) {
+    if (!canWrite) return
+    const ids = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
+    const origins = new Map<string, { x: number; y: number; width: number; height: number }>()
+    for (const id of ids) {
+      const found = findElement(activePage, id)
+      if (found) {
+        const aabb = elementAabb(found.element)
+        origins.set(id, { x: found.element.x, y: found.element.y, width: aabb.width, height: aabb.height })
+      }
+    }
+    dragOriginRef.current = origins
+    gestureRef.current = 'drag'
+    if (!selectedElementIds.includes(elementId)) {
+      stack.setView({ selectedElementIds: [elementId] })
+    }
+  }
+
+  function handleElementDragMove(elementId: string, dx: number, dy: number) {
+    if (!canWrite) return
+    const origin = dragOriginRef.current.get(elementId)
+    if (!origin) return
+    const dragging = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
+    const proposedX = origin.x + dx
+    const proposedY = origin.y + dy
+    // Use the actual element AABB dimensions so center and far-edge snap points
+    // are correct for elements of any size (not the former hardcoded 100×100).
+    const snapBounds = { x: proposedX, y: proposedY, width: origin.width, height: origin.height }
+
+    if (snapEnabled) {
+      const snapResult = snapDragBounds(snapBounds, dragging)
+      setActiveSnap(snapResult)
+    }
+  }
+
+  async function handleElementDragEnd(elementId: string, finalX: number, finalY: number) {
+    if (!canWrite) return
+    gestureRef.current = 'idle'
+    setActiveSnap(null)
+
+    const origin = dragOriginRef.current.get(elementId)
+    if (!origin) return
+
+    const draggingIds = selectedElementIds.includes(elementId) ? selectedElementIds : [elementId]
+
+    // Re-run snapping for the drop position so the PERSISTED coordinates match the
+    // guide the user saw mid-drag. Without this the element lands at the raw
+    // pointer position and the snap line is purely cosmetic.
+    let snappedX = finalX
+    let snappedY = finalY
+    if (snapEnabled) {
+      const snapBounds = { x: finalX, y: finalY, width: origin.width, height: origin.height }
+      const snapResult = snapDragBounds(snapBounds, draggingIds)
+      snappedX = snapResult.x
+      snappedY = snapResult.y
+    }
+
+    const dx = snappedX - origin.x
+    const dy = snappedY - origin.y
+
+    if (draggingIds.length === 1) {
+      const el = findElement(activePage, elementId)?.element
+      if (!el) return
+      await persist(
+        setAttrsCommand({
+          pageId: activePageId,
+          elementId,
+          attrs: { x: snappedX, y: snappedY },
+          priorAttrs: { x: el.x, y: el.y },
+        }),
+      )
+    } else {
+      const entries: MultiSetAttrsEntry[] = []
+      for (const id of draggingIds) {
+        const el = findElement(activePage, id)?.element
+        const orig = dragOriginRef.current.get(id)
+        if (!el || !orig) continue
+        entries.push({
+          pageId: activePageId,
+          elementId: id,
+          attrs: { x: orig.x + dx, y: orig.y + dy },
+          priorAttrs: { x: orig.x, y: orig.y },
+        })
+      }
+      if (entries.length > 0) await persist(multiSetAttrsCommand(entries))
+    }
+
+    dragOriginRef.current = new Map()
+  }
+  return { snapDragBounds, handleElementDragStart, handleElementDragMove, handleElementDragEnd }
+}
+
+
+function createWorkspaceElementHandlers({ stack, canWrite, activePage, editingPreRef,
+  setEditingElementId, editingElementId, persist,
+  activePageId }: { stack: WorkspaceViewProps['stack']; canWrite: boolean;
+  activePage: WorkspaceViewProps['activePage']; editingPreRef: { current: string };
+  setEditingElementId: (id: string | null) => void; editingElementId: string | null;
+  persist: (command: SceneCommand) => Promise<void>; activePageId: string }) {
+
+  // -------------------------------------------------------------------------
+  // Element interactions
+  // -------------------------------------------------------------------------
+
+  function handleElementClick(elementId: string) {
+    stack.setView({ selectedElementIds: [elementId] })
+  }
+
+  function handleElementDoubleClick(elementId: string) {
+    if (!canWrite) return
+    const found = findElement(activePage, elementId)
+    if (!found || found.element.kind !== 'text') return
+    editingPreRef.current = (found.element as TextElement).text
+    setEditingElementId(elementId)
+  }
+
+  async function handleTextCommit(text: string) {
+    const id = editingElementId
+    setEditingElementId(null)
+    if (!id || !canWrite) return
+    const found = findElement(activePage, id)
+    if (!found || found.element.kind !== 'text') return
+    if (text === editingPreRef.current) return
+    await persist(
+      setAttrsCommand({
+        pageId: activePageId,
+        elementId: id,
+        attrs: { text },
+        priorAttrs: { text: editingPreRef.current },
+      }),
+    )
+  }
+
+  function handleTextCancel() {
+    setEditingElementId(null)
+  }
+
+  // -------------------------------------------------------------------------
+  // Transformer end
+  // -------------------------------------------------------------------------
+
+  async function handleTransformEnd(entries: MultiSetAttrsEntry[]) {
+    if (!canWrite || entries.length === 0) return
+    await persist(multiSetAttrsCommand(entries))
+  }
+  return { handleElementClick, handleElementDoubleClick, handleTextCommit, handleTextCancel, handleTransformEnd }
 }

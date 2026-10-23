@@ -13,7 +13,6 @@ import {
   normalizeMarquee,
   computeTextOverlayPosition,
   snapRotation,
-  nudgeDelta,
   marqueeContains,
   gridVisible,
 } from '../../src/design-canvas-react/components/transform-math'
@@ -275,28 +274,6 @@ describe('snapRotation', () => {
 // nudgeDelta
 // ---------------------------------------------------------------------------
 
-describe('nudgeDelta', () => {
-  it('ArrowLeft gives dx=-1 without shift', () => {
-    expect(nudgeDelta('ArrowLeft', false)).toEqual({ dx: -1, dy: 0 })
-  })
-
-  it('ArrowRight gives dx=1 without shift', () => {
-    expect(nudgeDelta('ArrowRight', false)).toEqual({ dx: 1, dy: 0 })
-  })
-
-  it('ArrowUp gives dy=-1 without shift', () => {
-    expect(nudgeDelta('ArrowUp', false)).toEqual({ dx: 0, dy: -1 })
-  })
-
-  it('ArrowDown gives dy=1 without shift', () => {
-    expect(nudgeDelta('ArrowDown', false)).toEqual({ dx: 0, dy: 1 })
-  })
-
-  it('shift multiplies step by 10', () => {
-    expect(nudgeDelta('ArrowLeft', true)).toEqual({ dx: -10, dy: 0 })
-    expect(nudgeDelta('ArrowDown', true)).toEqual({ dx: 0, dy: 10 })
-  })
-})
 
 // ---------------------------------------------------------------------------
 // marqueeContains

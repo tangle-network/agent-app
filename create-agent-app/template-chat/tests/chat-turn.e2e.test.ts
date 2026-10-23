@@ -51,7 +51,7 @@ import type { AppEnv } from '../src/env'
 import { buildGatewayApp, type GatewayAppOptions } from '../src/gateway'
 import { appSlug } from '../src/sandbox'
 import { ARTIFACT_ROOT } from '../src/files'
-import { createWorker, type WorkerAssembly } from '../src/worker'
+import { createChatWorker as createWorker, type WorkerAssembly } from '../src/worker'
 
 const BASE = 'http://localhost:8787'
 const MODEL = 'test/model-1'

@@ -8,7 +8,7 @@
 
 import type { TimelineEditorLabels } from '../contracts'
 import { DEFAULT_TIMELINE_LABELS } from '../contracts'
-import { BrandMark } from './BrandMark'
+import { BrandMark } from '../../web-react/brand-mark'
 
 export interface TimelineSmallScreenGateProps {
   labels?: TimelineEditorLabels

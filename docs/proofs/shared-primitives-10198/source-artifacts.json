@@ -1,0 +1,41 @@
+{
+  "purpose": "Retired historical capture and gate source snapshots; text bytes retain their original SHA-256. Original manifests and media are unchanged.",
+  "artifacts": [
+    {
+      "originalPath": "capture.mjs",
+      "artifactPath": "capture.mjs.txt",
+      "sha256": "c7912a0d20fdd202501970fd7fdfd865341975a3c2342a70fabc74db045478b1",
+      "bytes": 15011
+    },
+    {
+      "originalPath": "capture-after.sh",
+      "artifactPath": "capture-after.sh.txt",
+      "sha256": "db8904f4d860992c61d84604a6dd8e2c45d7c139ec1774f47cf5ab46875986dc",
+      "bytes": 1646
+    },
+    {
+      "originalPath": "dismiss-ui-11.38.1/capture-used.mjs",
+      "artifactPath": "dismiss-ui-11.38.1/capture-used.mjs.txt",
+      "sha256": "e9c68b6f5684f42aa12d9acd60ced3d90ca255d6531ac8745d74a2af4868209b",
+      "bytes": 25063
+    },
+    {
+      "originalPath": "dismiss-ui-11.38.1/gate-used.sh",
+      "artifactPath": "dismiss-ui-11.38.1/gate-used.sh.txt",
+      "sha256": "e33d340db609800ef09d45cb8b563172b7476102d01604e883f68b137797aad0",
+      "bytes": 3937
+    },
+    {
+      "originalPath": "dismiss-ui-11.38.1/failed-before-brand-presence/capture-used.mjs",
+      "artifactPath": "dismiss-ui-11.38.1/failed-before-brand-presence/capture-used.mjs.txt",
+      "sha256": "152877501e995290d6662a4682a3b39fa54a582c3beebaef64117314e6ea6011",
+      "bytes": 20162
+    },
+    {
+      "originalPath": "dismiss-ui-11.38.1/failed-before-brand-presence/gate-used.sh",
+      "artifactPath": "dismiss-ui-11.38.1/failed-before-brand-presence/gate-used.sh.txt",
+      "sha256": "4d90d0a5e851b56cdbf0a428444333225cf5c7930a6533c4f9b5b8d43d9bfdc4",
+      "bytes": 3577
+    }
+  ]
+}

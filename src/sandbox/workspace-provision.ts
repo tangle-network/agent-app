@@ -269,6 +269,44 @@ export async function provisionWorkspaceSandbox(
   }
 
   // Stage 3 — create fresh.
+  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId)
+
+  let box = await measure('create', () => client.create(payload))
+
+  await measure('wait_running', () => box.waitFor('running', {
+    timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
+    ...(onProgress ? { onProgress } : {}),
+  }))
+  box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
+
+  if (deferredFiles.length > 0) {
+    const written = await writeProfileFilesToBox(box, deferredFiles)
+    if (!written.succeeded) {
+      throw deferredProfileWriteFailed('new', name, written.error)
+    }
+  }
+
+  if (shell.bootstrap) {
+    const bootstrap = shell.bootstrap.bind(shell)
+    const boot = await measure('bootstrap', () => bootstrap(box, scope))
+    if (!boot.succeeded) {
+      throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
+    }
+  }
+  return rememberRunningBox(name, box)
+}
+
+async function prepareWorkspacePayload(
+  shell: SandboxRuntimeConfig,
+  workspaceId: EnsureWorkspaceSandboxOptions['workspaceId'],
+  userId: EnsureWorkspaceSandboxOptions['userId'],
+  scope: Parameters<typeof resolveWorkspaceRuntimeEnv>[1],
+  harness: EnsureWorkspaceSandboxOptions['harness'],
+  name: string,
+  recoveryRestore: SandboxRestoreSpec | null | undefined,
+  resources: NonNullable<SandboxRuntimeConfig['resources']>,
+  billingOwnerId: EnsureWorkspaceSandboxOptions['billingOwnerId'],
+) {
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
   const buildCtx: SandboxBuildContext = {
     workspaceId,
@@ -360,28 +398,5 @@ export async function provisionWorkspaceSandbox(
   // `?? {}` only narrows the SDK parameter's `| undefined`; the literal above
   // is always defined. The structural sections type needs no cast.
   assertProvisionPayloadWithinCap(payload ?? {})
-
-  let box = await measure('create', () => client.create(payload))
-
-  await measure('wait_running', () => box.waitFor('running', {
-    timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
-    ...(onProgress ? { onProgress } : {}),
-  }))
-  box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
-
-  if (deferredFiles.length > 0) {
-    const written = await writeProfileFilesToBox(box, deferredFiles)
-    if (!written.succeeded) {
-      throw deferredProfileWriteFailed('new', name, written.error)
-    }
-  }
-
-  if (shell.bootstrap) {
-    const bootstrap = shell.bootstrap.bind(shell)
-    const boot = await measure('bootstrap', () => bootstrap(box, scope))
-    if (!boot.succeeded) {
-      throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
-    }
-  }
-  return rememberRunningBox(name, box)
+  return { payload, deferredFiles }
 }

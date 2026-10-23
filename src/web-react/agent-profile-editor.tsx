@@ -194,9 +194,7 @@ type Panel =
   | { kind: 'edit'; section: 'skills' | 'tools' | 'files'; index: number }
 
 interface InlineDraft { name: string; content: string; path: string; executable: boolean }
-
-/** Controlled editor for the canonical profile. The product owns save and execution authority. */
-export function AgentProfileEditor({ value, onChange, disabled = false, className, config, allowedResourceKinds,
+function useAgentProfileEditorViewState({ value, onChange, disabled = false, className, config, allowedResourceKinds,
   filePathPrefix, allowExecutableFiles = true, requireGitHubCommitSha = false, requireUniqueSkillNames = false,
   showToolsAndPermissions = true, publicHttpsMcpOnly = false, registry, onSaveStateChange }: AgentProfileEditorProps) {
   const id = useId()
@@ -365,172 +363,38 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
           onChange={event => model({ ...value.model, [field]: event.target.value || undefined })} />}
     </Field>
   }
-
-  // ── Resource rows and panels ─────────────────────────────────────────────
-  const github = config?.github
-  function refFromCheck(check: GitHubSourceCheck, name: string): AgentProfileResourceRef {
-    return github?.storage === 'inline'
-      ? { kind: 'inline', name, content: check.content }
-      : { kind: 'github', repository: check.repository, path: check.path, ref: check.commit.sha, ...(name ? { name } : {}) }
-  }
-  function addRef(section: 'skills' | 'tools', ref: AgentProfileResourceRef, index?: number): boolean {
-    const refs = section === 'skills' ? skills : toolFiles
-    const issue = section === 'skills' ? skillIssue(ref, refs, index ?? refs.length) : githubRefIssue(ref, requireGitHubCommitSha)
-    if (issue) { setError(issue); return false }
-    const next = index === undefined ? [...refs, ref] : refs.map((item, position) => position === index ? ref : item)
-    return resources(section, next)
-  }
-  function addFile(mount: AgentProfileFileMount, index?: number): boolean {
-    const issue = fileIssue(mount, index ?? files.length)
-    if (issue) { setError(issue); return false }
-    return setFiles(index === undefined ? [...files, mount] : files.map((item, position) => position === index ? mount : item))
-  }
-
-  function nameField(check: GitHubSourceCheck | null, section: 'skills' | 'tools') {
-    const fieldId = `${id}-${section}-github-name`
-    const suggested = check ? (section === 'skills' ? suggestedSkillName(check) : basename(check.path)) : ''
-    const name = githubName.touched ? githubName.value : suggested
-    const problem = section === 'skills' && requireUniqueSkillNames && name
-      ? skillIssue({ kind: 'inline', name, content: '' }, skills) : null
-    return <Field label={section === 'skills' ? 'Skill name' : 'File name'} htmlFor={fieldId} error={problem}
-      hint={section === 'skills' && !problem ? 'Shown to the agent in its skill list.' : undefined}>
-      <Input id={fieldId} size="compact" value={name} disabled={editingDisabled || !check} {...noAutofill}
-        aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(fieldId)}
-        onChange={event => setGithubName({ value: event.target.value, touched: true })} />
-    </Field>
-  }
-  function githubNameValue(check: GitHubSourceCheck, section: 'skills' | 'tools'): string {
-    return (githubName.touched ? githubName.value : section === 'skills' ? suggestedSkillName(check) : basename(check.path)).trim()
-  }
-
-  function inlineEditor(section: 'skills' | 'tools' | 'files', index?: number) {
-    const prefix = `${id}-${section}-inline`
-    const isSkill = section === 'skills'
-    const isFile = section === 'files'
-    const name = inlineDraft.name.trim()
-    const frontmatter = isSkill && inlineDraft.content.trim() ? readSkillFrontmatter(inlineDraft.content) : null
-    const mount: AgentProfileFileMount | null = isFile ? { path: inlineDraft.path.trim(),
-      resource: { kind: 'inline', name: name || basename(inlineDraft.path.trim()), content: inlineDraft.content },
-      ...(inlineDraft.executable ? { executable: true } : {}) } : null
-    const problem = isFile ? (inlineDraft.path.trim() ? fileIssue(mount!, index ?? files.length) : null)
-      : isSkill && name ? skillIssue({ kind: 'inline', name, content: inlineDraft.content }, skills, index ?? skills.length) : null
-    const ready = !editingDisabled && !problem && (isFile ? inlineDraft.path.trim() !== '' : name !== '')
-    return <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
-      {isFile
-        ? <Field label="Workspace path" htmlFor={`${prefix}-path`} error={problem}
-          hint={!problem && workspaceFilePrefix ? `Files go under ${workspaceFilePrefix}` : undefined}>
-          <Input id={`${prefix}-path`} size="compact" value={inlineDraft.path} disabled={editingDisabled} {...noAutofill}
-            placeholder={(workspaceFilePrefix ?? '') + 'guide.md'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-path`)}
-            onChange={event => setInlineDraft({ ...inlineDraft, path: event.target.value })} />
-        </Field>
-        : <Field label={isSkill ? 'Skill name' : 'File name'} htmlFor={`${prefix}-name`} error={problem}>
-          <Input id={`${prefix}-name`} size="compact" value={inlineDraft.name} disabled={editingDisabled} {...noAutofill}
-            placeholder={isSkill ? 'research' : 'search.ts'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-name`)}
-            onChange={event => setInlineDraft({ ...inlineDraft, name: event.target.value })} />
-        </Field>}
-      <Field label="Content" htmlFor={`${prefix}-content`}
-        hint={frontmatter && !frontmatter.ok ? 'Start the skill with frontmatter that sets name and description, so the agent knows when to use it.' : undefined}>
-        <Textarea id={`${prefix}-content`} className="min-h-40 font-mono text-sm leading-6" disabled={editingDisabled} value={inlineDraft.content}
-          onChange={event => setInlineDraft({ ...inlineDraft, content: event.target.value })} />
-      </Field>
-      {isFile && (allowExecutableFiles || inlineDraft.executable) && <label className={`flex items-center gap-3 ${formText.body}`}>
-        <Switch disabled={editingDisabled || (!allowExecutableFiles && !inlineDraft.executable)} checked={inlineDraft.executable}
-          onCheckedChange={executable => setInlineDraft({ ...inlineDraft, executable })} />Executable</label>}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="compact" disabled={!ready} onClick={() => {
-          const saved = isFile ? addFile(mount!, index)
-            : addRef(section as 'skills' | 'tools', { kind: 'inline', name, content: inlineDraft.content }, index)
-          if (saved) openPanel(null)
-        }}>{index === undefined ? (isSkill ? 'Add skill' : 'Add file') : 'Save'}</Button>
-        <Button type="button" size="compact" variant="ghost" onClick={() => openPanel(null)}>Cancel</Button>
-      </div>
-    </div>
-  }
-
-  function githubEditor(section: 'skills' | 'tools' | 'files', index?: number) {
-    if (!github) return null
-    const existing = index === undefined ? undefined
-      : section === 'files' ? files[index]?.resource : (section === 'skills' ? skills : toolFiles)[index]
-    const initial = existing?.kind === 'github' ? { repository: existing.repository, path: existing.path, ref: existing.ref } : undefined
-    const isFile = section === 'files'
-    const pathId = `${id}-${section}-github-path`
-    return <div className="rounded-lg border border-border bg-muted/30 p-4">
-      <GitHubSourcePicker port={github.port} purpose={section === 'skills' ? 'skill' : 'file'} disabled={editingDisabled}
-        connectHref={github.connectHref} initial={initial} onCancel={() => openPanel(null)}
-        actionLabel={index !== undefined ? 'Save' : section === 'skills' ? 'Add skill' : 'Add file'}
-        blocked={isFile && inlineDraft.path.trim() === '' ? 'Enter a workspace path.' : null}
-        onChoose={({ check }) => {
-          if (isFile) {
-            const path = (inlineDraft.path.trim() || (workspaceFilePrefix ?? '') + basename(check.path))
-            if (addFile({ path, resource: refFromCheck(check, basename(check.path)) }, index)) openPanel(null)
-            return
-          }
-          const name = githubNameValue(check, section as 'skills' | 'tools')
-          if (addRef(section as 'skills' | 'tools', refFromCheck(check, name), index)) openPanel(null)
-        }}>
-        {check => isFile
-          ? <GitHubFilePath check={check} id={pathId} value={inlineDraft.path} prefix={workspaceFilePrefix ?? ''} disabled={editingDisabled}
-            onChange={path => setInlineDraft(current => ({ ...current, path }))} issue={inlineDraft.path.trim() && check
-              ? fileIssue({ path: inlineDraft.path.trim(), resource: refFromCheck(check, basename(check.path)) }, index ?? files.length) : null} />
-          : nameField(check, section as 'skills' | 'tools')}
-      </GitHubSourcePicker>
-    </div>
-  }
-
-  function rowActions(label: string, section: 'skills' | 'tools' | 'files', index: number, ref: AgentProfileResourceRef) {
-    const canEdit = ref.kind === 'inline' || Boolean(github)
-    return <div className={rowActionsClass}>
-      {canEdit && <Button type="button" size="compact" variant="ghost" disabled={editingDisabled} aria-label={`Edit ${label}`}
-        onClick={() => openPanel({ kind: 'edit', section, index })}>Edit</Button>}
-      <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={editingDisabled}
-        aria-label={`Remove ${label}`} onClick={() => {
-          const removed = section === 'files' ? setFiles(files.filter((_, item) => item !== index))
-            : resources(section, (section === 'skills' ? skills : toolFiles).filter((_, item) => item !== index))
-          if (removed && panel?.kind === 'edit' && panel.section === section) openPanel(null)
-        }}>Remove</Button>
-    </div>
-  }
-
-  function refList(section: 'skills' | 'tools', refs: readonly AgentProfileResourceRef[], noun: string) {
-    if (refs.length === 0) return <p className={formText.muted}>No {noun}s yet.</p>
-    return <ul className="divide-y divide-border rounded-lg border border-border">{refs.map((ref, index) => {
-      const title = ref.name || (ref.kind === 'github' ? basename(ref.path) : `${noun} ${index + 1}`)
-      const issue = section === 'skills' ? skillIssue(ref, refs, index) : githubRefIssue(ref, requireGitHubCommitSha)
-      const described = ref.kind === 'inline' && section === 'skills' ? inlineSkillSummary(ref.content) : null
-      const words = (text: string) => text.toLowerCase().replace(/[-_\s]+/g, ' ').trim()
-      const summary = described && words(described) !== words(title) ? described : null
-      const editing = panel?.kind === 'edit' && panel.section === section && panel.index === index
-      return <li key={`${section}-${index}`} className="space-y-3 p-3" aria-label={`${noun} ${title}`}>
-        <div className={listRow}>
-          <div className="min-w-0">
-            <p className={`break-words ${formText.label}`}>{title}</p>
-            {summary && <p className={`line-clamp-2 ${formText.muted}`}>{summary}</p>}
-            {(ref.kind === 'github' || !summary) && <p className={`break-words ${formText.muted}`}>{sourceLine(ref)}</p>}
-            {issue && <p className={formText.error}>{issue}</p>}
-          </div>
-          {rowActions(title, section, index, ref)}
-        </div>
-        {editing && (ref.kind === 'github' && github ? githubEditor(section, index) : inlineEditor(section, index))}
-      </li>
-    })}</ul>
-  }
-
-  function addButtons(section: 'skills' | 'tools' | 'files', writeLabel: string) {
-    if (panel && panel.kind !== 'edit' && panel.section === section) {
-      return panel.kind === 'add-github' ? githubEditor(section) : inlineEditor(section)
-    }
-    return <div className="flex flex-wrap gap-2">
-      {github && <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
-        onClick={() => openPanel({ kind: 'add-github', section })}>Add from GitHub</Button>}
-      <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
-        onClick={() => openPanel({ kind: 'add-inline', section })}>{writeLabel}</Button>
-    </div>
-  }
+  const { github, refFromCheck, addRef, addFile, nameField, githubNameValue, inlineEditor,
+    githubEditor, rowActions, refList, addButtons } = createProfileResourceEditors({ config, skills,
+    toolFiles, skillIssue, requireGitHubCommitSha, setError, resources, fileIssue, files, setFiles, id,
+    githubName, requireUniqueSkillNames, editingDisabled, setGithubName, inlineDraft,
+    workspaceFilePrefix, setInlineDraft, allowExecutableFiles, openPanel, panel })
 
   const countLabel = (count: number, noun: string) => count ? `${count} ${noun}${count === 1 ? '' : 's'}` : undefined
   const toolNames = Object.keys(value.tools ?? {})
+  return { className, error, jsonDirty, unsupportedResources, value, constrainedEntryCount,
+    invalidMcpCount, show, config, id, editingDisabled, emit, prompt, moreOpen, setMoreOpen,
+    modelField, harness, changeHarness, catalog, thinkingLevels, model, modelNotice, countLabel,
+    toolNames, showAllTools, setShowAllTools, newTool, setNewTool, setError, skills, panel, refList,
+    addButtons, registry, skillIssue, resources, toolFiles, publicHttpsMcpOnly, setMcpPending, files,
+    fileIssue, rowActions, github, githubEditor, inlineEditor, workspaceFilePrefix, openPanel,
+    setFiles, disabled, json, setJson, setJsonDirty, applyJson }
+}
 
-  return <TooltipProvider delayDuration={150}>
+type AgentProfileEditorViewState = ReturnType<typeof useAgentProfileEditorViewState>
+
+export function AgentProfileEditor(props: AgentProfileEditorProps) {
+  const view = useAgentProfileEditorViewState(props)
+  return <AgentProfileEditorView {...view} />
+}
+
+function AgentProfileEditorView({ className, error, jsonDirty, unsupportedResources, value,
+  constrainedEntryCount, invalidMcpCount, show, config, id, editingDisabled, emit, prompt, moreOpen,
+  setMoreOpen, modelField, harness, changeHarness, catalog, thinkingLevels, model, modelNotice,
+  countLabel, toolNames, showAllTools, setShowAllTools, newTool, setNewTool, setError, skills, panel,
+  refList, addButtons, registry, skillIssue, resources, toolFiles, publicHttpsMcpOnly, setMcpPending,
+  files, fileIssue, rowActions, github, githubEditor, inlineEditor, workspaceFilePrefix, openPanel,
+  setFiles, disabled, json, setJson, setJsonDirty, applyJson }: AgentProfileEditorViewState) {
+  return (<TooltipProvider delayDuration={150}>
     <div className={`@container/profile-editor min-w-0 space-y-4 ${className ?? ''}`} aria-label="Agent profile editor">
       {error && <Notice tone="error">{error}</Notice>}
       {jsonDirty && <Notice tone="info">Apply or discard your Advanced JSON edits before changing other fields.</Notice>}
@@ -724,8 +588,10 @@ export function AgentProfileEditor({ value, onChange, disabled = false, classNam
         <p className={formText.muted}>Reference credentials by secret name; never paste them into a profile.</p>
       </Section>}
     </div>
-  </TooltipProvider>
+  </TooltipProvider>)
 }
+
+
 
 function GitHubFilePath({ check, id, value, prefix, disabled, onChange, issue }: {
   check: GitHubSourceCheck | null
@@ -746,3 +612,184 @@ function GitHubFilePath({ check, id, value, prefix, disabled, onChange, issue }:
   </Field>
 }
 
+
+
+function createProfileResourceEditors({ config, skills, toolFiles, skillIssue,
+  requireGitHubCommitSha, setError, resources, fileIssue, files, setFiles, id, githubName,
+  requireUniqueSkillNames, editingDisabled, setGithubName, inlineDraft, workspaceFilePrefix,
+  setInlineDraft, allowExecutableFiles, openPanel,
+  panel }: { config: AgentProfileEditorProps['config']; skills: AgentProfileResourceRef[];
+  toolFiles: AgentProfileResourceRef[]; skillIssue: (ref: AgentProfileResourceRef,
+  refs: readonly AgentProfileResourceRef[], index?: number) => string | null;
+  requireGitHubCommitSha: boolean; setError: (error: string | null) => void;
+  resources: (key: 'skills' | 'tools', refs: AgentProfileResourceRef[]) => boolean;
+  fileIssue: (mount: AgentProfileFileMount, index?: number) => string | null;
+  files: AgentProfileFileMount[]; setFiles: (files: AgentProfileFileMount[]) => boolean; id: string;
+  githubName: { value: string; touched: boolean }; requireUniqueSkillNames: boolean;
+  editingDisabled: boolean; setGithubName: (value: { value: string; touched: boolean }) => void;
+  inlineDraft: InlineDraft; workspaceFilePrefix: string | undefined;
+  setInlineDraft: (value: InlineDraft | ((value: InlineDraft) => InlineDraft)) => void;
+  allowExecutableFiles: boolean; openPanel: (panel: Panel | null) => void; panel: Panel | null }) {
+
+  // ── Resource rows and panels ─────────────────────────────────────────────
+  const github = config?.github
+  function refFromCheck(check: GitHubSourceCheck, name: string): AgentProfileResourceRef {
+    return github?.storage === 'inline'
+      ? { kind: 'inline', name, content: check.content }
+      : { kind: 'github', repository: check.repository, path: check.path, ref: check.commit.sha, ...(name ? { name } : {}) }
+  }
+  function addRef(section: 'skills' | 'tools', ref: AgentProfileResourceRef, index?: number): boolean {
+    const refs = section === 'skills' ? skills : toolFiles
+    const issue = section === 'skills' ? skillIssue(ref, refs, index ?? refs.length) : githubRefIssue(ref, requireGitHubCommitSha)
+    if (issue) { setError(issue); return false }
+    const next = index === undefined ? [...refs, ref] : refs.map((item, position) => position === index ? ref : item)
+    return resources(section, next)
+  }
+  function addFile(mount: AgentProfileFileMount, index?: number): boolean {
+    const issue = fileIssue(mount, index ?? files.length)
+    if (issue) { setError(issue); return false }
+    return setFiles(index === undefined ? [...files, mount] : files.map((item, position) => position === index ? mount : item))
+  }
+
+  function nameField(check: GitHubSourceCheck | null, section: 'skills' | 'tools') {
+    const fieldId = `${id}-${section}-github-name`
+    const suggested = check ? (section === 'skills' ? suggestedSkillName(check) : basename(check.path)) : ''
+    const name = githubName.touched ? githubName.value : suggested
+    const problem = section === 'skills' && requireUniqueSkillNames && name
+      ? skillIssue({ kind: 'inline', name, content: '' }, skills) : null
+    return <Field label={section === 'skills' ? 'Skill name' : 'File name'} htmlFor={fieldId} error={problem}
+      hint={section === 'skills' && !problem ? 'Shown to the agent in its skill list.' : undefined}>
+      <Input id={fieldId} size="compact" value={name} disabled={editingDisabled || !check} {...noAutofill}
+        aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(fieldId)}
+        onChange={event => setGithubName({ value: event.target.value, touched: true })} />
+    </Field>
+  }
+  function githubNameValue(check: GitHubSourceCheck, section: 'skills' | 'tools'): string {
+    return (githubName.touched ? githubName.value : section === 'skills' ? suggestedSkillName(check) : basename(check.path)).trim()
+  }
+
+  function inlineEditor(section: 'skills' | 'tools' | 'files', index?: number) {
+    const prefix = `${id}-${section}-inline`
+    const isSkill = section === 'skills'
+    const isFile = section === 'files'
+    const name = inlineDraft.name.trim()
+    const frontmatter = isSkill && inlineDraft.content.trim() ? readSkillFrontmatter(inlineDraft.content) : null
+    const mount: AgentProfileFileMount | null = isFile ? { path: inlineDraft.path.trim(),
+      resource: { kind: 'inline', name: name || basename(inlineDraft.path.trim()), content: inlineDraft.content },
+      ...(inlineDraft.executable ? { executable: true } : {}) } : null
+    const problem = isFile ? (inlineDraft.path.trim() ? fileIssue(mount!, index ?? files.length) : null)
+      : isSkill && name ? skillIssue({ kind: 'inline', name, content: inlineDraft.content }, skills, index ?? skills.length) : null
+    const ready = !editingDisabled && !problem && (isFile ? inlineDraft.path.trim() !== '' : name !== '')
+    return <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+      {isFile
+        ? <Field label="Workspace path" htmlFor={`${prefix}-path`} error={problem}
+          hint={!problem && workspaceFilePrefix ? `Files go under ${workspaceFilePrefix}` : undefined}>
+          <Input id={`${prefix}-path`} size="compact" value={inlineDraft.path} disabled={editingDisabled} {...noAutofill}
+            placeholder={(workspaceFilePrefix ?? '') + 'guide.md'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-path`)}
+            onChange={event => setInlineDraft({ ...inlineDraft, path: event.target.value })} />
+        </Field>
+        : <Field label={isSkill ? 'Skill name' : 'File name'} htmlFor={`${prefix}-name`} error={problem}>
+          <Input id={`${prefix}-name`} size="compact" value={inlineDraft.name} disabled={editingDisabled} {...noAutofill}
+            placeholder={isSkill ? 'research' : 'search.ts'} aria-invalid={problem ? true : undefined} aria-describedby={fieldMessageId(`${prefix}-name`)}
+            onChange={event => setInlineDraft({ ...inlineDraft, name: event.target.value })} />
+        </Field>}
+      <Field label="Content" htmlFor={`${prefix}-content`}
+        hint={frontmatter && !frontmatter.ok ? 'Start the skill with frontmatter that sets name and description, so the agent knows when to use it.' : undefined}>
+        <Textarea id={`${prefix}-content`} className="min-h-40 font-mono text-sm leading-6" disabled={editingDisabled} value={inlineDraft.content}
+          onChange={event => setInlineDraft({ ...inlineDraft, content: event.target.value })} />
+      </Field>
+      {isFile && (allowExecutableFiles || inlineDraft.executable) && <label className={`flex items-center gap-3 ${formText.body}`}>
+        <Switch disabled={editingDisabled || (!allowExecutableFiles && !inlineDraft.executable)} checked={inlineDraft.executable}
+          onCheckedChange={executable => setInlineDraft({ ...inlineDraft, executable })} />Executable</label>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="compact" disabled={!ready} onClick={() => {
+          const saved = isFile ? addFile(mount!, index)
+            : addRef(section as 'skills' | 'tools', { kind: 'inline', name, content: inlineDraft.content }, index)
+          if (saved) openPanel(null)
+        }}>{index === undefined ? (isSkill ? 'Add skill' : 'Add file') : 'Save'}</Button>
+        <Button type="button" size="compact" variant="ghost" onClick={() => openPanel(null)}>Cancel</Button>
+      </div>
+    </div>
+  }
+
+  function githubEditor(section: 'skills' | 'tools' | 'files', index?: number) {
+    if (!github) return null
+    const existing = index === undefined ? undefined
+      : section === 'files' ? files[index]?.resource : (section === 'skills' ? skills : toolFiles)[index]
+    const initial = existing?.kind === 'github' ? { repository: existing.repository, path: existing.path, ref: existing.ref } : undefined
+    const isFile = section === 'files'
+    const pathId = `${id}-${section}-github-path`
+    return <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <GitHubSourcePicker port={github.port} purpose={section === 'skills' ? 'skill' : 'file'} disabled={editingDisabled}
+        connectHref={github.connectHref} initial={initial} onCancel={() => openPanel(null)}
+        actionLabel={index !== undefined ? 'Save' : section === 'skills' ? 'Add skill' : 'Add file'}
+        blocked={isFile && inlineDraft.path.trim() === '' ? 'Enter a workspace path.' : null}
+        onChoose={({ check }) => {
+          if (isFile) {
+            const path = (inlineDraft.path.trim() || (workspaceFilePrefix ?? '') + basename(check.path))
+            if (addFile({ path, resource: refFromCheck(check, basename(check.path)) }, index)) openPanel(null)
+            return
+          }
+          const name = githubNameValue(check, section as 'skills' | 'tools')
+          if (addRef(section as 'skills' | 'tools', refFromCheck(check, name), index)) openPanel(null)
+        }}>
+        {check => isFile
+          ? <GitHubFilePath check={check} id={pathId} value={inlineDraft.path} prefix={workspaceFilePrefix ?? ''} disabled={editingDisabled}
+            onChange={path => setInlineDraft(current => ({ ...current, path }))} issue={inlineDraft.path.trim() && check
+              ? fileIssue({ path: inlineDraft.path.trim(), resource: refFromCheck(check, basename(check.path)) }, index ?? files.length) : null} />
+          : nameField(check, section as 'skills' | 'tools')}
+      </GitHubSourcePicker>
+    </div>
+  }
+
+  function rowActions(label: string, section: 'skills' | 'tools' | 'files', index: number, ref: AgentProfileResourceRef) {
+    const canEdit = ref.kind === 'inline' || Boolean(github)
+    return <div className={rowActionsClass}>
+      {canEdit && <Button type="button" size="compact" variant="ghost" disabled={editingDisabled} aria-label={`Edit ${label}`}
+        onClick={() => openPanel({ kind: 'edit', section, index })}>Edit</Button>}
+      <Button type="button" size="compact" variant="ghost" className="text-destructive hover:text-destructive" disabled={editingDisabled}
+        aria-label={`Remove ${label}`} onClick={() => {
+          const removed = section === 'files' ? setFiles(files.filter((_, item) => item !== index))
+            : resources(section, (section === 'skills' ? skills : toolFiles).filter((_, item) => item !== index))
+          if (removed && panel?.kind === 'edit' && panel.section === section) openPanel(null)
+        }}>Remove</Button>
+    </div>
+  }
+
+  function refList(section: 'skills' | 'tools', refs: readonly AgentProfileResourceRef[], noun: string) {
+    if (refs.length === 0) return <p className={formText.muted}>No {noun}s yet.</p>
+    return <ul className="divide-y divide-border rounded-lg border border-border">{refs.map((ref, index) => {
+      const title = ref.name || (ref.kind === 'github' ? basename(ref.path) : `${noun} ${index + 1}`)
+      const issue = section === 'skills' ? skillIssue(ref, refs, index) : githubRefIssue(ref, requireGitHubCommitSha)
+      const described = ref.kind === 'inline' && section === 'skills' ? inlineSkillSummary(ref.content) : null
+      const words = (text: string) => text.toLowerCase().replace(/[-_\s]+/g, ' ').trim()
+      const summary = described && words(described) !== words(title) ? described : null
+      const editing = panel?.kind === 'edit' && panel.section === section && panel.index === index
+      return <li key={`${section}-${index}`} className="space-y-3 p-3" aria-label={`${noun} ${title}`}>
+        <div className={listRow}>
+          <div className="min-w-0">
+            <p className={`break-words ${formText.label}`}>{title}</p>
+            {summary && <p className={`line-clamp-2 ${formText.muted}`}>{summary}</p>}
+            {(ref.kind === 'github' || !summary) && <p className={`break-words ${formText.muted}`}>{sourceLine(ref)}</p>}
+            {issue && <p className={formText.error}>{issue}</p>}
+          </div>
+          {rowActions(title, section, index, ref)}
+        </div>
+        {editing && (ref.kind === 'github' && github ? githubEditor(section, index) : inlineEditor(section, index))}
+      </li>
+    })}</ul>
+  }
+
+  function addButtons(section: 'skills' | 'tools' | 'files', writeLabel: string) {
+    if (panel && panel.kind !== 'edit' && panel.section === section) {
+      return panel.kind === 'add-github' ? githubEditor(section) : inlineEditor(section)
+    }
+    return <div className="flex flex-wrap gap-2">
+      {github && <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+        onClick={() => openPanel({ kind: 'add-github', section })}>Add from GitHub</Button>}
+      <Button type="button" size="compact" variant="outline" disabled={editingDisabled}
+        onClick={() => openPanel({ kind: 'add-inline', section })}>{writeLabel}</Button>
+    </div>
+  }
+  return { github, refFromCheck, addRef, addFile, nameField, githubNameValue, inlineEditor, githubEditor, rowActions, refList, addButtons }
+}

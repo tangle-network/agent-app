@@ -6,7 +6,7 @@
  */
 
 import type { SequenceTimeline } from '../../sequences/model'
-import type { SnapPoint, SnapResult } from '../contracts'
+import type { SnapPoint, TimelineSnapResult } from '../contracts'
 
 /** Snap point with its owning clip when it came from one, so a drag can
  *  exclude the dragged clip's own edges. Structurally a `SnapPoint`. */
@@ -43,7 +43,7 @@ export interface ApplySnapOptions {
 
 /** Nearest candidate wins; ties keep the first candidate in `points` order
  *  (sorted by frame from `collectSnapPoints`, so the lower frame). */
-export function applySnap(frame: number, points: SnapPoint[], opts: ApplySnapOptions): SnapResult {
+export function applySnap(frame: number, points: SnapPoint[], opts: ApplySnapOptions): TimelineSnapResult {
   if (!Number.isFinite(frame)) throw new Error(`frame must be a finite number, got ${frame}`)
   if (!Number.isFinite(opts.zoom) || opts.zoom <= 0) {
     throw new Error(`zoom must be a positive finite number (pixels per frame), got ${opts.zoom}`)

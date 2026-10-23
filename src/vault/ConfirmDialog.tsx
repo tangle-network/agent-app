@@ -1,3 +1,4 @@
+import { containDialogTab } from '../web-react/focus-navigation'
 /**
  * Self-contained confirm dialog — no dialog library. A focus-trapped modal with
  * Escape-to-cancel and Enter from text inputs, used for create / delete / discard-unsaved
@@ -63,21 +64,7 @@ export function ConfirmDialog({
       onConfirm()
       return
     }
-    if (event.key !== 'Tab') return
-    const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    )
-    if (!focusable || focusable.length === 0) return
-    const first = focusable[0]
-    const last = focusable[focusable.length - 1]
-    const active = document.activeElement as HTMLElement | null
-    if (event.shiftKey && active === first) {
-      event.preventDefault()
-      last?.focus()
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault()
-      first?.focus()
-    }
+    containDialogTab(event, panelRef.current)
   }
 
   return (

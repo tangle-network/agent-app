@@ -76,7 +76,7 @@ export interface SnapPoint {
 }
 
 /** Describe the result of snapping a point to a frame including success status and snapped point details */
-export interface SnapResult {
+export interface TimelineSnapResult {
   frame: number
   snapped: boolean
   point: SnapPoint | null

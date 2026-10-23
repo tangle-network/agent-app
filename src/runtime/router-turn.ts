@@ -449,55 +449,9 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   })
   const traceId = options.traceId !== undefined ? turnTraceId(options.traceId) : options.trace?.traceId
   const { trace } = options
-  let currentModel = options.model
-  let lastModelSpan: TurnSpan | undefined
-  const gzipAbove = options.gzipRequestAboveBytes ?? (
-    URL.canParse(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL) &&
-    new URL(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL).origin === new URL(DEFAULT_TANGLE_ROUTER_BASE_URL).origin
-      ? 32 * 1024 : undefined
-  )
-  const baseFetch: typeof fetch | undefined = gzipAbove !== undefined && gzipAbove >= 0
-    ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
-    : options.fetchImpl
-  // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
-  const sendOnce: typeof fetch | undefined = trace
-    ? tracedModelFetch(trace, baseFetch ?? fetch, {
-      onSpan: span => { lastModelSpan = span; span.set({ 'gen_ai.request.model': currentModel }) },
-    })
-    : baseFetch
-  const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
-    ? async (input, init) => {
-      const firstSentAt = Date.now()
-      // Resending stops once the attempts and the retry window are both spent; one attempt never resends.
-      const spent = (attempt: number) => attempts === 1 || (attempt >= attempts && Date.now() - firstSentAt >= RETRY_WINDOW_MS)
-      for (let attempt = 1; ; attempt++) {
-        signal?.throwIfAborted()
-        const signals = [signal, attemptTimeoutMs ? AbortSignal.timeout(attemptTimeoutMs) : undefined]
-          .filter((value): value is AbortSignal => Boolean(value))
-        const attemptSignal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
-        const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
-        // The wait before a resend is its own span, so the time between two sends is named, not a gap.
-        const wait = (ms: number, reason: string) => trace
-          ? trace.measure('model.retry_wait', 'other', () => pause(ms), { 'retry.attempt': attempt, 'retry.reason': reason, 'retry.wait_ms': Math.round(ms) })
-          : pause(ms)
-        let response: Response
-        try {
-          // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
-          response = await (sendOnce ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
-        } catch (error) {
-          if (signal?.aborted || spent(attempt)) throw error
-          await wait(backoff(), 'send_failed')
-          continue
-        }
-        // Nothing has streamed yet, so a resend repeats no word and no tool.
-        if (spent(attempt) || !RETRY_STATUS.has(response.status)) return response
-        if (DEAD_CREDENTIAL_CATEGORIES.has(response.headers.get('x-tangle-failure-category') ?? '')) return response
-        const retryAfter = Number(response.headers.get('retry-after'))
-        await response.body?.cancel().catch(() => {})
-        await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff(), `http_${response.status}`)
-      }
-    }
-    : sendOnce
+  const transportState = { currentModel: options.model, lastModelSpan: undefined as TurnSpan | undefined }
+  const { fetchImpl } = createRouterTurnTransport(options, trace, transportState, signal, attempts, attemptTimeoutMs, baseDelayMs, pause)
+
   const extraBody = {
     ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
     ...(options.maxCompletionTokens ? { max_completion_tokens: options.maxCompletionTokens } : {}),
@@ -543,7 +497,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     ...(fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => {
       servedModel = served.servedModel
-      if (served.servedModel) lastModelSpan?.set({ 'gen_ai.response.model': served.servedModel })
+      if (served.servedModel) transportState.lastModelSpan?.set({ 'gen_ai.response.model': served.servedModel })
     },
   })
   const segments: string[] = []
@@ -571,7 +525,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         return 'placement_refused'
       }
     }
-    currentModel = model
+    transportState.currentModel = model
     const streamTurn = streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -633,7 +587,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           reasoning.chars += event.text.length
           emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
-          addCallUsage(usage, event.usage, lastModelSpan)
+          addCallUsage(usage, event.usage, transportState.lastModelSpan)
           emit({ type: 'usage', ...event.usage })
         } else if (event.type === 'tool_call_start') {
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
@@ -733,4 +687,64 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     }
   }
   return outcome()
+}
+
+function createRouterTurnTransport(
+  options: RouterTurnOptions,
+  trace: RouterTurnOptions['trace'],
+  transportState: { currentModel: string; lastModelSpan: TurnSpan | undefined },
+  signal: RouterTurnOptions['signal'],
+  attempts: number,
+  attemptTimeoutMs: number | undefined,
+  baseDelayMs: number,
+  pause: (ms: number) => Promise<void>,
+) {
+  const gzipAbove = options.gzipRequestAboveBytes ?? (
+    URL.canParse(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL) &&
+      new URL(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL).origin === new URL(DEFAULT_TANGLE_ROUTER_BASE_URL).origin
+      ? 32 * 1024 : undefined
+  )
+  const baseFetch: typeof fetch | undefined = gzipAbove !== undefined && gzipAbove >= 0
+    ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
+    : options.fetchImpl
+  // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
+  const sendOnce: typeof fetch | undefined = trace
+    ? tracedModelFetch(trace, baseFetch ?? fetch, {
+      onSpan: span => { transportState.lastModelSpan = span; span.set({ 'gen_ai.request.model': transportState.currentModel }) },
+    })
+    : baseFetch
+  const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
+    ? async (input, init) => {
+      const firstSentAt = Date.now()
+      // Resending stops once the attempts and the retry window are both spent; one attempt never resends.
+      const spent = (attempt: number) => attempts === 1 || (attempt >= attempts && Date.now() - firstSentAt >= RETRY_WINDOW_MS)
+      for (let attempt = 1;;attempt++) {
+        signal?.throwIfAborted()
+        const signals = [signal, attemptTimeoutMs ? AbortSignal.timeout(attemptTimeoutMs) : undefined]
+          .filter((value): value is AbortSignal => Boolean(value))
+        const attemptSignal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
+        const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
+        // The wait before a resend is its own span, so the time between two sends is named, not a gap.
+        const wait = (ms: number, reason: string) => trace
+          ? trace.measure('model.retry_wait', 'other', () => pause(ms), { 'retry.attempt': attempt, 'retry.reason': reason, 'retry.wait_ms': Math.round(ms) })
+          : pause(ms)
+        let response: Response
+        try {
+          // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
+          response = await (sendOnce ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
+        } catch (error) {
+          if (signal?.aborted || spent(attempt)) throw error
+          await wait(backoff(), 'send_failed')
+          continue
+        }
+        // Nothing has streamed yet, so a resend repeats no word and no tool.
+        if (spent(attempt) || !RETRY_STATUS.has(response.status)) return response
+        if (DEAD_CREDENTIAL_CATEGORIES.has(response.headers.get('x-tangle-failure-category') ?? '')) return response
+        const retryAfter = Number(response.headers.get('retry-after'))
+        await response.body?.cancel().catch(() => { })
+        await wait(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.min(retryAfter * 1000, MAX_RETRY_DELAY_MS) : backoff(), `http_${response.status}`)
+      }
+    }
+    : sendOnce
+  return { fetchImpl }
 }

@@ -22,8 +22,7 @@ import {
   runSqliteStatements,
   type SqliteBatchDatabase,
 } from '../store'
-import { BULK_DELETE_MAX_THREADS, ChatStoreInputError, threadTitleFromMessage } from './core'
-import type { ChatMessagePart } from './parts'
+import { type ChatMessageValues, BULK_DELETE_MAX_THREADS, ChatStoreInputError, threadTitleFromMessage } from './core'
 import type { ChatMessageRow, ChatTables, ChatThreadRow, NewChatMessageRow, NewChatThreadRow } from './schema'
 
 /** Any SQLite drizzle database — `any` erases the driver-specific run-result
@@ -73,7 +72,7 @@ export interface CreateThreadInput {
 }
 
 /** Define input parameters for appending a message to a chat thread with optional metadata */
-export interface AppendMessageInput {
+export interface AppendMessageInput extends ChatMessageValues {
   /** Caller-assigned primary key. Omitted, the column default assigns a random
    *  hex id (today's behavior). Incremental assistant persistence passes a
    *  DETERMINISTIC id derived from the turn's own identity, so a re-entered
@@ -82,20 +81,7 @@ export interface AppendMessageInput {
   id?: string
   threadId: string
   role: 'user' | 'assistant' | 'system' | 'tool'
-  content: string
-  parts?: ChatMessagePart[]
   toolName?: string | null
-  model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
-  inputTokens?: number | null
-  outputTokens?: number | null
-  reasoningTokens?: number | null
-  cacheReadTokens?: number | null
-  cacheWriteTokens?: number | null
-  costUsd?: number | null
   /** Opaque product-column values written verbatim in the SAME insert. */
   extras?: Record<string, unknown>
 }
@@ -108,21 +94,8 @@ export interface AppendMessageInput {
  *  Exists for incremental assistant persistence — the streaming turn writes
  *  the row once and then patches it as content accumulates, so the durable
  *  transcript is at most one cadence interval behind the live stream. */
-export interface UpdateMessageInput {
-  content?: string
-  parts?: ChatMessagePart[]
+export interface UpdateMessageInput extends Partial<ChatMessageValues> {
   toolName?: string | null
-  model?: string | null
-  requestedModel?: string | null
-  servedModel?: string | null
-  servedProvider?: string | null
-  servedSource?: string | null
-  inputTokens?: number | null
-  outputTokens?: number | null
-  reasoningTokens?: number | null
-  cacheReadTokens?: number | null
-  cacheWriteTokens?: number | null
-  costUsd?: number | null
   /** Opaque product-column values written verbatim in the SAME update. */
   extras?: Record<string, unknown>
 }

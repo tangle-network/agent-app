@@ -132,7 +132,7 @@ export function closesIn(expiresAt: string | null | undefined, now = Date.now())
 }
 
 /** A short relative time: `just now`, `4 min ago`, `3 h ago`, then the date. */
-export function relativeTime(at: string | null | undefined, now = Date.now()): string | null {
+export function approvalRelativeTime(at: string | null | undefined, now = Date.now()): string | null {
   if (!at) return null
   const then = Date.parse(at)
   if (!Number.isFinite(then)) return null
