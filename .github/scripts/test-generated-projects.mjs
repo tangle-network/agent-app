@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -284,7 +284,12 @@ function installAndRunScaffolder({
     // Invoke the installed proof driver directly: pnpm exec would reinstall the
     // repository when its store differs from the deliberately scrubbed HOME.
     run(process.execPath, [playwrightCli, 'install', 'chromium'], { env })
-    const evidence = process.env.VERIFICATION_DIR ?? join(scratch, 'evidence')
+    // Keep sanitized proof diagnostics and browser evidence after the scrubbed
+    // project/home scratch is removed, including when the Worker dies mid-flow.
+    const evidenceRoot = join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'agent-app', 'generated-proof')
+    mkdirSync(evidenceRoot, { recursive: true, mode: 0o700 })
+    const evidence = process.env.VERIFICATION_DIR ?? mkdtempSync(join(evidenceRoot, 'workspace-'))
+    process.stdout.write(`Generated workspace evidence retained at ${evidence}\n`)
     run(process.execPath, [workspaceProof, project, evidence], { env })
   }
   assertEqual(
