@@ -34,6 +34,8 @@ export class SandboxRunError extends Error {
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
+  /** The Router engine's call identity; never derived from task text. */
+  callId?: string
   signal?: AbortSignal
   /** The engine-resolved member request, including checkpoint continuation. */
   userMessage?: string
@@ -45,6 +47,8 @@ export interface SandboxToolContext {
 }
 
 export interface SandboxTaskOptions {
+  /** Stable identity of this tool invocation, when the calling engine supplies it. */
+  callId?: string
   signal: AbortSignal
   timeoutMs: number
   /** Streams a typed side event from the box run (a progress step, a file written) as the turn's `tool_event`. */
@@ -155,6 +159,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
         const boxTask = prefix + task.slice(0, Math.max(0, TASK_LIMIT - prefix.length))
         answer = await capped(runTask(box, boxTask, {
           signal, timeoutMs: Math.max(1, timeoutMs - (Date.now() - started)), emit,
+          ...(context?.callId ? { callId: context.callId } : {}),
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {

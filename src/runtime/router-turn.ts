@@ -42,6 +42,8 @@ export interface RouterTurnTool {
 
 /** What a running tool gets besides its arguments. */
 export interface RouterTurnToolContext {
+  /** This call's identity, shared by streamed parts, tool history and a native child execution. */
+  callId?: string
   /** The effective turn cancellation signal. Tools must pass it to cancellable I/O. */
   signal?: AbortSignal
   /**
@@ -514,7 +516,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   let checkpoint: LoopMessage[] | null = null
   let toolLimitReached = false
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
-  const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
+  const callIdOf = (id: string | undefined, toolName: string) => {
+    if (id) return id
+    let fallback = `${toolName}-${started.size}`
+    while (started.has(fallback)) fallback += '_'
+    return fallback
+  }
 
   let placementFailure: RouterTurnFailure | undefined
   const run = async (model: string): Promise<ToolLoopStopReason | 'tool_limit' | 'placement_refused'> => {
@@ -560,6 +567,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         })
         try {
           const result = await tool.run(call.args, {
+            ...(call.toolCallId ? { callId: call.toolCallId } : {}),
             emit: emitEvent,
             userMessage: currentUserMessage,
             ...(signal ? { signal } : {}),
@@ -597,7 +605,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         } else if (event.type === 'tool_call') {
           segmentOpen = false
           const tool = byFunction.get(event.call.toolName)
-          const callId = callIdOf(event.call.toolCallId, event.call.toolName)
+          // The loop yields this event before extracting its call. Normalize a missing id once,
+          // so execution, progress, result and replay history reuse the displayed identity.
+          event.call.toolCallId ||= callIdOf(undefined, event.call.toolName)
+          const callId = event.call.toolCallId
           started.set(callId, Date.now())
           emit({ type: 'tool', callId, toolName: tool?.name ?? event.call.toolName, status: 'running',
             input: event.call.args, startedAt: started.get(callId)! })

@@ -29,10 +29,14 @@ it.each([
   { mode: 'execution', code: 'sandbox_failed' },
   { mode: 'empty', code: 'sandbox_empty' },
   { mode: 'success', code: undefined },
+  { mode: 'anonymous', code: undefined },
+  { mode: 'anonymous-repeat', code: undefined },
+  { mode: 'id-collision', code: undefined },
 ] as const)('keeps Router answering and persists the typed computer warning: $mode', async ({ mode, code }) => {
   let modelCalls = 0
   let boxReads = 0
   let executions = 0
+  const executedCallIds: Array<unknown> = []
   const requests: Array<Record<string, unknown>> = []
   let baseUrl = ''
   const peer = createServer((request, response) => {
@@ -50,13 +54,19 @@ it.each([
       }
       if (path.endsWith('/runtime/process/spawn')) {
         executions++
+        const input = JSON.parse(body) as { env?: Record<string, unknown> }
+        executedCallIds.push(input.env?.GTM_FIXTURE_CALL_ID)
         if (mode === 'execution') return json({ code: 'EXECUTION_REFUSED', message: 'Fixture execution refused' }, 409)
         return json({ data: { exitCode: 0, stdout: mode === 'empty' ? '' : 'Computer answer', stderr: '' } })
       }
       requests.push(JSON.parse(body))
-      const tool = ++modelCalls === 1 && mode !== 'plain'
+      modelCalls++
+      const repeat = mode === 'anonymous-repeat' || mode === 'id-collision'
+      const tool = mode !== 'plain' && modelCalls <= (repeat ? 2 : 1)
+      const id = mode === 'anonymous' || mode === 'anonymous-repeat' || (mode === 'id-collision' && modelCalls === 2)
+        ? undefined : mode === 'id-collision' ? 'sandbox_run-1' : 'computer-call'
       const delta = tool
-        ? { tool_calls: [{ index: 0, id: 'computer-call', function: { name: 'sandbox_run', arguments: JSON.stringify({ task: 'Inspect the requested document.' }) } }] }
+        ? { tool_calls: [{ index: 0, ...(id ? { id } : {}), function: { name: 'sandbox_run', arguments: JSON.stringify({ task: 'Inspect the requested document.' }) } }] }
         : { content: 'Here is the available answer.' }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       response.end(`data: ${JSON.stringify({ model: 'fixture/served', choices: [{ index: 0, delta, finish_reason: tool ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`)
@@ -86,7 +96,7 @@ it.each([
             if (!box) throw new Error('Computer absent')
             return box
           },
-          runTask: async (box, task, { timeoutMs }) => (await box.exec(task, { timeoutMs })).stdout,
+          runTask: async (box, task, { timeoutMs, callId }) => (await box.exec(task, { timeoutMs, env: { GTM_FIXTURE_CALL_ID: callId ?? 'missing' } })).stdout,
         },
       })
       return { ...producer, stream: (async function* () {
@@ -119,6 +129,17 @@ it.each([
     }
     expect(boxReads > 0).toBe(mode !== 'plain')
     expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision')
+    if (executions) {
+      const expectedCallIds = mode === 'anonymous-repeat' ? ['sandbox_run-0', 'sandbox_run-1']
+        : mode === 'id-collision' ? ['sandbox_run-1', 'sandbox_run-1_']
+        : [mode === 'anonymous' ? 'sandbox_run-0' : 'computer-call']
+      expect(executedCallIds).toEqual(expectedCallIds)
+      expect(parts.filter(part => part.type === 'tool').map(part => part.callID)).toEqual(expectedCallIds)
+      const messages = requests.at(-1)!.messages as Array<{ role: string; tool_call_id?: string; tool_calls?: Array<{ id: string }> }>
+      expect(messages.filter(message => message.role === 'assistant' && message.tool_calls).flatMap(message => message.tool_calls!.map(call => call.id))).toEqual(expectedCallIds)
+      expect(messages.filter(message => message.role === 'tool').map(message => message.tool_call_id)).toEqual(expectedCallIds)
+      for (const id of expectedCallIds) expect(wire).toContain(id)
+    }
     expect(sqlite.prepare('SELECT status FROM turn_status').get()).toMatchObject({ status: 'complete' })
   } finally {
     chatDb.$client.close(); sqlite.close(); await close(peer)
