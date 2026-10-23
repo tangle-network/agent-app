@@ -16,7 +16,7 @@
  * `variant` are the product's and are written when the row carries them. Pass `measuredFacts: false` to write
  * only the row's own values.
  */
-import { measuredTurnFacts } from '../turn-trace/turn-facts'
+import { measuredTurnFacts, nativeTimingObservationValues, type NativeTurnTimingFacts } from '../turn-trace/turn-facts'
 import { rolloutAdmits, type RolloutStage, type StageMeasurement } from './index'
 
 /** Minimal D1 surface (Cloudflare's `D1Database` satisfies it). */
@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   workspace_id TEXT NOT NULL,
   lane TEXT NOT NULL,
   admission_ms INTEGER,
+  request_received_at INTEGER,
   model TEXT,
   revision TEXT,
   arm TEXT,
@@ -66,7 +67,13 @@ ALTER TABLE rollout_turn_timing ADD COLUMN arm TEXT;
 export const ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL =
   `ALTER TABLE rollout_turn_timing ADD COLUMN variant TEXT;`
 
+/** Additive upgrade for a table created before durable native timing transfer. Historical origins remain NULL. */
+export const ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL =
+  `ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;`
+
 export interface TurnTimingRow {
+  /** Original route trace epoch, used to prevent facts from a different attempt merging into this row. */
+  requestReceivedAt?: number
   /** Request receipt to lifecycle start, before the existing relative durations. */
   admissionMs?: number
   model?: string
@@ -119,9 +126,27 @@ export function stageMetrics(rows: ReadonlyArray<Pick<TurnTimingRow, 'firstVisib
   }
 }
 
+interface TimingObservationRow {
+  admission_ms: number | null; first_visible_ms: number | null; first_text_ms: number | null
+  model: string | null; lane: string | null; revision: string | null
+}
+
+function timingCoverage(rows: readonly TimingObservationRow[]) {
+  const known = (value: string | null) => Boolean(value?.trim()) && value !== 'unknown'
+  return {
+    admission: rows.filter(row => row.admission_ms != null).length,
+    firstVisible: rows.filter(row => row.first_visible_ms != null).length,
+    firstText: rows.filter(row => row.first_text_ms != null).length,
+    requestOriginFirstVisible: rows.filter(row => row.admission_ms != null && row.first_visible_ms != null).length,
+    model: rows.filter(row => known(row.model)).length,
+    lane: rows.filter(row => known(row.lane)).length,
+    revision: rows.filter(row => known(row.revision)).length,
+  }
+}
+
 /** Columns `record` writes, in order; `variant` and the ruler columns arrived by migration. */
 const RECORD_COLUMNS = ['turn_id', 'rollout', 'workspace_id', 'lane', 'first_visible_ms', 'first_text_ms', 'settled_ms', 'failed',
-  'failure_code', 'at', 'admission_ms', 'model', 'revision', 'arm', 'variant'] as const
+  'failure_code', 'at', 'admission_ms', 'request_received_at', 'model', 'revision', 'arm', 'variant'] as const
 type RecordColumn = typeof RECORD_COLUMNS[number]
 
 /** The table's columns per database binding, read once per isolate; `null` when they could not be read. */
@@ -145,11 +170,13 @@ export function createD1TurnTimingStore(options: {
   now?: () => number
   /** Fill omitted timing and model from the chat route's measurement of the same turn. Default true. */
   measuredFacts?: boolean
+  /** Read missing observations from the existing native admission owner. Bound and index the selected identity batches. */
+  readObservedFacts?(turns: readonly { turnStreamId: string; requestReceivedAt: number }[]): Promise<readonly NativeTurnTimingFacts[]>
 }) {
   const now = options.now ?? Date.now
   return {
-    /** Record one settled turn. Idempotent on `turnId`. Never throws: telemetry must not fail a turn. */
-    async record(row: TurnTimingRow): Promise<void> {
+    /** Record one settled turn. Idempotent on `turnId`. Default never throws; durable owners opt into retryable writes with throwOnError. */
+    async record(row: TurnTimingRow, write?: { throwOnError?: boolean }): Promise<void> {
       try {
         // Read before any await: the facts belong to the request that is settling this turn.
         const measured = options.measuredFacts === false ? undefined : measuredTurnFacts(row.turnId)
@@ -162,13 +189,14 @@ export function createD1TurnTimingStore(options: {
           failure_code: productFailure && productFailure !== '[object Object]'
             ? row.failureCode : measured?.failureCode ?? row.failureCode ?? null,
           at: row.at ?? now(), admission_ms: roundOrNull(row.admissionMs ?? measured?.admissionMs),
+          request_received_at: row.requestReceivedAt ?? measured?.requestReceivedAt ?? null,
           model: row.model ?? measured?.model ?? null, revision: row.revision ?? null, arm: row.arm ?? null,
           variant: row.variant ?? null,
         }
         let columns = await readColumns(options.db, false)
         // A value the product passed whose column is unknown: the table may have migrated since the read.
         const explicit: Partial<Record<RecordColumn, unknown>> = { first_visible_ms: row.firstVisibleMs,
-          admission_ms: row.admissionMs, model: row.model, revision: row.revision, arm: row.arm, variant: row.variant }
+          admission_ms: row.admissionMs, request_received_at: row.requestReceivedAt, model: row.model, revision: row.revision, arm: row.arm, variant: row.variant }
         if (columns && Object.entries(explicit).some(([column, value]) => value !== undefined && !columns!.has(column))) {
           columns = await readColumns(options.db, true)
         }
@@ -180,6 +208,83 @@ export function createD1TurnTimingStore(options: {
       } catch (error) {
         console.error(JSON.stringify({ event: 'rollout_turn_timing_record_failed', turnId: row.turnId,
           error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200) }))
+        if (write?.throwOnError) throw error
+      }
+    },
+
+    /** Merge later genuine observations into an already-terminal row. Never inserts or changes its verdict.
+     * Exact origin and stream identity must agree; old NULL origins cannot be guessed. Throws so durable owners retry. */
+    async recordFacts(facts: NativeTurnTimingFacts): Promise<void> {
+      const values = nativeTimingObservationValues(facts)
+      await options.db.prepare(`UPDATE rollout_turn_timing SET
+        admission_ms = COALESCE(admission_ms, ?), first_visible_ms = COALESCE(first_visible_ms, ?),
+        first_text_ms = COALESCE(first_text_ms, ?) WHERE turn_id = ? AND request_received_at = ?
+          AND (admission_ms IS NULL OR ? IS NULL OR admission_ms = ?)`)
+        .bind(roundOrNull(values.admissionMs), roundOrNull(values.firstVisibleMs), roundOrNull(values.firstTextMs),
+          facts.turnStreamId, facts.requestReceivedAt, roundOrNull(values.admissionMs), roundOrNull(values.admissionMs)).run()
+    },
+
+    /** Request-origin ruler, separate from the rollout stage's relative latencies and missing-word failure rule.
+     * Unknown facts stay in the denominator. Newest rows are bounded explicitly and truncation is reported. */
+    async measureRequestOrigin(input: { rollout: string; lane?: string; since: number; until?: number; revision?: string | null }) {
+      const until = input.until ?? now()
+      const { results = [] } = await options.db.prepare(
+        `SELECT turn_id, request_received_at, admission_ms, first_visible_ms, first_text_ms, model, lane, revision, failed FROM rollout_turn_timing
+          WHERE rollout = ? AND (? IS NULL OR lane = ?) AND at >= ? AND at < ?
+            AND (? = 0 OR (? IS NULL AND (revision IS NULL OR revision = '')) OR revision = ?)
+          ORDER BY at DESC LIMIT ?`,
+      ).bind(input.rollout, input.lane ?? null, input.lane ?? null, input.since, until,
+        input.revision === undefined ? 0 : 1, input.revision ?? null, input.revision ?? null, MEASURE_ROW_LIMIT + 1).all<{
+        turn_id: string; request_received_at: number | null
+        admission_ms: number | null; first_visible_ms: number | null; first_text_ms: number | null
+        model: string | null; lane: string | null; revision: string | null; failed: number
+      }>()
+      const rows = results.slice(0, MEASURE_ROW_LIMIT)
+      const storedCoverage = timingCoverage(rows)
+      const missingTiming = () => rows.filter(row => row.admission_ms == null || row.first_visible_ms == null || row.first_text_ms == null)
+      const missing = missingTiming().filter(row => row.request_received_at != null)
+      const observedFacts = { requested: missing.length, matched: 0, observationReadFailed: false,
+        configured: Boolean(options.readObservedFacts), unknown: missingTiming().length }
+      if (missing.length && options.readObservedFacts) {
+        try {
+          const observed = await options.readObservedFacts(missing.map(row => ({ turnStreamId: row.turn_id, requestReceivedAt: row.request_received_at! })))
+          const byIdentity = new Map(missing.map(row => [row.turn_id, row]))
+          const matched = new Set<string>()
+          for (const facts of observed) {
+            const row = byIdentity.get(facts.turnStreamId)
+            if (!row || row.request_received_at !== facts.requestReceivedAt) continue
+            let values: ReturnType<typeof nativeTimingObservationValues>
+            try { values = nativeTimingObservationValues(facts) } catch { continue }
+            if (row.admission_ms != null && values.admissionMs != null && row.admission_ms !== Math.round(values.admissionMs)) continue
+            row.admission_ms ??= roundOrNull(values.admissionMs)
+            row.first_visible_ms ??= roundOrNull(values.firstVisibleMs)
+            row.first_text_ms ??= roundOrNull(values.firstTextMs)
+            matched.add(row.turn_id)
+          }
+          observedFacts.matched = matched.size
+          observedFacts.unknown = missingTiming().length
+        } catch {
+          observedFacts.observationReadFailed = true
+        }
+      }
+      const visible = rows.flatMap(row => row.admission_ms == null || row.first_visible_ms == null
+        ? [] : [row.admission_ms + row.first_visible_ms]).sort((a, b) => a - b)
+      const failed = rows.filter(row => row.failed === 1).length
+      const coverage = timingCoverage(rows)
+      return {
+        samples: rows.length, failed, failureRate: rows.length ? failed / rows.length : null,
+        requestOriginFirstVisibleP50Ms: percentile(visible, 50),
+        coverage,
+        storedCoverage,
+        recoveredCoverage: Object.fromEntries(Object.entries(coverage).map(([key, count]) => [key, count - storedCoverage[key as keyof typeof storedCoverage]])),
+        unknownCoverage: Object.fromEntries(Object.entries(coverage).map(([key, count]) => [key, rows.length - count])),
+        truncated: results.length > MEASURE_ROW_LIMIT,
+        observedFacts,
+        selection: { rollout: input.rollout, lane: input.lane ?? null, revision: input.revision === undefined ? 'all' : input.revision,
+          clock: 'settled-at', limit: MEASURE_ROW_LIMIT, filtered: input.lane !== undefined || input.revision !== undefined },
+        population: 'Persisted terminal timing rows in the selection; excludes pre-admission and missing-persistence attempts.',
+        source: `rollout_turn_timing lane=${input.lane ?? 'all'}`,
+        window: { from: new Date(input.since).toISOString(), to: new Date(until).toISOString() },
       }
     },
 

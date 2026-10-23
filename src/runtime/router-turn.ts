@@ -42,6 +42,10 @@ export interface RouterTurnTool {
 
 /** What a running tool gets besides its arguments. */
 export interface RouterTurnToolContext {
+  /** This call's identity, shared by streamed parts, tool history and a native child execution. */
+  callId?: string
+  /** The effective turn cancellation signal. Tools must pass it to cancellable I/O. */
+  signal?: AbortSignal
   /**
    * Report a typed side event while the tool runs (a graph edit, a file written, a
    * progress step). It streams at once as a `tool_event` and is recorded in the
@@ -507,12 +511,21 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
   const toolEvents: RouterTurnToolEvent[] = []
   const started = new Map<string, number>()
+  const priorCallIds = new Set((options.continueFrom?.messages ?? options.history ?? []).flatMap(message => [
+    ...('tool_calls' in message ? (message.tool_calls ?? []).map(call => call.id) : []),
+    ...('tool_call_id' in message && message.tool_call_id ? [message.tool_call_id] : []),
+  ]))
   let segmentOpen = false
   let toolsRan = 0
   let checkpoint: LoopMessage[] | null = null
   let toolLimitReached = false
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
-  const callIdOf = (id: string | undefined, toolName: string) => id ?? `${toolName}-${started.size}`
+  const callIdOf = (id: string | undefined, toolName: string) => {
+    if (id) return id
+    let fallback = `${toolName}-${started.size}`
+    while (started.has(fallback) || priorCallIds.has(fallback)) fallback += '_'
+    return fallback
+  }
 
   let placementFailure: RouterTurnFailure | undefined
   const run = async (model: string): Promise<ToolLoopStopReason | 'tool_limit' | 'placement_refused'> => {
@@ -558,8 +571,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         })
         try {
           const result = await tool.run(call.args, {
+            ...(call.toolCallId ? { callId: call.toolCallId } : {}),
             emit: emitEvent,
             userMessage: currentUserMessage,
+            ...(signal ? { signal } : {}),
             ...(trace && toolSpan ? { trace, span: toolSpan } : {}),
           })
           toolSpan?.end({ 'tool.ok': true })
@@ -594,7 +609,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         } else if (event.type === 'tool_call') {
           segmentOpen = false
           const tool = byFunction.get(event.call.toolName)
-          const callId = callIdOf(event.call.toolCallId, event.call.toolName)
+          // The loop yields this event before extracting its call. Normalize a missing id once,
+          // so execution, progress, result and replay history reuse the displayed identity.
+          event.call.toolCallId ||= callIdOf(undefined, event.call.toolName)
+          const callId = event.call.toolCallId
           started.set(callId, Date.now())
           emit({ type: 'tool', callId, toolName: tool?.name ?? event.call.toolName, status: 'running',
             input: event.call.args, startedAt: started.get(callId)! })
