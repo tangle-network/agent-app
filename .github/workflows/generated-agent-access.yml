@@ -30,7 +30,7 @@ concurrency:
 
 jobs:
   packed-consumer:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ci-public]
     timeout-minutes: 35
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -59,4 +59,4 @@ jobs:
           name: generated-agent-access-${{ github.event.pull_request.head.sha }}
           path: ${{ env.VERIFICATION_DIR }}
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 1

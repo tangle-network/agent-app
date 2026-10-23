@@ -1,0 +1,82 @@
+name: Deploy component catalog
+on:
+  workflow_call:
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: false
+      CLOUDFLARE_ACCOUNT_ID:
+        required: false
+permissions:
+  contents: read
+  deployments: write
+jobs:
+  deploy:
+    if: >-
+      github.repository == 'tangle-network/agent-app' && (
+        (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      )
+    runs-on:
+      group: public-app-production
+      labels: [self-hosted, ci-deploy]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      deployments: write
+    concurrency:
+      group: agent-app-catalog-${{ github.event_name == 'pull_request' && format('review-pr-{0}', github.event.pull_request.number) || 'main' }}
+      cancel-in-progress: false
+    env:
+      CATALOG_BRANCH: ${{ github.event_name == 'pull_request' && format('review-pr-{0}', github.event.pull_request.number) || 'main' }}
+    steps:
+      - name: Check deployment credentials
+        id: credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TARGET_BRANCH: ${{ github.event_name == 'pull_request' && format('review-pr-{0}', github.event.pull_request.number) || 'main' }}
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
+            if [[ "$TARGET_BRANCH" == main ]]; then
+              echo '::error::Cloudflare deployment credentials are missing.'
+              exit 1
+            fi
+            echo 'Catalog preview skipped because deployment credentials are missing.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        if: steps.credentials.outputs.present == 'true'
+        with:
+          name: agent-app-catalog-${{ github.sha }}
+          path: storybook-static
+      - uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087
+        if: steps.credentials.outputs.present == 'true'
+        id: deploy
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy storybook-static --project-name=agent-app-storybook --branch=${{ env.CATALOG_BRANCH }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify this exact catalog at the immutable deployment URL
+        if: steps.credentials.outputs.present == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const expected = JSON.parse(readFileSync('storybook-static/catalog-manifest.json', 'utf8'));
+          const url = new URL(process.env.DEPLOYMENT_URL);
+          if (url.protocol !== 'https:' || !url.hostname.endsWith('.pages.dev') || url.username || url.password) throw new Error('Missing or invalid immutable Pages URL');
+          let observed;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            try {
+              const response = await fetch(new URL('/catalog-manifest.json', url), { signal: AbortSignal.timeout(10000), redirect: 'error' });
+              if (response.ok) { observed = await response.json(); break; }
+            } catch {}
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+          }
+          if (observed?.sourceSha !== expected.sourceSha || observed?.indexSha256 !== expected.indexSha256) throw new Error('Hosted catalog differs from the built artifact');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Component review\n\nImmutable catalog: ${url.href}\n\nSource: \`${expected.sourceSha}\`\n\nFixture review does not establish product-flow success or visual approval.\n`);
+          NODE

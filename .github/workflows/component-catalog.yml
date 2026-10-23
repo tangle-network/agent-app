@@ -11,8 +11,7 @@ permissions:
 
 jobs:
   build:
-    needs: deployment-credentials
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, ci-public]
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -42,7 +41,7 @@ jobs:
             ${{ runner.temp }}/agent-app-signoff-evidence/*.png
             ${{ runner.temp }}/agent-app-signoff-evidence/workspace-proof.json
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 1
       - run: pnpm build-storybook
       - name: Read the shared catalog attestor at an immutable revision
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -59,92 +58,17 @@ jobs:
           name: agent-app-catalog-${{ github.sha }}
           path: storybook-static
           if-no-files-found: error
-          retention-days: 14
-
-  deployment-credentials:
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    permissions: {}
-    outputs:
-      target: ${{ steps.presence.outputs.target }}
-      branch: ${{ steps.presence.outputs.branch }}
-    steps:
-      - id: presence
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          if [[ "$GITHUB_EVENT_NAME" == 'pull_request' && "$PR_HEAD_REPO" == "$GITHUB_REPOSITORY" ]]; then
-            TARGET='preview'
-            BRANCH="review-pr-$PR_NUMBER"
-          elif [[ "$GITHUB_EVENT_NAME" != 'pull_request' && "$GITHUB_REF" == 'refs/heads/main' ]]; then
-            TARGET='main'
-            BRANCH='main'
-          else
-            TARGET='none'
-            BRANCH=''
-          fi
-          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" ]]; then
-            if [[ "$TARGET" == 'main' ]]; then
-              echo '::error::Cloudflare Actions secrets are missing for the main catalog deploy.'
-              echo 'Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID through the approved secret owner.'
-              exit 1
-            elif [[ "$TARGET" == 'preview' ]]; then
-              echo '::notice::Catalog preview skipped because Cloudflare Actions secrets are missing.'
-              echo 'Catalog preview was skipped because CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing.' >> "$GITHUB_STEP_SUMMARY"
-              TARGET='none'
-            fi
-          fi
-
-          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
-          # Keep the output contract explicit; deploy checks target before using branch.
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          retention-days: 1
 
   deploy:
-    needs: [build, deployment-credentials]
+    needs: build
     if: >-
-      needs.deployment-credentials.outputs.target != 'none'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    uses: tangle-network/agent-app/.github/workflows/deploy-catalog.yml@main
     permissions:
       contents: read
       deployments: write
-    concurrency:
-      group: agent-app-catalog-${{ github.event.pull_request.number || 'main' }}
-      cancel-in-progress: false
-    env:
-      CATALOG_BRANCH: ${{ needs.deployment-credentials.outputs.branch }}
-    steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
-        with:
-          name: agent-app-catalog-${{ github.sha }}
-          path: storybook-static
-      - uses: cloudflare/wrangler-action@25853364521e0d392ece9b0c1e97a4b37b638087
-        id: deploy
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy storybook-static --project-name=agent-app-storybook --branch=${{ env.CATALOG_BRANCH }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-      - name: Verify this exact catalog at the immutable deployment URL
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, appendFileSync } from 'node:fs';
-          const expected = JSON.parse(readFileSync('storybook-static/catalog-manifest.json', 'utf8'));
-          const url = new URL(process.env.DEPLOYMENT_URL);
-          if (url.protocol !== 'https:' || !url.hostname.endsWith('.pages.dev') || url.username || url.password) throw new Error('Missing or invalid immutable Pages URL');
-          let observed;
-          for (let attempt = 0; attempt < 6; attempt++) {
-            try {
-              const response = await fetch(new URL('/catalog-manifest.json', url), { signal: AbortSignal.timeout(10000), redirect: 'error' });
-              if (response.ok) { observed = await response.json(); break; }
-            } catch {}
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-          }
-          if (observed?.sourceSha !== expected.sourceSha || observed?.indexSha256 !== expected.indexSha256) throw new Error('Hosted catalog differs from the built artifact');
-          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## Component review\n\nImmutable catalog: ${url.href}\n\nSource: \`${expected.sourceSha}\`\n\nFixture review does not establish product-flow success or visual approval.\n`);
-          NODE
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
