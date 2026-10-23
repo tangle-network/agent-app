@@ -306,7 +306,7 @@ export default {
     }
     const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
     const tokenKey = url.pathname === '/cross-channel' ? turnLockChannelKey('another-workspace', input.threadId, input.scope) : key
-    const headers = url.pathname === '/raw-unauthenticated' ? {} : { [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(tokenKey, auth.secret) }
+    const headers: Record<string, string> = url.pathname === '/raw-unauthenticated' ? {} : { [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(tokenKey, auth.secret) }
     const path = url.pathname === '/close' ? '/fixture/close' : url.pathname === '/sockets' ? '/fixture/sockets'
       : url.pathname === '/raw-lock' ? '/fixture/raw-lock' : '/chat-turn-lock/peek'
     const response = await namespace.get(namespace.idFromName(key)).fetch(`https://fixture.internal${path}`,
