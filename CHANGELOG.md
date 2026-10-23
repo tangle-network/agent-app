@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.61.2
+
+- fix(chat): preserve codes that prefix failure explanations (#1284)
+
 ## 0.61.1
 
 - fix(chat): retain readable terminal failures in timing records (#1283)

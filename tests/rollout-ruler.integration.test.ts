@@ -236,7 +236,10 @@ it('a product writer that omits timing still records first visible, admission an
   } finally { full.close(); legacy.close(); optedOut.close() }
 })
 
-it.each([undefined, '', '[object Object]', 'product.refused'])('records the sandbox failure through the route lifecycle and real timing table (product code=%s)', async failureCode => {
+it.each([
+  { code: 'MODEL_REFUSED', message: 'The selected model is outside the delegated key allow-list.' },
+  { code: 'E', message: 'Error while connecting' },
+].flatMap(error => [undefined, '', '[object Object]', 'product.refused'].map(failureCode => ({ ...error, failureCode })) ))('records the sandbox failure through the route lifecycle and real timing table ($code, product code=$failureCode)', async ({ code, message, failureCode }) => {
   const sqlite = new Database(':memory:')
   sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
   const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
@@ -250,7 +253,7 @@ it.each([undefined, '', '[object Object]', 'product.refused'])('records the sand
     turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }),
     produce: () => createSandboxChatProducer({ errorNotice: true, events: (async function* () {
-      yield { type: 'error', data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the delegated key allow-list.' } }
+      yield { type: 'error', data: { code, message } }
     })() }),
     lifecycle: { onTurnError: info => timing.record({
       turnId: info.turnStreamId, rollout: 'reliability', workspaceId: 'workspace', lane: 'sandbox',
@@ -263,12 +266,12 @@ it.each([undefined, '', '[object Object]', 'product.refused'])('records the sand
     { waitUntil: promise => { pending.push(promise) } })
     const events = (await response.text()).trim().split('\n').map(line => JSON.parse(line))
     await Promise.all(pending)
-    expect(events.find(event => event.type === 'session.run.failed')?.data.code).toBe('MODEL_REFUSED')
+    expect(events.find(event => event.type === 'session.run.failed')?.data.code).toBe(code)
     expect(events.some(event => event.type === 'session.run.completed')).toBe(false)
     expect(sqlite.prepare('SELECT failed, failure_code FROM rollout_turn_timing').get()).toEqual({
       failed: 1,
       failure_code: failureCode === 'product.refused' ? failureCode
-        : 'MODEL_REFUSED: The selected model is outside the delegated key allow-list.',
+        : `${code}: ${message}`,
     })
   } finally { sqlite.close() }
 })
