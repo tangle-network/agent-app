@@ -363,15 +363,17 @@ export type ChatTurnGateResult =
    *  the route releases its lock. */
   | { proceed: 'handoff'; response: Response }
 
-/** Single-flight lock verdict — acquired (with an opaque handle passed back to
- *  `release`), or already held (short-circuit with the product's 409-style
- *  `Response`). */
+/** This owner's cancellation observation: the signal aborts on Stop or control loss.
+ *  Closing observation does not release the lock or establish remote completion. */
 export interface ChatTurnCancellation {
   signal: AbortSignal
   /** Close this owner's observation; never release the durable lock or claim remote work stopped. */
   close(): void | Promise<void>
 }
 
+/** Single-flight lock verdict — acquired (with an opaque handle passed back to
+ *  `release`), or already held (short-circuit with the product's 409-style
+ *  `Response`). */
 export type ChatTurnLockResult =
   | { acquired: true; handle?: unknown; cancellation?: ChatTurnCancellation }
   | { acquired: false; response: Response }
