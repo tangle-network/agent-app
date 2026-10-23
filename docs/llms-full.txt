@@ -4020,7 +4020,7 @@ interface CreateLegacyAttachmentUploadRouteOptions
 `function`
 
 ```ts
-(options: RouterTurnProducerOptions) => ChatTurnRouteProducer
+(options: RouterTurnProducerOptions) => Omit<ChatTurnRouteProducer, "stream"> & { stream: AsyncGenerator<ProducerWireEv…
 ```
 
 ### `createSandboxChatProducer`
@@ -4551,6 +4551,14 @@ interface NativeCompletionAdmission
 interface NativeCompletionAdmissionStore
 ```
 
+### `NativeCompletionHandoffOptions`
+
+`interface`
+
+```ts
+interface NativeCompletionHandoffOptions
+```
+
 ### `NativeCompletionObservation`
 
 `type`
@@ -4589,6 +4597,14 @@ type NativeCompletionSessionSource
 
 ```ts
 interface NativeCompletionTurnReceipt
+```
+
+### `NativeTurnTimingFacts`
+
+`interface` — Serializable route observations for an admission that transfers terminal authority to a durable native owner.
+
+```ts
+interface NativeTurnTimingFacts
 ```
 
 ### `normalizeChatPromptForSandbox`
@@ -20792,7 +20808,7 @@ Source: `src/rollout/d1.ts` · depends on `signoff`, `turn-trace`
 `function`
 
 ```ts
-(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…
+(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; readObservedFa…
 ```
 
 ### `D1LikeForRollout`
@@ -20809,6 +20825,14 @@ interface D1LikeForRollout
 
 ```ts
 "ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;"
+```
+
+### `ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL`
+
+`const` — Additive upgrade for a table created before durable native timing transfer.
+
+```ts
+"ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;"
 ```
 
 ### `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`
@@ -26893,6 +26917,22 @@ interface UseSettingFieldOptions
 
 Source: `src/signoff/index.ts` · depends on `launch-invariants`
 
+### `CachePruneOptions`
+
+`interface`
+
+```ts
+interface CachePruneOptions
+```
+
+### `CachePruneResult`
+
+`interface`
+
+```ts
+interface CachePruneResult
+```
+
 ### `CdpResponseSource`
 
 `interface` — The fields of Chromium's `Network.responseReceived` that say where a response came from.
@@ -27157,6 +27197,14 @@ interface NetworkCount
 (argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }
 ```
 
+### `pruneSignoffCache`
+
+`function` — Bound idle trees and stores by age first, then allocated physical bytes.
+
+```ts
+(cacheDir: string, options?: CachePruneOptions) => Promise<CachePruneResult>
+```
+
 ### `QUIET_CHROMIUM_ARGS`
 
 `const` — Chromium flags that stop prerender and speculative prefetch of linked pages.
@@ -27349,6 +27397,14 @@ interface SignoffInstallResult
 interface SignoffInstallSpec
 ```
 
+### `SignoffPhase`
+
+`type`
+
+```ts
+type SignoffPhase
+```
+
 ### `SignoffRepoFacts`
 
 `interface`
@@ -27363,6 +27419,14 @@ interface SignoffRepoFacts
 
 ```ts
 interface SignoffReport
+```
+
+### `SignoffSelection`
+
+`interface` — Declared scope, including dependency steps brought into a partial run.
+
+```ts
+interface SignoffSelection
 ```
 
 ### `SignoffShuffleSpec`
