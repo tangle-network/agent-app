@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.1
+
+- fix(sandbox): settle restart-prefetched reads after liveness recovers (#1287)
+
 ## 0.62.0
 
 - refactor!: consolidate framework owners and retire unused APIs (#1280)
