@@ -73,7 +73,10 @@ async function pushRuntimeEnv(
 ): Promise<Outcome<void>> {
   try {
     const push = () => box.setRuntimeEnv(env)
-    const deliver = () => deadline === undefined ? push() : readDuringPlannedHostRestart(push, deadline)
+    const deliver = async () => {
+      if (deadline === undefined) await push()
+      else await readDuringPlannedHostRestart(push, deadline)
+    }
     await (measure ? measure('runtime_env_push', deliver) : deliver())
     recordCheck(box, { env: { digest: runtimeEnvDigest(env), at: Date.now() } })
     return ok(undefined)
