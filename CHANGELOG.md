@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.4
+
+- feat: add fenced durable Stop for Router turns (#1309)
+
 ## 0.63.3
 
 - perf: prewarm the shared turn lock before send (#1306)
