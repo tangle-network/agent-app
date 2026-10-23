@@ -21,6 +21,7 @@
  * `admissionSignal` cancels.
  */
 import type { TurnTrace } from '../turn-trace/recorder'
+import type { NativeCompletionHandoffOptions } from './native-turn-timing'
 import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
@@ -72,7 +73,7 @@ function dispatchProducerFirst<TContext>(
     ...args,
     admitted,
     admissionSignal: abort.signal,
-    ...(handoffCompletion ? { handoffCompletion: () => admitted.then(() => handoffCompletion()) } : {}),
+    ...(handoffCompletion ? { handoffCompletion: (options?: NativeCompletionHandoffOptions) => admitted.then(() => handoffCompletion(options)) } : {}),
   }))
   const draining = started.then(async (producer) => {
     try {

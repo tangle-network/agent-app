@@ -4,7 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { z } from 'zod'
 import { APP_DEFAULTS_STEP, EXEMPTIBLE_DEFAULTS } from './app-defaults'
 import { WORKER_DEFAULTS_STEP } from './worker-defaults'
-import type { LoadedSignoffConfig, SignoffConfig, SignoffStepSpec } from './types'
+import { selectSignoffPhase } from './phases'
+import type { LoadedSignoffConfig, SignoffConfig, SignoffStepSpec, SignoffPhase } from './types'
 
 /**
  * Where the step list comes from.
@@ -35,6 +36,7 @@ const shuffleSchema = z.object({
 })
 
 const stepSchema = z.object({
+  phase: z.enum(['release', 'suites']).optional(),
   name: z.string().min(1),
   run: z.string().min(1),
   cwd: z.string().optional(),
@@ -160,9 +162,15 @@ export interface LoadSignoffConfigOptions {
   readonly repoRoot: string
   /** Explicit config path. Missing file is an error, never a silent fallback. */
   readonly configPath?: string
+  /** Defaults to the full gate. Partial phases require complete classification. */
+  readonly phase?: SignoffPhase
 }
 
 export async function loadSignoffConfig(options: LoadSignoffConfigOptions): Promise<LoadedSignoffConfig> {
+  return selectSignoffPhase(await loadDeclaredConfig(options), options.phase)
+}
+
+async function loadDeclaredConfig(options: LoadSignoffConfigOptions): Promise<LoadedSignoffConfig> {
   const { repoRoot, configPath } = options
 
   if (configPath !== undefined) {
