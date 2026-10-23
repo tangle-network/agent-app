@@ -264,13 +264,14 @@ export interface ChatTurnProduceArgs<TContext> {
    *  is the only way to name a REUSED row (which `priorMessages` excludes).
    *
    *  Three states, all meaningful:
-   *  - `undefined` — not resolved yet. `turnLock.acquire` is the one seam that
-   *    sees this: it runs before any side effect by contract, so the row does
-   *    not exist when it reads the args.
+   *  - `undefined` — a new row is not inserted yet. The dispatch-first policy
+   *    and `turnLock.acquire` see this for a fresh turn; a reused row's id is
+   *    already available from the history read, without another query.
    *  - `null` — resolved, no row: `authorize` returned `insertUserMessage:
    *    false` on a turn with nothing to reuse, or the store's `appendMessage`
    *    resolved without a usable id.
-   *  - a string — the row id, for `contextGate`, `beforeTurn`, and `produce`. */
+   *  - a string — the row id, including a reused row before dispatch policy;
+   *    also supplied to `contextGate`, `beforeTurn`, and `produce`. */
   userMessageId?: string | null
   /** True when this turn's own insert created `userMessageId`, so no earlier
    *  attempt can have answered it; false when retry-dedup reused the row or no
