@@ -103,7 +103,12 @@ const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
   [...workflow.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)]
     .map((match) => ({ file, name: match[1], ref: match[2] })),
 )
-check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
+// The credential runner group admits the reviewed catalog deployment only at
+// main. Third-party actions and the package release controls stay immutable.
+const trustedCatalog = 'tangle-network/agent-app/.github/workflows/deploy-catalog.yml'
+check(actionRefs.every(({ name, ref }) =>
+  (name === trustedCatalog && ref === 'main') || /^[0-9a-f]{40}$/.test(ref),
+), 'actions must be pinned; only the group-restricted catalog workflow follows main')
 for (const [name, pin] of Object.entries(pins)) {
   const refs = actionRefs.filter((action) => action.name === name)
   check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
