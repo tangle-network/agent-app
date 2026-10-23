@@ -156,7 +156,7 @@ try {
   const replay = identity('replay')
   await acquire(replay)
   assert.deepEqual(await json('/stop', replay), { requested: true })
-  assert((await peek(replay))?.cancellation?.requestedAt)
+  assert((await peek(replay))?.cancellation?.requestedAt, 'Durable cancellation intent must persist before acknowledgement')
   // Restart the actual storage process: no isolate memory can carry this request into the next owner connection.
   await runtime.dispose(); runtime = start()
   database = await runtime.getD1Database('CHAT', 'stop-fixture')
