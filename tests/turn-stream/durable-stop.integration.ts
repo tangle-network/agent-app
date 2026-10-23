@@ -100,8 +100,8 @@ const peer = createServer((request, response) => {
 })
 let modelUrl = ''
 function start() {
-  return new Miniflare(convertV4MiniflareOptions({ durableObjectsPersist: resolve(directory, 'objects'),
-    d1Persist: resolve(directory, 'sqlite'), workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
+  return new Miniflare(convertV4MiniflareOptions({ resourcePersistencePath: resolve(directory, 'state'),
+    workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
       compatibilityFlags, scriptPath: bundlePath, modulesRoot: bundleDirectory,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
         ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream'],
@@ -173,6 +173,10 @@ try {
   // Restart the actual storage process: no isolate memory can carry this request into the next owner connection.
   await runtime.dispose(); runtime = start()
   database = await runtime.getD1Database('CHAT', 'stop-fixture')
+  const restored = await peek(replay)
+  assert.deepEqual(restored && { workspaceId: restored.workspaceId, threadId: restored.threadId, scope: restored.scope,
+    executionId: restored.executionId, lockId: restored.lockId, turnStreamId: restored.cancellation?.turnStreamId }, replay,
+    'Runtime restart must retain the exact durable cancellation owner')
   assert.deepEqual(await json('/observe', replay), { aborted: true })
   assert.equal((await peek(replay))?.lockId, replay.lockId, 'Closing the owner connection cannot release the lock')
   assert.deepEqual(await json('/release', replay), { released: true })
