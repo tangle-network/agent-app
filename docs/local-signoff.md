@@ -317,10 +317,66 @@ agent-app-signoff --keep-going        # run every step, full picture
 agent-app-signoff --json proof.json   # machine-readable record
 ```
 
-Exit 0 means every declared step passed in a pristine tree.
+By default (also `--phase all`), exit 0 means every declared step passed in a pristine tree.
 Exit 1 is a real failure. Exit 2 is a usage or config error, so a script can tell "your code is broken" from "your gate is misconfigured".
 
 The report names the bytes verified (commit + patch digest + untracked file count), the environment (clean tree path, store warm/cold, host, node pin), every step with its seeds and its start→finish window, wall clock against the serial sum, and the command that reproduces the run.
+
+### Declared release and suites phases
+
+`--phase release` and `--phase suites` select a partial gate. Every declared step
+must first have `phase: 'release'` or `phase: 'suites'`; legacy and derived configs
+continue to work for the full gate. Names never determine phase membership.
+
+```js
+export default {
+  steps: [
+    { name: 'build', phase: 'release', run: 'pnpm run build' },
+    { name: 'exercise', phase: 'suites', needs: ['build'], run: 'pnpm run test' },
+  ],
+}
+```
+
+Both partial phases install and check the Node pin and installed Node types.
+The runner adds the selected steps' transitive `needs` prerequisites. A release
+step depending on a suites step is refused, as are an empty selection, an
+unclassified step, an invalid phase, and an invalid graph. Full and release runs
+also check the built-in Worker and app defaults; suites runs do not demand a
+bundle merely to measure those defaults. Installation is unchanged: any
+suite-specific setup declared in `install` still runs in the release phase.
+
+JSON identifies `phase` at the top level. Partial reports include `selection`
+with `requested`, `prerequisites`, and `excluded` step names; excluded steps are
+not reported as failed or skipped executions. Text and quiet output label the
+partial scope and reproduction includes `--phase`. A partial report cannot be
+converted into a full signed proof by `proofFromSignoffReport`.
+
+Metadata readers use the same selector:
+
+```js
+const { config, selection } = await loadSignoffConfig({ repoRoot, phase: 'release' })
+// config.steps contains exactly the selected steps and their prerequisites.
+```
+
+### Handing the checked artifact to native release
+
+Use `--source head --phase release --keep-workspace --json receipt.json` with a
+**dedicated job-owned `--cache-dir`**. Validate the successful receipt, release
+phase, retained workspace, original repository root and HEAD, clean `head`
+source, and the retained worktree's HEAD and Git common directory before native
+release. Then run the existing native release command from `report.workspace`.
+That real detached Git worktree contains the build the gate checked. Running
+release from the original caller directory would consume a different artifact.
+The workflow owner validates this handoff; no second install or build is needed.
+Absolute workspace paths are a same-host handoff, not an artifact transport.
+
+A kept workspace survives its own run, but another run may prune idle entries.
+The dedicated cache prevents a concurrent signoff from retiring the release
+artifact. After native release or bounded diagnostic retention, its owner calls
+the existing `pruneSignoffCache(jobCache, { maxAgeMs: 0, maxBytes: 0 })` exported
+from `/signoff`. It retires idle registered worktrees through Git under the
+cache lock and preserves active leases. Immediate cleanup is for a dedicated
+job cache; a shared cache retains its normal age and byte policy.
 
 ## The engine's own tests were each proven able to fail
 
