@@ -329,6 +329,14 @@ jobs:
             "release_control_sha=$RELEASE_CONTROL_SHA" > "$EXPECTED"
           cmp "$EXPECTED" RELEASE_PROVENANCE
           PUBLICATION_OUTPUT="$GITHUB_OUTPUT" bash publish-packages.sh validate agent-app.tgz create-agent-app.tgz
+          # A legacy retained control must never turn missing outputs into a
+          # successful workflow that silently skips both publications.
+          for package in agent-app create-agent-app; do
+            grep -Eq "^$package-pending=(true|false)$" "$GITHUB_OUTPUT" || {
+              echo "::error::Source publication control did not report registry state for $package."
+              exit 1
+            }
+          done
 
   write_release:
     needs: package_release
