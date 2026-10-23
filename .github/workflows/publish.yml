@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   package_release:
-    uses: tangle-network/agent-app/.github/workflows/prepare-publish.yml@main
+    uses: tangle-network/agent-app/.github/workflows/prepare-publish.yml@28c882cb570fa4103fd1265eb390090bfb86fee7
     permissions:
       contents: read
       actions: read
