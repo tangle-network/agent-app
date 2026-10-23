@@ -40,6 +40,7 @@ const INSTALL = `node -e "require('fs').writeFileSync('installed.txt', process.e
 interface RepoOptions {
   readonly steps: string
   readonly install?: string
+  readonly configPrelude?: string
 }
 
 function fixtureRepo(options: RepoOptions): string {
@@ -62,7 +63,7 @@ function fixtureRepo(options: RepoOptions): string {
   )
   writeFileSync(
     join(repo, 'signoff.config.mjs'),
-    `export default {
+    `${options.configPrelude ?? ''}export default {
   install: {
     run: ${JSON.stringify(options.install ?? INSTALL)},
     storeDirFlag: null,
@@ -153,8 +154,11 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     return { status, stdout, stderr }
   }
 
-  it('delivers the complete large failure report to a slow pipe after cleanup', async () => {
-    const repo = fixtureRepo({ steps: `[{ name: 'large failure', run: 'node failure.mjs' }]` })
+  it('delivers the complete large failure report and exits despite a config timer', async () => {
+    const repo = fixtureRepo({
+      steps: `[{ name: 'large failure', run: 'node failure.mjs' }]`,
+      configPrelude: 'setInterval(() => {}, 1000)\n',
+    })
     const payload = JSON.stringify({ detail: 'x'.repeat(1024 * 1024), last: 'PIPE-FAILURE-DETAIL-END' })
     writeFileSync(join(repo, 'failure.mjs'),
       `process.stdout.write(${JSON.stringify(payload)}, () => { process.exitCode = 17 })\n`)
@@ -173,8 +177,11 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(result.stdout).toBe(`${formatSignoffReport(report)}\n`)
   })
 
-  it('preserves success status and releases the clean tree and cache lease', async () => {
-    const repo = fixtureRepo({ steps: `[{ name: 'pass', run: 'node -e ""' }]` })
+  it('preserves success status and cleanup despite a config timer', async () => {
+    const repo = fixtureRepo({
+      steps: `[{ name: 'pass', run: 'node -e ""' }]`,
+      configPrelude: 'setInterval(() => {}, 1000)\n',
+    })
     const cacheDir = temp('signoff-cli-cache-')
     const json = join(temp('signoff-cli-report-'), 'report.json')
     const result = await runCli([repo, '--source', 'head', '--cache-dir', cacheDir, '--json', json])
@@ -187,10 +194,11 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
   })
 
-  it('delivers a complete config error to a slow stderr pipe with exit 2 and cleanup', async () => {
+  it('delivers a complete config error and exits despite its retained timer', async () => {
     const repo = fixtureRepo({ steps: `[{ name: 'unused', run: 'node -e ""' }]` })
     const message = `CONFIG-ERROR-${'x'.repeat(1024 * 1024)}-END`
-    writeFileSync(join(repo, 'signoff.config.mjs'), `throw new Error(${JSON.stringify(message)})\n`)
+    writeFileSync(join(repo, 'signoff.config.mjs'),
+      `setInterval(() => {}, 1000)\nthrow new Error(${JSON.stringify(message)})\n`)
     git(['add', 'signoff.config.mjs'], repo)
     git(['commit', '--quiet', '-m', 'invalid config'], repo)
     const cacheDir = temp('signoff-cli-cache-')
