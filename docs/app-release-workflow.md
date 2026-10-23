@@ -32,7 +32,7 @@ Keep caller triggers and runtime path filters in the thin caller. This workflow 
 
 ## Source, artifact and writer invariants
 
-The checkout is the immutable `github.sha`, with full history and no persisted credentials. The source guard uses the tracking ref populated by checkout; it does not issue an unauthenticated second fetch in private repositories. The native release retains its supported authenticated fresh-source and served-ancestry barrier.
+The checkout is the immutable `github.sha`, with full history and no persisted credentials. The source guard uses the tracking ref populated by checkout; it does not issue an unauthenticated second fetch in private repositories. The native release retains its supported authenticated fresh-source and served-ancestry barrier. Only a successfully validated source may reach the later suites or failure-reporting job; rejecting an event, branch or ancestry must not execute its test code on a self-hosted runner.
 
 Do not require the candidate to equal a mutable default-branch tip after verification. A later docs merge must not strand a verified forward release. Refuse actual source rewinds against the served release through the native owner's existing barrier.
 
