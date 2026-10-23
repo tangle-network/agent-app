@@ -128,7 +128,8 @@ jobs:
             }
             workspace = realpathSync(report.workspace)
             const common = cwd => realpathSync(resolve(cwd, git(cwd, 'rev-parse', '--git-common-dir')))
-            if (workspace === root || git(workspace, 'rev-parse', 'HEAD') !== process.env.SOURCE_SHA ||
+            if (workspace === root || realpathSync(git(workspace, 'rev-parse', '--show-toplevel')) !== workspace ||
+                git(workspace, 'rev-parse', 'HEAD') !== process.env.SOURCE_SHA ||
                 common(workspace) !== common(root)) {
               throw Error('signoff workspace is not the retained worktree for this source')
             }
