@@ -6,20 +6,29 @@ import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 
 /** Real HTTP model transport, SQLite canonical Stop state and assistant draft storage. */
-async function observationFixture(constructionHeld = false) {
+async function observationFixture(constructionHeld = false, iteratorCleanup = false) {
   const sql = new DatabaseSync(':memory:')
   sql.exec(`CREATE TABLE message(id TEXT PRIMARY KEY,thread TEXT,role TEXT,content TEXT);
     CREATE TABLE turn_state(status TEXT); INSERT INTO turn_state VALUES ('running');
     CREATE TABLE retired(id TEXT);`)
-  let sawDraft!: () => void, sawRequest!: () => void, finishHttp!: () => void
+  let sawDraft!: () => void, sawRequest!: () => void, finishHttp!: () => void, sawRetirement!: () => void, finishRetirement: (() => void) | undefined
   const draftWritten = new Promise<void>(resolve => { sawDraft = resolve })
   const httpStarted = new Promise<void>(resolve => { sawRequest = resolve })
+  const retirementStarted = new Promise<void>(resolve => { sawRetirement = resolve })
   const pending: Promise<unknown>[] = [], signals: AbortSignal[] = []
   let sourceClosed = 0, reads = 0, releaseLate!: () => void
   const late = new Promise<void>(resolve => { releaseLate = resolve })
   const server = createServer((request, response) => {
     request.resume()
     request.on('end', () => {
+      if (request.method === 'DELETE' && request.url === '/retire') {
+        finishRetirement = () => {
+          sql.prepare('INSERT INTO retired VALUES (?)').run('iterator-finally')
+          response.end('retired')
+        }
+        sawRetirement()
+        return
+      }
       response.writeHead(200, { 'content-type': 'text/plain' })
       response.flushHeaders()
       if (!constructionHeld) response.write('Draft answer.')
@@ -59,16 +68,16 @@ async function observationFixture(constructionHeld = false) {
     produce: async args => {
       signals.push(args.admissionSignal!)
       const response = await fetch(origin, { signal: args.admissionSignal })
-      const cleanup = new Promise<void>(resolve => {
+      const cleanup = constructionHeld ? new Promise<void>(resolve => {
         args.admissionSignal?.addEventListener('abort', () => {
           void late.then(() => { sql.prepare('INSERT INTO retired VALUES (?)').run('late-producer'); resolve() })
         }, { once: true })
-      })
+      }) : undefined
       if (constructionHeld) await late
       let text = ''
       const reader = response.body!.getReader()
       return {
-        cleanup: constructionHeld ? cleanup : undefined,
+        cleanup,
         stream: (async function* () {
           try {
             for (;;) {
@@ -78,7 +87,11 @@ async function observationFixture(constructionHeld = false) {
               text += delta
               yield { type: 'text' as const, text: delta }
             }
-          } finally { sourceClosed++; await reader.cancel().catch(() => {}) }
+          } finally {
+            sourceClosed++
+            await reader.cancel().catch(() => {})
+            if (iteratorCleanup) await fetch(`${origin}/retire`, { method: 'DELETE' })
+          }
         })(),
         finalText: () => text || 'A retained producer projection must never escape Stop.',
         assistantParts: () => [{ type: 'text', text: text || 'Retained part.' }],
@@ -87,14 +100,15 @@ async function observationFixture(constructionHeld = false) {
     log: () => {},
   })
   return {
-    sql, pending, signals, draftWritten, httpStarted, releaseLate,
+    sql, pending, signals, draftWritten, httpStarted, retirementStarted, releaseLate,
+    releaseRetirement: () => finishRetirement?.(),
     finish: () => finishHttp(), reads: () => reads, sourceClosed: () => sourceClosed,
     setStatus: (status: string) => { sql.prepare('UPDATE turn_state SET status=?').run(status) },
     send: () => routes.turn(new Request('http://app.test/chat', { method: 'POST',
       headers: { 'content-type': 'application/json' }, body: JSON.stringify({ threadId: 'thread', turnId: 'client-turn', content: 'Answer.' }) }),
       { waitUntil: promise => { pending.push(promise) } }),
     async close() {
-      releaseLate(); finishHttp?.()
+      releaseLate(); finishHttp?.(); finishRetirement?.()
       await Promise.all(pending)
       server.closeAllConnections()
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
@@ -139,6 +153,32 @@ it('observes Stop during ordinary async construction and tracks late producer cl
     h.releaseLate()
     await cleanup
     expect(h.sql.prepare('SELECT * FROM retired').all()).toEqual([{ id: 'late-producer' }])
+    expect(h.sql.prepare('SELECT role FROM message').all()).toEqual([{ role: 'user' }])
+  } finally { await h.close() }
+}, 10_000)
+
+
+it('retains a generic source iterator finally on the actual host while its real HTTP retirement is still pending', async () => {
+  const h = await observationFixture(false, true)
+  try {
+    const response = await h.send()
+    const body = response.text()
+    await h.draftWritten
+    h.setStatus('stopped')
+    await h.retirementStarted
+    await body
+    expect(h.signals[0].aborted).toBe(true)
+    let settled = false
+    const continuations = Promise.all(h.pending).then(() => { settled = true })
+    await new Promise<void>(resolve => setImmediate(resolve))
+    // This producer declares NO cleanup promise. Only the observer's retained
+    // iterator.return can keep its still-running finally attached to this host.
+    expect(settled).toBe(false)
+    expect(h.sql.prepare('SELECT * FROM retired').all()).toEqual([])
+    h.releaseRetirement()
+    await continuations
+    expect(h.sql.prepare('SELECT * FROM retired').all()).toEqual([{ id: 'iterator-finally' }])
+    expect(h.sourceClosed()).toBe(1)
     expect(h.sql.prepare('SELECT role FROM message').all()).toEqual([{ role: 'user' }])
   } finally { await h.close() }
 }, 10_000)

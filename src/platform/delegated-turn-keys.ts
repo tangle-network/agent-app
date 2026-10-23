@@ -79,7 +79,7 @@ export type DelegatedTurnKeyEvent =
   | { type: 'park_failed'; slot: string; code: string; keyId?: string }
 
 export interface DelegatedTurnKeysOptions {
-  client: PlatformDelegatedKeyClient
+  client: Pick<PlatformDelegatedKeyClient, 'delegate' | 'revoke'>
   /** Null turns pre-minting off: every turn mints inline, as before. */
   db: DelegatedKeyPremintD1Like | null
   /** The app's at-rest crypto (`createFieldCrypto` from `./crypto`). */

@@ -125,7 +125,9 @@ async function setup(clock = { at: Date.now() }, crypto = createFieldCrypto('ab'
   sqlite.exec(DELEGATED_KEY_PREMINT_TABLE_DDL)
   const client = createPlatformDelegatedKeyClient({ platformUrl: p.url, serviceName: 'creative-agent', serviceToken: 'svc' })
   const pending: Promise<unknown>[] = []
-  const keys = createDelegatedTurnKeys({ client, db: d1(sqlite), crypto, now: () => clock.at })
+  // The turn-key owner needs only these real Platform HTTP capabilities.
+  const keys = createDelegatedTurnKeys({ client: { delegate: client.delegate, revoke: client.revoke },
+    db: d1(sqlite), crypto, now: () => clock.at })
   const turn = (turnId: string, models?: string[]) =>
     keys.forTurn({ slot: 'usr_payer:w1:router', scope: scope(models), ttlMs: 30 * 60_000, turnId, waitUntil: (x) => pending.push(x) })
   const settle = async () => { await Promise.all(pending.splice(0)) }
