@@ -1,0 +1,20 @@
+name = "agent-app-lock-prewarm-proof"
+main = "./lock-prewarm.worker.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "agent-app-lock-prewarm-proof"
+database_id = "00000000-0000-0000-0000-000000000019"
+
+[[durable_objects.bindings]]
+name = "TURN_STREAM_DO"
+class_name = "ColdStartTurnStreamDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ColdStartTurnStreamDO"]
+
+[vars]
+TURN_STREAM_AUTH_SECRET = "local-only-lock-prewarm-integration-secret"

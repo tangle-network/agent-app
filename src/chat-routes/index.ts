@@ -43,3 +43,5 @@ export * from './intelligence'
 export * from './cancellation'
 
 export * from './stored-attachments'
+
+export type { ChatTurnStoreBindings } from './route-storage'

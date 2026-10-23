@@ -145,3 +145,11 @@ time is insufficient), then use `/turn-stream`’s `releaseDurableTurnLock` with
 the held executionId and lockId. Its authorization remains deployment-owned.
 This is a supported typed adapter requirement, not database surgery or automatic
 resubmission. Retained operator UUIDs continue to identify their original work.
+
+
+The workspace prewarm route wakes its single-flight lock on page-open and
+composer focus, including Router-only turns; Router warm does not provision a
+box. Apply all `migrations/`, including warm receipts, before deployment.
+Set `D1_REGION` beside the database configuration to match the primary's region.
+It is the one setting used by chat and prewarm for new lock channel placement;
+existing channel locations and IDs do not change.

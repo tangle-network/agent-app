@@ -19,7 +19,7 @@ agent-app-signoff defaults --no-bundle --json matrix.json
 | turn trace | the app uses `createChatTurnRoutes` at agent-app 0.60.221 or later (it exports every turn by default, a turn handed to `handoffCompletion` included), or wires a sink (`createIntelligenceTurnTraceSink`, or a `turnTrace: { sink }`); with `--probe`, Intelligence also holds a turn from the last 30 days. An app that passes `handoffCompletion` below 0.60.221 is a gap: nothing exports its handed-off turns. A sink that exports with an explicit `TANGLE_API_KEY` reads `?` until `--probe` shows an accepted turn: the ingest refused Legal's Worker key (HTTP 401, #468) and accepts Hospitality's | source, Intelligence |
 | first visible | latency headline: the turn owner marks reasoning, tool activity or answer output (`createChatTurnRoutes`, or `trace.markFirstVisible()`) and the trace is on | source + last export |
 | first text | the turn owner marks it (`createChatTurnRoutes` from 0.60.203, or `trace.markFirstText()` in a Durable Object turn) and the trace is on | source |
-| prewarm route | the app mounts `createWorkspacePrewarmRoute`; a local route named prewarm is a local copy | source |
+| prewarm route | the app mounts `createWorkspacePrewarmRoute`; when passed the same `turnStore` bindings as chat, it also warms the workspace lock by default using keyed receipts. The allowed authorizer supplies its verified `workspaceId`. A local route named prewarm is a local copy | source |
 | placement | a Wrangler `[placement]` names a `region` or `host`; smart placement does not pin | Wrangler config |
 | tool calls p50 | the root span's `tangle.turn.tool_calls` (every `tool.call` span of the turn, the box agent's included); no ceiling is set until a measured link to first text exists | Intelligence |
 | limit alarms | the server wraps its D1 binding with `withD1LimitAlarms` and builds the alarms with `createProductLimitAlarms`, not a copy of `createLimitAlarms` | source |
@@ -45,3 +45,10 @@ export default {
 
 An exemption may name `turn-trace`, `first-visible`, `first-text`, `prewarm`, `placement` or `limit-alarms`; a reason shorter than eight characters is a configuration error.
 Passing `turnTrace: false` to `createChatTurnRoutes` is an opt-out too, and it fails the step until its exemption carries a reason.
+
+
+The binding descriptor keeps the D1 region and lock namespace/auth together.
+Its `region` controls the placement hint of new lock channels. Existing DOs stay
+where they were created; adding a hint does not relocate them. See the
+[chat assembly guide](../examples/chat-app.md#prewarm-the-same-lock-before-send)
+for the shared prewarm, receipt migration, and cold-versus-warm proof boundary.

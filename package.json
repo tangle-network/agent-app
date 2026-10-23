@@ -856,7 +856,8 @@
     "agent-eval-0204": "npm:@tangle-network/agent-eval@0.204.0",
     "agent-eval-0211": "npm:@tangle-network/agent-eval@0.211.2",
     "agent-eval-0217": "npm:@tangle-network/agent-eval@0.217.1",
-    "agent-eval-0218": "npm:@tangle-network/agent-eval@0.218.1"
+    "agent-eval-0218": "npm:@tangle-network/agent-eval@0.218.1",
+    "wrangler": "4.127.1"
   },
   "peerDependencies": {
     "@better-auth/oauth-provider": ">=1.7.2",

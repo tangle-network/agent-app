@@ -40,7 +40,9 @@
  * step with `hit`, `miss`, `joined` or `failed`, so a caller reads every miss.
  */
 import { formatServerTiming } from '../turn-trace/server-timing'
-import { warmReceiptId, type WarmReceiptStore } from './warm-receipts'
+import { warmReceiptId, warmKey, createD1WarmReceiptStore, type WarmReceiptStore } from './warm-receipts'
+import { createDefaultTurnLock, type ChatTurnStoreBindings } from '../chat-routes/route-storage'
+import { DEFAULT_TURN_LOCK_LOCATION_HINT } from '../turn-stream/adapters'
 
 /** What the product decided for this request. */
 export type WorkspacePrewarmAuthorization =
@@ -54,9 +56,9 @@ export type WorkspacePrewarmAuthorization =
    * the box; members who share a box share a key. `warm` may return a small
    * JSON-safe report for the response and `onEvent`.
    */
-  | { status: 'allowed'; key: string; warm: () => Promise<WorkspacePrewarmReport | void> }
+  | { status: 'allowed'; workspaceId?: string; key: string; warm: () => Promise<WorkspacePrewarmReport | void> }
   /** Run each step whose key has no unexpired receipt. */
-  | { status: 'allowed'; steps: readonly WorkspaceWarmStep[] }
+  | { status: 'allowed'; workspaceId?: string; steps: readonly WorkspaceWarmStep[] }
 
 /** One warm step, keyed by exactly what it depends on. */
 export interface WorkspaceWarmStep {
@@ -113,6 +115,10 @@ export type WorkspacePrewarmEvent =
   | { type: 'step'; name: string; key: string; outcome: WorkspaceWarmStepOutcome; ms: number; error?: string }
 
 export interface CreateWorkspacePrewarmRouteOptions<Context = void> {
+  /** The same binding descriptor chat uses. Adds the keyed turn_lock warm by default.
+   * An allowed authorization must carry its server-verified workspaceId; request body identity is never used.
+   * Receipts default to this database; apply WARM_RECEIPT_TABLE_DDL through the product migration runner. */
+  turnStore?: ChatTurnStoreBindings
   /** `context` is whatever the caller passed beside the request, such as a
    *  Hono context carrying the Worker's bindings. */
   /** `threadId` is the thread the composer belongs to, when the browser sent one (composer focus). Check the member's access to it before warming anything for it. */
@@ -177,6 +183,8 @@ function reply(body: WorkspacePrewarmResponse, status = 200): Response {
 export function createWorkspacePrewarmRoute<Context = void>(
   options: CreateWorkspacePrewarmRouteOptions<Context>,
 ): (request: Request, context: Context) => Promise<Response> {
+  const turnLock = options.turnStore ? createDefaultTurnLock(options.turnStore) : undefined
+  const receipts = options.receipts ?? (options.turnStore ? createD1WarmReceiptStore(options.turnStore.db) : undefined)
   const recentMs = options.recentMs ?? 30_000
   const now = options.now ?? (() => Date.now())
   const staleMs = options.staleMs ?? 45_000
@@ -237,9 +245,9 @@ export function createWorkspacePrewarmRoute<Context = void>(
     const mark = { at: now() }
     stepsInFlight.set(id, mark)
     try {
-      if (options.receipts) {
+      if (receipts) {
         try {
-          const stored = await options.receipts.get(id)
+          const stored = await receipts.get(id)
           if (stored && now() < stored.expiresAt) {
             remember(id, stored.expiresAt, warmUntil)
             return result('hit')
@@ -258,14 +266,29 @@ export function createWorkspacePrewarmRoute<Context = void>(
       const at = now()
       const expiresAt = at + step.ttlMs
       remember(id, expiresAt, warmUntil)
-      if (options.receipts) {
-        await options.receipts.put(id, { at, expiresAt, ...(report ? { report } : {}) }).catch((err: unknown) => {
+      if (receipts) {
+        await receipts.put(id, { at, expiresAt, ...(report ? { report } : {}) }).catch((err: unknown) => {
           emit({ type: 'failed', key: id, ms: now() - started, error: err instanceof Error ? err.message : String(err) })
         })
       }
       return result('miss')
     } finally {
       if (stepsInFlight.get(id) === mark) stepsInFlight.delete(id)
+    }
+  }
+
+  async function runLegacy(key: string, warm: () => Promise<WorkspacePrewarmReport | void>): Promise<WorkspacePrewarmResponse> {
+    const started = now()
+    const running = inFlight.get(key)
+    if (running && now() - running.at < staleMs) return { outcome: 'joined', ms: now() - started }
+    const warmedAt = recent.get(key)
+    if (warmedAt !== undefined && now() - warmedAt < recentMs) return { outcome: 'recent', ms: now() - started }
+    const mark = { at: now() }
+    inFlight.set(key, mark)
+    try {
+      return { ...(await run(key, warm)), ms: now() - started }
+    } finally {
+      if (inFlight.get(key) === mark) inFlight.delete(key)
     }
   }
 
@@ -286,29 +309,36 @@ export function createWorkspacePrewarmRoute<Context = void>(
     }
     if (auth.status === 'denied') return auth.response
     if (auth.status === 'declined') return reply({ outcome: 'declined', ms: now() - started, reason: auth.reason })
+    const steps = 'steps' in auth ? [...auth.steps] : []
+    let lockFailure: WorkspaceWarmStepResult | undefined
+    if (turnLock) {
+      if (!auth.workspaceId?.trim()) return reply({ outcome: 'failed', ms: now() - started, reason: 'Lock prewarm requires an authorized workspaceId' })
+      const workspaceId = auth.workspaceId
+      if (steps.some(step => step.name === 'turn_lock')) return reply({ outcome: 'failed', ms: now() - started, reason: 'turn_lock is owned by the shared prewarm route' })
+      try {
+        steps.push({ name: 'turn_lock', key: await warmKey({ workspaceId,
+          channel: String(options.turnStore!.lock.namespace.idFromName(workspaceId)), region: options.turnStore!.region ?? DEFAULT_TURN_LOCK_LOCATION_HINT }),
+          ttlMs: 30_000, run: async () => { await turnLock.warm({ tenantId: workspaceId }); return { lockReady: true } },
+        })
+      } catch (error) {
+        const ms = now() - started
+        lockFailure = { name: 'turn_lock', outcome: 'failed', ms }
+        emit({ type: 'step', name: 'turn_lock', key: workspaceId, outcome: 'failed', ms,
+          error: error instanceof Error ? error.message : String(error) })
+      }
+    }
+    const pendingSteps = Promise.all(steps.map(step => runStep(step))).then(results => lockFailure ? [...results, lockFailure] : results)
     if ('steps' in auth) {
-      const steps = await Promise.all(auth.steps.map((step) => runStep(step)))
-      const outcome: WorkspacePrewarmOutcome = steps.some((step) => step.outcome === 'failed') ? 'failed'
-        : steps.some((step) => step.outcome === 'miss') ? 'warmed'
-          : steps.some((step) => step.outcome === 'joined') ? 'joined' : 'recent'
-      return reply({ outcome, ms: now() - started, steps })
+      const results = await pendingSteps
+      const outcome: WorkspacePrewarmOutcome = results.some(step => step.outcome === 'failed') ? 'failed'
+        : results.some(step => step.outcome === 'miss') ? 'warmed'
+          : results.some(step => step.outcome === 'joined') ? 'joined' : 'recent'
+      return reply({ outcome, ms: now() - started, steps: results })
     }
-
-    const { key } = auth
-    const running = inFlight.get(key)
-    if (running && now() - running.at < staleMs) {
-      return reply({ outcome: 'joined', ms: now() - started })
-    }
-    const warmedAt = recent.get(key)
-    if (warmedAt !== undefined && now() - warmedAt < recentMs) {
-      return reply({ outcome: 'recent', ms: now() - started })
-    }
-    const mark = { at: now() }
-    inFlight.set(key, mark)
-    try {
-      return reply({ ...(await run(key, auth.warm)), ms: now() - started })
-    } finally {
-      if (inFlight.get(key) === mark) inFlight.delete(key)
-    }
+    const [legacy, results] = await Promise.all([runLegacy(auth.key, auth.warm), pendingSteps])
+    const outcome: WorkspacePrewarmOutcome = legacy.outcome === 'failed' || results.some(step => step.outcome === 'failed') ? 'failed'
+      : legacy.outcome === 'warmed' || results.some(step => step.outcome === 'miss') ? 'warmed'
+        : legacy.outcome === 'joined' || results.some(step => step.outcome === 'joined') ? 'joined' : legacy.outcome
+    return reply({ ...legacy, outcome, ms: now() - started, ...(results.length ? { steps: results } : {}) })
   }
 }
