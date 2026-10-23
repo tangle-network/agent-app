@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.62.3
+
+- test: delete stale Runtime cohort unit after valid adoption (#1290)
+
 ## 0.62.2
 
 - fix(sandbox): settle planned restarts even without a liveness probe (#1289)
