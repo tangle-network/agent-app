@@ -47,6 +47,11 @@ function causeChain(error: unknown): Record<string, unknown>[] {
   return chain
 }
 
+/** A planned host-agent swap leaves the sandbox alive; an ordinary probe failure is not that evidence. */
+export function plannedHostRestart(error: unknown): boolean {
+  return causeChain(error).some(cause => cause.code === 'HOST_AGENT_RESTARTING' && cause.status === 503)
+}
+
 function status(value: unknown): number | undefined {
   if (typeof value === 'number') return value
   if (typeof value === 'string' && /^\d{3}$/.test(value)) return Number(value)
