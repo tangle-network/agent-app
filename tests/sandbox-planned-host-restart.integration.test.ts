@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { isReusableBox, recoverUnresponsiveBox } from '../src/sandbox/box-health'
 import { ensureWorkspaceSandbox, type SandboxRuntimeConfig } from '../src/sandbox/index'
 
-type RestartCase = { probe?: number; sessions?: number; permanent?: boolean; probeCode?: string; prefetch?: boolean; prefetchCode?: string }
+type RestartCase = { probe?: number; sessions?: number; permanent?: boolean; probeCode?: string; prefetch?: boolean; prefetchCode?: string; strict?: boolean }
 
 /** The real SDK reads a platform peer over loopback HTTP; no fetch, SDK
  * method, clock or lifecycle implementation is replaced. No paid calls. */
@@ -65,7 +65,7 @@ async function boundary(test: RestartCase) {
     env: async () => ({}), files: async () => [], secrets: async () => [],
     profile: () => { throw new Error('Reuse must not create a cold profile') },
     runtimeEnv: async () => ({ RESTART_FIXTURE_ENV: 'loopback-only' }),
-    egressPolicy: { mode: 'open' },
+    egressPolicy: test.strict ? { mode: 'strict', allowDomains: ['api.example.test'] } : { mode: 'open' },
     livenessProbe: { execTimeoutMs: 1_000, cacheTtlMs: 0 },
     provisionTimeoutMs: 1_000,
   }
@@ -93,11 +93,12 @@ describe('sandbox liveness during a planned host restart', () => {
     } finally { await peer.close() }
   })
 
-  it('preserves unrelated prefetch failures after the composed reuse probe recovers', async () => {
-    const peer = await boundary({ probe: 2, prefetch: true, prefetchCode: 'SIDECAR_HEALTH_CHECK_FAILED' })
+  it('preserves an unrelated strict-policy prefetch refusal without delivering credentials', async () => {
+    const peer = await boundary({ probe: 2, prefetch: true, prefetchCode: 'SIDECAR_HEALTH_CHECK_FAILED', strict: true })
     try {
       await expect(peer.ensure()).rejects.toMatchObject({ cause: { code: 'SIDECAR_HEALTH_CHECK_FAILED' } })
-      expect(peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))).toHaveLength(1)
+      expect(peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))).toHaveLength(0)
+      expect(peer.requests.filter(path => path === 'GET /v1/sandboxes/restart-box')).toHaveLength(2)
       expect(lifecycleRequests(peer.requests)).toEqual([])
     } finally { await peer.close() }
   })
