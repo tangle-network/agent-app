@@ -5,6 +5,7 @@
  * Ordinary functions and Sandbox backends never execute speculatively.
  */
 import type { TurnTrace } from '../turn-trace/recorder'
+import type { NativeCompletionHandoffOptions } from './native-turn-timing'
 import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
 import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
 import { withProducerStream } from './producer-stream'
@@ -58,7 +59,7 @@ function dispatchProducerFirst<TContext, TResource = unknown>(
     ...args,
     admitted,
     admissionSignal: args.admissionSignal ? AbortSignal.any([args.admissionSignal, abort.signal]) : abort.signal,
-    ...(handoffCompletion ? { handoffCompletion: () => admitted.then(() => handoffCompletion()) } : {}),
+    ...(handoffCompletion ? { handoffCompletion: (options?: NativeCompletionHandoffOptions) => admitted.then(() => handoffCompletion(options)) } : {}),
   }))
   // Register before construction resolves: admission can refuse and return
   // while a producer is still awaiting an ephemeral credential or resource.

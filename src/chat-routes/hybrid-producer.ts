@@ -30,9 +30,12 @@
  *
  * The trace passes through: model calls, tool calls, the box claim and the box
  * run are recorded under the turn's `trace` when the route gives one.
+ * A typed computer failure also emits a persisted warning; the Router keeps
+ * answering without relying on the model to explain that failure faithfully.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import { redactErrorMessage } from '../redact/index'
+import { noticePart } from '../interactions/contract'
 import type { RouterTurnTool } from '../runtime/router-turn'
 import {
   createEscalationSpeculator,
@@ -45,6 +48,7 @@ import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
+import type { ProducerNoticeEvent } from './wire'
 
 // The lead-in covers every tool, not only sandbox_run: on Legal's Router lane (2026-10-20) the model streamed a
 // submit_proposal payload for 45 s before its first word, so first text came at 54.9 s after a first token at 3.8 s.
@@ -164,6 +168,11 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   })()
 
   try {
+    const warnings = new Map<string, ProducerNoticeEvent>()
+    const withWarnings = (parts: Array<Record<string, unknown>>) => parts.flatMap(part => {
+      const warning = warnings.get(String(part.callID ?? part.id ?? ''))
+      return warning ? [part, noticePart(warning.noticeKind, warning.id, warning.text, warning.code)] : [part]
+    })
     const sandboxRun = createSandboxRunTool({
       box: () => acquire(),
       runTask: async (...args) => { await admitted; stop.throwIfAborted(); return box.runTask(...args) },
@@ -183,7 +192,7 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
     speculator.onInput({ text: speculateOn ?? router.userMessage, ...(attachments ? { attachments } : {}) })
 
     const extra = guidance === false ? '' : (guidance ?? HYBRID_TURN_GUIDANCE)
-    return createRouterTurnProducer({
+    const producer = createRouterTurnProducer({
       ...router,
       systemPrompt: Promise.resolve(router.systemPrompt).then(prompt => !extra ? prompt : typeof prompt === 'string'
         ? `${prompt}\n\n${extra}` : { ...prompt, stable: [...(prompt.stable ?? []), extra] }),
@@ -195,10 +204,45 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
       onSettled: settle,
       onEvent: event => {
         speculator.onEvent(event as { type: string; toolName?: string })
+        if (event.type === 'tool' && event.status === 'error' && event.toolName === sandboxRun.name && !stop.aborted) {
+          const code = event.error.code
+          if (code === 'sandbox_unavailable' || code === 'sandbox_failed' || code === 'sandbox_empty') {
+            warnings.set(event.callId, {
+              type: 'notice', noticeKind: 'warning', id: `sandbox-warning:${event.callId}`, code,
+              text: code === 'sandbox_unavailable'
+                ? 'The workspace computer is unavailable. I can continue with work that does not need it.'
+                : 'The computer step did not return a confirmed answer. I can continue with work that does not need it.',
+            })
+          }
+        }
         router.onEvent?.(event)
       },
     })
-
+    const events = (async function* () {
+      for await (const event of producer.stream) {
+        yield event
+        if (event.type === 'tool_result') {
+          const warning = warnings.get(event.toolCallId)
+          if (warning) yield warning
+        }
+      }
+    })()
+    // Closing before the wrapper's first pull must still abort the running Router.
+    const end = events.return.bind(events)
+    const fail = events.throw.bind(events)
+    events.return = async value => {
+      const closing = producer.stream.return(value)
+      try { return await end(value) } finally { await closing }
+    }
+    events.throw = async error => {
+      const closing = producer.stream.throw(error)
+      try { return await fail(error) } finally { await closing }
+    }
+    return { ...producer, stream: events,
+      assistantParts: () => withWarnings(producer.assistantParts?.() ?? []),
+      draftParts: () => withWarnings(producer.draftParts?.() ?? []),
+      get model() { return producer.model },
+    }
   } catch (error) {
     // Construction failures use the same tracked lifetime as stream failures, including a key still arriving.
     return createRouterTurnProducer({ ...router, systemPrompt: Promise.reject(error), signal: stop, onSettled: settle })

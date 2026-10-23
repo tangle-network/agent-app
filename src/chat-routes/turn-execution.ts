@@ -11,6 +11,8 @@ import {
 import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
 import { noteMeasuredTurnFacts, readableTurnFailure } from '../turn-trace/turn-facts'
+import { createNativeTimingTransfer, type NativeTimingTransfer } from './native-turn-timing'
+import { createChatTurnOwnership } from './turn-ownership'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
@@ -80,7 +82,7 @@ function settledTurnTiming(turnStreamId: string, at: {
     ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
   }
   const failureCode = at.failure ? readableTurnFailure(at.failure.error, at.failure.data) : undefined
-  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}),
+  noteMeasuredTurnFacts(turnStreamId, { requestReceivedAt: at.requestAt, ...measured, ...(at.model ? { model: at.model } : {}),
     ...(failureCode ? { failureCode } : {}) })
   return { ...measured, trace }
 }
@@ -128,7 +130,14 @@ async function runAdmittedTurn<TContext, TResource>({
   const state = createAdmittedTurnState<TContext>()
   if (options.cancel) state.cancellationAbort = new AbortController()
 
-  const { handoffCompletion, releaseLock } = createTurnOwnership(state, log, turnStreamId, options)
+  state.nativeTiming = createNativeTimingTransfer(() => ({
+    turnStreamId, requestReceivedAt: trace.startedAt,
+    ...(state.turnStarted ? { lifecycleStartedAt: state.turnStartedAtMs, admissionMs: state.turnStartedAtMs - trace.startedAt } : {}),
+    ...(state.firstVisibleAtMs === undefined ? {} : { firstVisibleMs: state.firstVisibleAtMs - state.turnStartedAtMs }),
+    ...(state.firstTextAtMs === undefined ? {} : { firstTextMs: state.firstTextAtMs - state.turnStartedAtMs }),
+  }), error => log('[chat-routes] native timing persistence failed', { turnId: turnStreamId,
+    error: error instanceof Error ? error.message : String(error) }))
+  const { handoffCompletion, releaseLock } = createChatTurnOwnership(state, log, turnStreamId, options)
 
   let produceArgs: ChatTurnProduceArgs<TContext, TResource> = {
     request,
@@ -143,6 +152,7 @@ async function runAdmittedTurn<TContext, TResource>({
     turnStreamId,
     priorMessages: chatTurn.priorMessages, ...(chatTurn.reusedUserMessageId ? { userMessageId: chatTurn.reusedUserMessageId, userMessageInserted: false } : {}),
     handoffCompletion,
+    timingFacts: state.nativeTiming.snapshot,
     trace,
     ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
     ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
@@ -351,6 +361,7 @@ async function runAdmittedTurn<TContext, TResource>({
 interface AdmittedTurnState<TContext> {
   draft: AssistantDraftWriter | undefined
   tap: BufferedTurnTap | undefined
+  nativeTiming: NativeTimingTransfer | undefined
   completionHandoff: boolean
   completionHandoffPromise: Promise<void> | undefined
   lockAcquired: boolean
@@ -377,6 +388,7 @@ function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
   return {
     draft: undefined,
     tap: undefined,
+    nativeTiming: undefined,
     completionHandoff: false,
     completionHandoffPromise: undefined,
     lockAcquired: false,
@@ -710,13 +722,20 @@ function createTurnEngine<TContext, TResource>(
         finalText: () => state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
       }),
       onEvent: async (event) => {
+        let timingChanged = false
         if (state.firstVisibleAtMs === undefined && isVisibleOutput(event)) {
           state.firstVisibleAtMs = Date.now()
           trace.markFirstVisible(state.firstVisibleAtMs)
+          timingChanged = true
         }
         if (state.firstTextAtMs === undefined && isVisibleText(event)) {
           state.firstTextAtMs = Date.now()
           trace.markFirstText(state.firstTextAtMs)
+          timingChanged = true
+        }
+        if (timingChanged) {
+          const written = state.nativeTiming?.note()
+          if (written && ctx?.waitUntil) ctx.waitUntil(written)
         }
         if (event.type === 'session.run.failed' || event.type === 'error') {
           state.runFailed = true
@@ -883,7 +902,7 @@ function startTurnDrain<TContext>(
       // observation stop, never a terminal verdict for that owner. The
       // trace is this request's own record, so it ends here.
       endTrace(failed, drainError)
-      await Promise.all([state.tap!.detach(), exportTrace()])
+      await Promise.all([state.tap!.detach(), state.nativeTiming?.flush(), exportTrace()])
       return
     }
     const finalize = trace.start('persist.finalize', 'persist')
@@ -911,52 +930,6 @@ function startTurnDrain<TContext>(
   return { clientBody }
 }
 
-function createTurnOwnership<TContext, TResource>(state: AdmittedTurnState<TContext>, log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: `${string}-${string}-${string}-${string}-${string}`, options: TurnExecutionOptions<TContext, TResource>['options']) {
-  const handoffCompletion = (): Promise<void> => {
-    if (!state.completionHandoffPromise) {
-      state.completionHandoffPromise = (async () => {
-        // Switch first: an event arriving while the prior draft write closes
-        // must stay live-only and cannot arm another draft write or renewal.
-        state.completionHandoff = true
-        try {
-          await state.tap?.detach()
-        } catch (err) {
-          log('[chat-routes] turn buffer detach failed', {
-            turnId: turnStreamId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-        // `close` waits for the draft writer's in-flight write. The durable
-        // owner can therefore safely replace that draft after this resolves.
-        await state.draft?.close()
-      })()
-    }
-    return state.completionHandoffPromise
-  }
-
-
-  // Single-flight lock: acquire before any side effect. `release` runs
-  // exactly once — in the drain's `finally` on a normal turn, or right here
-  // on a short-circuit / throw.
-
-  const releaseLock = async (): Promise<void> => {
-    // `handoffCompletion` transfers the route-acquired lock to the durable
-    // owner too. Keep the legacy contextGate `{proceed:'handoff'}` path
-    // unchanged when that callback was never invoked.
-    if (state.completionHandoff || !state.lockAcquired || state.lockReleased) return
-    state.lockReleased = true
-    try {
-      await options.turnLock!.release(state.lockHandle)
-    } catch (err) {
-      log('[chat-routes] turnLock.release failed', {
-        turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-
-  return { handoffCompletion, releaseLock }
-}
 
 function createTurnReplayResponse(
   contentType: string,

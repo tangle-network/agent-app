@@ -33,7 +33,9 @@ export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent' | 'sys
   onSettled?(): Promise<void> | void
 }
 
-export function createRouterTurnProducer(options: RouterTurnProducerOptions): ChatTurnRouteProducer {
+export function createRouterTurnProducer(options: RouterTurnProducerOptions): Omit<ChatTurnRouteProducer, 'stream'> & {
+  stream: AsyncGenerator<ProducerWireEvent, void, unknown>
+} {
   const abort = new AbortController()
   const signal = options.signal ? AbortSignal.any([abort.signal, options.signal]) : abort.signal
   void options.admitted?.catch(error => { abort.abort(error) })
@@ -205,7 +207,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
   }
 
   return {
-    stream: events as ChatTurnRouteProducer['stream'],
+    stream: events,
     // The route tracks this continuation even when failure is visible before a pending key arrives.
     cleanup: run.then(retire, retire),
     finalText: () => outcome?.text ?? '',
