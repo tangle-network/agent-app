@@ -456,7 +456,7 @@ interface ChatTurnCancelControlResult
 
 ### `ChatTurnCancellation`
 
-`interface` — Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`).
+`interface` — This owner's cancellation observation: the signal aborts on Stop or control loss.
 
 ```ts
 interface ChatTurnCancellation
@@ -624,7 +624,7 @@ interface ChatTurnLock
 
 ### `ChatTurnLockResult`
 
-`type`
+`type` — Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`).
 
 ```ts
 type ChatTurnLockResult

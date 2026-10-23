@@ -2860,7 +2860,7 @@
           "name": "ChatTurnCancellation",
           "kind": "interface",
           "signature": "interface ChatTurnCancellation",
-          "doc": "Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`)."
+          "doc": "This owner's cancellation observation: the signal aborts on Stop or control loss."
         },
         {
           "name": "ChatTurnCancelOptions",
@@ -2986,7 +2986,7 @@
           "name": "ChatTurnLockResult",
           "kind": "type",
           "signature": "type ChatTurnLockResult",
-          "doc": null
+          "doc": "Single-flight lock verdict — acquired (with an opaque handle passed back to `release`), or already held (short-circuit with the product's 409-style `Response`)."
         },
         {
           "name": "ChatTurnMessageStore",
