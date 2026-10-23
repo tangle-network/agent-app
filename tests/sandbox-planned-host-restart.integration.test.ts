@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest'
 import { isReusableBox, recoverUnresponsiveBox } from '../src/sandbox/box-health'
 import { ensureWorkspaceSandbox, type SandboxRuntimeConfig } from '../src/sandbox/index'
 
-type RestartCase = { probe?: number; sessions?: number; permanent?: boolean; probeCode?: string; prefetch?: boolean; prefetchCode?: string; strict?: boolean }
+type RestartCase = {
+  probe?: number; sessions?: number; permanent?: boolean; probeCode?: string
+  prefetch?: boolean; prefetchCode?: string; strict?: boolean
+  omitProbe?: boolean; prefetchRefusals?: number; permanentPrefetch?: 'egress' | 'env'; budgetMs?: number
+}
 
 /** The real SDK reads a platform peer over loopback HTTP; no fetch, SDK
  * method, clock or lifecycle implementation is replaced. No paid calls. */
@@ -34,13 +38,15 @@ async function boundary(test: RestartCase) {
     }
     if (path === '/v1/sandboxes') return json({ sandboxes: [box], total: 1 })
     if (path === '/v1/sandboxes/restart-box') {
-      // The fixture's initial SDK get succeeds; the public shell's prefetched
-      // egress.get (the same GET route) meets the planned restart once.
-      if (test.prefetch && boxReads++ === 1) return restarting(test.prefetchCode)
+      // The fixture's initial SDK get succeeds. The public shell's prefetch
+      // and fresh egress reads then meet the same actual HTTP refusal.
+      const read = boxReads++
+      if (test.prefetch && read > 0 && (test.permanentPrefetch === 'egress' || read <= (test.prefetchRefusals ?? 1))) return restarting(test.prefetchCode)
       return json(box)
     }
     if (path.endsWith('/runtime/config/config/app-env')) {
-      if (test.prefetch && envWrites++ === 0) return restarting(test.prefetchCode)
+      const write = envWrites++
+      if (test.prefetch && (test.permanentPrefetch === 'env' || write < (test.prefetchRefusals ?? 1))) return restarting(test.prefetchCode)
       return json({ injected: 1 })
     }
     if (path.endsWith('/runtime/process/spawn')) {
@@ -68,8 +74,8 @@ async function boundary(test: RestartCase) {
     profile: () => { throw new Error('Reuse must not create a cold profile') },
     runtimeEnv: async () => ({ RESTART_FIXTURE_ENV: 'loopback-only' }),
     egressPolicy: test.strict ? { mode: 'strict', allowDomains: ['api.example.test'] } : { mode: 'open' },
-    livenessProbe: { execTimeoutMs: 1_000, cacheTtlMs: 0 },
-    provisionTimeoutMs: 1_000,
+    ...(test.omitProbe ? {} : { livenessProbe: { execTimeoutMs: 1_000, cacheTtlMs: 0 } }),
+    provisionTimeoutMs: test.budgetMs ?? 1_000,
   }
   return { client, box, requests,
     ensure: () => ensureWorkspaceSandbox(shell, { workspaceId: boxName, harness: 'opencode' }),
@@ -83,6 +89,34 @@ async function boundary(test: RestartCase) {
 const lifecycleRequests = (requests: string[]) => requests.filter(path => /\/(stop|resume|delete)(?:$|\/)/.test(path))
 
 describe('sandbox liveness during a planned host restart', () => {
+  it('waits through repeated typed prefetch refusals when the liveness probe is omitted', async () => {
+    const peer = await boundary({ prefetch: true, prefetchRefusals: 2, omitProbe: true })
+    try {
+      expect((await peer.ensure()).id).toBe('restart-box')
+      expect(peer.requests.filter(path => path.endsWith('/process/spawn'))).toHaveLength(0)
+      expect(peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))).toHaveLength(3)
+      // Initial fixture get, two refused reads, then the authoritative policy.
+      expect(peer.requests.filter(path => path === 'GET /v1/sandboxes/restart-box')).toHaveLength(4)
+      expect(lifecycleRequests(peer.requests)).toEqual([])
+    } finally { await peer.close() }
+  })
+
+  it.each(['egress', 'env'] as const)('bounds permanent typed %s prefetch refusals without a liveness probe', async kind => {
+    const peer = await boundary({ prefetch: true, omitProbe: true, permanentPrefetch: kind, strict: kind === 'egress', budgetMs: 150 })
+    const started = Date.now()
+    try {
+      const expected = { code: 'HOST_AGENT_RESTARTING', status: 503 }
+      await expect(peer.ensure()).rejects.toMatchObject(kind === 'egress' ? { cause: expected } : expected)
+      expect(Date.now() - started).toBeLessThan(1_500)
+      const egressReads = peer.requests.filter(path => path === 'GET /v1/sandboxes/restart-box')
+      const envWrites = peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))
+      expect(kind === 'egress' ? egressReads.length : envWrites.length).toBeGreaterThan(2)
+      if (kind === 'egress') expect(envWrites).toHaveLength(0)
+      expect(peer.requests.filter(path => path.endsWith('/process/spawn'))).toHaveLength(0)
+      expect(lifecycleRequests(peer.requests)).toEqual([])
+    } finally { await peer.close() }
+  }, 3_000)
+
   it('refreshes typed prefetch failures after the composed reuse probe recovers', async () => {
     const peer = await boundary({ probe: 2, prefetch: true })
     try {
