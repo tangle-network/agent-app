@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.3
+
+- perf: prewarm the shared turn lock before send (#1306)
+
 ## 0.63.2
 
 - fix(rollout): select request cohorts by origin with indexed ranges (#1308)
