@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.61.4
+
+- chore(deps): adopt 4 @tangle-network/* packages (#1278)
+- fix(sandbox): honor planned host restarts before recovery (#1286)
+
 ## 0.61.3
 
 - fix(chat): expose reused message identity before early dispatch
