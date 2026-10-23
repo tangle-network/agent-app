@@ -4,7 +4,23 @@
 
 Source: `src/signoff/index.ts`
 
-84 exports.
+89 exports.
+
+### `CachePruneOptions`
+
+`interface`
+
+```ts
+interface CachePruneOptions
+```
+
+### `CachePruneResult`
+
+`interface`
+
+```ts
+interface CachePruneResult
+```
 
 ### `CdpResponseSource`
 
@@ -270,6 +286,14 @@ interface NetworkCount
 (argv: readonly string[]) => SurfaceLadderOptions & { readonly jsonPath?: string | undefined; }
 ```
 
+### `pruneSignoffCache`
+
+`function` — Bound idle trees and stores by age first, then allocated physical bytes.
+
+```ts
+(cacheDir: string, options?: CachePruneOptions) => Promise<CachePruneResult>
+```
+
 ### `QUIET_CHROMIUM_ARGS`
 
 `const` — Chromium flags that stop prerender and speculative prefetch of linked pages.
@@ -462,6 +486,14 @@ interface SignoffInstallResult
 interface SignoffInstallSpec
 ```
 
+### `SignoffPhase`
+
+`type`
+
+```ts
+type SignoffPhase
+```
+
 ### `SignoffRepoFacts`
 
 `interface`
@@ -476,6 +508,14 @@ interface SignoffRepoFacts
 
 ```ts
 interface SignoffReport
+```
+
+### `SignoffSelection`
+
+`interface` — Declared scope, including dependency steps brought into a partial run.
+
+```ts
+interface SignoffSelection
 ```
 
 ### `SignoffShuffleSpec`
