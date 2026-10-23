@@ -30,6 +30,12 @@ export interface D1LikeForRollout {
   }
 }
 
+/** Apply through the product migration runner after request_received_at exists. Safe to apply again. */
+export const ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL = `
+CREATE INDEX IF NOT EXISTS rollout_turn_timing_by_request_origin ON rollout_turn_timing (rollout, request_received_at, at);
+CREATE INDEX IF NOT EXISTS rollout_turn_timing_by_lane_request_origin ON rollout_turn_timing (rollout, lane, request_received_at, at);
+`
+
 export const ROLLOUT_TURN_TIMING_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   turn_id TEXT PRIMARY KEY,
@@ -50,6 +56,7 @@ CREATE TABLE IF NOT EXISTS rollout_turn_timing (
   at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS rollout_turn_timing_by_lane ON rollout_turn_timing (rollout, lane, at);
+${ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL}
 `
 
 /** Apply once through the product migration runner to existing tables; historical rows stay NULL. */
@@ -226,16 +233,21 @@ export function createD1TurnTimingStore(options: {
     },
 
     /** Request-origin ruler, separate from the rollout stage's relative latencies and missing-word failure rule.
-     * Unknown facts stay in the denominator. Newest rows are bounded explicitly and truncation is reported. */
+     * Known origins select the request window; missing observations stay in that denominator. Unknown origins
+     * are unassigned and reported separately by settlement window. Limits bound returned rows, not index reads. */
     async measureRequestOrigin(input: { rollout: string; lane?: string; since: number; until?: number; revision?: string | null }) {
       const until = input.until ?? now()
+      const filters: string[] = ['rollout = ?']
+      const bindings: unknown[] = [input.rollout]
+      if (input.lane !== undefined) { filters.push('lane = ?'); bindings.push(input.lane) }
+      if (input.revision === null) filters.push("(revision IS NULL OR revision = '')")
+      else if (input.revision !== undefined) { filters.push('revision = ?'); bindings.push(input.revision) }
+      const selected = filters.join(' AND ')
       const { results = [] } = await options.db.prepare(
         `SELECT turn_id, request_received_at, admission_ms, first_visible_ms, first_text_ms, model, lane, revision, failed FROM rollout_turn_timing
-          WHERE rollout = ? AND (? IS NULL OR lane = ?) AND at >= ? AND at < ?
-            AND (? = 0 OR (? IS NULL AND (revision IS NULL OR revision = '')) OR revision = ?)
-          ORDER BY at DESC LIMIT ?`,
-      ).bind(input.rollout, input.lane ?? null, input.lane ?? null, input.since, until,
-        input.revision === undefined ? 0 : 1, input.revision ?? null, input.revision ?? null, MEASURE_ROW_LIMIT + 1).all<{
+          WHERE ${selected} AND request_received_at >= ? AND request_received_at < ?
+          ORDER BY request_received_at DESC LIMIT ?`,
+      ).bind(...bindings, input.since, until, MEASURE_ROW_LIMIT + 1).all<{
         turn_id: string; request_received_at: number | null
         admission_ms: number | null; first_visible_ms: number | null; first_text_ms: number | null
         model: string | null; lane: string | null; revision: string | null; failed: number
@@ -272,6 +284,14 @@ export function createD1TurnTimingStore(options: {
         ? [] : [row.admission_ms + row.first_visible_ms]).sort((a, b) => a - b)
       const failed = rows.filter(row => row.failed === 1).length
       const coverage = timingCoverage(rows)
+      const { results: unassigned = [] } = await options.db.prepare(
+        `SELECT failed FROM rollout_turn_timing WHERE ${selected} AND request_received_at IS NULL AND at >= ? AND at < ?
+          ORDER BY at DESC LIMIT ?`,
+      ).bind(...bindings, input.since, until, MEASURE_ROW_LIMIT + 1).all<{ failed: number }>()
+      const unassignedRows = unassigned.slice(0, MEASURE_ROW_LIMIT)
+      const selection = { rollout: input.rollout, lane: input.lane ?? null, revision: input.revision === undefined ? 'all' : input.revision,
+        limit: MEASURE_ROW_LIMIT, filtered: input.lane !== undefined || input.revision !== undefined }
+      const window = { from: new Date(input.since).toISOString(), to: new Date(until).toISOString() }
       return {
         samples: rows.length, failed, failureRate: rows.length ? failed / rows.length : null,
         requestOriginFirstVisibleP50Ms: percentile(visible, 50),
@@ -281,11 +301,13 @@ export function createD1TurnTimingStore(options: {
         unknownCoverage: Object.fromEntries(Object.entries(coverage).map(([key, count]) => [key, rows.length - count])),
         truncated: results.length > MEASURE_ROW_LIMIT,
         observedFacts,
-        selection: { rollout: input.rollout, lane: input.lane ?? null, revision: input.revision === undefined ? 'all' : input.revision,
-          clock: 'settled-at', limit: MEASURE_ROW_LIMIT, filtered: input.lane !== undefined || input.revision !== undefined },
-        population: 'Persisted terminal timing rows in the selection; excludes pre-admission and missing-persistence attempts.',
+        selection: { ...selection, clock: 'request-received-at' },
+        population: 'Persisted terminal timing rows with known request origins in the request window; excludes pre-admission, missing-persistence and unassigned-origin attempts.',
+        unassignedOrigins: { samples: unassignedRows.length, failed: unassignedRows.filter(row => row.failed === 1).length,
+          truncated: unassigned.length > MEASURE_ROW_LIMIT, selection: { ...selection, clock: 'settled-at' }, window,
+          population: 'Persisted terminal timing rows with unknown request origins settled in this window; cannot be assigned to the request-window denominator.' },
         source: `rollout_turn_timing lane=${input.lane ?? 'all'}`,
-        window: { from: new Date(input.since).toISOString(), to: new Date(until).toISOString() },
+        window,
       }
     },
 
