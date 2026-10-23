@@ -269,6 +269,8 @@ export interface ChatTurnProduceArgs<TContext> {
   handoffCompletion?: (options?: NativeCompletionHandoffOptions) => Promise<void>
   /** Serializable observations only; snapshots never predict events after handoff. */
   timingFacts?: () => NativeTurnTimingFacts
+  /** Effective turn cancellation, including an opted-in durable lock's authenticated Stop. Pass to producer I/O. */
+  signal?: AbortSignal
   /** What the route's `prefetch` read for this turn's admitted identity; set only when `prefetch` is configured. */
   prefetched?: Promise<unknown>
   /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with
@@ -276,7 +278,7 @@ export interface ChatTurnProduceArgs<TContext> {
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
    *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
   admitted?: Promise<ChatTurnProduceArgs<TContext>>
-  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started, or when the route stops
+  /** Set only under `dispatchFirst`: includes `signal` and aborts when the turn is refused after `produce` started, or when the route stops
    *  reading the producer (a disconnect under `cancelOnDisconnect`). Pass it to the model call. Under `dispatchFirst`,
    *  `handoffCompletion` resolves only after `admitted` does. */
   admissionSignal?: AbortSignal
@@ -322,8 +324,14 @@ export type ChatTurnGateResult =
 /** Single-flight lock verdict — acquired (with an opaque handle passed back to
  *  `release`), or already held (short-circuit with the product's 409-style
  *  `Response`). */
+export interface ChatTurnCancellation {
+  signal: AbortSignal
+  /** Close this owner's observation; never release the durable lock or claim remote work stopped. */
+  close(): void | Promise<void>
+}
+
 export type ChatTurnLockResult =
-  | { acquired: true; handle?: unknown }
+  | { acquired: true; handle?: unknown; cancellation?: ChatTurnCancellation }
   | { acquired: false; response: Response }
 
 /** Async acquire/release wrapped around the turn. `acquire` runs before any

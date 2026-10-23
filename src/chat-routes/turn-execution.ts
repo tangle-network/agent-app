@@ -157,6 +157,7 @@ async function runAdmittedTurn<TContext>({
     priorMessages: chatTurn.priorMessages, ...(chatTurn.reusedUserMessageId ? { userMessageId: chatTurn.reusedUserMessageId, userMessageInserted: false } : {}),
     handoffCompletion,
     timingFacts: state.nativeTiming.snapshot,
+    signal: ctx?.cancelOnDisconnect ? AbortSignal.any([state.executionAbort.signal, request.signal]) : state.executionAbort.signal,
     trace,
     ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
     ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
@@ -170,6 +171,16 @@ async function runAdmittedTurn<TContext>({
     if (!acquired.acquired) return acquired.response
     state.lockAcquired = true
     state.lockHandle = acquired.handle
+    if (acquired.cancellation) {
+      const cancellation = acquired.cancellation
+      const abort = () => state.executionAbort.abort(cancellation.signal.reason)
+      if (cancellation.signal.aborted) abort()
+      else cancellation.signal.addEventListener('abort', abort, { once: true })
+      state.closeCancellation = async () => {
+        cancellation.signal.removeEventListener('abort', abort)
+        await cancellation.close()
+      }
+    }
   }
   progress?.('preparing', progressMessages.preparing)
 
@@ -366,6 +377,8 @@ async function runAdmittedTurn<TContext>({
   }
 }
 interface AdmittedTurnState<TContext> {
+  executionAbort: AbortController
+  closeCancellation: (() => Promise<void>) | undefined
   draft: AssistantDraftWriter | undefined
   tap: BufferedTurnTap | undefined
   nativeTiming: NativeTimingTransfer | undefined
@@ -392,6 +405,7 @@ interface AdmittedTurnState<TContext> {
 
 function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
   return {
+    executionAbort: new AbortController(), closeCancellation: undefined,
     draft: undefined,
     tap: undefined,
     nativeTiming: undefined,

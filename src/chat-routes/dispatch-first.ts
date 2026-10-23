@@ -51,6 +51,7 @@ function dispatchProducerFirst<TContext>(
   trace: TurnTrace,
 ): DispatchedProducer<TContext> {
   const abort = new AbortController()
+  const signal = args.signal ? AbortSignal.any([abort.signal, args.signal]) : abort.signal
   let admit!: (final: ChatTurnProduceArgs<TContext>) => void
   let reject!: (error: Error) => void
   const admitted = new Promise<ChatTurnProduceArgs<TContext>>((resolve, fail) => { admit = resolve; reject = fail })
@@ -72,7 +73,8 @@ function dispatchProducerFirst<TContext>(
   const started = trace.measure('admission.produce', 'admission', () => produce({
     ...args,
     admitted,
-    admissionSignal: abort.signal,
+    admissionSignal: signal,
+    signal,
     ...(handoffCompletion ? { handoffCompletion: (options?: NativeCompletionHandoffOptions) => admitted.then(() => handoffCompletion(options)) } : {}),
   }))
   const draining = started.then(async (producer) => {
