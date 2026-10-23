@@ -86,6 +86,7 @@ Legacy interrupted releases without this positive recovery proof cannot release 
 The standalone `tests/turn-stream/durable-stop.integration.ts` proof bundles the actual shared route and DO into workerd through a consuming app's declared Wrangler.
 It uses durable DO storage, D1 SQLite and a real local Router HTTP peer, including runtime restart and producer I/O cancellation; it makes no paid calls or model-quality claim.
 Run it through that app's installed TypeScript runner with `AGENT_APP_STOP_CONSUMER_ROOT` set to its checkout.
+Its optional `--transport-only` mode bundles the shared transport fixture without product/runtime peers and runs only the acquire, retained Stop, restart and control-observation path. That bounded diagnostic does not replace the complete product-route acceptance proof.
 
 ## Removed exports
 

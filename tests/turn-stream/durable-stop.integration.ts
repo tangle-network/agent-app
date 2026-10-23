@@ -15,6 +15,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import type { DurableTurnLock } from '../../src/turn-stream/core'
 import type { TurnCancellationIdentity } from '../../src/turn-stream/cancellation'
 
+const transportOnly = process.argv.includes('--transport-only')
 const consumerRoot = process.env.AGENT_APP_STOP_CONSUMER_ROOT
 if (!consumerRoot) throw new Error('Set AGENT_APP_STOP_CONSUMER_ROOT to an installed consuming app with declared Wrangler')
 const consumer = createRequire(resolve(consumerRoot, 'package.json'))
@@ -40,7 +41,8 @@ interface Runtime {
 }
 const directory = mkdtempSync(resolve(tmpdir(), 'agent-app-durable-stop-'))
 const bundleDirectory = resolve(directory, 'bundle')
-const bundlePath = resolve(bundleDirectory, 'durable-stop.worker.js')
+const workerEntry = transportOnly ? 'durable-stop.transport' : 'durable-stop.worker'
+const bundlePath = resolve(bundleDirectory, `${workerEntry}.js`)
 const checks: string[] = []
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -148,7 +150,7 @@ try {
   // prebuilt-worker path; it performs no upload or production resource access.
   const configPath = resolve(directory, 'wrangler.json')
   writeFileSync(configPath, JSON.stringify({ name: 'stop-fixture',
-    main: fileURLToPath(new URL('./durable-stop.worker.ts', import.meta.url)),
+    main: fileURLToPath(new URL(`./${workerEntry}.ts`, import.meta.url)),
     compatibility_date: compatibilityDate, compatibility_flags: compatibilityFlags, send_metrics: false }))
   execFileSync(process.execPath, [consumer.resolve('wrangler'), 'deploy', '--dry-run',
     '--config', configPath, '--outdir', bundleDirectory], { cwd: directory,
@@ -176,271 +178,273 @@ try {
   assert.deepEqual(await json('/release', replay), { released: true })
   checks.push('durable cancellation survives runtime restart and owner disconnect')
 
-  const racing = identity('racing')
-  await acquire(racing)
-  assert.deepEqual(await json('/observe-race', racing), { aborted: true })
-  assert.deepEqual(await json('/release', racing), { released: true })
-  const beforeSync = identity('before-sync')
-  await acquire(beforeSync)
-  assert.deepEqual(await json('/observe-before-sync', beforeSync), { aborted: true })
-  assert.deepEqual(await json('/release', beforeSync), { released: true })
-  checks.push('Stop during connection and after upgrade before sync reaches the owner')
+  if (!transportOnly) {
+    const racing = identity('racing')
+    await acquire(racing)
+    assert.deepEqual(await json('/observe-race', racing), { aborted: true })
+    assert.deepEqual(await json('/release', racing), { released: true })
+    const beforeSync = identity('before-sync')
+    await acquire(beforeSync)
+    assert.deepEqual(await json('/observe-before-sync', beforeSync), { aborted: true })
+    assert.deepEqual(await json('/release', beforeSync), { released: true })
+    checks.push('Stop during connection and after upgrade before sync reaches the owner')
 
-  const disconnected = identity('disconnected')
-  await acquire(disconnected)
-  assert.deepEqual(await json('/observe', disconnected), { aborted: false })
-  assert.equal((await peek(disconnected))?.lockId, disconnected.lockId)
-  await json('/stop', disconnected)
-  assert.deepEqual(await json('/observe', disconnected), { aborted: true })
-  await json('/release', disconnected)
-  const successor = { ...disconnected, executionId: 'new-execution', lockId: 'new-lock', turnStreamId: 'new-stream' }
-  await acquire(successor)
-  assert.deepEqual(await json('/stop', disconnected), { requested: false, reason: 'stale-owner' })
-  assert.equal((await peek(successor))?.cancellation?.requestedAt, undefined)
-  assert.equal((await request('/observe', disconnected)).status, 409, 'An old exact owner cannot connect to a successor')
-  await json('/release', successor)
-  checks.push('stale Stop and stale control identity cannot affect a successor')
+    const disconnected = identity('disconnected')
+    await acquire(disconnected)
+    assert.deepEqual(await json('/observe', disconnected), { aborted: false })
+    assert.equal((await peek(disconnected))?.lockId, disconnected.lockId)
+    await json('/stop', disconnected)
+    assert.deepEqual(await json('/observe', disconnected), { aborted: true })
+    await json('/release', disconnected)
+    const successor = { ...disconnected, executionId: 'new-execution', lockId: 'new-lock', turnStreamId: 'new-stream' }
+    await acquire(successor)
+    assert.deepEqual(await json('/stop', disconnected), { requested: false, reason: 'stale-owner' })
+    assert.equal((await peek(successor))?.cancellation?.requestedAt, undefined)
+    assert.equal((await request('/observe', disconnected)).status, 409, 'An old exact owner cannot connect to a successor')
+    await json('/release', successor)
+    checks.push('stale Stop and stale control identity cannot affect a successor')
 
-  const expired = identity('expired')
-  await acquire(expired, '?short=1'); await json('/stop?short=1', expired)
-  await delay(1100)
-  const afterExpiry = { ...expired, executionId: 'expiry-successor', lockId: 'expiry-lock', turnStreamId: 'expiry-stream' }
-  await acquire(afterExpiry, '?short=1')
-  assert.deepEqual(await json('/stop?short=1', expired), { requested: false, reason: 'stale-owner' })
-  assert.equal((await peek(afterExpiry, '?short=1'))?.cancellation?.requestedAt, undefined)
-  await json('/release?short=1', afterExpiry)
-  checks.push('existing lock expiry admits a successor after a cancelled owner crashes')
-
-  const pruneTrigger = identity('prune-external-read')
-  await acquire(pruneTrigger, '?barrier=1')
-  await delay(1100)
-  const pruneBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
-  deferrals.set(pruneTrigger.executionId, pruneBarrier)
-  const competing = identity('competing-target')
-  const firstAcquire = json<{ acquired: boolean }>('/lock?barrier=1', competing)
-  void firstAcquire.catch(() => {})
-  try {
-    await bounded(pruneBarrier.entered.promise, 'expired other-thread ownership read')
-    const winner = { ...competing, executionId: 'competing-winner', lockId: 'competing-winner-lock', turnStreamId: 'competing-winner-stream' }
-    await acquire(winner, '?barrier=1')
-    pruneBarrier.response.resolve()
-    assert.equal((await firstAcquire).acquired, false, 'An acquire delayed by other-thread pruning cannot overwrite the winning owner')
-    assert.equal((await peek(winner, '?barrier=1'))?.lockId, winner.lockId)
-    await json('/release?barrier=1', winner)
-  } finally { pruneBarrier.response.resolve(); deferrals.delete(pruneTrigger.executionId) }
-  checks.push('external pruning read admits exactly one competing target owner without overwriting its generation')
-
-  const delayedExpiry = identity('delayed-expiry-read')
-  await acquire(delayedExpiry, '?barrier=1')
-  await delay(1100)
-  const expiryBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
-  deferrals.set(delayedExpiry.executionId, expiryBarrier)
-  const delayedRead = peek(delayedExpiry, '?barrier=1')
-  void delayedRead.catch(() => {})
-  try {
-    await bounded(expiryBarrier.entered.promise, 'old generation expiry observation')
-    assert.equal(await peek(delayedExpiry, '?barrier=1'), null)
-    // The public adapter permits explicitly reused ids. The lease generation,
-    // rather than only those ids, must fence a delayed expiry observation.
-    await acquire(delayedExpiry, '?barrier=1')
-    const successorStart = (await peek(delayedExpiry, '?barrier=1'))!.startedAt
+    const expired = identity('expired')
+    await acquire(expired, '?short=1'); await json('/stop?short=1', expired)
     await delay(1100)
-    expiryBarrier.response.resolve()
-    assert.equal((await delayedRead)?.startedAt, successorStart, 'A delayed expiry verdict cannot delete a successor lease with reused identity')
-    assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock?barrier=1', delayedExpiry)).active.startedAt, successorStart)
-    assert.equal(await peek(delayedExpiry, '?barrier=1'), null, 'A fresh observation may reclaim the now-expired successor')
-  } finally { expiryBarrier.response.resolve(); deferrals.delete(delayedExpiry.executionId) }
-  checks.push('delayed expiry cannot delete a successor lease even when caller ids are reused')
+    const afterExpiry = { ...expired, executionId: 'expiry-successor', lockId: 'expiry-lock', turnStreamId: 'expiry-stream' }
+    await acquire(afterExpiry, '?short=1')
+    assert.deepEqual(await json('/stop?short=1', expired), { requested: false, reason: 'stale-owner' })
+    assert.equal((await peek(afterExpiry, '?short=1'))?.cancellation?.requestedAt, undefined)
+    await json('/release?short=1', afterExpiry)
+    checks.push('existing lock expiry admits a successor after a cancelled owner crashes')
 
-  const heldAcrossExpiry = identity('child-across-expiry')
-  const heldQuery = '?deferred=1&short=1'
-  await acquire(heldAcrossExpiry, heldQuery)
-  const originalExpiry = (await peek(heldAcrossExpiry, heldQuery))!.expiresAt
-  await json('/hold-child', heldAcrossExpiry)
-  await json(`/stop${heldQuery}`, heldAcrossExpiry)
-  await delay(1100)
-  assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId)
-  assert.equal((await peek(heldAcrossExpiry, heldQuery))?.expiresAt, originalExpiry, 'Child deferral never rewrites the expiry clock')
-  assert.equal((await json<{ acquired: boolean }>(`/lock${heldQuery}`, { ...heldAcrossExpiry, executionId: 'blocked', lockId: 'blocked' })).acquired, false)
-  const unrelated = identity('expiry-prune-trigger')
-  await acquire(unrelated, heldQuery)
-  assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId, 'Pruning another thread cannot drop a registered child hold')
-  await json(`/release${heldQuery}`, unrelated)
-  await json('/hold-child', { ...heldAcrossExpiry, childStatus: 'unknown' })
-  assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId)
-  await json('/hold-child', { ...heldAcrossExpiry, childStatus: 'read-error' })
-  assert.equal((await request(`/peek${heldQuery}`, heldAcrossExpiry)).status, 503, 'A real child ownership read error cannot become absence')
-  assert.equal((await json<{ active: DurableTurnLock }>(`/raw-lock${heldQuery}`, heldAcrossExpiry)).active.lockId, heldAcrossExpiry.lockId)
-  await json('/clear-child', heldAcrossExpiry)
-  const childSuccessor = { ...heldAcrossExpiry, executionId: 'child-successor', lockId: 'child-successor-lock', turnStreamId: 'child-successor-stream' }
-  await acquire(childSuccessor, heldQuery)
-  assert.deepEqual(await json(`/stop${heldQuery}`, heldAcrossExpiry), { requested: false, reason: 'stale-owner' })
-  await json(`/release${heldQuery}`, childSuccessor)
-  checks.push('registered durable child, unknown state and read error hold across expiry until exact clear; cancellation alone does not')
+    const pruneTrigger = identity('prune-external-read')
+    await acquire(pruneTrigger, '?barrier=1')
+    await delay(1100)
+    const pruneBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
+    deferrals.set(pruneTrigger.executionId, pruneBarrier)
+    const competing = identity('competing-target')
+    const firstAcquire = json<{ acquired: boolean }>('/lock?barrier=1', competing)
+    void firstAcquire.catch(() => {})
+    try {
+      await bounded(pruneBarrier.entered.promise, 'expired other-thread ownership read')
+      const winner = { ...competing, executionId: 'competing-winner', lockId: 'competing-winner-lock', turnStreamId: 'competing-winner-stream' }
+      await acquire(winner, '?barrier=1')
+      pruneBarrier.response.resolve()
+      assert.equal((await firstAcquire).acquired, false, 'An acquire delayed by other-thread pruning cannot overwrite the winning owner')
+      assert.equal((await peek(winner, '?barrier=1'))?.lockId, winner.lockId)
+      await json('/release?barrier=1', winner)
+    } finally { pruneBarrier.response.resolve(); deferrals.delete(pruneTrigger.executionId) }
+    checks.push('external pruning read admits exactly one competing target owner without overwriting its generation')
 
-  const deferredOwner = identity('deferred')
-  await acquire(deferredOwner, '?deferred=1')
-  await json('/hold-child', deferredOwner)
-  assert.deepEqual(await json('/release?deferred=1', deferredOwner), { released: false, deferred: true })
-  assert.deepEqual(await json('/stop?deferred=1', deferredOwner), { requested: true })
-  assert.deepEqual(await json('/observe?deferred=1', deferredOwner), { aborted: true })
-  assert.equal((await peek(deferredOwner, '?deferred=1'))?.lockId, deferredOwner.lockId)
-  await json('/owner-evidence', { ...deferredOwner, ownerStatus: 'abandoned' })
-  assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, false, 'A child hold vetoes otherwise abandoned owner recovery')
-  await json('/clear-child', { ...deferredOwner, lockId: 'stale-child-parent' })
-  assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, false, 'A stale child acknowledgement cannot clear the parent hold')
-  await json('/clear-child', deferredOwner)
-  assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, true)
-  checks.push('scoped child deferral vetoes recovery until cleared; deferred Stop delivery remains effective')
+    const delayedExpiry = identity('delayed-expiry-read')
+    await acquire(delayedExpiry, '?barrier=1')
+    await delay(1100)
+    const expiryBarrier = { entered: deferred<void>(), response: deferred<void>(), claimed: false }
+    deferrals.set(delayedExpiry.executionId, expiryBarrier)
+    const delayedRead = peek(delayedExpiry, '?barrier=1')
+    void delayedRead.catch(() => {})
+    try {
+      await bounded(expiryBarrier.entered.promise, 'old generation expiry observation')
+      assert.equal(await peek(delayedExpiry, '?barrier=1'), null)
+      // The public adapter permits explicitly reused ids. The lease generation,
+      // rather than only those ids, must fence a delayed expiry observation.
+      await acquire(delayedExpiry, '?barrier=1')
+      const successorStart = (await peek(delayedExpiry, '?barrier=1'))!.startedAt
+      await delay(1100)
+      expiryBarrier.response.resolve()
+      assert.equal((await delayedRead)?.startedAt, successorStart, 'A delayed expiry verdict cannot delete a successor lease with reused identity')
+      assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock?barrier=1', delayedExpiry)).active.startedAt, successorStart)
+      assert.equal(await peek(delayedExpiry, '?barrier=1'), null, 'A fresh observation may reclaim the now-expired successor')
+    } finally { expiryBarrier.response.resolve(); deferrals.delete(delayedExpiry.executionId) }
+    checks.push('delayed expiry cannot delete a successor lease even when caller ids are reused')
 
-  const abandoned = identity('abandoned')
-  await acquire(abandoned)
-  assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'Absent owner evidence stays unknown')
-  await json('/owner-evidence', { ...abandoned, ownerStatus: 'live' })
-  assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'A live owner cannot be recovered')
-  await json('/owner-evidence', { ...abandoned, lockId: 'different-owner', ownerStatus: 'abandoned' })
-  assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'A terminal row for another generation is unknown')
-  await json('/owner-evidence', { ...abandoned, ownerStatus: 'abandoned' })
-  assert.equal((await json<{ released: boolean }>('/recover-with-control', abandoned)).released, false, 'An actual exact owner socket vetoes recovery')
-  await json('/close', abandoned)
-  assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, true, 'Confirmed quiescent owner recovers without waiting for lock expiry')
-  const recoveredSuccessor = { ...abandoned, executionId: 'recovered-execution', lockId: 'recovered-lock', turnStreamId: 'recovered-stream' }
-  await acquire(recoveredSuccessor)
-  assert.deepEqual(await json('/recover-exact', abandoned), { released: false })
-  assert.equal((await peek(recoveredSuccessor))?.lockId, recoveredSuccessor.lockId)
-  await json('/release', recoveredSuccessor)
-  const graceOwner = identity('grace')
-  await acquire(graceOwner)
-  await json('/owner-evidence', { ...graceOwner, ownerStatus: 'abandoned' })
-  assert.equal((await json<{ released: boolean }>('/recover?grace=1', graceOwner)).released, false)
-  await delay(1100)
-  assert.equal((await json<{ released: boolean }>('/recover?grace=1', graceOwner)).released, true)
-  assert.equal(nativeProbes, 0, 'Native-only probes cannot certify an outer Router owner abandoned')
-  checks.push('exact tri-state owner proof, existing grace, live socket veto and successor fencing govern recovery')
+    const heldAcrossExpiry = identity('child-across-expiry')
+    const heldQuery = '?deferred=1&short=1'
+    await acquire(heldAcrossExpiry, heldQuery)
+    const originalExpiry = (await peek(heldAcrossExpiry, heldQuery))!.expiresAt
+    await json('/hold-child', heldAcrossExpiry)
+    await json(`/stop${heldQuery}`, heldAcrossExpiry)
+    await delay(1100)
+    assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId)
+    assert.equal((await peek(heldAcrossExpiry, heldQuery))?.expiresAt, originalExpiry, 'Child deferral never rewrites the expiry clock')
+    assert.equal((await json<{ acquired: boolean }>(`/lock${heldQuery}`, { ...heldAcrossExpiry, executionId: 'blocked', lockId: 'blocked' })).acquired, false)
+    const unrelated = identity('expiry-prune-trigger')
+    await acquire(unrelated, heldQuery)
+    assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId, 'Pruning another thread cannot drop a registered child hold')
+    await json(`/release${heldQuery}`, unrelated)
+    await json('/hold-child', { ...heldAcrossExpiry, childStatus: 'unknown' })
+    assert.equal((await peek(heldAcrossExpiry, heldQuery))?.lockId, heldAcrossExpiry.lockId)
+    await json('/hold-child', { ...heldAcrossExpiry, childStatus: 'read-error' })
+    assert.equal((await request(`/peek${heldQuery}`, heldAcrossExpiry)).status, 503, 'A real child ownership read error cannot become absence')
+    assert.equal((await json<{ active: DurableTurnLock }>(`/raw-lock${heldQuery}`, heldAcrossExpiry)).active.lockId, heldAcrossExpiry.lockId)
+    await json('/clear-child', heldAcrossExpiry)
+    const childSuccessor = { ...heldAcrossExpiry, executionId: 'child-successor', lockId: 'child-successor-lock', turnStreamId: 'child-successor-stream' }
+    await acquire(childSuccessor, heldQuery)
+    assert.deepEqual(await json(`/stop${heldQuery}`, heldAcrossExpiry), { requested: false, reason: 'stale-owner' })
+    await json(`/release${heldQuery}`, childSuccessor)
+    checks.push('registered durable child, unknown state and read error hold across expiry until exact clear; cancellation alone does not')
 
-  const native = identity('non-adopting-native')
-  assert.equal((await json<{ acquired: boolean }>('/native-lock', native)).acquired, true)
-  assert.equal((await peek(native))?.cancellation, undefined)
-  assert.deepEqual(await json('/stop', native), { requested: false, reason: 'stale-owner' })
-  assert.deepEqual(await json('/legacy-interrupt', native), { released: true })
-  checks.push('non-adopting native locks retain existing interrupted release behavior')
+    const deferredOwner = identity('deferred')
+    await acquire(deferredOwner, '?deferred=1')
+    await json('/hold-child', deferredOwner)
+    assert.deepEqual(await json('/release?deferred=1', deferredOwner), { released: false, deferred: true })
+    assert.deepEqual(await json('/stop?deferred=1', deferredOwner), { requested: true })
+    assert.deepEqual(await json('/observe?deferred=1', deferredOwner), { aborted: true })
+    assert.equal((await peek(deferredOwner, '?deferred=1'))?.lockId, deferredOwner.lockId)
+    await json('/owner-evidence', { ...deferredOwner, ownerStatus: 'abandoned' })
+    assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, false, 'A child hold vetoes otherwise abandoned owner recovery')
+    await json('/clear-child', { ...deferredOwner, lockId: 'stale-child-parent' })
+    assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, false, 'A stale child acknowledgement cannot clear the parent hold')
+    await json('/clear-child', deferredOwner)
+    assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, true)
+    checks.push('scoped child deferral vetoes recovery until cleared; deferred Stop delivery remains effective')
 
-  const outage = identity('setup-outage')
-  assert.equal((await json<{ failed: boolean }>('/setup-failure?outage=1', outage)).failed, true)
-  assert.equal(await peek(outage, '?outage=1'), null)
-  await acquire(outage, '?outage=1'); await json('/release?outage=1', outage)
-  assert.equal((await request('/stop', replay, false)).status, 401)
-  assert.equal((await request('/raw-unauthenticated', replay)).status, 401)
-  assert.equal((await request('/cross-channel', replay)).status, 401)
-  checks.push('setup outage cleans the exact lock; product and channel authentication fail closed')
+    const abandoned = identity('abandoned')
+    await acquire(abandoned)
+    assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'Absent owner evidence stays unknown')
+    await json('/owner-evidence', { ...abandoned, ownerStatus: 'live' })
+    assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'A live owner cannot be recovered')
+    await json('/owner-evidence', { ...abandoned, lockId: 'different-owner', ownerStatus: 'abandoned' })
+    assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, false, 'A terminal row for another generation is unknown')
+    await json('/owner-evidence', { ...abandoned, ownerStatus: 'abandoned' })
+    assert.equal((await json<{ released: boolean }>('/recover-with-control', abandoned)).released, false, 'An actual exact owner socket vetoes recovery')
+    await json('/close', abandoned)
+    assert.equal((await json<{ released: boolean }>('/recover', abandoned)).released, true, 'Confirmed quiescent owner recovers without waiting for lock expiry')
+    const recoveredSuccessor = { ...abandoned, executionId: 'recovered-execution', lockId: 'recovered-lock', turnStreamId: 'recovered-stream' }
+    await acquire(recoveredSuccessor)
+    assert.deepEqual(await json('/recover-exact', abandoned), { released: false })
+    assert.equal((await peek(recoveredSuccessor))?.lockId, recoveredSuccessor.lockId)
+    await json('/release', recoveredSuccessor)
+    const graceOwner = identity('grace')
+    await acquire(graceOwner)
+    await json('/owner-evidence', { ...graceOwner, ownerStatus: 'abandoned' })
+    assert.equal((await json<{ released: boolean }>('/recover?grace=1', graceOwner)).released, false)
+    await delay(1100)
+    assert.equal((await json<{ released: boolean }>('/recover?grace=1', graceOwner)).released, true)
+    assert.equal(nativeProbes, 0, 'Native-only probes cannot certify an outer Router owner abandoned')
+    checks.push('exact tri-state owner proof, existing grace, live socket veto and successor fencing govern recovery')
 
-  const authority = identity('control-authority')
-  await acquire(authority)
-  assert.deepEqual(await json('/viewer-control', authority), { status: 401 }, 'A valid channel viewer token plus exact owner coordinates cannot become the owner')
-  assert.deepEqual(await json('/wrong-identity-control', authority), { status: 401 })
-  assert.deepEqual(await json('/wrong-purpose-control', authority), { status: 401 })
-  assert.deepEqual(await json('/viewer', authority), { status: 101 }, 'Normal viewer upgrades retain legacy capability behavior')
-  assert.equal((await request('/viewer-stop', authority)).status, 401)
-  assert.equal((await request('/viewer-recover', authority)).status, 401)
-  assert.deepEqual(await json('/observe', authority), { aborted: false }, 'The server purpose and exact identity capability can establish owner control')
-  await json('/stop', authority)
-  assert.deepEqual(await json('/observe', authority), { aborted: true })
-  await json('/release', authority)
-  checks.push('server purpose and exact identity claims separate owner control, Stop and recovery from legacy viewer capabilities')
+    const native = identity('non-adopting-native')
+    assert.equal((await json<{ acquired: boolean }>('/native-lock', native)).acquired, true)
+    assert.equal((await peek(native))?.cancellation, undefined)
+    assert.deepEqual(await json('/stop', native), { requested: false, reason: 'stale-owner' })
+    assert.deepEqual(await json('/legacy-interrupt', native), { released: true })
+    checks.push('non-adopting native locks retain existing interrupted release behavior')
 
-  for (const purpose of ['turn-control', 'turn-cancel', 'turn-recovery']) {
-    const scoped = identity(`purpose-${purpose}`)
-    await acquire(scoped)
-    for (const operation of ['acquire', 'release', 'interrupt', 'status', 'product', 'viewer']) {
-      assert.deepEqual(await json(`/purpose-capability?purpose=${purpose}&operation=${operation}`, scoped), { status: 401 },
-        'A purpose-bound capability cannot authorize a legacy channel operation')
-      assert.equal((await peek(scoped))?.lockId, scoped.lockId)
+    const outage = identity('setup-outage')
+    assert.equal((await json<{ failed: boolean }>('/setup-failure?outage=1', outage)).failed, true)
+    assert.equal(await peek(outage, '?outage=1'), null)
+    await acquire(outage, '?outage=1'); await json('/release?outage=1', outage)
+    assert.equal((await request('/stop', replay, false)).status, 401)
+    assert.equal((await request('/raw-unauthenticated', replay)).status, 401)
+    assert.equal((await request('/cross-channel', replay)).status, 401)
+    checks.push('setup outage cleans the exact lock; product and channel authentication fail closed')
+
+    const authority = identity('control-authority')
+    await acquire(authority)
+    assert.deepEqual(await json('/viewer-control', authority), { status: 401 }, 'A valid channel viewer token plus exact owner coordinates cannot become the owner')
+    assert.deepEqual(await json('/wrong-identity-control', authority), { status: 401 })
+    assert.deepEqual(await json('/wrong-purpose-control', authority), { status: 401 })
+    assert.deepEqual(await json('/viewer', authority), { status: 101 }, 'Normal viewer upgrades retain legacy capability behavior')
+    assert.equal((await request('/viewer-stop', authority)).status, 401)
+    assert.equal((await request('/viewer-recover', authority)).status, 401)
+    assert.deepEqual(await json('/observe', authority), { aborted: false }, 'The server purpose and exact identity capability can establish owner control')
+    await json('/stop', authority)
+    assert.deepEqual(await json('/observe', authority), { aborted: true })
+    await json('/release', authority)
+    checks.push('server purpose and exact identity claims separate owner control, Stop and recovery from legacy viewer capabilities')
+
+    for (const purpose of ['turn-control', 'turn-cancel', 'turn-recovery']) {
+      const scoped = identity(`purpose-${purpose}`)
+      await acquire(scoped)
+      for (const operation of ['acquire', 'release', 'interrupt', 'status', 'product', 'viewer']) {
+        assert.deepEqual(await json(`/purpose-capability?purpose=${purpose}&operation=${operation}`, scoped), { status: 401 },
+          'A purpose-bound capability cannot authorize a legacy channel operation')
+        assert.equal((await peek(scoped))?.lockId, scoped.lockId)
+      }
+      await json('/release', scoped)
     }
-    await json('/release', scoped)
+    checks.push('all three purpose capabilities reject six legacy mutation, product and viewer operations without changing ownership')
+
+    let expectedEffects = 0
+    for (const mode of ['stop', 'transport-loss', 'external-release', 'complete'] as const) {
+      active = modelCase()
+      active.complete = mode === 'complete'
+      const thread = `route-${mode}`
+      const clientTurnId = `client-${thread}`
+      const response = await bounded(request('/turn', { threadId: thread, turnId: clientTurnId, content: 'Read my request.' }), 'route response')
+      assert.equal(response.status, 200)
+      const wire = response.text()
+      // Observe rejection at creation even while the scenario is waiting for
+      // admission/settlement; its deciding await below still reports the error.
+      void wire.catch(() => {})
+      await bounded(active.entered.promise, 'real Router model request')
+      await bounded(active.admitted.promise, 'actual lock/control and captured target registration')
+      const lock = await peek(identity(thread))
+      assert(lock?.cancellation)
+      const owner: TurnCancellationIdentity = { ...lock, turnStreamId: lock.cancellation.turnStreamId }
+      const readTarget = async () => {
+        const rows = await database.prepare('SELECT metadata FROM control_targets WHERE thread_id = ?').bind(thread).all<{ metadata: string }>()
+        assert(rows.results[0], 'Admission must persist the exact captured target before its output commits')
+        return JSON.parse(rows.results[0].metadata) as TurnCancellationIdentity & { dispatchToken: string; responseStatus: string }
+      }
+      const target = await readTarget()
+      assert.equal(target.lockId, owner.lockId)
+      assert.equal(target.executionId, owner.executionId)
+      assert.equal(target.turnStreamId, owner.turnStreamId)
+      const stopRequest = { threadId: thread, turnId: clientTurnId, cancellationToken: target.dispatchToken,
+        // A caller's coordinates are not target authority; the existing target owner must ignore these.
+        workspaceId: 'forged-workspace', executionId: 'forged-execution', lockId: 'forged-lock', turnStreamId: 'forged-stream' }
+      const successor = { ...owner, executionId: 'external-successor', lockId: 'external-successor-lock', turnStreamId: 'external-successor-stream' }
+      if (mode === 'stop') {
+        assert.equal((await request('/cancel', stopRequest, false)).status, 401)
+        assert.equal((await request('/cancel', stopRequest, 'viewer-member')).status, 403)
+        assert.equal((await request('/cancel', stopRequest, 'foreign-editor')).status, 403)
+        assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE thread_id = ?').bind(thread).all()).results.length, 0,
+          'Shared authorization must refuse callers before resolving their target')
+        assert.equal((await request('/cancel', { ...stopRequest, cancellationToken: 'old-dispatch' })).status, 409)
+        assert.equal((await peek(owner))?.cancellation?.requestedAt, undefined)
+        assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true })
+        assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true }, 'Repeated Stop is idempotent')
+        assert.equal((await readTarget()).responseStatus, 'running', 'Intent is not confirmed native completion or stopped metadata')
+        assert.deepEqual(await json('/legacy-interrupt', owner), { released: false }, 'Legacy interrupt cannot release a cancellable producer early')
+      } else if (mode === 'transport-loss') await json('/close', owner)
+      else if (mode === 'external-release') {
+        assert.deepEqual(await json('/release', owner), { released: true })
+        await acquire(successor)
+        assert.equal((await request('/cancel', stopRequest)).status, 409, 'The captured old target cannot request Stop for its successor')
+        assert.equal((await peek(successor))?.cancellation?.requestedAt, undefined)
+      }
+      if (mode !== 'complete') await bounded(active.aborted.promise, 'effective signal closes actual producer HTTP I/O')
+      const settlement = await bounded(active.settling.promise, 'terminal lifecycle effect')
+      assert.equal((await peek(owner))?.lockId, mode === 'external-release' ? successor.lockId : lock.lockId, 'Only an external exact release can remove the owner during settlement')
+      assert.equal((await json<{ acquired: boolean }>('/lock', { ...owner, executionId: 'conflict', lockId: 'conflict' })).acquired, false)
+      settlement.end('settled')
+      await bounded(active.released.promise, 'cooperative exact release')
+      assert((await bounded(wire, 'terminal wire')).includes(mode === 'complete' ? 'The request is complete.' : 'turn_aborted'))
+      assert.deepEqual(await json('/status', owner), { status: mode === 'complete' ? 'complete' : 'error' })
+      assert.equal(active.releases, 1, 'Cooperative release runs once')
+      assert.equal(active.releaseSignalAborted, mode !== 'complete', 'Normal completion closes control before release without self-aborting')
+      if (mode === 'external-release') {
+        assert.equal((await peek(successor))?.lockId, successor.lockId, 'The old cooperative release cannot remove its successor')
+        await json('/release', successor)
+      }
+      assert.equal(await peek(owner), null)
+      assert.deepEqual(await json('/sockets', owner), { open: 0 })
+      const effects = await database.prepare('SELECT code FROM effects ORDER BY rowid').all<{ code: string }>()
+      assert.equal(effects.results.length, ++expectedEffects, 'Exactly one terminal effect per route')
+      assert.equal(effects.results.at(-1)?.code, mode === 'complete' ? 'complete' : mode === 'stop' ? 'turn_cancel_requested' : 'turn_control_unavailable')
+      assert.equal((await readTarget()).responseStatus, mode === 'complete' ? 'answered' : 'error')
+      assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE kind = ?').bind('observation').all()).results.length, 0,
+        'Durable control cannot add a metadata polling observer')
+      assert.equal((await database.prepare('SELECT kind FROM forbidden_effects').all()).results.length, 0,
+        'A requested-only control target must never invoke stopped metadata CAS')
+      checks.push(`${mode}: actual producer I/O, terminal status, one settlement/release and exact successor ownership`)
+    }
   }
-  checks.push('all three purpose capabilities reject six legacy mutation, product and viewer operations without changing ownership')
-
-  let expectedEffects = 0
-  for (const mode of ['stop', 'transport-loss', 'external-release', 'complete'] as const) {
-    active = modelCase()
-    active.complete = mode === 'complete'
-    const thread = `route-${mode}`
-    const clientTurnId = `client-${thread}`
-    const response = await bounded(request('/turn', { threadId: thread, turnId: clientTurnId, content: 'Read my request.' }), 'route response')
-    assert.equal(response.status, 200)
-    const wire = response.text()
-    // Observe rejection at creation even while the scenario is waiting for
-    // admission/settlement; its deciding await below still reports the error.
-    void wire.catch(() => {})
-    await bounded(active.entered.promise, 'real Router model request')
-    await bounded(active.admitted.promise, 'actual lock/control and captured target registration')
-    const lock = await peek(identity(thread))
-    assert(lock?.cancellation)
-    const owner: TurnCancellationIdentity = { ...lock, turnStreamId: lock.cancellation.turnStreamId }
-    const readTarget = async () => {
-      const rows = await database.prepare('SELECT metadata FROM control_targets WHERE thread_id = ?').bind(thread).all<{ metadata: string }>()
-      assert(rows.results[0], 'Admission must persist the exact captured target before its output commits')
-      return JSON.parse(rows.results[0].metadata) as TurnCancellationIdentity & { dispatchToken: string; responseStatus: string }
-    }
-    const target = await readTarget()
-    assert.equal(target.lockId, owner.lockId)
-    assert.equal(target.executionId, owner.executionId)
-    assert.equal(target.turnStreamId, owner.turnStreamId)
-    const stopRequest = { threadId: thread, turnId: clientTurnId, cancellationToken: target.dispatchToken,
-      // A caller's coordinates are not target authority; the existing target owner must ignore these.
-      workspaceId: 'forged-workspace', executionId: 'forged-execution', lockId: 'forged-lock', turnStreamId: 'forged-stream' }
-    const successor = { ...owner, executionId: 'external-successor', lockId: 'external-successor-lock', turnStreamId: 'external-successor-stream' }
-    if (mode === 'stop') {
-      assert.equal((await request('/cancel', stopRequest, false)).status, 401)
-      assert.equal((await request('/cancel', stopRequest, 'viewer-member')).status, 403)
-      assert.equal((await request('/cancel', stopRequest, 'foreign-editor')).status, 403)
-      assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE thread_id = ?').bind(thread).all()).results.length, 0,
-        'Shared authorization must refuse callers before resolving their target')
-      assert.equal((await request('/cancel', { ...stopRequest, cancellationToken: 'old-dispatch' })).status, 409)
-      assert.equal((await peek(owner))?.cancellation?.requestedAt, undefined)
-      assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true })
-      assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true }, 'Repeated Stop is idempotent')
-      assert.equal((await readTarget()).responseStatus, 'running', 'Intent is not confirmed native completion or stopped metadata')
-      assert.deepEqual(await json('/legacy-interrupt', owner), { released: false }, 'Legacy interrupt cannot release a cancellable producer early')
-    } else if (mode === 'transport-loss') await json('/close', owner)
-    else if (mode === 'external-release') {
-      assert.deepEqual(await json('/release', owner), { released: true })
-      await acquire(successor)
-      assert.equal((await request('/cancel', stopRequest)).status, 409, 'The captured old target cannot request Stop for its successor')
-      assert.equal((await peek(successor))?.cancellation?.requestedAt, undefined)
-    }
-    if (mode !== 'complete') await bounded(active.aborted.promise, 'effective signal closes actual producer HTTP I/O')
-    const settlement = await bounded(active.settling.promise, 'terminal lifecycle effect')
-    assert.equal((await peek(owner))?.lockId, mode === 'external-release' ? successor.lockId : lock.lockId, 'Only an external exact release can remove the owner during settlement')
-    assert.equal((await json<{ acquired: boolean }>('/lock', { ...owner, executionId: 'conflict', lockId: 'conflict' })).acquired, false)
-    settlement.end('settled')
-    await bounded(active.released.promise, 'cooperative exact release')
-    assert((await bounded(wire, 'terminal wire')).includes(mode === 'complete' ? 'The request is complete.' : 'turn_aborted'))
-    assert.deepEqual(await json('/status', owner), { status: mode === 'complete' ? 'complete' : 'error' })
-    assert.equal(active.releases, 1, 'Cooperative release runs once')
-    assert.equal(active.releaseSignalAborted, mode !== 'complete', 'Normal completion closes control before release without self-aborting')
-    if (mode === 'external-release') {
-      assert.equal((await peek(successor))?.lockId, successor.lockId, 'The old cooperative release cannot remove its successor')
-      await json('/release', successor)
-    }
-    assert.equal(await peek(owner), null)
-    assert.deepEqual(await json('/sockets', owner), { open: 0 })
-    const effects = await database.prepare('SELECT code FROM effects ORDER BY rowid').all<{ code: string }>()
-    assert.equal(effects.results.length, ++expectedEffects, 'Exactly one terminal effect per route')
-    assert.equal(effects.results.at(-1)?.code, mode === 'complete' ? 'complete' : mode === 'stop' ? 'turn_cancel_requested' : 'turn_control_unavailable')
-    assert.equal((await readTarget()).responseStatus, mode === 'complete' ? 'answered' : 'error')
-    assert.equal((await database.prepare('SELECT kind FROM target_reads WHERE kind = ?').bind('observation').all()).results.length, 0,
-      'Durable control cannot add a metadata polling observer')
-    assert.equal((await database.prepare('SELECT kind FROM forbidden_effects').all()).results.length, 0,
-      'A requested-only control target must never invoke stopped metadata CAS')
-    checks.push(`${mode}: actual producer I/O, terminal status, one settlement/release and exact successor ownership`)
-  }
-  console.log(JSON.stringify({ checks, consumerRoot,
+  console.log(JSON.stringify({ checks, consumerRoot, scope: transportOnly ? 'transport-only' : 'complete-product-route',
     consumerRevision: execFileSync('git', ['-C', consumerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     consumerLockSha256: createHash('sha256').update(readFileSync(resolve(consumerRoot, 'pnpm-lock.yaml'))).digest('hex'),
     miniflareEntry: realpathSync(wrangler.resolve('miniflare')), wranglerEntry: dirname(consumer.resolve('wrangler/package.json')),
     compatibilityDate, compatibilityFlags, builder: 'consumer-wrangler-dry-run',
-    actualDO: true, actualSQLite: true, actualRouterHTTP: true, paidCalls: 0 }))
+    actualDO: true, actualSQLite: true, actualRouterHTTP: !transportOnly, paidCalls: 0 }))
 } catch (error) {
   primaryFailed = true
   throw error
