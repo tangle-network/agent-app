@@ -199,8 +199,9 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(result.status).toBe(2)
     expect(readdirSync(join(cacheDir, 'trees'))).toEqual([])
     expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
-    expect(Buffer.byteLength(result.stderr)).toBe(Buffer.byteLength(`${message}\n`))
-    expect(result.stderr).toBe(`${message}\n`)
+    // Node may also emit environment warnings; the entire error must survive.
+    expect(Buffer.byteLength(result.stderr)).toBeGreaterThanOrEqual(Buffer.byteLength(`${message}\n`))
+    expect(result.stderr).toContain(`${message}\n`)
   })
 })
 
