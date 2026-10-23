@@ -89,7 +89,7 @@ function routes(env: Env) {
     produce: { router(args) {
       args.context.signal = args.admissionSignal
       signal = args.admissionSignal
-      return { apiKey: 'fixture-no-spend', model: 'fixture/model', baseUrl: env.MODEL_URL,
+      return { apiKey: 'fixture-no-spend', model: 'fixture/model', baseUrl: `${env.MODEL_URL}/v1`,
         systemPrompt: 'Answer the member.', repeat: false }
     } },
     lifecycle: {
