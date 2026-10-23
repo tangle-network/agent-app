@@ -87,7 +87,7 @@ function settledTurnTiming(turnStreamId: string, at: {
   }
   const reason = at.failure ? failureReasonOf(at.failure.data) ?? redactErrorMessage(at.failure.error, 'chat turn failed') : undefined
   const code = at.failure ? failureCodeOf(at.failure.data) : undefined
-  const failureCode = reason ? redactErrorMessage(code && !reason.startsWith(code) ? `${code}: ${reason}` : reason) : undefined
+  const failureCode = reason ? redactErrorMessage(code && reason !== code && !reason.startsWith(`${code}:`) ? `${code}: ${reason}` : reason) : undefined
   noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}),
     ...(failureCode ? { failureCode } : {}) })
   return { ...measured, trace }
