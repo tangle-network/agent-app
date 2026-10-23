@@ -171,13 +171,19 @@ export async function runSignoffCli(argv: readonly string[]): Promise<number> {
 }
 
 /* c8 ignore start — process wiring, exercised by the bin itself */
+function exitAfterOutput(code: number): void {
+  // Drain queued pipe writes, then terminate even if a config retained a handle.
+  process.stdout.write('', () => {
+    process.stderr.write('', () => { process.exit(code) })
+  })
+}
+
 if (invokedAsScript(import.meta.url, process.argv[1])) {
   runSignoffCli(process.argv.slice(2))
-    // Forced exit can discard the report while stdout/stderr pipes are draining.
-    .then((code) => { process.exitCode = code })
+    .then(exitAfterOutput)
     .catch((err: unknown) => {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`)
-      process.exitCode = 2
+      exitAfterOutput(2)
     })
 }
 /* c8 ignore stop */
