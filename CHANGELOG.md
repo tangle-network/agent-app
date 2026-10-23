@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.2
+
+- fix(rollout): select request cohorts by origin with indexed ranges (#1308)
+- docs: record published signoff phase consumer proof [skip release]
+
 ## 0.63.1
 
 - test: prove sandbox deadlines through real HTTP turns (#1305)
