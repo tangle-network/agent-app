@@ -100,7 +100,9 @@ describe('signoff cache retention', () => {
         cwd: ${JSON.stringify(tree)}, env: { ...process.env, SIGNOFF_TREE: ${JSON.stringify(tree)} },
         detached: true, stdio: 'ignore',
       })
-      console.log(check.pid)
+      // A numeric console.log is ANSI-colored under FORCE_COLOR, corrupting the
+      // machine-readable PID and skipping the detached child's cleanup.
+      process.stdout.write(String(check.pid))
       check.unref()
     `], { encoding: 'utf8' })
     expect(coordinator.status, coordinator.stderr).toBe(0)
