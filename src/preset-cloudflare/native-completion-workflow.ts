@@ -57,6 +57,12 @@ export interface NativeCompletionWorkflowOptions<
     receipt: NativeCompletionReceipt,
     messageId: TMessageId,
   ): Promise<NativeCompletionReceipt | void>
+  /**
+   * Record final timing only after settlement (including Vault reconciliation) returned its final verdict.
+   * The callback must be idempotent by turnStreamId and use explicit durable facts, never isolate-local fallback.
+   * Workflow replay reuses this step; an observer outage never reaches it.
+   */
+  recordTiming?(payload: TPayload, receipt: NativeCompletionReceipt, timing: { settledAt: number }): Promise<void>
   /** Optional product buffer completion after successful settlement. */
   finalizeBuffer?(payload: TPayload, receipt: NativeCompletionReceipt, messageId: TMessageId): Promise<void>
   /** Release the product lock only after every terminal effect completed. */
@@ -126,6 +132,11 @@ export async function runNativeCompletionWorkflow<
     receipt = settledReceipt
     await options.step.do(`${name}:persist-final-transcript`, () => (
       options.persistTranscript(options.event.payload, receipt, messageId)
+    ))
+  }
+  if (options.recordTiming) {
+    await options.step.do(`${name}:record-timing`, () => (
+      options.recordTiming!(options.event.payload, receipt, { settledAt: Date.now() })
     ))
   }
   if (options.finalizeBuffer) {
