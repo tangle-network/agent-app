@@ -45,7 +45,7 @@ grounded in real records, never fabricated. See `AGENTS.md` for the full contrac
 Public `/agent-setup.md`, `/llms.txt` and `/.well-known/tangle-agent.json` describe
 this skeleton's readiness truthfully. The default `/chat` fails closed with
 503 `auth.not_configured`. Install a trusted `HeadlessAuth.authenticate`
-resolver through `createWorker` before enabling it. Never derive identity from
+resolver through `createHeadlessWorker` before enabling it. Never derive identity from
 request-body userId/workspaceId. Update the public contract only after proving
 real authentication, authorization, spending and results. Use the default chat
 template for the assembled local-key operator API and browser owner setup.

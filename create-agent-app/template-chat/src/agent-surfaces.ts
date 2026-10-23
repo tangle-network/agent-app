@@ -3,7 +3,7 @@ import { operatorOpenApi } from './openapi'
 import { config } from '../agent.config'
 
 /** Public customer docs, separate from the repository's coding-agent AGENTS.md. */
-export function agentSurfaces(origin: string, runEnabled = false) {
+export function chatAgentSurfaces(origin: string, runEnabled = false) {
   const api = `${origin}/api/operator/v1`
   const product: AgentSurfaceConfig = {
     id: '__PACKAGE_NAME__', name: config.name, origin,

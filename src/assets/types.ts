@@ -79,7 +79,7 @@ export interface EmailDividerSection {
 }
 
 /** Define a union type representing different sections of an email template */
-export type EmailSection =
+type EmailSection =
   | EmailHeroSection
   | EmailBodySection
   | EmailFeatureSection

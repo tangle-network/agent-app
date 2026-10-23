@@ -89,5 +89,3 @@ export const config = {
     maxOutputTokens: number
   }
 }
-
-export type Config = typeof config

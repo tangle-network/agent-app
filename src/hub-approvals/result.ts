@@ -8,7 +8,7 @@ const MAX_KEYS = 24
 const MAX_ITEMS = 50
 const MAX_STRING = 600
 
-export function asRecord(value: unknown): Record<string, unknown> {
+export function hubResultRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
@@ -35,7 +35,7 @@ export function unwrapHubResult(value: unknown): unknown {
     }
   }
   for (let depth = 0; depth < 3; depth++) {
-    const record = asRecord(current)
+    const record = hubResultRecord(current)
     const keys = Object.keys(record)
     const inner = keys.find((key) => key === 'result' || key === 'data')
     // Only a thin envelope is unwrapped; a body that happens to carry a `data`
@@ -76,7 +76,7 @@ export function summarizeHubResult(result: unknown): unknown {
 
 /** The first non-empty string among `keys`, searched one level into nested records. */
 export function readText(value: unknown, ...keys: string[]): string | undefined {
-  const record = asRecord(value)
+  const record = hubResultRecord(value)
   for (const key of keys) {
     const found = record[key]
     if (typeof found === 'string' && found.trim()) return found.trim()
@@ -86,7 +86,7 @@ export function readText(value: unknown, ...keys: string[]): string | undefined 
 }
 
 export function readNumber(value: unknown, ...keys: string[]): number | undefined {
-  const record = asRecord(value)
+  const record = hubResultRecord(value)
   for (const key of keys) {
     const found = record[key]
     if (typeof found === 'number' && Number.isFinite(found)) return found

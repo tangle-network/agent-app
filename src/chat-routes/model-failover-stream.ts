@@ -497,7 +497,7 @@ export function streamWithModelFailover(
   let serving: string | undefined
   let trail: ModelFailoverAttempt[] = []
   let fellBack = false
-  let attemptIndex = 0
+  const attemptState = { index: 0 }
   let finalTimeout: {
     code: ModelAttemptTimeoutCode
     model: string
@@ -512,15 +512,176 @@ export function streamWithModelFailover(
    * have returned, so exhausting the retry budget is byte-identical to no
    * retry at all.
    */
+  const { drainOnce } = createModelAttemptDrainer(attemptState, options, openTimeoutMs, firstResponseTimeoutMs, committing, liveLifecycle, progress)
+
+  const probe = async (model: string): Promise<AttemptOutcome> => {
+    // Only the FINAL attempted model decides the exhaustion code. Clear a
+    // prior model's timeout before this model can throw a different outage.
+    finalTimeout = undefined
+    for (let retry = 0; ; retry += 1) {
+      const pass = await drainOnce(model)
+      if (!pass.empty || retry >= emptyTurnRetries) {
+        if (!pass.outcome.committed && pass.outcome.timeoutCode) {
+          finalTimeout = {
+            code: pass.outcome.timeoutCode,
+            model,
+            timeoutMs: pass.outcome.timeoutCode === 'model_stream_open_timeout'
+              ? openTimeoutMs
+              : firstResponseTimeoutMs,
+          }
+        } else {
+          finalTimeout = undefined
+        }
+        return pass.outcome
+      }
+      // Discard the empty pass entirely — including its `step-finish` token
+      // receipt, which must not be billed — and re-run the same model.
+      const iterator = pass.outcome.committed ? pass.outcome.iterator : null
+      if (pass.outcome.committed) pass.outcome.abort()
+      if (iterator) void closeIterator(iterator, options.log)
+      const info: EmptyTurnRetryInfo = { model, retry: retry + 1, remaining: emptyTurnRetries - retry - 1 }
+      options.log?.('[chat-routes] turn completed with no assistant text; re-running the same model', {
+        ...info,
+      })
+      options.onEmptyTurnRetry?.(info)
+    }
+  }
+
+  const events = (async function* (): AsyncGenerator<unknown, void, unknown> {
+    let handle: AttemptCommit
+    // Progress arrives while the probe is still running. The queue closes only
+    // after the verdict settles, so every event pushed before it is delivered
+    // in order and ahead of the replayed buffer.
+    const settled = runWithModelFailover<AttemptOutcome>({
+      models: options.models,
+      run: probe,
+      ...(options.policy ? { policy: options.policy } : {}),
+      // The probe has already classified the raw payload with
+      // `isUpstreamUnavailable`; this reads its verdict rather than
+      // re-classifying a wrapper object, so the two can never disagree.
+      isUnavailableResult: (result) => result.committed === false,
+      onFallback: (attempt, nextModel) => {
+        const info: ModelFallbackInfo = {
+          from: attempt.model,
+          to: nextModel,
+          reason: attempt.reason ?? 'upstream unavailable',
+        }
+        options.log?.('[chat-routes] model upstream unavailable; falling over', { ...info })
+        options.onFallback?.(info)
+      },
+    }).finally(() => progress.close())
+    // The verdict is read after the drain; mark the rejection handled until then.
+    settled.catch(() => undefined)
+    for (;;) {
+      const item = await progress.pull()
+      if (item === PROGRESS_CLOSED) break
+      yield item
+    }
+    try {
+      const outcome = await settled
+      serving = outcome.model
+      trail = outcome.attempts
+      fellBack = outcome.usedFallback
+      handle = outcome.value as AttemptCommit
+    } catch (err) {
+      // Exhaustion carries the full trail; keep it so the receipt still names
+      // every model tried even though the turn produced nothing.
+      const attempts = (err as { attempts?: ModelFailoverAttempt[] })?.attempts
+      if (Array.isArray(attempts)) trail = attempts
+      if (err instanceof ModelFailoverExhaustedError && finalTimeout) {
+        throw new ModelFailoverTimeoutError({
+          attempts: trail,
+          ...finalTimeout,
+        })
+      }
+      throw err
+    }
+
+    for (const event of handle.buffered) yield event
+
+    const live = handle.iterator
+    if (!live) {
+      handle.abort()
+      return
+    }
+    try {
+      for (;;) {
+        const next = await live.next()
+        if (next.done) return
+        yield next.value
+      }
+    } finally {
+      // The consumer may abandon this generator mid-turn (client drop); close
+      // the underlying stream rather than leaking it.
+      handle.abort()
+      await closeIterator(live, options.log)
+    }
+  })()
+
+  return {
+    events,
+    servingModel: () => serving,
+    attempts: () => trail,
+    usedFallback: () => fellBack,
+  }
+}
+
+const PROGRESS_CLOSED: unique symbol = Symbol('progress-closed')
+
+/**
+ * FIFO handoff from the probe (a plain promise chain) to the event generator.
+ * `close` is idempotent and queues one sentinel behind everything pushed
+ * before it, so a consumer never loses a progress event to the verdict.
+ */
+function createProgressQueue(): {
+  push(event: unknown): void
+  close(): void
+  pull(): Promise<unknown>
+} {
+  const items: unknown[] = []
+  const waiters: Array<(value: unknown) => void> = []
+  let closed = false
+  const deliver = (value: unknown): void => {
+    const waiter = waiters.shift()
+    if (waiter) waiter(value)
+    else items.push(value)
+  }
+  return {
+    push(event) {
+      if (closed) return
+      deliver(event)
+    },
+    close() {
+      if (closed) return
+      closed = true
+      deliver(PROGRESS_CLOSED)
+    },
+    pull() {
+      if (items.length > 0) return Promise.resolve(items.shift())
+      if (closed) return Promise.resolve(PROGRESS_CLOSED)
+      return new Promise((resolve) => waiters.push(resolve))
+    },
+  }
+}
+
+function createModelAttemptDrainer(
+  attemptState: { index: number },
+  options: ModelFailoverStreamOptions,
+  openTimeoutMs: ReturnType<typeof resolveTimeoutMs>,
+  firstResponseTimeoutMs: ReturnType<typeof resolveTimeoutMs>,
+  committing: (event: unknown) => boolean,
+  liveLifecycle: boolean,
+  progress: ReturnType<typeof createProgressQueue>,
+) {
   const drainOnce = async (model: string): Promise<{ outcome: AttemptOutcome; empty: boolean }> => {
-    attemptIndex += 1
+    attemptState.index += 1
     const controller = new AbortController()
     const abort = (): void => {
       if (!controller.signal.aborted) controller.abort()
     }
     const opening = Promise.resolve().then(() => options.open({
       model,
-      attempt: attemptIndex,
+      attempt: attemptState.index,
       signal: controller.signal,
     }))
     const openDeadline = deadlineAfter(openTimeoutMs)
@@ -694,153 +855,5 @@ export function streamWithModelFailover(
       }
     }
   }
-
-  const probe = async (model: string): Promise<AttemptOutcome> => {
-    // Only the FINAL attempted model decides the exhaustion code. Clear a
-    // prior model's timeout before this model can throw a different outage.
-    finalTimeout = undefined
-    for (let retry = 0; ; retry += 1) {
-      const pass = await drainOnce(model)
-      if (!pass.empty || retry >= emptyTurnRetries) {
-        if (!pass.outcome.committed && pass.outcome.timeoutCode) {
-          finalTimeout = {
-            code: pass.outcome.timeoutCode,
-            model,
-            timeoutMs: pass.outcome.timeoutCode === 'model_stream_open_timeout'
-              ? openTimeoutMs
-              : firstResponseTimeoutMs,
-          }
-        } else {
-          finalTimeout = undefined
-        }
-        return pass.outcome
-      }
-      // Discard the empty pass entirely — including its `step-finish` token
-      // receipt, which must not be billed — and re-run the same model.
-      const iterator = pass.outcome.committed ? pass.outcome.iterator : null
-      if (pass.outcome.committed) pass.outcome.abort()
-      if (iterator) void closeIterator(iterator, options.log)
-      const info: EmptyTurnRetryInfo = { model, retry: retry + 1, remaining: emptyTurnRetries - retry - 1 }
-      options.log?.('[chat-routes] turn completed with no assistant text; re-running the same model', {
-        ...info,
-      })
-      options.onEmptyTurnRetry?.(info)
-    }
-  }
-
-  const events = (async function* (): AsyncGenerator<unknown, void, unknown> {
-    let handle: AttemptCommit
-    // Progress arrives while the probe is still running. The queue closes only
-    // after the verdict settles, so every event pushed before it is delivered
-    // in order and ahead of the replayed buffer.
-    const settled = runWithModelFailover<AttemptOutcome>({
-      models: options.models,
-      run: probe,
-      ...(options.policy ? { policy: options.policy } : {}),
-      // The probe has already classified the raw payload with
-      // `isUpstreamUnavailable`; this reads its verdict rather than
-      // re-classifying a wrapper object, so the two can never disagree.
-      isUnavailableResult: (result) => result.committed === false,
-      onFallback: (attempt, nextModel) => {
-        const info: ModelFallbackInfo = {
-          from: attempt.model,
-          to: nextModel,
-          reason: attempt.reason ?? 'upstream unavailable',
-        }
-        options.log?.('[chat-routes] model upstream unavailable; falling over', { ...info })
-        options.onFallback?.(info)
-      },
-    }).finally(() => progress.close())
-    // The verdict is read after the drain; mark the rejection handled until then.
-    settled.catch(() => undefined)
-    for (;;) {
-      const item = await progress.pull()
-      if (item === PROGRESS_CLOSED) break
-      yield item
-    }
-    try {
-      const outcome = await settled
-      serving = outcome.model
-      trail = outcome.attempts
-      fellBack = outcome.usedFallback
-      handle = outcome.value as AttemptCommit
-    } catch (err) {
-      // Exhaustion carries the full trail; keep it so the receipt still names
-      // every model tried even though the turn produced nothing.
-      const attempts = (err as { attempts?: ModelFailoverAttempt[] })?.attempts
-      if (Array.isArray(attempts)) trail = attempts
-      if (err instanceof ModelFailoverExhaustedError && finalTimeout) {
-        throw new ModelFailoverTimeoutError({
-          attempts: trail,
-          ...finalTimeout,
-        })
-      }
-      throw err
-    }
-
-    for (const event of handle.buffered) yield event
-
-    const live = handle.iterator
-    if (!live) {
-      handle.abort()
-      return
-    }
-    try {
-      for (;;) {
-        const next = await live.next()
-        if (next.done) return
-        yield next.value
-      }
-    } finally {
-      // The consumer may abandon this generator mid-turn (client drop); close
-      // the underlying stream rather than leaking it.
-      handle.abort()
-      await closeIterator(live, options.log)
-    }
-  })()
-
-  return {
-    events,
-    servingModel: () => serving,
-    attempts: () => trail,
-    usedFallback: () => fellBack,
-  }
-}
-
-const PROGRESS_CLOSED: unique symbol = Symbol('progress-closed')
-
-/**
- * FIFO handoff from the probe (a plain promise chain) to the event generator.
- * `close` is idempotent and queues one sentinel behind everything pushed
- * before it, so a consumer never loses a progress event to the verdict.
- */
-function createProgressQueue(): {
-  push(event: unknown): void
-  close(): void
-  pull(): Promise<unknown>
-} {
-  const items: unknown[] = []
-  const waiters: Array<(value: unknown) => void> = []
-  let closed = false
-  const deliver = (value: unknown): void => {
-    const waiter = waiters.shift()
-    if (waiter) waiter(value)
-    else items.push(value)
-  }
-  return {
-    push(event) {
-      if (closed) return
-      deliver(event)
-    },
-    close() {
-      if (closed) return
-      closed = true
-      deliver(PROGRESS_CLOSED)
-    },
-    pull() {
-      if (items.length > 0) return Promise.resolve(items.shift())
-      if (closed) return Promise.resolve(PROGRESS_CLOSED)
-      return new Promise((resolve) => waiters.push(resolve))
-    },
-  }
+  return { drainOnce }
 }

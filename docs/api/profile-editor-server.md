@@ -4,7 +4,7 @@
 
 Source: `src/profile-editor/server.ts`
 
-39 exports.
+38 exports.
 
 ### `checkMcpServer`
 
@@ -44,14 +44,6 @@ Source: `src/profile-editor/server.ts`
 
 ```ts
 ({ endpoint, fetch: fetchImpl }: ProfileEditorClientOptions) => ProfileEditorClient
-```
-
-### `formatBytes`
-
-`function`
-
-```ts
-(bytes: number) => string
 ```
 
 ### `GitHubCommitRecord`

@@ -20,6 +20,8 @@
  * Imports `drizzle-orm`, so this is a subpath, never re-exported from root.
  */
 
+import { fireMemberSync } from './member-sync'
+
 import { and, eq, isNull } from 'drizzle-orm'
 import { INVITATION_EMAIL_HINT, isInvitationEmail } from './invitations'
 import {
@@ -91,7 +93,7 @@ export class SeatLimitError extends Error {
  * swallows rejections, so an unavailable downstream never blocks the mutation.
  * Each fires only for members with a real `userId` (never email-only invites).
  */
-export interface MemberSyncSeam {
+export interface MemberSyncCallbacks {
   add?(input: { workspaceId: string; userId: string; role: WorkspaceRole }): Promise<void> | void
   role?(input: { workspaceId: string; userId: string; role: WorkspaceRole }): Promise<void> | void
   remove?(input: { workspaceId: string; userId: string }): Promise<void> | void
@@ -108,7 +110,7 @@ export interface MembersApiOptions {
   /** Workspace-access API from createWorkspaceAccess — RBAC stays one source. */
   access: WorkspaceAccessReader
   enforceSeat?: EnforceSeatSeam
-  memberSyncSeam?: MemberSyncSeam
+  memberSyncSeam?: MemberSyncCallbacks
 }
 
 /** Define the structure of a workspace member entry with identification, role, and status details */
@@ -134,83 +136,6 @@ export function createMembersApi(opts: MembersApiOptions) {
   const { organizations, organizationMembers, workspaceMembers } = tables
   const users = userTable
   const workspaces = workspaceTable
-
-  function fireSync(op: () => Promise<void> | void) {
-    try {
-      Promise.resolve(op()).catch(() => {})
-    } catch {
-      // seam threw synchronously — swallow; sync is best-effort by contract.
-    }
-  }
-
-  async function listMembers(input: { workspaceId: string; actor: MembersApiActor }): Promise<Response> {
-    const accessRow = await access.getWorkspaceAccess(input.workspaceId, input.actor.id)
-    if (!accessRow) return Response.json({ error: 'Workspace not found' }, { status: 404 })
-
-    const organizationId = (accessRow.workspace as { organizationId: string }).organizationId
-
-    const [projectMembers, orgAdmins] = await Promise.all([
-      db
-        .select({
-          id: workspaceMembers.id,
-          organizationMemberId: workspaceMembers.organizationMemberId,
-          userId: workspaceMembers.userId,
-          role: workspaceMembers.role,
-          invitedAt: workspaceMembers.invitedAt,
-          acceptedAt: workspaceMembers.acceptedAt,
-          inviteEmail: workspaceMembers.inviteEmail,
-          userName: users.name,
-          userEmail: users.email,
-        })
-        .from(workspaceMembers)
-        .leftJoin(users, eq(users.id, workspaceMembers.userId))
-        .where(eq(workspaceMembers.workspaceId, input.workspaceId)),
-      db
-        .select({
-          id: organizationMembers.id,
-          userId: organizationMembers.userId,
-          orgRole: organizationMembers.role,
-          userName: users.name,
-          userEmail: users.email,
-          createdAt: organizationMembers.createdAt,
-        })
-        .from(organizationMembers)
-        .innerJoin(users, eq(users.id, organizationMembers.userId))
-        .where(eq(organizationMembers.organizationId, organizationId)),
-    ])
-
-    const explicitOrgMemberIds = new Set(
-      projectMembers.map((m: any) => m.organizationMemberId).filter(Boolean),
-    )
-    const members: MemberListEntry[] = [
-      ...orgAdmins
-        .filter((m: any) => organizationRoleGrantsWorkspaceOwner(m.orgRole) && !explicitOrgMemberIds.has(m.id))
-        .map((m: any) => ({
-          id: `org:${m.id}`,
-          userId: m.userId,
-          organizationMemberId: m.id,
-          role: 'owner' as WorkspaceRole,
-          name: m.userName,
-          email: m.userEmail,
-          invitedAt: m.createdAt,
-          acceptedAt: m.createdAt,
-          inherited: true,
-        })),
-      ...projectMembers.map((m: any) => ({
-        id: m.id,
-        userId: m.userId,
-        organizationMemberId: m.organizationMemberId,
-        role: m.role as WorkspaceRole,
-        name: m.userName,
-        email: m.userEmail ?? m.inviteEmail,
-        invitedAt: m.invitedAt,
-        acceptedAt: m.acceptedAt,
-        inherited: false,
-      })),
-    ]
-
-    return Response.json({ members, currentRole: accessRow.role, organizationId })
-  }
 
   async function inviteMember(input: {
     workspaceId: string
@@ -314,7 +239,7 @@ export function createMembersApi(opts: MembersApiOptions) {
     if (target.userId && memberSyncSeam?.role) {
       const userId = target.userId
       const nextRole = input.role as WorkspaceRole
-      fireSync(() => memberSyncSeam.role!({ workspaceId: input.workspaceId, userId, role: nextRole }))
+      fireMemberSync(() => memberSyncSeam.role!({ workspaceId: input.workspaceId, userId, role: nextRole }))
     }
     return Response.json({ success: true })
   }
@@ -347,7 +272,7 @@ export function createMembersApi(opts: MembersApiOptions) {
     await db.delete(workspaceMembers).where(eq(workspaceMembers.id, input.memberId))
     if (target.userId && memberSyncSeam?.remove) {
       const userId = target.userId
-      fireSync(() => memberSyncSeam.remove!({ workspaceId: input.workspaceId, userId }))
+      fireMemberSync(() => memberSyncSeam.remove!({ workspaceId: input.workspaceId, userId }))
     }
     return Response.json({ success: true })
   }
@@ -419,7 +344,7 @@ export function createMembersApi(opts: MembersApiOptions) {
 
     if (memberSyncSeam?.add) {
       const role = invite.role as WorkspaceRole
-      fireSync(() => memberSyncSeam.add!({ workspaceId: invite.workspaceId, userId: input.actor.id, role }))
+      fireMemberSync(() => memberSyncSeam.add!({ workspaceId: invite.workspaceId, userId: input.actor.id, role }))
     }
 
     return Response.json({
@@ -429,6 +354,19 @@ export function createMembersApi(opts: MembersApiOptions) {
     })
   }
 
+  const { listMembers, getUserByEmail, getOrganizationMember, findExistingProjectInvite, hasPendingOrgInvite } = createMemberQueries(db, users, organizationMembers, workspaceMembers, workspaces, access)
+
+  return { listMembers, inviteMember, updateMemberRole, removeMember, acceptInvite }
+}
+
+function createMemberQueries(
+  db: MembersApiOptions['db'],
+  users: MembersApiOptions['userTable'],
+  organizationMembers: MembersApiOptions['tables']['organizationMembers'],
+  workspaceMembers: MembersApiOptions['tables']['workspaceMembers'],
+  workspaces: MembersApiOptions['workspaceTable'],
+  access: MembersApiOptions['access'],
+) {
   // ── internal query helpers ──
 
   async function getUserByEmail(email: string) {
@@ -479,5 +417,77 @@ export function createMembersApi(opts: MembersApiOptions) {
     return Boolean(row)
   }
 
-  return { listMembers, inviteMember, updateMemberRole, removeMember, acceptInvite }
+
+
+
+  async function listMembers(input: { workspaceId: string; actor: MembersApiActor }): Promise<Response> {
+    const accessRow = await access.getWorkspaceAccess(input.workspaceId, input.actor.id)
+    if (!accessRow) return Response.json({ error: 'Workspace not found' }, { status: 404 })
+
+    const organizationId = (accessRow.workspace as { organizationId: string }).organizationId
+
+    const [projectMembers, orgAdmins] = await Promise.all([
+      db
+        .select({
+          id: workspaceMembers.id,
+          organizationMemberId: workspaceMembers.organizationMemberId,
+          userId: workspaceMembers.userId,
+          role: workspaceMembers.role,
+          invitedAt: workspaceMembers.invitedAt,
+          acceptedAt: workspaceMembers.acceptedAt,
+          inviteEmail: workspaceMembers.inviteEmail,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(workspaceMembers)
+        .leftJoin(users, eq(users.id, workspaceMembers.userId))
+        .where(eq(workspaceMembers.workspaceId, input.workspaceId)),
+      db
+        .select({
+          id: organizationMembers.id,
+          userId: organizationMembers.userId,
+          orgRole: organizationMembers.role,
+          userName: users.name,
+          userEmail: users.email,
+          createdAt: organizationMembers.createdAt,
+        })
+        .from(organizationMembers)
+        .innerJoin(users, eq(users.id, organizationMembers.userId))
+        .where(eq(organizationMembers.organizationId, organizationId)),
+    ])
+
+    const explicitOrgMemberIds = new Set(
+      projectMembers.map((m: any) => m.organizationMemberId).filter(Boolean),
+    )
+    const members: MemberListEntry[] = [
+      ...orgAdmins
+        .filter((m: any) => organizationRoleGrantsWorkspaceOwner(m.orgRole) && !explicitOrgMemberIds.has(m.id))
+        .map((m: any) => ({
+          id: `org:${m.id}`,
+          userId: m.userId,
+          organizationMemberId: m.id,
+          role: 'owner' as WorkspaceRole,
+          name: m.userName,
+          email: m.userEmail,
+          invitedAt: m.createdAt,
+          acceptedAt: m.createdAt,
+          inherited: true,
+        })),
+      ...projectMembers.map((m: any) => ({
+        id: m.id,
+        userId: m.userId,
+        organizationMemberId: m.organizationMemberId,
+        role: m.role as WorkspaceRole,
+        name: m.userName,
+        email: m.userEmail ?? m.inviteEmail,
+        invitedAt: m.invitedAt,
+        acceptedAt: m.acceptedAt,
+        inherited: false,
+      })),
+    ]
+
+    return Response.json({ members, currentRole: accessRow.role, organizationId })
+  }
+
+  return { listMembers, getUserByEmail, getOrganizationMember, findExistingProjectInvite, hasPendingOrgInvite }
 }

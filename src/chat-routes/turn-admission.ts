@@ -25,7 +25,7 @@ export type AdmittedTurn<TContext> = {
 }
 
 /** Emits one stage on a progress-first stream. */
-export type TurnProgress = (phase: string, message: string) => void
+export type TurnProgressCallback = (phase: string, message: string) => void
 
 export function errorResponse(err: ChatTurnInputError): Response {
   return Response.json({ code: err.code, error: err.message }, { status: err.status })

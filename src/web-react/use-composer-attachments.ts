@@ -263,83 +263,7 @@ export function useComposerAttachments(
   )
 
   const upload = useCallback(
-    async (id: string, file: File, name: string) => {
-      const opts = optionsRef.current
-      setStaged((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: 'uploading', errorMessage: undefined } : s)),
-      )
-      const controller = new AbortController()
-      controllersRef.current.set(id, controller)
-      const form = new FormData()
-      form.append('file', file, name)
-
-      const request = opts.buildUploadRequest
-        ? opts.buildUploadRequest({ file, name, form })
-        : opts.uploadUrl
-          ? { url: opts.uploadUrl }
-          : null
-
-      if (!request) {
-        setStaged((prev) =>
-          prev.map((s) =>
-            s.id === id ? { ...s, status: 'error', errorMessage: NO_UPLOAD_TARGET_MESSAGE } : s,
-          ),
-        )
-        opts.onError?.(NO_UPLOAD_TARGET_MESSAGE)
-        controllersRef.current.delete(id)
-        return
-      }
-
-      try {
-        const res = opts.uploadBody === 'raw'
-          ? await fetch(withFilename(request.url, name), {
-              method: 'POST',
-              credentials: 'same-origin',
-              ...request.init,
-              headers: rawUploadHeaders(request.init?.headers, file.size),
-              body: file,
-              signal: controller.signal,
-            })
-          : await fetch(request.url, {
-              method: 'POST',
-              credentials: 'same-origin',
-              ...request.init,
-              body: form,
-              signal: controller.signal,
-            })
-        if (!res.ok) {
-          const message = await parseUploadError(res)
-          setStaged((prev) =>
-            prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
-          )
-          opts.onError?.(message)
-          return
-        }
-        const data = (await res.json()) as { files?: ChatAttachmentInput[] }
-        const uploaded = data.files?.[0]
-        if (!uploaded) {
-          const message = 'Upload returned no file'
-          setStaged((prev) =>
-            prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
-          )
-          opts.onError?.(message)
-          return
-        }
-        setStaged((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, status: 'ready', reference: uploaded } : s)),
-        )
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return // silent removal — see removeAttachment/clear
-        const message =
-          err instanceof Error && err.message ? err.message : 'Upload failed — check your connection'
-        setStaged((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
-        )
-        opts.onError?.(message)
-      } finally {
-        controllersRef.current.delete(id)
-      }
-    },
+    (id: string, file: File, name: string) => uploadComposerAttachment(id, file, name, { optionsRef, setStaged, controllersRef }),
     [setStaged],
   )
 
@@ -537,3 +461,85 @@ export function useComposerAttachments(
     blockReason,
   }
 }
+
+
+async function uploadComposerAttachment(id: string, file: File, name: string, { optionsRef,
+  setStaged, controllersRef }: { optionsRef: { current: UseComposerAttachmentsOptions };
+  setStaged: (updater: StagedAttachment[] | ((prev: StagedAttachment[]) => StagedAttachment[])) => void;
+  controllersRef: { current: Map<string, AbortController> } }) {
+      const opts = optionsRef.current
+      setStaged((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, status: 'uploading', errorMessage: undefined } : s)),
+      )
+      const controller = new AbortController()
+      controllersRef.current.set(id, controller)
+      const form = new FormData()
+      form.append('file', file, name)
+
+      const request = opts.buildUploadRequest
+        ? opts.buildUploadRequest({ file, name, form })
+        : opts.uploadUrl
+          ? { url: opts.uploadUrl }
+          : null
+
+      if (!request) {
+        setStaged((prev) =>
+          prev.map((s) =>
+            s.id === id ? { ...s, status: 'error', errorMessage: NO_UPLOAD_TARGET_MESSAGE } : s,
+          ),
+        )
+        opts.onError?.(NO_UPLOAD_TARGET_MESSAGE)
+        controllersRef.current.delete(id)
+        return
+      }
+
+      try {
+        const res = opts.uploadBody === 'raw'
+          ? await fetch(withFilename(request.url, name), {
+              method: 'POST',
+              credentials: 'same-origin',
+              ...request.init,
+              headers: rawUploadHeaders(request.init?.headers, file.size),
+              body: file,
+              signal: controller.signal,
+            })
+          : await fetch(request.url, {
+              method: 'POST',
+              credentials: 'same-origin',
+              ...request.init,
+              body: form,
+              signal: controller.signal,
+            })
+        if (!res.ok) {
+          const message = await parseUploadError(res)
+          setStaged((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
+          )
+          opts.onError?.(message)
+          return
+        }
+        const data = (await res.json()) as { files?: ChatAttachmentInput[] }
+        const uploaded = data.files?.[0]
+        if (!uploaded) {
+          const message = 'Upload returned no file'
+          setStaged((prev) =>
+            prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
+          )
+          opts.onError?.(message)
+          return
+        }
+        setStaged((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, status: 'ready', reference: uploaded } : s)),
+        )
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return // silent removal — see removeAttachment/clear
+        const message =
+          err instanceof Error && err.message ? err.message : 'Upload failed — check your connection'
+        setStaged((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, status: 'error', errorMessage: message } : s)),
+        )
+        opts.onError?.(message)
+      } finally {
+        controllersRef.current.delete(id)
+      }
+    }

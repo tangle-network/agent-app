@@ -5,7 +5,7 @@
  * own name and its input's scalar fields.
  */
 
-import { asRecord, readNumber, readText, resultLink, unwrapHubResult } from './result'
+import { hubResultRecord, readNumber, readText, resultLink, unwrapHubResult } from './result'
 import { HUB_APPROVAL_UNKNOWN_WARNING } from './unknown'
 import type {
   HubActionField,
@@ -72,8 +72,8 @@ function list(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((entry) => {
     if (typeof entry === 'string' && entry.trim()) return [entry.trim()]
-    const record = asRecord(entry)
-    const address = text(record.email) ?? text(record.address) ?? text(asRecord(record.emailAddress).address)
+    const record = hubResultRecord(entry)
+    const address = text(record.email) ?? text(record.address) ?? text(hubResultRecord(record.emailAddress).address)
     return address ? [address] : []
   })
 }
@@ -153,12 +153,12 @@ function branchOf(ref: unknown): string | undefined {
 
 /** The files a call writes, as its input declares them. */
 export function hubActionFiles(actionPath: string, input: unknown): HubActionFile[] {
-  const fields = asRecord(input)
+  const fields = hubResultRecord(input)
   const { action } = splitHubActionPath(actionPath)
   const entries = action === 'git.createTree' ? fields.tree : fields.files
   if (!Array.isArray(entries)) return []
   return entries.flatMap((entry): HubActionFile[] => {
-    const item = asRecord(entry)
+    const item = hubResultRecord(entry)
     const path = text(item.path)
     if (!path) return []
     const deleted = item.delete === true || (item.sha === null && item.content === undefined)
@@ -175,7 +175,7 @@ function mergedFiles(declared: readonly HubActionFile[], counted: readonly HubAc
 }
 
 function emailPreview(input: Record<string, unknown>, reply: boolean): HubActionPreview {
-  const from = asRecord(input.from)
+  const from = hubResultRecord(input.from)
   const htmlBody = typeof input.html === 'string' ? input.html : undefined
   return {
     kind: 'email',
@@ -300,13 +300,13 @@ function sendEmail(verb: 'Send' | 'Save draft', reply = false): Presenter {
 
 function post(channel: 'x' | 'linkedin' | 'instagram' | 'facebook' | 'tiktok', reply = false, sponsored = false): Presenter {
   return (input) => {
-    const container = asRecord(input.container)
+    const container = hubResultRecord(input.container)
     const body = [input.text, input.commentary, input.caption, input.message, container.caption, input.title]
       .find((value): value is string => typeof value === 'string') ?? ''
     const url = text(input.url) ?? text(input.link)
     const where = { x: 'X', linkedin: 'LinkedIn', instagram: 'Instagram', facebook: 'Facebook', tiktok: 'TikTok' }[channel]
     const media = (Array.isArray(input.media) ? input.media : []).flatMap((value): HubPreviewMedia[] => {
-      const entry = asRecord(value)
+      const entry = hubResultRecord(value)
       if ((entry.kind !== 'image' && entry.kind !== 'video') || typeof entry.src !== 'string') return []
       return [{ kind: entry.kind, src: entry.src, alt: typeof entry.alt === 'string' ? entry.alt : '',
         ...(typeof entry.poster === 'string' ? { poster: entry.poster } : {}),
@@ -336,7 +336,7 @@ function post(channel: 'x' | 'linkedin' | 'instagram' | 'facebook' | 'tiktok', r
         handle: text(input.handle),
         callToAction: text(input.callToAction),
         images: (Array.isArray(input.images) ? input.images : input.image ? [input.image] : []).flatMap((image) => {
-          const record = asRecord(image)
+          const record = hubResultRecord(image)
           const url = text(image) ?? text(record.url)
           return url ? [{ url, alt: text(record.alt) }] : []
         }),
@@ -370,9 +370,9 @@ function calendarEvent(input: Record<string, unknown>, _item?: Pick<HubApprovalI
     preview: {
       kind: 'event',
       title,
-      start: text(input.start) ?? text(asRecord(input.start).dateTime),
-      end: text(input.end) ?? text(asRecord(input.end).dateTime),
-      location: text(input.location) ?? text(asRecord(input.location).displayName),
+      start: text(input.start) ?? text(hubResultRecord(input.start).dateTime),
+      end: text(input.end) ?? text(hubResultRecord(input.end).dateTime),
+      location: text(input.location) ?? text(hubResultRecord(input.location).displayName),
       attendees: list(input.attendees),
       description: text(input.description),
     },
@@ -465,7 +465,7 @@ const PRESENTERS: Record<string, Presenter> = {
   },
   'phony.start_outbound_call': (input) => {
     const to = text(input.toNumber) ?? text(input.to)
-    const mission = asRecord(input.mission)
+    const mission = hubResultRecord(input.mission)
     return {
       action: 'Start call',
       title: to ? `Call ${to}` : 'Start an outbound call',
@@ -514,7 +514,7 @@ export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'pro
   const { provider: pathProvider, action } = splitHubActionPath(item.actionPath)
   const providerId = item.providerId || pathProvider
   const provider = { id: providerId, name: hubProviderName(providerId) }
-  const input = asRecord(item.input)
+  const input = hubResultRecord(item.input)
   const known = PRESENTERS[item.actionPath]
   const presented = known
     ? known(input, item)
@@ -534,7 +534,7 @@ export function presentHubAction(item: Pick<HubApprovalItem, 'actionPath' | 'pro
 // ---------- receipts ----------
 
 function prField(result: Record<string, unknown>): HubActionField | undefined {
-  const pull = asRecord(result.pullRequest)
+  const pull = hubResultRecord(result.pullRequest)
   const number = readNumber(pull, 'number') ?? readNumber(result, 'number')
   if (number === undefined) return undefined
   return { label: 'Pull request', value: `#${number}`, href: resultLink(pull) ?? resultLink(result) }
@@ -542,8 +542,8 @@ function prField(result: Record<string, unknown>): HubActionField | undefined {
 
 function receiptTitle(item: HubApprovalItem, presentation: HubActionPresentation, result: Record<string, unknown>): string {
   const { action } = splitHubActionPath(item.actionPath)
-  const input = asRecord(item.input)
-  const pull = asRecord(result.pullRequest)
+  const input = hubResultRecord(item.input)
+  const pull = hubResultRecord(result.pullRequest)
   const number = readNumber(pull, 'number') ?? readNumber(result, 'number')
   switch (item.actionPath) {
     case 'github.pulls.propose':
@@ -611,7 +611,7 @@ function receiptFields(item: HubApprovalItem, presentation: HubActionPresentatio
       const head = readText(result, 'branch') ?? preview.head
       const base = readText(result, 'base') ?? preview.base
       if (head && base) fields.push({ label: 'Branch', value: `${head} → ${base}`, mono: true })
-      const commit = asRecord(result.commit)
+      const commit = hubResultRecord(result.commit)
       const sha = readText(commit, 'sha')
       if (sha) fields.push({ label: 'Commit', value: shortSha(sha)!, href: resultLink(commit), mono: true })
       const repo = readText(result, 'repository') ?? preview.repository
@@ -661,7 +661,7 @@ function receiptFields(item: HubApprovalItem, presentation: HubActionPresentatio
       return fields
     }
     case 'call': {
-      const status = readText(asRecord(result.call), 'status') ?? readText(result, 'status')
+      const status = readText(hubResultRecord(result.call), 'status') ?? readText(result, 'status')
       if (status) fields.push({ label: 'Status', value: status })
       return fields
     }
@@ -691,7 +691,7 @@ export function formatWhen(start: string, end?: string): string {
 function receiptFiles(result: Record<string, unknown>): HubActionFile[] | undefined {
   if (!Array.isArray(result.files)) return undefined
   return result.files.flatMap((entry): HubActionFile[] => {
-    const file = asRecord(entry)
+    const file = hubResultRecord(entry)
     const path = text(file.path) ?? text(file.filename)
     if (!path) return []
     const status = text(file.status)
@@ -703,7 +703,7 @@ function receiptFiles(result: Record<string, unknown>): HubActionFile[] | undefi
 /** What a decided call did: its past-tense title, key fields, link, media and files. */
 export function hubActionReceipt(item: HubApprovalItem): HubActionReceipt {
   const presentation = presentHubAction(item)
-  const result = asRecord(unwrapHubResult(item.result))
+  const result = hubResultRecord(unwrapHubResult(item.result))
   const status: HubActionReceipt['status'] = item.phase === 'done' || item.phase === 'unknown' || item.phase === 'failed' || item.phase === 'denied' || item.phase === 'expired'
     ? item.phase
     : item.phase === 'queued' || item.phase === 'running' ? 'running' : 'waiting'
@@ -715,7 +715,7 @@ export function hubActionReceipt(item: HubApprovalItem): HubActionReceipt {
   if (status !== 'done') return { ...base, title: presentation.title, fields: [] }
   const title = receiptTitle(item, presentation, result)
   const fields = receiptFields(item, presentation, result)
-  const pull = asRecord(result.pullRequest)
+  const pull = hubResultRecord(result.pullRequest)
   const href = presentation.preview.kind === 'post'
     ? postLink(item, result)
     : resultLink(pull) ?? (item.actionPath.startsWith('github.git.') ? undefined : resultLink(result))

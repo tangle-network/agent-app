@@ -1,3 +1,4 @@
+export { useDocumentDark as useIsDark } from '../../web-react/use-document-dark'
 /**
  * Local fixtures + harness helpers for the design-canvas stories.
  *
@@ -302,33 +303,6 @@ export function makeMultiPageScene(): SceneDocument {
 /** The layers-showcase page on its own (panel stories). */
 export function makeLayersShowcasePage(): ScenePage {
   return makeMultiPageScene().pages[1]!
-}
-
-// ---------------------------------------------------------------------------
-// Harness helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Read the live theme from the document element so the Konva canvas (which
- * cannot resolve CSS vars) paints with the active palette. Tracks the global
- * Storybook theme toolbar, which mutates `data-theme` / `.dark` on
- * `document.documentElement`. Stories never set the theme themselves.
- */
-export function useIsDark(): boolean {
-  const read = () => {
-    if (typeof document === 'undefined') return false
-    const root = document.documentElement
-    return root.getAttribute('data-theme') === 'dark' || root.classList.contains('dark')
-  }
-  const [isDark, setIsDark] = useState(read)
-  useEffect(() => {
-    const root = document.documentElement
-    const obs = new MutationObserver(() => setIsDark(read()))
-    obs.observe(root, { attributes: true, attributeFilter: ['data-theme', 'class'] })
-    setIsDark(read())
-    return () => obs.disconnect()
-  }, [])
-  return isDark
 }
 
 /**

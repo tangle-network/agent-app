@@ -134,16 +134,7 @@ function MessageIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-
-/**
- * The full session history: search, sort, cursor-paged rows with per-row
- * actions, and the states in between (first-run empty, loading, no matches,
- * error + retry).
- *
- * This is the surface the rail's capped list overflows into — the reason the
- * rail can stay short without hiding the user's work.
- */
-export function SessionHistoryPanel({
+function useSessionHistoryPanelViewState({
   history,
   hasAnySessions,
   query,
@@ -238,8 +229,29 @@ export function SessionHistoryPanel({
       setBulkBusy(false)
     }
   }, [bulkTarget, deleteLabel, history, onBulkAction])
+  return { className, showHeader, column, title, newSessionHref, Link, scrollRef, hasAnySessions,
+    query, onQueryChange, sort, onSortChange, onBulkAction, setSelectedIds, history,
+    allVisibleSelected, selectedCount, openBulkAction, selectedIds, deleteLabel, ageDays, setAgeDays,
+    validAgeDays, parsedAgeDays, emptyTitle, emptyDescription, isSearching, searchTerm, hrefForSession,
+    respondingSessionIds, untitledLabel, formatTimestamp, onRename, onDelete, renameLabel,
+    extraActions, sentinelRef, bulkTarget, bulkBusy, setBulkTarget, setBulkError, bulkError, confirmBulkAction }
+}
 
-  return (
+type SessionHistoryPanelViewState = ReturnType<typeof useSessionHistoryPanelViewState>
+
+export function SessionHistoryPanel(props: SessionHistoryPanelProps) {
+  const view = useSessionHistoryPanelViewState(props)
+  return <SessionHistoryPanelView {...view} />
+}
+
+function SessionHistoryPanelView({ className, showHeader, column, title, newSessionHref, Link,
+  scrollRef, hasAnySessions, query, onQueryChange, sort, onSortChange, onBulkAction, setSelectedIds,
+  history, allVisibleSelected, selectedCount, openBulkAction, selectedIds, deleteLabel, ageDays,
+  setAgeDays, validAgeDays, parsedAgeDays, emptyTitle, emptyDescription, isSearching, searchTerm,
+  hrefForSession, respondingSessionIds, untitledLabel, formatTimestamp, onRename, onDelete,
+  renameLabel, extraActions, sentinelRef, bulkTarget, bulkBusy, setBulkTarget, setBulkError,
+  bulkError, confirmBulkAction }: SessionHistoryPanelViewState) {
+  return ((
     <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${className ?? ''}`}>
       {/* A ShellHeader row, so its divider continues the rail's. */}
       {showHeader && (
@@ -448,8 +460,10 @@ export function SessionHistoryPanel({
         </ActionDialog>
       )}
     </div>
-  )
+  ))
 }
+
+
 
 function ErrorBlock({ message, onRetry, inline }: { message: string; onRetry: () => void; inline?: boolean }) {
   return (

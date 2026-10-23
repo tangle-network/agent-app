@@ -124,11 +124,6 @@
       "import": "./dist/skills/index.js",
       "default": "./dist/skills/index.js"
     },
-    "./skills/marketplace-drizzle": {
-      "types": "./dist/skills/marketplace-drizzle.d.ts",
-      "import": "./dist/skills/marketplace-drizzle.js",
-      "default": "./dist/skills/marketplace-drizzle.js"
-    },
     "./skills-placement": {
       "types": "./dist/skills-placement/index.d.ts",
       "import": "./dist/skills-placement/index.js",
@@ -178,11 +173,6 @@
       "types": "./dist/agent-profiles/drizzle.d.ts",
       "import": "./dist/agent-profiles/drizzle.js",
       "default": "./dist/agent-profiles/drizzle.js"
-    },
-    "./agent-profiles/reaper": {
-      "types": "./dist/agent-profiles/reaper.d.ts",
-      "import": "./dist/agent-profiles/reaper.js",
-      "default": "./dist/agent-profiles/reaper.js"
     },
     "./prompt": {
       "types": "./dist/prompt/index.d.ts",

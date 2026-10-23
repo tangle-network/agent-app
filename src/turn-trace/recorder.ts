@@ -146,15 +146,8 @@ export interface CreateTurnTraceOptions {
   /** Live counter captured by the server turn owner; no Node dependency in the recorder. */
   d1QueryCounter?: { readonly queries: number }
 }
-
-const TRACE_ID_PATTERN = /^[\w-]{8,200}$/
 const MAX_ATTRS = 48
 const MAX_ATTR_STRING = 200
-
-/** True when the Router and the Sandbox API keep this id as a `x-tangle-trace-id`. */
-export function isTraceId(value: string): boolean {
-  return TRACE_ID_PATTERN.test(value)
-}
 
 /**
  * The turn's execution id as a trace id. Execution ids carry `:` (`app:session:turn`),

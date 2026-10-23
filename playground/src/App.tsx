@@ -50,7 +50,7 @@ function currentPath(): string {
   return ROUTES.some((r) => r.path === path) || AUDIT_PATHS.includes(path) ? path : '/canvas'
 }
 
-export function App() {
+export function PlaygroundApp() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme)
   const [path, setPath] = useState<string>(currentPath)
 

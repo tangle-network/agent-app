@@ -1,6 +1,6 @@
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { type DesignCanvasMcpToolEnv, resolvePageId, applyPlan } from './mcp-context'
-import { objectSchema, requireString, requireEnum, isRecord } from '../tools/mcp-arguments'
+import { objectSchema, requireMcpString, requireEnum, isRecord } from '../tools/mcp-arguments'
 import {
   pageIdProp,
   xProp,
@@ -56,7 +56,7 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       const { document } = await env.store.getDocument()
       const pageId = resolvePageId(document, args)
       const id = env.mintId()
-      const text = requireString(args, 'text')
+      const text = requireMcpString(args, 'text')
       const element: TextElement = {
         id,
         kind: 'text',
@@ -115,7 +115,7 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
         y: requireNumber(args, 'y'),
         width: requireNumber(args, 'width'),
         height: requireNumber(args, 'height'),
-        src: requireString(args, 'src'),
+        src: requireMcpString(args, 'src'),
         fit: optionalEnum(args, 'fit', ['fill', 'cover', 'contain'] as const) ?? 'cover',
         rotation: 0,
         opacity: 1,
@@ -239,7 +239,7 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
         y: requireNumber(args, 'y'),
         width: requireNumber(args, 'width'),
         height: requireNumber(args, 'height'),
-        src: requireString(args, 'src'),
+        src: requireMcpString(args, 'src'),
         rotation: 0,
         opacity: 1,
         locked: false,
@@ -272,8 +272,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id', 'attrs'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       if (!isRecord(args['attrs'])) throw new Error('attrs must be an object')
       const attrs = args['attrs'] as Record<string, unknown>
       const result = await applyPlan(env.store, env.mintId, `set attrs on ${elementId}`, [
@@ -291,8 +291,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id', 'x', 'y'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       const x = requireNumber(args, 'x')
       const y = requireNumber(args, 'y')
       const result = await applyPlan(env.store, env.mintId, `move element ${elementId} to (${x}, ${y})`, [
@@ -310,8 +310,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id', 'width', 'height'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       const width = requireNumber(args, 'width')
       const height = requireNumber(args, 'height')
       const result = await applyPlan(env.store, env.mintId, `resize element ${elementId} to ${width}×${height}`, [
@@ -333,8 +333,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id', 'degrees'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       const rotation = requireNumber(args, 'degrees')
       const result = await applyPlan(env.store, env.mintId, `rotate element ${elementId} to ${rotation}°`, [
         { type: 'set_attrs', pageId, elementId, attrs: { rotation } },
@@ -356,8 +356,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id', 'to_index'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       const toIndex = optionalNonNegativeInteger(args, 'to_index') ?? 0
       const result = await applyPlan(env.store, env.mintId, `reorder element ${elementId} to index ${toIndex}`, [
         { type: 'reorder_element', pageId, elementId, toIndex },
@@ -374,8 +374,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_id'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
       const result = await applyPlan(env.store, env.mintId, `delete element ${elementId}`, [
         { type: 'delete_element', pageId, elementId },
       ])
@@ -396,7 +396,7 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'element_ids'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
+      const pageId = requireMcpString(args, 'page_id')
       const elementIds = requireStringArray(args, 'element_ids')
       const groupId = env.mintId()
       const result = await applyPlan(env.store, env.mintId, `group ${elementIds.length} elements`, [
@@ -414,8 +414,8 @@ export const CANVAS_ELEMENTS_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[] 
       ['page_id', 'group_id'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const groupId = requireString(args, 'group_id')
+      const pageId = requireMcpString(args, 'page_id')
+      const groupId = requireMcpString(args, 'group_id')
       const result = await applyPlan(env.store, env.mintId, `ungroup ${groupId}`, [
         { type: 'ungroup_element', pageId, groupId },
       ])

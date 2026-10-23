@@ -19,9 +19,9 @@
  *   POST /v1/agents/:slug/chat/completions  OpenAI-compatible API
  */
 
-export { TurnStreamDO } from './turn-lock'
+export { DetachedTurnStreamDO as TurnStreamDO } from './turn-lock'
 
-import { agentSurfaces } from './agent-surfaces'
+import { chatAgentSurfaces } from './agent-surfaces'
 import { createArtifactIndex } from './files'
 import type { peekWorkspaceSandbox } from '@tangle-network/agent-app/sandbox'
 import { config } from '../agent.config'
@@ -67,7 +67,7 @@ const defaultAssembly: WorkerAssembly = {
 }
 
 /** Build the Worker around one app assembly. Tests inject the real app with a test database. */
-export function createWorker(assembly: WorkerAssembly = defaultAssembly): ExportedHandler<AppEnv> {
+export function createChatWorker(assembly: WorkerAssembly = defaultAssembly): ExportedHandler<AppEnv> {
   // Reuse the database-backed chat assembly within one Worker environment.
   // Build the gateway per request so its background work binds to that
   // request's ExecutionContext. Durable stores remain authoritative.
@@ -85,7 +85,7 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
   return {
     async fetch(request: Request, rawEnv: AppEnv, ctx: ExecutionContext): Promise<Response> {
       const env = withLimitAlarms(rawEnv)
-      const surfaces = agentSurfaces(new URL(env.BETTER_AUTH_URL).origin, env.OPERATOR_RUN_ENABLED === 'true')
+      const surfaces = chatAgentSurfaces(new URL(env.BETTER_AUTH_URL).origin, env.OPERATOR_RUN_ENABLED === 'true')
       const surface = surfaces.handle(request)
       if (surface) return surface
       const url = new URL(request.url)
@@ -151,4 +151,4 @@ export function createWorker(assembly: WorkerAssembly = defaultAssembly): Export
   }
 }
 
-export default createWorker()
+export default createChatWorker()

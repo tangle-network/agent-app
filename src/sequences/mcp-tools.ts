@@ -1,4 +1,4 @@
-import { isRecord, requireString, requireEnum, objectSchema } from '../tools/mcp-arguments'
+import { isRecord, requireMcpString, requireEnum, objectSchema } from '../tools/mcp-arguments'
 /**
  * The sequences MCP tool registry — what the in-sandbox agent sees over the
  * live agent→timeline channel. Each entry carries an LLM-facing description,
@@ -385,7 +385,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
     description: 'Read one clip by id, including its position (seconds + timecode), source in/out points, text, and media/provider status.',
     inputSchema: objectSchema({ clip_id: CLIP_ID_SCHEMA }, ['clip_id']),
     run: async (args, env) => {
-      const clip = await env.store.getClip(requireString(args, 'clip_id'))
+      const clip = await env.store.getClip(requireMcpString(args, 'clip_id'))
       const timeline = await env.store.getTimeline()
       return clipView(clip, timeline.sequence.fps)
     },
@@ -428,7 +428,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
           operations: [
             {
               type: 'place_clip',
-              label: requireString(args, 'label'),
+              label: requireMcpString(args, 'label'),
               startFrame: bounds.startFrame,
               durationFrames: bounds.durationFrames,
               ...(trackId !== undefined ? { trackId } : {}),
@@ -471,7 +471,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
           operations: [
             {
               type: 'add_caption',
-              text: requireString(args, 'text'),
+              text: requireMcpString(args, 'text'),
               ...(language !== undefined ? { language } : {}),
               ...bounds,
             },
@@ -525,7 +525,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
             )
             return {
               type: 'add_caption',
-              text: requireString(entry, 'text'),
+              text: requireMcpString(entry, 'text'),
               startFrame: bounds.startFrame,
               durationFrames: bounds.durationFrames,
               ...(language !== undefined ? { language } : {}),
@@ -549,7 +549,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       ['clip_id', 'start_seconds'],
     ),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('move_clip', args, env, (timeline) => {
         const trackId = optionalString(args, 'track_id')
         return {
@@ -581,7 +581,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       ['clip_id', 'start_seconds', 'duration_seconds'],
     ),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('trim_clip', args, env, (timeline) => {
         const fps = timeline.sequence.fps
         const sourceInSeconds = optionalSeconds(args, 'source_in_seconds')
@@ -619,7 +619,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       ['clip_id', 'at_seconds'],
     ),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('split_clip', args, env, (timeline) => ({
         clipId,
         operations: [
@@ -644,7 +644,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       ['clip_id', 'text'],
     ),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('set_clip_text', args, env, () => {
         const language = optionalString(args, 'language')
         return {
@@ -653,7 +653,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
             {
               type: 'set_clip_text',
               clipId,
-              text: requireString(args, 'text'),
+              text: requireMcpString(args, 'text'),
               ...(language !== undefined ? { language } : {}),
             },
           ],
@@ -666,7 +666,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
     description: 'Remove a clip from the timeline permanently. Prefer set_clip_disabled to audition a cut without losing the clip.',
     inputSchema: objectSchema({ clip_id: CLIP_ID_SCHEMA }, ['clip_id']),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('delete_clip', args, env, () => ({
         operations: [{ type: 'delete_clip', clipId }],
       }))
@@ -683,7 +683,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
       ['clip_id', 'disabled'],
     ),
     run: (args, env) => {
-      const clipId = requireString(args, 'clip_id')
+      const clipId = requireMcpString(args, 'clip_id')
       return runMutation('set_clip_disabled', args, env, () => ({
         clipId,
         operations: [{ type: 'set_clip_disabled', clipId, disabled: requireBoolean(args, 'disabled') }],
@@ -706,7 +706,7 @@ export const SEQUENCE_MCP_TOOLS: readonly SequenceMcpToolDefinition[] = [
           {
             type: 'create_track',
             kind: requireEnum(args, 'kind', SEQUENCE_TRACK_KINDS),
-            name: requireString(args, 'name'),
+            name: requireMcpString(args, 'name'),
           },
         ],
       })),

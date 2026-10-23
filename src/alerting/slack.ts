@@ -1,57 +1,11 @@
 /**
- * `/alerting` — post an operational alert to Slack, and say honestly when it
- * did not arrive.
+ * Post operational alerts to Slack with an explicit delivery verdict.
  *
- * WHY THIS EXISTS: on 2026-08-06 an audit of every Slack credential the org
- * held found three of four dead — the fleet incoming webhook 404ing
- * (`no_service`), a second company webhook likewise, and the bot token
- * answering `account_inactive`. One ops webhook was still live. Nobody knew
- * which was which until each was tested by hand, and that is the actual
- * problem: the credentials were indistinguishable from where the code stood.
- *
- * This failure has already been paid for once, with numbers: in
- * `agent-container`, a revoked webhook let the CI healthcheck sit dead for
- * 18 days — 2,567 consecutive failures, 27 successes, zero alerts — because
- * fifteen call sites across six workflows posted with no body inspection and
- * then asserted delivery. That repo fixed the reporting (its `post-slack.sh`
- * confirms 2xx AND Slack's literal `ok` body, and fails closed otherwise) and
- * that half of the lesson is theirs, adopted here.
- *
- * What their fix cannot do, and this module can, is answer the question BEFORE
- * an alert needs to fire. A fail-closed post still only discovers a dead
- * credential at the moment a page is lost. That is the second half.
- *
- * Two design consequences, and they are the whole module:
- *
- * 1. **A bot token and `chat.postMessage` is the preferred transport; an
- *    incoming webhook is supported because one is usually what you already
- *    have.** A token reaches every channel (a webhook is bolted to one), is
- *    revocable and rotatable in place, and — the part that matters — is
- *    VERIFIABLE: `auth.test` answers whether the credential is alive without
- *    posting anything, which is what lets `/preflight` fail a deploy on a dead
- *    alerting channel instead of discovering it during an incident. A webhook
- *    can only be tested by posting to it, which is why the three dead
- *    credentials above went unnoticed. A token is never fallen back FROM: if
- *    one is configured and dead, delivering over a webhook instead would hide
- *    the very condition worth reporting.
- *
- * 2. **Slack answers `ok:false` under HTTP 200.** `invalid_auth`,
- *    `channel_not_found` and `not_in_channel` all arrive as a successful
- *    response with a failure inside it, so a status check reads a dead channel
- *    as a delivered page. The body is always parsed, and the outcome
- *    distinguishes a MISSING credential (configuration absent — not an
- *    incident) from a DEAD one (the alerting channel itself is broken — the
- *    loudest thing this module can report). A summary that calls those two the
- *    same thing is the defect wearing a different hat.
- *
- * The caller decides what to do with a non-delivery; this module never throws
- * on one, because an alerting path that can take down the thing it reports on
- * is worse than the outage it was watching for. It is also never the only
- * channel: a durable record (an issue, an audit row) is the caller's job, and
- * that is what survives the credential going dead again.
- *
- * Server-only: holds a bot token. This subpath must never reach a browser
- * bundle.
+ * Slack can return ok:false under HTTP 200, and revoked webhooks can return
+ * no_service. Inspect both status and body. A configured bot token remains
+ * authoritative: falling back to a webhook would hide a broken token.
+ * Transient failures retry within the caller's bound; credential and channel
+ * failures do not. The caller owns escalation and durable incident records.
  */
 
 const SLACK_API = 'https://slack.com/api'
@@ -379,74 +333,3 @@ const WEBHOOK_CREDENTIAL_ERRORS = new Set(['no_service', 'no_team', 'invalid_tok
 
 /** Webhook error tokens that mean the webhook is valid but its channel is not usable. */
 const WEBHOOK_CHANNEL_ERRORS = new Set(['channel_not_found', 'channel_is_archived', 'action_prohibited'])
-
-/** Define configuration options for verifying that a Slack bot token is live */
-export interface SlackCredentialCheckOptions {
-  token: string | undefined
-  /** Per-request deadline. Default 10s. */
-  timeoutMs?: number
-  /** Injection seam for tests; defaults to global `fetch`. */
-  fetchImpl?: typeof fetch
-}
-
-/** What `checkSlackCredential` concluded. `team`/`botId` are present only when live. */
-export type SlackCredentialVerdict =
-  | { live: true; team: string; botId: string }
-  | { live: false; reason: SlackFailureReason; detail: string }
-
-/**
- * Ask Slack whether the bot token is alive, WITHOUT posting anything.
- *
- * This is the check that was missing. An incoming webhook offers no equivalent
- * — the only way to test one is to post to it — which is how a revoked webhook
- * sat in a repo secret for months looking configured. Wire it into `/preflight`
- * so a dead alerting channel fails a deploy rather than an incident.
- */
-export async function checkSlackCredential(
-  options: SlackCredentialCheckOptions,
-): Promise<SlackCredentialVerdict> {
-  const token = options.token?.trim()
-  if (!token) {
-    return {
-      live: false,
-      reason: 'not-configured',
-      detail: 'no Slack bot token configured — set SLACK_BOT_TOKEN',
-    }
-  }
-  const fetchImpl = options.fetchImpl ?? fetch
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-  try {
-    const response = await fetchImpl(`${SLACK_API}/auth.test`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    })
-    const body = (await response.json()) as {
-      ok?: boolean
-      error?: string
-      team?: string
-      bot_id?: string
-    }
-    if (body.ok === true) {
-      return { live: true, team: body.team ?? 'unknown', botId: body.bot_id ?? 'unknown' }
-    }
-    const outcome = classifySlackError(body.error ?? `http_${response.status}`, '(auth.test)')
-    // `classifySlackError` is shaped for a post; auth.test only ever answers
-    // about the credential, so a non-credential code here still means the
-    // token cannot be used.
-    return {
-      live: false,
-      reason: outcome.reason === 'channel' ? 'credential' : outcome.reason,
-      detail: outcome.detail,
-    }
-  } catch (error) {
-    return {
-      live: false,
-      reason: 'transport',
-      detail: `could not reach Slack: ${error instanceof Error ? error.message : String(error)}`,
-    }
-  } finally {
-    clearTimeout(timer)
-  }
-}

@@ -29,7 +29,7 @@
  *   instead of passing with a note. One page load can't be paced from outside
  *   the page, so the exit code is the enforcement.
  */
-import type { Page } from 'playwright'
+import type { Page, Browser, BrowserContextOptions } from 'playwright'
 
 /** Chromium flags that stop prerender and speculative prefetch of linked pages. */
 export const QUIET_CHROMIUM_ARGS: readonly string[] = [
@@ -128,4 +128,16 @@ export function networkExitCode(count: NetworkCount | undefined): number {
 export function formatNetworkCount(count: NetworkCount): string {
   const line = `network: ${count.requests} requests, busiest 10 s ${count.peak10s} (budget ${REQUEST_BUDGET_PER_10S})`
   return isOverBudget(count) ? `FAIL ${line}: over the shared edge budget` : line
+}
+
+
+/** Every visual check installs its theme before opening a network-metered page. */
+export async function createMeteredBrowserPage(browser: Browser, options: BrowserContextOptions, meter: RequestMeter, themeScript?: string) {
+  const context = await browser.newContext(options)
+  if (themeScript) {
+    await context.addInitScript({ content: `(() => { const theme = ${JSON.stringify(options.colorScheme)}; ${themeScript} })()` })
+  }
+  const page = await context.newPage()
+  await meterPage(page, meter)
+  return { context, page }
 }

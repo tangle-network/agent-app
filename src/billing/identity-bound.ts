@@ -1,3 +1,4 @@
+import { createWorkspaceKeyLocks } from './identity-locks'
 import { assertWorkspaceKeyCryptoUsable } from './crypto-probe'
 import type { KeyCrypto, KeyProvisioner } from './index'
 
@@ -410,95 +411,188 @@ export function createIdentityBoundWorkspaceKeyManager(
   const now = options.now ?? (() => new Date())
   const isRemoteMissing = options.isRemoteMissing ?? defaultRemoteMissing
   const recoveryProvisioner = options.recoveryProvisioner ?? options.provisioner
-  const localLocks = new Map<string, Promise<void>>()
+  const { withLocalLock, withDurableLease } = createWorkspaceKeyLocks(leaseWaitMs, options, now, leaseMs, leasePollMs, leaseRenewIntervalMs, operationId, sleep)
 
-  async function withLocalLock<T>(scope: string, work: () => Promise<T>): Promise<T> {
-    const previous = localLocks.get(scope) ?? Promise.resolve()
-    let release!: () => void
-    const current = new Promise<void>((resolve) => { release = resolve })
-    localLocks.set(scope, current)
-    await previous
-    try {
-      return await work()
-    } finally {
-      release()
-      if (localLocks.get(scope) === current) localLocks.delete(scope)
+  const { revokePending, markPending, cleanupProvisioning, reconcileProvisioning } = createWorkspaceKeyRecovery(revocationRetryMaxMs, revocationRetryBaseMs, options, now, recoveryProvisioner, isRemoteMissing, product)
+
+  async function retryPendingRevocationsUnlocked(
+    scopeFilter?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
+    activeIdentity?: WorkspaceKeyIdentity,
+  ): Promise<{ completed: number; pending: number }> {
+    const rows = await options.store.listPendingRevocations({
+      product,
+      workspaceId: scopeFilter?.workspaceId,
+      ownerUserId: scopeFilter?.ownerUserId,
+      now: now(),
+      limit: PENDING_REVOCATION_BATCH_SIZE,
+    })
+    let completed = 0
+    let pending = 0
+    for (const row of rows) {
+      if (row.product !== product) continue
+      if (scopeFilter && (row.workspaceId !== scopeFilter.workspaceId || row.ownerUserId !== scopeFilter.ownerUserId)) continue
+      if (await revokePending(row, activeIdentity)) completed += 1
+      else pending += 1
+    }
+    return { completed, pending }
+  }
+
+  async function assertNoPendingRevocations(identity: WorkspaceKeyIdentity): Promise<void> {
+    const rows = await options.store.listPendingRevocations({
+      product,
+      workspaceId: identity.workspaceId,
+      ownerUserId: identity.ownerUserId,
+      now: now(),
+      limit: PENDING_REVOCATION_BATCH_SIZE,
+      includeFuture: true,
+    })
+    if (rows.some((row) => row.product === product
+      && row.workspaceId === identity.workspaceId
+      && row.ownerUserId === identity.ownerUserId)) {
+      throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
     }
   }
 
-  async function withDurableLease<T>(
-    scope: string,
-    work: () => Promise<T>,
-    onLeaseLost?: () => Promise<void>,
-  ): Promise<T> {
-    const leaseOperationId = operationId()
-    const startedAt = Date.now()
-    let acquired = false
-    while (!acquired && Date.now() - startedAt <= leaseWaitMs) {
-      acquired = await options.store.acquireLease(scope, leaseOperationId, now(), leaseMs)
-      if (!acquired) await sleep(leasePollMs)
+  async function retryPendingRevocations(
+    scopeInput?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
+    identityInput?: WorkspaceKeyIdentity,
+  ): Promise<number> {
+    const identity = identityInput ? normalizeIdentity(identityInput) : undefined
+    if (identity && scopeInput
+      && (identity.workspaceId !== scopeInput.workspaceId || identity.ownerUserId !== scopeInput.ownerUserId)) {
+      throw new Error('workspace child key retry identity does not match its scope')
     }
-    if (!acquired) throw new Error('workspace child-key issuance is busy; retry the request')
-
-    let stopped = false
-    let leaseLost: Error | null = null
-    let leaseTimer: ReturnType<typeof setTimeout> | undefined
-    let renewalPromise: Promise<void> | undefined
-    const scheduleRenewal = () => {
-      if (stopped || leaseLost) return
-      leaseTimer = setTimeout(() => {
-        leaseTimer = undefined
-        const renewal = (async () => {
-          try {
-            if (!await options.store.renewLease(scope, leaseOperationId, now(), leaseMs)) {
-              leaseLost = new Error('workspace child-key lease was lost during reconciliation')
-              return
-            }
-            scheduleRenewal()
-          } catch (error) {
-            leaseLost = error instanceof Error ? error : new Error('workspace child-key lease renewal failed')
-          }
-        })()
-        renewalPromise = renewal
-        void renewal.finally(() => {
-          if (renewalPromise === renewal) renewalPromise = undefined
-        }).catch(() => undefined)
-      }, leaseRenewIntervalMs)
+    if (scopeInput) {
+      const workspaceId = scopeInput.workspaceId.trim()
+      const ownerUserId = scopeInput.ownerUserId.trim()
+      if (!workspaceId || !ownerUserId) throw new Error('workspace child key retry scope is incomplete')
+      const scope = scopeKey({ workspaceId, ownerUserId, product })
+      return withLocalLock(scope, () => withDurableLease(scope, async () => (
+        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId }, identity)).completed))
     }
-    scheduleRenewal()
 
-    let workError: unknown
-    let leaseLossCleanupError: unknown
+    if (identity) {
+      const scope = scopeKey(scopeFor(identity, product))
+      return withLocalLock(scope, () => withDurableLease(scope, async () => (
+        await retryPendingRevocationsUnlocked({ workspaceId: identity.workspaceId, ownerUserId: identity.ownerUserId }, identity)).completed))
+    }
+
+    const rows = await options.store.listPendingRevocations({ product, now: now(), limit: PENDING_REVOCATION_BATCH_SIZE })
+    let completed = 0
+    const scopes = new Set<string>()
+    for (const row of rows) {
+      if (row.product !== product) continue
+      const scope = scopeKey({ workspaceId: row.workspaceId, ownerUserId: row.ownerUserId, product })
+      if (scopes.has(scope)) continue
+      scopes.add(scope)
+      completed += await withLocalLock(scope, () => withDurableLease(scope, async () => (await retryPendingRevocationsUnlocked({
+        workspaceId: row.workspaceId,
+        ownerUserId: row.ownerUserId,
+      })).completed))
+    }
+    return completed
+  }
+
+  async function readActive(identity: WorkspaceKeyIdentity): Promise<{ row: DurableWorkspaceKeyRecord; usage: WorkspaceKeyUsage } | null> {
+    const row = await options.store.getActive(scopeFor(identity, product))
+    if (!row) return null
+    if (!sameIdentity(row, identity, product)) {
+      await options.store.markRevocationPending({
+        id: row.id,
+        error: 'active child key identity does not match the authenticated owner and source',
+        nextAttemptAt: now(),
+        incrementAttempts: false,
+      })
+      return null
+    }
+
+    let remote: Awaited<ReturnType<DurableWorkspaceKeyProvisioner['getKey']>>
     try {
-      const result = await work()
-      if (leaseLost) throw leaseLost
-      return result
+      remote = await recoveryProvisioner.getKey(row.keyId)
     } catch (error) {
-      workError = error
+      if (isRemoteMissing(error)) {
+        await options.store.markRevoked(row.id, now())
+        return null
+      }
       throw error
-    } finally {
-      stopped = true
-      if (leaseTimer) clearTimeout(leaseTimer)
-      if (renewalPromise) await renewalPromise
-      if (leaseLost && onLeaseLost) {
-        try {
-          await onLeaseLost()
-        } catch (error) {
-          leaseLossCleanupError = error
-        }
-      }
-      try {
-        await options.store.releaseLease(scope, leaseOperationId)
-      } catch (error) {
-        if (workError === undefined) throw error
-      }
-      if (workError === undefined && leaseLossCleanupError) {
-        throw new Error('workspace child-key lease was lost and cleanup failed', { cause: leaseLossCleanupError })
-      }
-      if (workError === undefined && leaseLost) throw leaseLost
     }
+    const usage = usageFromRemote(row, remote, now())
+    if (usage.exhausted) {
+      await options.store.markRevocationPending({
+        id: row.id,
+        error: 'active child key is expired or exhausted',
+        nextAttemptAt: now(),
+        incrementAttempts: false,
+      })
+      return null
+    }
+    return { row, usage }
   }
 
+  const { mint } = createWorkspaceKeyMinter(options, now, keyLifetimeMs, product, markPending, cleanupProvisioning, revokePending)
+
+  async function ensureKey(identityInput: WorkspaceKeyIdentity, keyOptions?: { budgetUsd?: number }): Promise<WorkspaceRuntimeKey> {
+    const identity = normalizeIdentity(identityInput)
+    const budgetUsd = keyOptions?.budgetUsd ?? defaultBudgetUsd
+    requirePositive(budgetUsd, 'budgetUsd')
+    const scope = scopeKey(scopeFor(identity, product))
+    let mintedRemote: { row: DurableWorkspaceKeyProvisioningRecord; remoteId: string } | null = null
+    return withLocalLock(scope, () => withDurableLease(scope, async () => {
+      const initialCleanup = await retryPendingRevocationsUnlocked(identity, identity)
+      if (initialCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
+      await reconcileProvisioning(identity)
+      const active = await readActive(identity)
+      if (active) {
+        const key = await options.crypto.decrypt(active.row.keyEncrypted)
+        if (!key.trim()) throw new Error('workspace child key secret is empty')
+        // The decrypt is awaited after the expiry check; a key that expired meanwhile is never handed out.
+        if (Date.parse(active.usage.expiresAt) > now().getTime()) return { key, usage: active.usage, refreshed: false }
+        await options.store.markRevocationPending({
+          id: active.row.id,
+          error: 'active child key expired while it was read',
+          nextAttemptAt: now(),
+          incrementAttempts: false,
+        })
+      }
+      const finalCleanup = await retryPendingRevocationsUnlocked(identity, identity)
+      if (finalCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
+      await assertNoPendingRevocations(identity)
+      return mint(identity, budgetUsd, (row, remoteId) => {
+        mintedRemote = { row, remoteId }
+      })
+    }, async () => {
+      const remote = mintedRemote
+      if (!remote) return
+      const cleaned = await revokePending({
+        ...remote.row,
+        keyId: remote.remoteId,
+        status: 'revocation_pending',
+      }, identity)
+      if (!cleaned) throw new Error('lease-loss child-key cleanup is pending')
+    }))
+  }
+
+  async function getUsage(identityInput: WorkspaceKeyIdentity): Promise<WorkspaceKeyUsage | null> {
+    const identity = normalizeIdentity(identityInput)
+    const scope = scopeKey(scopeFor(identity, product))
+    return withLocalLock(scope, () => withDurableLease(scope, async () => {
+      const active = await readActive(identity)
+      return active?.usage ?? null
+    }))
+  }
+
+  return { ensureKey, getUsage, retryPendingRevocations }
+}
+
+function createWorkspaceKeyRecovery(
+  revocationRetryMaxMs: ReturnType<typeof requirePositive>,
+  revocationRetryBaseMs: ReturnType<typeof requirePositive>,
+  options: DurableWorkspaceKeyManagerOptions,
+  now: () => Date,
+  recoveryProvisioner: Pick<DurableWorkspaceKeyProvisioner, "getKey" | "revokeKey" | "findCreatedKeys">,
+  isRemoteMissing: (error: unknown) => boolean,
+  product: string,
+) {
   function retryDelay(attempts: number): number {
     return Math.min(revocationRetryMaxMs, revocationRetryBaseMs * 2 ** Math.min(Math.max(attempts - 1, 0), 5))
   }
@@ -660,121 +754,18 @@ export function createIdentityBoundWorkspaceKeyManager(
       }
     }
   }
+  return { revokePending, markPending, cleanupProvisioning, reconcileProvisioning }
+}
 
-  async function retryPendingRevocationsUnlocked(
-    scopeFilter?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
-    activeIdentity?: WorkspaceKeyIdentity,
-  ): Promise<{ completed: number; pending: number }> {
-    const rows = await options.store.listPendingRevocations({
-      product,
-      workspaceId: scopeFilter?.workspaceId,
-      ownerUserId: scopeFilter?.ownerUserId,
-      now: now(),
-      limit: PENDING_REVOCATION_BATCH_SIZE,
-    })
-    let completed = 0
-    let pending = 0
-    for (const row of rows) {
-      if (row.product !== product) continue
-      if (scopeFilter && (row.workspaceId !== scopeFilter.workspaceId || row.ownerUserId !== scopeFilter.ownerUserId)) continue
-      if (await revokePending(row, activeIdentity)) completed += 1
-      else pending += 1
-    }
-    return { completed, pending }
-  }
-
-  async function assertNoPendingRevocations(identity: WorkspaceKeyIdentity): Promise<void> {
-    const rows = await options.store.listPendingRevocations({
-      product,
-      workspaceId: identity.workspaceId,
-      ownerUserId: identity.ownerUserId,
-      now: now(),
-      limit: PENDING_REVOCATION_BATCH_SIZE,
-      includeFuture: true,
-    })
-    if (rows.some((row) => row.product === product
-      && row.workspaceId === identity.workspaceId
-      && row.ownerUserId === identity.ownerUserId)) {
-      throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
-    }
-  }
-
-  async function retryPendingRevocations(
-    scopeInput?: Pick<WorkspaceKeyIdentity, 'ownerUserId' | 'workspaceId'>,
-    identityInput?: WorkspaceKeyIdentity,
-  ): Promise<number> {
-    const identity = identityInput ? normalizeIdentity(identityInput) : undefined
-    if (identity && scopeInput
-      && (identity.workspaceId !== scopeInput.workspaceId || identity.ownerUserId !== scopeInput.ownerUserId)) {
-      throw new Error('workspace child key retry identity does not match its scope')
-    }
-    if (scopeInput) {
-      const workspaceId = scopeInput.workspaceId.trim()
-      const ownerUserId = scopeInput.ownerUserId.trim()
-      if (!workspaceId || !ownerUserId) throw new Error('workspace child key retry scope is incomplete')
-      const scope = scopeKey({ workspaceId, ownerUserId, product })
-      return withLocalLock(scope, () => withDurableLease(scope, async () => (
-        await retryPendingRevocationsUnlocked({ workspaceId, ownerUserId }, identity)).completed))
-    }
-
-    if (identity) {
-      const scope = scopeKey(scopeFor(identity, product))
-      return withLocalLock(scope, () => withDurableLease(scope, async () => (
-        await retryPendingRevocationsUnlocked({ workspaceId: identity.workspaceId, ownerUserId: identity.ownerUserId }, identity)).completed))
-    }
-
-    const rows = await options.store.listPendingRevocations({ product, now: now(), limit: PENDING_REVOCATION_BATCH_SIZE })
-    let completed = 0
-    const scopes = new Set<string>()
-    for (const row of rows) {
-      if (row.product !== product) continue
-      const scope = scopeKey({ workspaceId: row.workspaceId, ownerUserId: row.ownerUserId, product })
-      if (scopes.has(scope)) continue
-      scopes.add(scope)
-      completed += await withLocalLock(scope, () => withDurableLease(scope, async () => (await retryPendingRevocationsUnlocked({
-        workspaceId: row.workspaceId,
-        ownerUserId: row.ownerUserId,
-      })).completed))
-    }
-    return completed
-  }
-
-  async function readActive(identity: WorkspaceKeyIdentity): Promise<{ row: DurableWorkspaceKeyRecord; usage: WorkspaceKeyUsage } | null> {
-    const row = await options.store.getActive(scopeFor(identity, product))
-    if (!row) return null
-    if (!sameIdentity(row, identity, product)) {
-      await options.store.markRevocationPending({
-        id: row.id,
-        error: 'active child key identity does not match the authenticated owner and source',
-        nextAttemptAt: now(),
-        incrementAttempts: false,
-      })
-      return null
-    }
-
-    let remote: Awaited<ReturnType<DurableWorkspaceKeyProvisioner['getKey']>>
-    try {
-      remote = await recoveryProvisioner.getKey(row.keyId)
-    } catch (error) {
-      if (isRemoteMissing(error)) {
-        await options.store.markRevoked(row.id, now())
-        return null
-      }
-      throw error
-    }
-    const usage = usageFromRemote(row, remote, now())
-    if (usage.exhausted) {
-      await options.store.markRevocationPending({
-        id: row.id,
-        error: 'active child key is expired or exhausted',
-        nextAttemptAt: now(),
-        incrementAttempts: false,
-      })
-      return null
-    }
-    return { row, usage }
-  }
-
+function createWorkspaceKeyMinter(
+  options: DurableWorkspaceKeyManagerOptions,
+  now: () => Date,
+  keyLifetimeMs: ReturnType<typeof requirePositive>,
+  product: string,
+  markPending: ReturnType<typeof createWorkspaceKeyRecovery>['markPending'],
+  cleanupProvisioning: ReturnType<typeof createWorkspaceKeyRecovery>['cleanupProvisioning'],
+  revokePending: ReturnType<typeof createWorkspaceKeyRecovery>['revokePending'],
+) {
   async function mint(
     identity: WorkspaceKeyIdentity,
     budgetUsd: number,
@@ -928,56 +919,5 @@ export function createIdentityBoundWorkspaceKeyManager(
     }, now())
     return { key: secret, usage, refreshed: true }
   }
-
-  async function ensureKey(identityInput: WorkspaceKeyIdentity, keyOptions?: { budgetUsd?: number }): Promise<WorkspaceRuntimeKey> {
-    const identity = normalizeIdentity(identityInput)
-    const budgetUsd = keyOptions?.budgetUsd ?? defaultBudgetUsd
-    requirePositive(budgetUsd, 'budgetUsd')
-    const scope = scopeKey(scopeFor(identity, product))
-    let mintedRemote: { row: DurableWorkspaceKeyProvisioningRecord; remoteId: string } | null = null
-    return withLocalLock(scope, () => withDurableLease(scope, async () => {
-      const initialCleanup = await retryPendingRevocationsUnlocked(identity, identity)
-      if (initialCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
-      await reconcileProvisioning(identity)
-      const active = await readActive(identity)
-      if (active) {
-        const key = await options.crypto.decrypt(active.row.keyEncrypted)
-        if (!key.trim()) throw new Error('workspace child key secret is empty')
-        // The decrypt is awaited after the expiry check; a key that expired meanwhile is never handed out.
-        if (Date.parse(active.usage.expiresAt) > now().getTime()) return { key, usage: active.usage, refreshed: false }
-        await options.store.markRevocationPending({
-          id: active.row.id,
-          error: 'active child key expired while it was read',
-          nextAttemptAt: now(),
-          incrementAttempts: false,
-        })
-      }
-      const finalCleanup = await retryPendingRevocationsUnlocked(identity, identity)
-      if (finalCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
-      await assertNoPendingRevocations(identity)
-      return mint(identity, budgetUsd, (row, remoteId) => {
-        mintedRemote = { row, remoteId }
-      })
-    }, async () => {
-      const remote = mintedRemote
-      if (!remote) return
-      const cleaned = await revokePending({
-        ...remote.row,
-        keyId: remote.remoteId,
-        status: 'revocation_pending',
-      }, identity)
-      if (!cleaned) throw new Error('lease-loss child-key cleanup is pending')
-    }))
-  }
-
-  async function getUsage(identityInput: WorkspaceKeyIdentity): Promise<WorkspaceKeyUsage | null> {
-    const identity = normalizeIdentity(identityInput)
-    const scope = scopeKey(scopeFor(identity, product))
-    return withLocalLock(scope, () => withDurableLease(scope, async () => {
-      const active = await readActive(identity)
-      return active?.usage ?? null
-    }))
-  }
-
-  return { ensureKey, getUsage, retryPendingRevocations }
+  return { mint }
 }

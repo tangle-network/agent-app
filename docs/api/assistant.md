@@ -139,7 +139,7 @@ interface AssistantPageContext
 `function`
 
 ```ts
-({ chat, userId, onClose, layout, context, toggleRef, navigate, balanceUsd, formatMoney, renderGraph, renderProviderIco…
+(props: AssistantPanelProps) => Element
 ```
 
 ### `AssistantPanelLayout`

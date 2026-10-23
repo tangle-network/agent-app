@@ -15,7 +15,7 @@
  * proposals stay proposals.
  */
 
-import { agentSurfaces } from './agent-surfaces'
+import { headlessAgentSurfaces } from './agent-surfaces'
 import { config } from '../agent.config'
 import { createAgentApp, type AppBindings } from './agent-app'
 import {
@@ -72,9 +72,9 @@ function buildSystemPrompt(): string {
 export interface HeadlessAuth {
   authenticate(request: Request, env: AppBindings): Promise<AppToolContext | null>
 }
-export function createWorker(auth?: HeadlessAuth) { return {
+export function createHeadlessWorker(auth?: HeadlessAuth) { return {
   async fetch(request: Request, env: AppBindings): Promise<Response> {
-    const surface = agentSurfaces(new URL(request.url).origin).handle(request)
+    const surface = headlessAgentSurfaces(new URL(request.url).origin).handle(request)
     if (surface) return surface
     const url = new URL(request.url)
     if (url.pathname !== '/chat' || request.method !== 'POST') {
@@ -124,4 +124,4 @@ export function createWorker(auth?: HeadlessAuth) { return {
   },
 } }
 
-export default createWorker()
+export default createHeadlessWorker()

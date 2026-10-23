@@ -163,7 +163,7 @@ interface ReviewRecordEntryInput
 `function` — Project a stored row onto the slice the pure fold reads.
 
 ```ts
-(row: { path: string; id: string; createdAt: number; seq: number; dimension: string; period: number; conflict: boolean;…
+(row: { id: string; createdAt: number; path: string; seq: number; dimension: string; period: number; conflict: boolean;…
 ```
 
 ### `WriteRecordEntryInput`

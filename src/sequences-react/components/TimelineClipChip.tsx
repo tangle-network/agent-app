@@ -132,8 +132,7 @@ function sourceDurationFrames(clip: SequenceClip, fps: number): number | undefin
   if (clip.media?.durationSeconds !== undefined) return Math.round(clip.media.durationSeconds * fps)
   return undefined
 }
-
-export function TimelineClipChip(props: TimelineClipChipProps) {
+function useTimelineClipChipViewState(props: TimelineClipChipProps) {
   const { clip, track, fps, zoom, selected, canWrite, tabbable, frameProvider } = props
   const rootRef = useRef<HTMLDivElement | null>(null)
   const gestureRef = useRef<GestureState | null>(null)
@@ -155,6 +154,267 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
   }
   const geometry = clipChipGeometry({ startFrame: shown.startFrame, durationFrames: shown.durationFrames, zoom })
   const interactive = canWrite && !track.locked
+  const { collectLaneTargets, beginGesture, applyPreview, updateGesture, endGestureCleanup,
+    finishGesture } = createClipGestureHandlers({ rootRef, track, interactive, editingText, gestureRef,
+    clip, previewRef, setPreview, zoom, props, fps })
+
+  // Escape abandons the gesture: pre-drag state restores, nothing emits.
+  useEffect(() => {
+    if (!preview) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      endGestureCleanup()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // endGestureCleanup is stable in behavior; preview presence gates the listener.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview !== null])
+
+  // -------------------------------------------------------------------------
+  // Media previews (poster frame / waveform)
+  // -------------------------------------------------------------------------
+
+  const mediaUrl = clip.media?.url
+  const mediaKind = clip.media?.kind
+  const isVisualMedia = mediaKind === 'video' || mediaKind === 'image'
+  const isAudioMedia = mediaKind === 'audio'
+
+  useEffect(() => {
+    const canvas = posterRef.current
+    if (!canvas || !mediaUrl || !isVisualMedia) return
+    const ctx = canvas.getContext('2d')
+    // Canvas 2D is unavailable in non-browser test environments; the chip
+    // still lays out, only the poster paint is skipped.
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    const cssWidth = canvas.clientWidth || 40
+    const cssHeight = canvas.clientHeight || 40
+    canvas.width = Math.round(cssWidth * dpr)
+    canvas.height = Math.round(cssHeight * dpr)
+    ctx.scale(dpr, dpr)
+    let cancelled = false
+    frameProvider
+      .drawFrame(mediaUrl, clip.sourceInFrame / fps, ctx, { x: 0, y: 0, width: cssWidth, height: cssHeight })
+      .catch(() => {
+        // A failed poster leaves the chip's base tone; the same failure
+        // surfaces loudly in the preview canvas where it blocks real work.
+        if (!cancelled) canvas.dataset.posterError = 'true'
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mediaUrl, isVisualMedia, clip.sourceInFrame, fps, frameProvider])
+
+  useEffect(() => {
+    const canvas = waveformRef.current
+    if (!canvas || !mediaUrl || !isAudioMedia) return
+    let pending = waveformCache.get(clip.id)
+    if (!pending) {
+      pending = loadWaveform(mediaUrl, WAVEFORM_BUCKETS)
+      pending.catch(() => waveformCache.delete(clip.id))
+      waveformCache.set(clip.id, pending)
+    }
+    let cancelled = false
+    pending
+      .then((data) => {
+        if (cancelled) return
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        const dpr = window.devicePixelRatio || 1
+        const cssWidth = canvas.clientWidth || 1
+        const cssHeight = canvas.clientHeight || 1
+        canvas.width = Math.round(cssWidth * dpr)
+        canvas.height = Math.round(cssHeight * dpr)
+        ctx.scale(dpr, dpr)
+        // Paint only the source window this clip plays.
+        const bucketsPerSecond = data.peaks.length / data.durationSeconds
+        const fromBucket = Math.floor((shown.sourceInFrame / fps) * bucketsPerSecond)
+        const toBucket = Math.ceil(((shown.sourceInFrame + shown.durationFrames) / fps) * bucketsPerSecond)
+        const peaks = data.peaks.subarray(Math.max(0, fromBucket), Math.min(data.peaks.length, Math.max(fromBucket + 1, toBucket)))
+        if (peaks.length === 0) return
+        drawWaveform(
+          ctx,
+          { peaks, samplesPerBucket: data.samplesPerBucket, durationSeconds: data.durationSeconds },
+          { x: 0, y: 0, width: cssWidth, height: cssHeight },
+          'rgba(52, 211, 153, 0.75)',
+        )
+      })
+      .catch(() => {
+        if (!cancelled) canvas.dataset.waveformError = 'true'
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [mediaUrl, isAudioMedia, clip.id, fps, shown.sourceInFrame, shown.durationFrames, geometry.width])
+
+  // -------------------------------------------------------------------------
+  // Caption text editing
+  // -------------------------------------------------------------------------
+
+  function commitText() {
+    if (editingText === null) return
+    const next = editingText.trim()
+    setEditingText(null)
+    if (next.length === 0 || next === clip.text) return
+    props.onCommitText({ clipId: clip.id, text: next })
+  }
+
+  const isCaption = track.kind === 'caption'
+  const dragging = preview !== null
+
+  // Keyboard parity with the pointer gestures: the chip is a roving-tabindex
+  // button — Enter/Space selects (Shift for additive, mirroring shift-click),
+  // Delete/Backspace removes it through the editor's locked-track guard, and
+  // Arrow keys walk focus across the chip set. Frame stepping and clip nudging
+  // are the editor's keydown (they need the playhead clock + command stack).
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (editingText !== null) return
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault()
+      event.stopPropagation()
+      props.onSelect(clip.id, event.shiftKey)
+      return
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (!interactive) return
+      event.preventDefault()
+      event.stopPropagation()
+      props.onRequestDelete(clip.id)
+      return
+    }
+    // Plain Arrow walks focus across the chip set (roving tabindex). Alt+Arrow
+    // is reserved for clip nudge and falls through to the editor's keydown.
+    if (event.altKey) return
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      props.onFocusStep(clip.id, -1)
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      props.onFocusStep(clip.id, 1)
+    }
+  }
+  return { rootRef, clip, selected, tabbable, handleKeyDown, track, dragging, interactive,
+    geometry, shown, beginGesture, updateGesture, finishGesture, endGestureCleanup, isCaption,
+    setEditingText, isAudioMedia, waveformRef, isVisualMedia, posterRef, fps, editingText, commitText }
+}
+
+type TimelineClipChipViewState = ReturnType<typeof useTimelineClipChipViewState>
+
+export function TimelineClipChip(props: TimelineClipChipProps) {
+  const view = useTimelineClipChipViewState(props)
+  return <TimelineClipChipView {...view} />
+}
+
+function TimelineClipChipView({ rootRef, clip, selected, tabbable, handleKeyDown, track, dragging,
+  interactive, geometry, shown, beginGesture, updateGesture, finishGesture, endGestureCleanup,
+  isCaption, setEditingText, isAudioMedia, waveformRef, isVisualMedia, posterRef, fps, editingText, commitText }: TimelineClipChipViewState) {
+  return ((
+    <div
+      ref={rootRef}
+      data-clip-id={clip.id}
+      role="button"
+      aria-pressed={selected}
+      aria-label={clip.label}
+      tabIndex={tabbable ? 0 : -1}
+      onKeyDown={handleKeyDown}
+      title={clip.label}
+      // No `outline-none` here: the chip's `ring-2` is its SELECTED state, not
+      // its focused state, so suppressing the floor would leave an unselected
+      // chip with nothing at all under keyboard focus.
+      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none ${KIND_TONES[track.kind]} ${
+        selected ? 'ring-2 ring-[var(--brand-primary)]' : 'hover:ring-1 hover:ring-[var(--text-muted)]'
+      } ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
+        interactive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+      }`}
+      style={{
+        left: `${geometry.left}px`,
+        width: `${geometry.width}px`,
+        transform: shown.translateY !== 0 ? `translateY(${shown.translateY}px)` : undefined,
+        // own the touch gesture so move/trim drags don't trigger lane scroll
+        touchAction: 'none',
+      }}
+      onPointerDown={(event) => beginGesture(event, 'move')}
+      onPointerMove={updateGesture}
+      onPointerUp={finishGesture}
+      onPointerCancel={endGestureCleanup}
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        event.stopPropagation()
+        if (isCaption && interactive && typeof clip.text === 'string') setEditingText(clip.text)
+      }}
+    >
+      {isAudioMedia ? <canvas ref={waveformRef} className="absolute inset-0 h-full w-full" /> : null}
+
+      <div className="relative flex h-full min-w-0 items-stretch gap-1.5 px-1.5 py-1">
+        {isVisualMedia ? (
+          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-medium leading-4 text-[var(--text-primary)]">
+            {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
+          </div>
+          <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
+            {formatTimecode(shown.durationFrames, fps)}
+          </span>
+        </div>
+      </div>
+
+      {editingText !== null ? (
+        <input
+          autoFocus
+          value={editingText}
+          onChange={(event) => setEditingText(event.target.value)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commitText()
+            if (event.key === 'Escape') setEditingText(null)
+            event.stopPropagation()
+          }}
+          onBlur={commitText}
+          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-xs text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
+          aria-label="Caption text"
+        />
+      ) : null}
+
+      {interactive ? (
+        <>
+          <span
+            data-trim-handle="start"
+            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
+            onPointerDown={(event) => beginGesture(event, 'trim-start')}
+            onPointerMove={updateGesture}
+            onPointerUp={finishGesture}
+            onPointerCancel={endGestureCleanup}
+            aria-hidden
+          />
+          <span
+            data-trim-handle="end"
+            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
+            onPointerDown={(event) => beginGesture(event, 'trim-end')}
+            onPointerMove={updateGesture}
+            onPointerUp={finishGesture}
+            onPointerCancel={endGestureCleanup}
+            aria-hidden
+          />
+        </>
+      ) : null}
+    </div>
+  ))
+}
+
+
+
+
+function createClipGestureHandlers({ rootRef, track, interactive, editingText, gestureRef, clip,
+  previewRef, setPreview, zoom, props, fps }: { rootRef: { current: HTMLDivElement | null };
+  track: TimelineClipChipProps['track']; interactive: boolean; editingText: string | null;
+  gestureRef: { current: GestureState | null }; clip: TimelineClipChipProps['clip'];
+  previewRef: { current: GesturePreview | null };
+  setPreview: (preview: GesturePreview | null) => void; zoom: number; props: TimelineClipChipProps; fps: number }) {
 
   // -------------------------------------------------------------------------
   // Gestures
@@ -318,237 +578,5 @@ export function TimelineClipChip(props: TimelineClipChipProps) {
       sourceInFrame: finalPreview.sourceInFrame,
     })
   }
-
-  // Escape abandons the gesture: pre-drag state restores, nothing emits.
-  useEffect(() => {
-    if (!preview) return
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      endGestureCleanup()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-    // endGestureCleanup is stable in behavior; preview presence gates the listener.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preview !== null])
-
-  // -------------------------------------------------------------------------
-  // Media previews (poster frame / waveform)
-  // -------------------------------------------------------------------------
-
-  const mediaUrl = clip.media?.url
-  const mediaKind = clip.media?.kind
-  const isVisualMedia = mediaKind === 'video' || mediaKind === 'image'
-  const isAudioMedia = mediaKind === 'audio'
-
-  useEffect(() => {
-    const canvas = posterRef.current
-    if (!canvas || !mediaUrl || !isVisualMedia) return
-    const ctx = canvas.getContext('2d')
-    // Canvas 2D is unavailable in non-browser test environments; the chip
-    // still lays out, only the poster paint is skipped.
-    if (!ctx) return
-    const dpr = window.devicePixelRatio || 1
-    const cssWidth = canvas.clientWidth || 40
-    const cssHeight = canvas.clientHeight || 40
-    canvas.width = Math.round(cssWidth * dpr)
-    canvas.height = Math.round(cssHeight * dpr)
-    ctx.scale(dpr, dpr)
-    let cancelled = false
-    frameProvider
-      .drawFrame(mediaUrl, clip.sourceInFrame / fps, ctx, { x: 0, y: 0, width: cssWidth, height: cssHeight })
-      .catch(() => {
-        // A failed poster leaves the chip's base tone; the same failure
-        // surfaces loudly in the preview canvas where it blocks real work.
-        if (!cancelled) canvas.dataset.posterError = 'true'
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mediaUrl, isVisualMedia, clip.sourceInFrame, fps, frameProvider])
-
-  useEffect(() => {
-    const canvas = waveformRef.current
-    if (!canvas || !mediaUrl || !isAudioMedia) return
-    let pending = waveformCache.get(clip.id)
-    if (!pending) {
-      pending = loadWaveform(mediaUrl, WAVEFORM_BUCKETS)
-      pending.catch(() => waveformCache.delete(clip.id))
-      waveformCache.set(clip.id, pending)
-    }
-    let cancelled = false
-    pending
-      .then((data) => {
-        if (cancelled) return
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        const dpr = window.devicePixelRatio || 1
-        const cssWidth = canvas.clientWidth || 1
-        const cssHeight = canvas.clientHeight || 1
-        canvas.width = Math.round(cssWidth * dpr)
-        canvas.height = Math.round(cssHeight * dpr)
-        ctx.scale(dpr, dpr)
-        // Paint only the source window this clip plays.
-        const bucketsPerSecond = data.peaks.length / data.durationSeconds
-        const fromBucket = Math.floor((shown.sourceInFrame / fps) * bucketsPerSecond)
-        const toBucket = Math.ceil(((shown.sourceInFrame + shown.durationFrames) / fps) * bucketsPerSecond)
-        const peaks = data.peaks.subarray(Math.max(0, fromBucket), Math.min(data.peaks.length, Math.max(fromBucket + 1, toBucket)))
-        if (peaks.length === 0) return
-        drawWaveform(
-          ctx,
-          { peaks, samplesPerBucket: data.samplesPerBucket, durationSeconds: data.durationSeconds },
-          { x: 0, y: 0, width: cssWidth, height: cssHeight },
-          'rgba(52, 211, 153, 0.75)',
-        )
-      })
-      .catch(() => {
-        if (!cancelled) canvas.dataset.waveformError = 'true'
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [mediaUrl, isAudioMedia, clip.id, fps, shown.sourceInFrame, shown.durationFrames, geometry.width])
-
-  // -------------------------------------------------------------------------
-  // Caption text editing
-  // -------------------------------------------------------------------------
-
-  function commitText() {
-    if (editingText === null) return
-    const next = editingText.trim()
-    setEditingText(null)
-    if (next.length === 0 || next === clip.text) return
-    props.onCommitText({ clipId: clip.id, text: next })
-  }
-
-  const isCaption = track.kind === 'caption'
-  const dragging = preview !== null
-
-  // Keyboard parity with the pointer gestures: the chip is a roving-tabindex
-  // button — Enter/Space selects (Shift for additive, mirroring shift-click),
-  // Delete/Backspace removes it through the editor's locked-track guard, and
-  // Arrow keys walk focus across the chip set. Frame stepping and clip nudging
-  // are the editor's keydown (they need the playhead clock + command stack).
-  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
-    if (editingText !== null) return
-    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
-      event.preventDefault()
-      event.stopPropagation()
-      props.onSelect(clip.id, event.shiftKey)
-      return
-    }
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (!interactive) return
-      event.preventDefault()
-      event.stopPropagation()
-      props.onRequestDelete(clip.id)
-      return
-    }
-    // Plain Arrow walks focus across the chip set (roving tabindex). Alt+Arrow
-    // is reserved for clip nudge and falls through to the editor's keydown.
-    if (event.altKey) return
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      props.onFocusStep(clip.id, -1)
-      return
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      props.onFocusStep(clip.id, 1)
-    }
-  }
-
-  return (
-    <div
-      ref={rootRef}
-      data-clip-id={clip.id}
-      role="button"
-      aria-pressed={selected}
-      aria-label={clip.label}
-      tabIndex={tabbable ? 0 : -1}
-      onKeyDown={handleKeyDown}
-      title={clip.label}
-      // No `outline-none` here: the chip's `ring-2` is its SELECTED state, not
-      // its focused state, so suppressing the floor would leave an unselected
-      // chip with nothing at all under keyboard focus.
-      className={`group absolute bottom-1 top-1 overflow-hidden rounded border text-left select-none ${KIND_TONES[track.kind]} ${
-        selected ? 'ring-2 ring-[var(--brand-primary)]' : 'hover:ring-1 hover:ring-[var(--text-muted)]'
-      } ${clip.disabled ? 'opacity-40' : ''} ${dragging ? 'z-30 shadow-lg shadow-black/30' : ''} ${
-        interactive ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
-      }`}
-      style={{
-        left: `${geometry.left}px`,
-        width: `${geometry.width}px`,
-        transform: shown.translateY !== 0 ? `translateY(${shown.translateY}px)` : undefined,
-        // own the touch gesture so move/trim drags don't trigger lane scroll
-        touchAction: 'none',
-      }}
-      onPointerDown={(event) => beginGesture(event, 'move')}
-      onPointerMove={updateGesture}
-      onPointerUp={finishGesture}
-      onPointerCancel={endGestureCleanup}
-      onClick={(event) => event.stopPropagation()}
-      onDoubleClick={(event) => {
-        event.stopPropagation()
-        if (isCaption && interactive && typeof clip.text === 'string') setEditingText(clip.text)
-      }}
-    >
-      {isAudioMedia ? <canvas ref={waveformRef} className="absolute inset-0 h-full w-full" /> : null}
-
-      <div className="relative flex h-full min-w-0 items-stretch gap-1.5 px-1.5 py-1">
-        {isVisualMedia ? (
-          <canvas ref={posterRef} className="h-full w-10 shrink-0 rounded-sm bg-black object-cover" />
-        ) : null}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium leading-4 text-[var(--text-primary)]">
-            {isCaption && typeof clip.text === 'string' ? clip.text : clip.label}
-          </div>
-          <span className="mt-0.5 inline-block rounded bg-[hsl(var(--background))] px-1 font-mono text-[9px] leading-3 text-[var(--text-secondary)]">
-            {formatTimecode(shown.durationFrames, fps)}
-          </span>
-        </div>
-      </div>
-
-      {editingText !== null ? (
-        <input
-          autoFocus
-          value={editingText}
-          onChange={(event) => setEditingText(event.target.value)}
-          onPointerDown={(event) => event.stopPropagation()}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commitText()
-            if (event.key === 'Escape') setEditingText(null)
-            event.stopPropagation()
-          }}
-          onBlur={commitText}
-          className="agent-app-edit-selection absolute inset-0 z-10 w-full bg-[hsl(var(--popover))] px-1.5 text-xs text-[var(--text-primary)] ring-1 ring-[var(--brand-primary)]"
-          aria-label="Caption text"
-        />
-      ) : null}
-
-      {interactive ? (
-        <>
-          <span
-            data-trim-handle="start"
-            className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
-            onPointerDown={(event) => beginGesture(event, 'trim-start')}
-            onPointerMove={updateGesture}
-            onPointerUp={finishGesture}
-            onPointerCancel={endGestureCleanup}
-            aria-hidden
-          />
-          <span
-            data-trim-handle="end"
-            className="absolute bottom-0 right-0 top-0 z-10 w-1.5 cursor-ew-resize bg-transparent opacity-0 transition group-hover:opacity-100 group-hover:bg-[var(--brand-primary)]"
-            onPointerDown={(event) => beginGesture(event, 'trim-end')}
-            onPointerMove={updateGesture}
-            onPointerUp={finishGesture}
-            onPointerCancel={endGestureCleanup}
-            aria-hidden
-          />
-        </>
-      ) : null}
-    </div>
-  )
+  return { collectLaneTargets, beginGesture, applyPreview, updateGesture, endGestureCleanup, finishGesture }
 }

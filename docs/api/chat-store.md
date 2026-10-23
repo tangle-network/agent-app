@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-60 exports.
+61 exports.
 
 ### `AppendMessageInput`
 
@@ -164,6 +164,14 @@ type ChatMessagePart
 
 ```ts
 type ChatMessageRow
+```
+
+### `ChatMessageValues`
+
+`type` — Stored message body, model attribution and usage shared by append and patch adapters.
+
+```ts
+type ChatMessageValues
 ```
 
 ### `ChatNoticePart`

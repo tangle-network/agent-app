@@ -11,7 +11,7 @@ Source: `src/design-canvas-react/lazy.tsx`
 `function` — Raw chrome only — use when supplying a custom renderWorkspace/renderThumbnail.
 
 ```ts
-LazyExoticComponent<({ document: initialDocument, rev: initialRev, canWrite, mode, onApplyOperations, onSelectionChange…
+LazyExoticComponent<(props: DesignCanvasFullProps) => Element>
 ```
 
 ### `DesignCanvasFullProps`

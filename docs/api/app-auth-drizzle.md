@@ -4,7 +4,15 @@
 
 Source: `src/app-auth/drizzle.ts`
 
-8 exports.
+9 exports.
+
+### `AppAuthAccountsTable`
+
+`type` — The `account` table, preserving whether this product migrated an issuer column.
+
+```ts
+type AppAuthAccountsTable
+```
 
 ### `AppAuthColumnMap`
 
@@ -59,7 +67,7 @@ type AppAuthUsersTable
 `function` — Build the better-auth `user`, `session`, `account` and `verification` tables.
 
 ```ts
-<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>>(options?:…
+<S extends AppAuthSessionColumns = Record<never, never>, U extends AppAuthUserColumns = Record<never, never>, I extends…
 ```
 
 ### `CreateAppAuthTablesOptions`

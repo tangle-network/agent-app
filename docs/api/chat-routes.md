@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-291 exports.
+294 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -876,6 +876,14 @@ interface CreateLegacyAttachmentUploadRouteOptions
 
 ```ts
 interface CreateSandboxFileIndexRouteOptions
+```
+
+### `createStoredChatAttachments`
+
+`function` — Bind durable object storage without capturing an uninitialized request binding.
+
+```ts
+(options: StoredChatAttachmentsOptions) => StoredChatAttachments
 ```
 
 ### `createStreamingSniffer`
@@ -2052,6 +2060,22 @@ type StaleTurnLockSessionProbeResult
 
 ```ts
 (body: Pick<ChatTurnRequestPayload, "content" | "parts">, acquire: () => Promise<SandboxInstance>) => Promise<SandboxIn…
+```
+
+### `StoredChatAttachments`
+
+`interface` — Scoped stored bytes behind the existing chat attachment reader and writer ports.
+
+```ts
+interface StoredChatAttachments
+```
+
+### `StoredChatAttachmentsOptions`
+
+`interface` — A product supplies its private object store after its request bindings are ready.
+
+```ts
+interface StoredChatAttachmentsOptions
 ```
 
 ### `storeSupportsDraftPersistence`

@@ -565,22 +565,11 @@ export function mergeComposedSkills(batches: ComposedSkills[]): ComposedSkills {
 //
 // A shared catalog contract on top of the self-mount verb (see
 // `./agent-profiles`): entries, validation, the local∪shared merge with
-// namespacing and local precedence, a discovery line, and read-only store
-// adapters. Mounting, caps and baseline protection stay in the verb.
+// namespacing and local precedence. Mounting, caps and baseline protection
+// stay in the verb.
 export {
-  MAX_MARKETPLACE_ENTRIES,
-  createInMemoryMarketplaceStore,
-  createStaticMarketplaceStore,
-  createKVMarketplaceStore,
-  marketplaceDiscoveryLine,
-  marketplaceRowsFor,
   mergeSkillCatalogs,
-  namespacedSkillId,
-  parseNamespacedSkillId,
   validateMarketplaceCatalog,
-  validateMarketplaceSkill,
   type MarketplaceSkill,
-  type MarketplaceStore,
-  type MarketplaceRow,
   type CatalogSkillEntry,
 } from './marketplace'

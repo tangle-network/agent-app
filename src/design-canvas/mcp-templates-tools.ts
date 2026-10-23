@@ -1,6 +1,6 @@
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { type DesignCanvasMcpToolEnv, applyPlan, collectPageSlotAttrs } from './mcp-context'
-import { objectSchema, requireString, isRecord, requireEnum } from '../tools/mcp-arguments'
+import { objectSchema, requireMcpString, isRecord, requireEnum } from '../tools/mcp-arguments'
 import { pageIdProp, elementIdProp, optionalRecord, optionalString, optionalNumber } from './mcp-input'
 import type { SceneOperation } from './operations'
 import { requirePage } from './model'
@@ -21,9 +21,9 @@ export const CANVAS_TEMPLATES_TOOLS: McpToolDefinition<DesignCanvasMcpToolEnv>[]
       ['page_id', 'element_id', 'slot'],
     ),
     async run(args, env) {
-      const pageId = requireString(args, 'page_id')
-      const elementId = requireString(args, 'element_id')
-      const slot = args['slot'] === null ? null : requireString(args, 'slot')
+      const pageId = requireMcpString(args, 'page_id')
+      const elementId = requireMcpString(args, 'element_id')
+      const slot = args['slot'] === null ? null : requireMcpString(args, 'slot')
       const result = await applyPlan(env.store, env.mintId, `bind slot "${slot}" to ${elementId}`, [
         { type: 'bind_slot', pageId, elementId, slot },
       ])

@@ -14,6 +14,8 @@
  * `step-finish` parts. `createChatTurnRoutes` reads both after drain.
  */
 
+import { createSandboxModelSource } from './sandbox-model-source'
+
 import {
   cancelStatusFor,
   interactionPartKey,
@@ -44,24 +46,18 @@ import {
   type StreamEvent,
 } from '../stream/index'
 import {
-  buildModelChain,
   ModelFailoverExhaustedError,
   type ModelFailoverAttempt,
 } from '../model-resolution/failover'
 import type { ModelPolicy } from '../policy-filters/index'
 import {
   ModelFailoverTimeoutError,
-  resolveEmptyTurnRetries,
-  streamWithModelFailover,
-  summarizeFailoverReason,
   type EmptyTurnRetryInfo,
   type ModelFallbackInfo,
-  type ModelFailoverStreamHandle,
   type OpenModelStream,
 } from './model-failover-stream'
 import { createReasoningClock, type ReasoningRunTime } from './reasoning-clock'
 import type {
-  ChatTurnModelAttribution,
   ChatTurnRouteProducer,
   ChatTurnUsage,
 } from './turn-routes'
@@ -248,27 +244,6 @@ function textDelta(tracker: TextTracker, key: string, part: JsonRecord, rawDelta
   return snapshot
 }
 
-function parseEffectiveBackend(data: JsonRecord): Omit<
-  ChatTurnModelAttribution,
-  'requestedModel' | 'echoReceived'
-> | undefined {
-  const backend = asRecord(data.effectiveBackend)
-  if (!backend) return undefined
-  const provider = asString(backend.provider)
-  const model = asString(backend.model)
-  const rawSource = asString(backend.source)
-  const source =
-    rawSource === 'request' || rawSource === 'environment' || rawSource === 'profile'
-      ? rawSource
-      : undefined
-  if (!provider && !model && !source) return undefined
-  return {
-    ...(model ? { servedModel: model } : {}),
-    ...(provider ? { servedProvider: provider } : {}),
-    ...(source ? { servedSource: source } : {}),
-  }
-}
-
 function toFiniteNumber(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
   if (typeof value === 'string' && value.trim() !== '') {
@@ -386,189 +361,19 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   // named more than one model. There is no `enabled` flag on purpose: the class
   // of failure this fixes was a capability that shipped switched off, and a
   // second opt-in on top of supplying the chain would reproduce it exactly.
-  if (options.openEvents && !options.model) {
-    throw new Error(
-      'createSandboxChatProducer: `openEvents` requires `model` — failover must know which model it is running',
-    )
-  }
-  if (!options.openEvents && !options.events) {
-    throw new Error('createSandboxChatProducer: pass `openEvents` (failover-capable) or `events`')
-  }
-  // A fixed `events` stream cannot be re-opened, so the retry silently does
-  // nothing. A config that asks for recovery and receives none is the exact
-  // silent-no-op class this seam exists to remove — refuse it at construction
-  // rather than let a product believe blank turns are being retried.
-  if (!options.openEvents && resolveEmptyTurnRetries(options.emptyTurnRetries) > 0) {
-    throw new Error(
-      'createSandboxChatProducer: `emptyTurnRetries` requires `openEvents` — a fixed `events` stream cannot be re-opened',
-    )
-  }
-  const chain = options.model
-    ? buildModelChain(options.model, options.modelFailover === false ? [] : (options.fallbackModels ?? []))
-    : []
+  const { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState } = createSandboxModelSource(options, log)
 
-  /** Fallback notices waiting to be emitted. `onFallback` fires from inside the
-   *  first pull of the failover stream, where a generator cannot yield, so the
-   *  notice is queued and drained at the top of the next loop iteration —
-   *  landing immediately before the serving model's first event. */
-  const pendingModelNotices: Array<{ id: string; text: string }> = []
-  let modelNoticeCount = 0
-
-  let failover: ModelFailoverStreamHandle | undefined
-  let source: AsyncIterable<unknown>
-  if (options.openEvents) {
-    failover = streamWithModelFailover({
-      models: chain,
-      open: options.openEvents,
-      log,
-      ...(options.modelPolicy ? { policy: options.modelPolicy } : {}),
-      ...(options.openTimeoutMs !== undefined ? { openTimeoutMs: options.openTimeoutMs } : {}),
-      ...(options.firstResponseTimeoutMs !== undefined
-        ? { firstResponseTimeoutMs: options.firstResponseTimeoutMs }
-        : {}),
-      ...(options.emptyTurnRetries !== undefined ? { emptyTurnRetries: options.emptyTurnRetries } : {}),
-      ...(options.onEmptyTurnRetry ? { onEmptyTurnRetry: options.onEmptyTurnRetry } : {}),
-      ...(options.liveLifecycleEvents !== undefined ? { liveLifecycleEvents: options.liveLifecycleEvents } : {}),
-      onFallback: (info) => {
-        modelNoticeCount += 1
-        pendingModelNotices.push({
-          id: `model-fallback-${modelNoticeCount}`,
-          // Named models on both sides: a quality regression after a downgrade
-          // must be attributable to the model that actually answered. The
-          // REASON is condensed — a real edge 5xx arrives as Cloudflare's HTML
-          // error page, and the raw text put `<!DOCTYPE html><!--[if lt IE 7]>…`
-          // into the customer's transcript. The verbatim text is still on
-          // `modelFailover.attempts[].reason` for the operator.
-          text: `${info.from} was unavailable (${summarizeFailoverReason(info.reason)}) — answered with ${info.to} instead.`,
-        })
-        options.onModelFallback?.(info)
-      },
-    })
-    source = failover.events
-  } else {
-    source = options.events!
+  const projectionState: SandboxProjectionState = {
+    fullText: '',
+    terminalObserved: false,
+    stepCounter: 0,
+    danglingToolsTerminalized: false,
+    interactionOutcome: 'answered',
+    warningCount: 0,
+    errorNoticeCount: 0,
   }
 
-  /** The model that ACTUALLY served this turn. Read lazily everywhere (the
-   *  `model` getter, the draft snapshot, the persisted row) so a fallback that
-   *  happens after the row was drafted still lands on the final write. */
-  const servingModel = (): string | undefined => failover?.servingModel() ?? options.model
-  let effectiveBackend: ReturnType<typeof parseEffectiveBackend>
-  let substitutionNoticeQueued = false
-  const servedModel = (): string | undefined => effectiveBackend?.servedModel ?? servingModel()
-
-  const captureEffectiveBackend = (data: JsonRecord | undefined): void => {
-    if (!data) return
-    const parsed = parseEffectiveBackend(data)
-    if (!parsed) return
-    effectiveBackend = parsed
-    const sentModel = servingModel()
-    if (
-      substitutionNoticeQueued ||
-      !options.model ||
-      !sentModel ||
-      !parsed.servedModel ||
-      parsed.servedModel === sentModel
-    ) return
-    substitutionNoticeQueued = true
-    pendingModelNotices.push({
-      id: 'model-substitution-1',
-      text: `Requested ${sentModel} — the sandbox answered with ${parsed.servedModel} instead.`,
-    })
-  }
-
-  let fullText = ''
-  let terminalObserved = false
-  const partOrder: string[] = []
-  const partMap = new Map<string, JsonRecord>()
-  const tracker: TextTracker = { seen: new Map() }
-  /** Each reasoning part's start and end where the harness sent none: the same timing the engine's producer persists. */
-  const reasoningClock = createReasoningClock<string>()
-  const usage: ChatTurnUsage = {}
-  /** Whether each announced tool_call carried populated arguments. */
-  const announcedToolArgs = new Map<string, boolean>()
-  const settledTools = new Set<string>()
-  /** Id-less step boundaries: one occurrence per key, never merged. */
-  let stepCounter = 0
-  let danglingToolsTerminalized = false
-  let interactionOutcome: 'answered' | 'expired' = 'answered'
-  let warningCount = 0
-  /** `promoteFilePart` memo, keyed by `id ?? url` of the raw part. Holds the
-   *  PROMISE (never the settled result) so concurrent duplicate events for
-   *  the same part await the one in-flight attempt instead of each starting
-   *  their own; the promise never rejects (see below), so a later duplicate
-   *  reading a settled entry reuses that first outcome — success or
-   *  failure — rather than retrying. */
-  const promotedFileParts = new Map<string, Promise<FilePartPromotionOutcome>>()
-
-  function recordPersistedPart(part: JsonRecord, delta: string | undefined, keyOverride?: string): void {
-    const persisted = normalizePersistedPart(part)
-    if (!persisted) return
-    const key = keyOverride ?? getPartKey(persisted)
-    if (!partMap.has(key)) partOrder.push(key)
-    partMap.set(key, mergePersistedPart(partMap.get(key), persisted, delta))
-  }
-
-  function* emitTerminalizedTools(): Generator<ProducerWireEvent, void, unknown> {
-    if (danglingToolsTerminalized) return
-    danglingToolsTerminalized = true
-    const updates = terminalizeDanglingAssistantToolUpdates(partOrder, partMap, fullText)
-    for (const part of updates) {
-      const toolId = asString(part.id)
-      if (!toolId || settledTools.has(toolId)) continue
-      settledTools.add(toolId)
-      const state = asRecord(part.state)
-      yield {
-        type: 'tool_result',
-        toolCallId: toolId,
-        toolName: asString(part.tool) ?? 'tool',
-        outcome: {
-          ok: false,
-          ...(asString(state?.error) ? { message: asString(state?.error) } : {}),
-        },
-      }
-    }
-  }
-
-  function* emitFinalUsage(): Generator<ProducerWireEvent, void, unknown> {
-    const promptTokens = usage.inputTokens ?? 0
-    const completionTokens = usage.outputTokens ?? 0
-    if (promptTokens || completionTokens) {
-      yield {
-        type: 'usage',
-        usage: {
-          promptTokens,
-          completionTokens,
-          ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
-          ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
-        },
-      }
-    }
-  }
-
-  /** Emit any queued fallback notices, persisting each so the downgrade is in
-   *  the durable transcript and not only in the live stream. Uses the existing
-   *  `warning` notice kind deliberately: every shipped client already renders
-   *  it, whereas a bespoke kind would be dropped by `dispatchChatStreamLine`'s
-   *  filter — an attribution nobody sees is not attribution. */
-  function* drainModelNotices(): Generator<ProducerWireEvent, void, unknown> {
-    while (pendingModelNotices.length > 0) {
-      const queued = pendingModelNotices.shift()!
-      const notice = noticePart('warning', queued.id, queued.text)
-      recordPersistedPart(notice, undefined, noticePartKey(notice.id))
-      yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: queued.text }
-    }
-  }
-
-  let errorNoticeCount = 0
-  /** `errorNotice` mode: the terminal error as a persisted `error` notice part,
-   *  so the durable row says "this turn failed" in a typed field. */
-  function* emitErrorNotice(text: string, code: string): Generator<ProducerWireEvent, void, unknown> {
-    errorNoticeCount += 1
-    const notice = noticePart('error', `error-${errorNoticeCount}`, text, code)
-    recordPersistedPart(notice, undefined, noticePartKey(notice.id))
-    yield { type: 'notice', id: notice.id, noticeKind: 'error', text, code }
-  }
+  const { timedParts, drainModelNotices, tracker, recordPersistedPart, reasoningClock, partMap, announcedToolArgs, settledTools, usage, promotedFileParts, emitFinalUsage, emitTerminalizedTools, emitErrorNotice, partOrder } = createSandboxProjection(projectionState, pendingModelNotices)
 
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
@@ -586,145 +391,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           : { type: record.type, data: asRecord(record.data) }
 
         if (event.type === 'message.part.updated') {
-          const part = asRecord(event.data?.part)
-          if (!part) continue
-          const rawDelta = event.data?.delta
-          const partType = String(part.type ?? '')
-
-          if (partType === 'text' || partType === 'reasoning') {
-            const key = getPartKey(part)
-            const delta = textDelta(tracker, key, part, rawDelta)
-            recordPersistedPart(part, delta || undefined)
-            if (delta) {
-              if (partType === 'reasoning') reasoningClock.reasoning(key)
-              else reasoningClock.settle()
-              if (partType === 'text') fullText += delta
-              yield { type: partType, text: delta }
-            }
-            continue
-          }
-
-          if (partType === 'tool') {
-            reasoningClock.settle()
-            recordPersistedPart(part, undefined)
-            const persisted = partMap.get(getPartKey(part))
-            const state = asRecord(persisted?.state)
-            const toolId = String(persisted?.id ?? '')
-            const toolName = String(persisted?.tool ?? 'tool')
-            const args = asRecord(state?.input) ?? {}
-            const hasPopulatedArgs = Object.keys(args).length > 0
-            const announcedWithPopulatedArgs = announcedToolArgs.get(toolId)
-            if (
-              toolId &&
-              (announcedWithPopulatedArgs === undefined ||
-                (!announcedWithPopulatedArgs && hasPopulatedArgs && !settledTools.has(toolId)))
-            ) {
-              announcedToolArgs.set(toolId, hasPopulatedArgs)
-              yield {
-                type: 'tool_call',
-                call: { toolCallId: toolId, toolName, args },
-              }
-            }
-            const status = String(state?.status ?? '')
-            if (toolId && (status === 'completed' || status === 'error') && !settledTools.has(toolId)) {
-              settledTools.add(toolId)
-              yield {
-                type: 'tool_result',
-                toolCallId: toolId,
-                toolName,
-                outcome: {
-                  ok: status === 'completed',
-                  ...(state?.output !== undefined ? { result: state.output } : {}),
-                  ...(asString(state?.error) ? { message: asString(state?.error) } : {}),
-                },
-              }
-            }
-            continue
-          }
-
-          if (partType === 'step-finish') {
-            addStepFinishUsage(part, usage)
-            // Persist the per-step receipt too (unique key per occurrence: the
-            // parts have no id and two receipts must never merge into one).
-            recordPersistedPart(part, undefined, `step-finish:#${stepCounter++}`)
-            const promptTokens = usage.inputTokens ?? 0
-            const completionTokens = usage.outputTokens ?? 0
-            if (promptTokens || completionTokens) {
-              yield {
-                type: 'usage',
-                usage: {
-                  promptTokens,
-                  completionTokens,
-                  ...(usage.reasoningTokens !== undefined
-                    ? { reasoningTokens: usage.reasoningTokens }
-                    : {}),
-                  ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
-                },
-              }
-            }
-            continue
-          }
-
-          if (partType === 'step-start') {
-            recordPersistedPart(part, undefined, `step-start:#${stepCounter}`)
-            continue
-          }
-
-          if (partType === 'file' && options.promoteFilePart) {
-            const promote = options.promoteFilePart
-            // Prefixed by source (`id:`/`url:`) rather than the bare raw string —
-            // an `id` and a `url` that happen to share the same text (e.g. both
-            // `"abc"`) would otherwise collide onto one memo entry and fold two
-            // unrelated parts' promotions together. Internal Map key only; never
-            // observable outside this module.
-            const rawId = asString(part.id)
-            const rawUrl = asString(part.url)
-            const memoKey = rawId ? `id:${rawId}` : rawUrl ? `url:${rawUrl}` : undefined
-            // Always invoke the callback for a `file` part when one is wired —
-            // gtm never skips promotion outright, even for a part with neither
-            // `id` nor `url` (it simply fails "carries no url" and resolves
-            // through the ordinary failure path). Memoization by PROMISE only
-            // applies when there is something to key it on; keyless parts are
-            // invoked un-memoized, once per occurrence.
-            //
-            // `Promise.resolve().then(...)` (rather than calling `promote(part)`
-            // directly) so a SYNC throw from a non-async `promoteFilePart` is
-            // captured into the promise chain instead of escaping this function
-            // call outright — `.catch` below only ever sees a rejection, never a
-            // thrown exception that unwinds past `attempt()`.
-            const attempt = (): Promise<FilePartPromotionOutcome> =>
-              Promise.resolve()
-                .then(() => promote(part))
-                .catch((err) => {
-                  const reason = err instanceof Error ? err.message : String(err)
-                  log('[chat-routes] file part promotion threw', { key: memoKey ?? '(keyless)', error: reason })
-                  return { succeeded: false as const, reason }
-                })
-
-            let pending: Promise<FilePartPromotionOutcome>
-            if (memoKey) {
-              pending = promotedFileParts.get(memoKey) ?? attempt()
-              promotedFileParts.set(memoKey, pending)
-            } else {
-              pending = attempt()
-            }
-
-            const outcome = await pending
-            if (outcome.succeeded) {
-              recordPersistedPart(outcome.part, undefined, outcome.key)
-            } else if (outcome.part) {
-              // Substitute part (e.g. a warning notice) takes the raw part's
-              // place in the transcript — the transient url never lands.
-              recordPersistedPart(outcome.part, undefined, outcome.key)
-            } else {
-              recordPersistedPart(part, undefined)
-            }
-            continue
-          }
-
-          // Remaining storable kinds (file/image/subtask) have no live
-          // vocabulary line; they persist so the transcript keeps them.
-          recordPersistedPart(part, undefined)
+          yield* projectSandboxMessagePart(event, tracker, recordPersistedPart, reasoningClock, projectionState, partMap, announcedToolArgs, settledTools, usage, options, log, promotedFileParts)
           continue
         }
 
@@ -805,10 +472,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           if (message) {
-            warningCount += 1
+            projectionState.warningCount += 1
             const code = asString(event.data?.code)
             const text = code ? `${code}: ${message}` : message
-            const notice = noticePart('warning', `warning-${warningCount}`, text)
+            const notice = noticePart('warning', `warning-${projectionState.warningCount}`, text)
             recordPersistedPart(notice, undefined, noticePartKey(notice.id))
             yield { type: 'notice', id: notice.id, noticeKind: 'warning', text }
           }
@@ -826,9 +493,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'result') {
-          terminalObserved = true
+          projectionState.terminalObserved = true
           const finalText = asString(event.data?.finalText)
-          if (finalText) fullText = finalText
+          if (finalText) projectionState.fullText = finalText
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -848,7 +515,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'done') {
-          terminalObserved = true
+          projectionState.terminalObserved = true
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -861,17 +528,17 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
         if (event.type === 'error') {
           const message = sandboxStreamErrorMessage(event.data)
-          const errorContent = fullText.trim()
+          const errorContent = projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
           if (options.errorNotice) {
             yield* emitErrorNotice(errorContent, sandboxStreamErrorCode(event.data))
           } else if (options.includeErrorText !== false) {
-            const errorDelta = fullText ? `\n\n---\n${errorContent}` : errorContent
-            fullText += errorDelta
+            const errorDelta = projectionState.fullText ? `\n\n---\n${errorContent}` : errorContent
+            projectionState.fullText += errorDelta
             yield { type: 'text', text: errorDelta }
           }
-          interactionOutcome = 'expired'
+          projectionState.interactionOutcome = 'expired'
           yield* emitTerminalizedTools()
           yield toProducerWireEvent(record)
           continue
@@ -893,13 +560,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       if (options.errorNotice) {
         yield* emitErrorNotice(diagnostic.userMessage, diagnostic.code)
       } else if (options.includeErrorText !== false) {
-        const errorDelta = fullText
+        const errorDelta = projectionState.fullText
           ? `\n\n---\n${diagnostic.userMessage}`
           : diagnostic.userMessage
-        fullText += errorDelta
+        projectionState.fullText += errorDelta
         yield { type: 'text', text: errorDelta }
       }
-      interactionOutcome = 'expired'
+      projectionState.interactionOutcome = 'expired'
       yield* emitTerminalizedTools()
       yield {
         type: 'error',
@@ -914,31 +581,20 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     }
   }
 
-  /** The persisted parts with each reasoning part's time: the harness's own, else the clock's. */
-  const timedParts = (): Map<string, JsonRecord> => {
-    const timed = new Map(partMap)
-    for (const [key, part] of partMap) {
-      if (part.type !== 'reasoning') continue
-      const time = reasoningClock.time(key, asRecord(part.time) as ReasoningRunTime | undefined)
-      if (time) timed.set(key, { ...part, time })
-    }
-    return timed
-  }
-
   return {
     stream: stream(),
-    finalText: () => fullText,
-    terminalObserved: () => terminalObserved,
+    finalText: () => projectionState.fullText,
+    terminalObserved: () => projectionState.terminalObserved,
     assistantParts: () => finalizePendingInteractionParts(
-      finalizeAssistantParts(partOrder, timedParts(), fullText),
-      interactionOutcome,
+      finalizeAssistantParts(partOrder, timedParts(), projectionState.fullText),
+      projectionState.interactionOutcome,
     ),
     // Mid-stream snapshot for incremental persistence: the same accumulators,
     // WITHOUT the two completion-time settlements (`terminalizeDanglingTool*`
     // and `finalizePendingInteractionParts`). A running tool and an unanswered
     // ask are the correct live state; settling them early would persist
     // phantom failures the final write then reverses.
-    draftParts: () => draftAssistantParts(partOrder, timedParts(), fullText),
+    draftParts: () => draftAssistantParts(partOrder, timedParts(), projectionState.fullText),
     usage: () => usage,
     // A GETTER, not a captured value: `turn-routes` reads `producer.model` at
     // draft-snapshot and persist time, both of which happen after the stream
@@ -955,8 +611,279 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
     }),
     modelAttribution: () => ({
       ...(options.model ? { requestedModel: options.model } : {}),
-      ...(effectiveBackend ?? {}),
-      echoReceived: effectiveBackend !== undefined,
+      ...(modelState.effectiveBackend ?? {}),
+      echoReceived: modelState.effectiveBackend !== undefined,
     }),
+  }
+}
+
+interface SandboxProjectionState {
+  fullText: string
+  terminalObserved: boolean
+  stepCounter: number
+  danglingToolsTerminalized: boolean
+  interactionOutcome: 'answered' | 'expired'
+  warningCount: number
+  errorNoticeCount: number
+}
+
+function createSandboxProjection(projectionState: SandboxProjectionState, pendingModelNotices: { id: string; text: string }[]) {
+  const partOrder: string[] = []
+  const partMap = new Map<string, JsonRecord>()
+  const tracker: TextTracker = { seen: new Map() }
+  /** Each reasoning part's start and end where the harness sent none: the same timing the engine's producer persists. */
+  const reasoningClock = createReasoningClock<string>()
+  const usage: ChatTurnUsage = {}
+  /** Whether each announced tool_call carried populated arguments. */
+  const announcedToolArgs = new Map<string, boolean>()
+  const settledTools = new Set<string>()
+  /** Id-less step boundaries: one occurrence per key, never merged. */
+
+  /** `promoteFilePart` memo, keyed by `id ?? url` of the raw part. Holds the
+   *  PROMISE (never the settled result) so concurrent duplicate events for
+   *  the same part await the one in-flight attempt instead of each starting
+   *  their own; the promise never rejects (see below), so a later duplicate
+   *  reading a settled entry reuses that first outcome — success or
+   *  failure — rather than retrying. */
+  const promotedFileParts = new Map<string, Promise<FilePartPromotionOutcome>>()
+
+  function recordPersistedPart(part: JsonRecord, delta: string | undefined, keyOverride?: string): void {
+    const persisted = normalizePersistedPart(part)
+    if (!persisted) return
+    const key = keyOverride ?? getPartKey(persisted)
+    if (!partMap.has(key)) partOrder.push(key)
+    partMap.set(key, mergePersistedPart(partMap.get(key), persisted, delta))
+  }
+
+  function* emitTerminalizedTools(): Generator<ProducerWireEvent, void, unknown> {
+    if (projectionState.danglingToolsTerminalized) return
+    projectionState.danglingToolsTerminalized = true
+    const updates = terminalizeDanglingAssistantToolUpdates(partOrder, partMap, projectionState.fullText)
+    for (const part of updates) {
+      const toolId = asString(part.id)
+      if (!toolId || settledTools.has(toolId)) continue
+      settledTools.add(toolId)
+      const state = asRecord(part.state)
+      yield {
+        type: 'tool_result',
+        toolCallId: toolId,
+        toolName: asString(part.tool) ?? 'tool',
+        outcome: {
+          ok: false,
+          ...(asString(state?.error) ? { message: asString(state?.error) } : {}),
+        },
+      }
+    }
+  }
+
+  function* emitFinalUsage(): Generator<ProducerWireEvent, void, unknown> {
+    const promptTokens = usage.inputTokens ?? 0
+    const completionTokens = usage.outputTokens ?? 0
+    if (promptTokens || completionTokens) {
+      yield {
+        type: 'usage',
+        usage: {
+          promptTokens,
+          completionTokens,
+          ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
+          ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+        },
+      }
+    }
+  }
+
+  /** Emit any queued fallback notices, persisting each so the downgrade is in
+   *  the durable transcript and not only in the live stream. Uses the existing
+   *  `warning` notice kind deliberately: every shipped client already renders
+   *  it, whereas a bespoke kind would be dropped by `dispatchChatStreamLine`'s
+   *  filter — an attribution nobody sees is not attribution. */
+  function* drainModelNotices(): Generator<ProducerWireEvent, void, unknown> {
+    while (pendingModelNotices.length > 0) {
+      const queued = pendingModelNotices.shift()!
+      const notice = noticePart('warning', queued.id, queued.text)
+      recordPersistedPart(notice, undefined, noticePartKey(notice.id))
+      yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: queued.text }
+    }
+  }
+
+  /** `errorNotice` mode: the terminal error as a persisted `error` notice part,
+   *  so the durable row says "this turn failed" in a typed field. */
+  function* emitErrorNotice(text: string, code: string): Generator<ProducerWireEvent, void, unknown> {
+    projectionState.errorNoticeCount += 1
+    const notice = noticePart('error', `error-${projectionState.errorNoticeCount}`, text, code)
+    recordPersistedPart(notice, undefined, noticePartKey(notice.id))
+    yield { type: 'notice', id: notice.id, noticeKind: 'error', text, code }
+  }
+
+
+  /** The persisted parts with each reasoning part's time: the harness's own, else the clock's. */
+  const timedParts = (): Map<string, JsonRecord> => {
+    const timed = new Map(partMap)
+    for (const [key, part] of partMap) {
+      if (part.type !== 'reasoning') continue
+      const time = reasoningClock.time(key, asRecord(part.time) as ReasoningRunTime | undefined)
+      if (time) timed.set(key, { ...part, time })
+    }
+    return timed
+  }
+
+  return { timedParts, drainModelNotices, tracker, recordPersistedPart, reasoningClock, partMap, announcedToolArgs, settledTools, usage, promotedFileParts, emitFinalUsage, emitTerminalizedTools, emitErrorNotice, partOrder }
+}
+
+async function* projectSandboxMessagePart(
+  event: StreamEvent,
+  tracker: TextTracker,
+  recordPersistedPart: (part: JsonRecord, delta: string | undefined, keyOverride?: string) => void,
+  reasoningClock: ReturnType<typeof createSandboxProjection>['reasoningClock'],
+  projectionState: SandboxProjectionState,
+  partMap: Map<string, JsonRecord>,
+  announcedToolArgs: Map<string, boolean>,
+  settledTools: Set<string>,
+  usage: ChatTurnUsage,
+  options: SandboxChatProducerOptions,
+  log: (message: string, meta?: Record<string, unknown>) => void,
+  promotedFileParts: Map<string, Promise<FilePartPromotionOutcome>>,
+): AsyncGenerator<ProducerWireEvent, void, unknown> {
+  if (event.type === 'message.part.updated') {
+    const part = asRecord(event.data?.part)
+    if (!part) return
+    const rawDelta = event.data?.delta
+    const partType = String(part.type ?? '')
+
+    if (partType === 'text' || partType === 'reasoning') {
+      const key = getPartKey(part)
+      const delta = textDelta(tracker, key, part, rawDelta)
+      recordPersistedPart(part, delta || undefined)
+      if (delta) {
+        if (partType === 'reasoning') reasoningClock.reasoning(key)
+        else reasoningClock.settle()
+        if (partType === 'text') projectionState.fullText += delta
+        yield { type: partType, text: delta }
+      }
+      return
+    }
+
+    if (partType === 'tool') {
+      reasoningClock.settle()
+      recordPersistedPart(part, undefined)
+      const persisted = partMap.get(getPartKey(part))
+      const state = asRecord(persisted?.state)
+      const toolId = String(persisted?.id ?? '')
+      const toolName = String(persisted?.tool ?? 'tool')
+      const args = asRecord(state?.input) ?? {}
+      const hasPopulatedArgs = Object.keys(args).length > 0
+      const announcedWithPopulatedArgs = announcedToolArgs.get(toolId)
+      if (
+        toolId &&
+        (announcedWithPopulatedArgs === undefined ||
+          (!announcedWithPopulatedArgs && hasPopulatedArgs && !settledTools.has(toolId)))
+      ) {
+        announcedToolArgs.set(toolId, hasPopulatedArgs)
+        yield {
+          type: 'tool_call',
+          call: { toolCallId: toolId, toolName, args },
+        }
+      }
+      const status = String(state?.status ?? '')
+      if (toolId && (status === 'completed' || status === 'error') && !settledTools.has(toolId)) {
+        settledTools.add(toolId)
+        yield {
+          type: 'tool_result',
+          toolCallId: toolId,
+          toolName,
+          outcome: {
+            ok: status === 'completed',
+            ...(state?.output !== undefined ? { result: state.output } : {}),
+            ...(asString(state?.error) ? { message: asString(state?.error) } : {}),
+          },
+        }
+      }
+      return
+    }
+
+    if (partType === 'step-finish') {
+      addStepFinishUsage(part, usage)
+      // Persist the per-step receipt too (unique key per occurrence: the
+      // parts have no id and two receipts must never merge into one).
+      recordPersistedPart(part, undefined, `step-finish:#${projectionState.stepCounter++}`)
+      const promptTokens = usage.inputTokens ?? 0
+      const completionTokens = usage.outputTokens ?? 0
+      if (promptTokens || completionTokens) {
+        yield {
+          type: 'usage',
+          usage: {
+            promptTokens,
+            completionTokens,
+            ...(usage.reasoningTokens !== undefined
+              ? { reasoningTokens: usage.reasoningTokens }
+              : {}),
+            ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+          },
+        }
+      }
+      return
+    }
+
+    if (partType === 'step-start') {
+      recordPersistedPart(part, undefined, `step-start:#${projectionState.stepCounter}`)
+      return
+    }
+
+    if (partType === 'file' && options.promoteFilePart) {
+      const promote = options.promoteFilePart
+      // Prefixed by source (`id:`/`url:`) rather than the bare raw string —
+      // an `id` and a `url` that happen to share the same text (e.g. both
+      // `"abc"`) would otherwise collide onto one memo entry and fold two
+      // unrelated parts' promotions together. Internal Map key only; never
+      // observable outside this module.
+      const rawId = asString(part.id)
+      const rawUrl = asString(part.url)
+      const memoKey = rawId ? `id:${rawId}` : rawUrl ? `url:${rawUrl}` : undefined
+      // Always invoke the callback for a `file` part when one is wired —
+      // gtm never skips promotion outright, even for a part with neither
+      // `id` nor `url` (it simply fails "carries no url" and resolves
+      // through the ordinary failure path). Memoization by PROMISE only
+      // applies when there is something to key it on; keyless parts are
+      // invoked un-memoized, once per occurrence.
+      //
+      // `Promise.resolve().then(...)` (rather than calling `promote(part)`
+      // directly) so a SYNC throw from a non-async `promoteFilePart` is
+      // captured into the promise chain instead of escaping this function
+      // call outright — `.catch` below only ever sees a rejection, never a
+      // thrown exception that unwinds past `attempt()`.
+      const attempt = (): Promise<FilePartPromotionOutcome> =>
+        Promise.resolve()
+          .then(() => promote(part))
+          .catch((err) => {
+            const reason = err instanceof Error ? err.message : String(err)
+            log('[chat-routes] file part promotion threw', { key: memoKey ?? '(keyless)', error: reason })
+            return { succeeded: false as const, reason }
+          })
+
+      let pending: Promise<FilePartPromotionOutcome>
+      if (memoKey) {
+        pending = promotedFileParts.get(memoKey) ?? attempt()
+        promotedFileParts.set(memoKey, pending)
+      } else {
+        pending = attempt()
+      }
+
+      const outcome = await pending
+      if (outcome.succeeded) {
+        recordPersistedPart(outcome.part, undefined, outcome.key)
+      } else if (outcome.part) {
+        // Substitute part (e.g. a warning notice) takes the raw part's
+        // place in the transcript — the transient url never lands.
+        recordPersistedPart(outcome.part, undefined, outcome.key)
+      } else {
+        recordPersistedPart(part, undefined)
+      }
+      return
+    }
+
+    // Remaining storable kinds (file/image/subtask) have no live
+    // vocabulary line; they persist so the transcript keeps them.
+    recordPersistedPart(part, undefined)
+    return
   }
 }

@@ -1,3 +1,4 @@
+import { writeRecordGridCell, deleteRecordGridRow, createRecordGridRow } from "./record-grid-writes"
 /**
  * `RecordGrid` — the editable record table four verticals each hand-rolled: a
  * cap table, two relationship record pages, a content board, and an entities
@@ -114,13 +115,7 @@ function alignmentClass(column: RecordGridColumn): string {
   const align = column.align ?? (column.kind === 'number' || column.kind === 'currency' ? 'right' : 'left')
   return align === 'right' ? 'text-right' : 'text-left'
 }
-
-/**
- * The shared editable record table. A row is a flat value bag keyed by column
- * id, so a record store's fold output maps straight on: one cell per entry,
- * its quote and link in `sources`.
- */
-export function RecordGrid({
+function useRecordGridViewState({
   columns,
   caption,
   state,
@@ -264,35 +259,9 @@ export function RecordGrid({
   /** Apply one cell value optimistically, write it, and on failure put the
    *  previous value back with the reason attached to the row. */
   const applyCellWrite = useCallback(
-    async (row: RecordGridRow, column: RecordGridColumn, value: RecordGridValue) => {
-      if (!onUpdate) return
-      const values = { ...row.values, [column.id]: value }
-      setOverlay((current) => withRecordGridUpdate(current, row.id, column.id, value))
-      setRowError(row.id, null)
-      setRowPending(row.id, true)
-
-      let outcome: RecordGridWriteOutcome
-      try {
-        outcome = await onUpdate({ row, columnId: column.id, value, values })
-      } catch (cause) {
-        outcome = { succeeded: false, error: cause instanceof Error ? cause.message : String(cause) }
-      }
-
-      setRowPending(row.id, false)
-      if (outcome.succeeded) {
-        const canonical = outcome.value
-        if (canonical) setOverlay((current) => withRecordGridServerRow(current, row.id, canonical))
-        return
-      }
-      setOverlay((current) => withoutRecordGridUpdate(current, row.id, column.id))
-      const rejected = formatRecordGridValue(column, value, locale)
-      setRowError(
-        row.id,
-        rejected === ''
-          ? `Could not save ${column.header}: ${outcome.error}`
-          : `Could not save ${column.header} as ${rejected}: ${outcome.error}`,
-      )
-    },
+    (row: RecordGridRow, column: RecordGridColumn,
+      value: RecordGridValue) => writeRecordGridCell(row, column, value, { onUpdate, setOverlay,
+      setRowError, setRowPending, locale }),
     [locale, onUpdate, setRowError, setRowPending],
   )
 
@@ -333,22 +302,7 @@ export function RecordGrid({
   )
 
   const performDelete = useCallback(
-    async (row: RecordGridRow) => {
-      if (!onDelete) return
-      setConfirmDelete(null)
-      setRowError(row.id, null)
-      setOverlay((current) => withRecordGridRemoved(current, row.id))
-
-      let outcome: RecordGridWriteOutcome
-      try {
-        outcome = await onDelete(row)
-      } catch (cause) {
-        outcome = { succeeded: false, error: cause instanceof Error ? cause.message : String(cause) }
-      }
-      if (outcome.succeeded) return
-      setOverlay((current) => withoutRecordGridRemoved(current, row.id))
-      setRowError(row.id, `Could not delete ${recordGridRowLabel(columns, row)}: ${outcome.error}`)
-    },
+    (row: RecordGridRow) => deleteRecordGridRow(row, { onDelete, setConfirmDelete, setRowError, setOverlay, columns }),
     [columns, onDelete, setRowError],
   )
 
@@ -363,41 +317,9 @@ export function RecordGrid({
     setAdding(true)
   }, [resetDraft])
 
-  const submitDraft = useCallback(async () => {
-    if (!onCreate) return
-    const validated = validateRecordGridRow(columns, draft)
-    if (!validated.succeeded) {
-      setDraftErrors(validated.cellErrors)
-      setDraftError(validated.error)
-      return
-    }
-    setDraftErrors({})
-    setDraftError(null)
-
-    draftCounter.current += 1
-    const draftId = `${fieldPrefix}-draft-${draftCounter.current}`
-    setOverlay((current) => withRecordGridCreated(current, { id: draftId, values: validated.value }))
-    setCreating(true)
-
-    let outcome: RecordGridCreateOutcome
-    try {
-      outcome = await onCreate(validated.value)
-    } catch (cause) {
-      outcome = { succeeded: false, error: cause instanceof Error ? cause.message : String(cause) }
-    }
-
-    setCreating(false)
-    if (outcome.succeeded) {
-      setOverlay((current) => withRecordGridServerRow(current, draftId, outcome.value))
-      setAdding(false)
-      resetDraft()
-      return
-    }
-    // The optimistic row goes away and the form keeps what was typed: a
-    // rejected create is correctable, never silently lost.
-    setOverlay((current) => withoutRecordGridCreated(current, draftId))
-    setDraftError(outcome.error)
-  }, [columns, draft, fieldPrefix, onCreate, resetDraft])
+  const submitDraft = useCallback(() => createRecordGridRow({ onCreate, columns, draft,
+    setDraftErrors, setDraftError, draftCounter, fieldPrefix, setOverlay, setCreating, setAdding,
+    resetDraft }), [columns, draft, fieldPrefix, onCreate, resetDraft])
 
   const handleGridKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTableElement>) => {
@@ -440,6 +362,26 @@ export function RecordGrid({
     },
     [beginEdit, columns, editing, focusCell, onUpdate, reviewing, visibleRows],
   )
+ return { state, className, toolbar, caption, loadingRowCount, adding, onCreate, reviewing,
+   columns, draft, setDraft, draftErrors, draftError, creating, addLabel, fieldPrefix, submitDraft,
+   setAdding, resetDraft, visibleRows, empty, openAdd, onDelete, diffs, addedRows, onAcceptAll,
+   onRejectAll, handleGridKeyDown, pendingRows, rowErrors, diffByRow, onUpdate, editing, cellErrors,
+   activeFocus, diffCellByKey, setEditing, commitEdit, cancelEdit, cellRefs, setFocus, applyCellWrite,
+   locale, beginEdit, openSource, setOpenSource, onAcceptRow, onRejectRow, confirmDelete,
+   performDelete, setConfirmDelete }
+}
+type RecordGridViewState = ReturnType<typeof useRecordGridViewState>
+export function RecordGrid(props: RecordGridProps) {
+ const view = useRecordGridViewState(props)
+ return <RecordGridView {...view} />
+}
+function RecordGridView({ state, className, toolbar, caption, loadingRowCount, adding, onCreate,
+  reviewing, columns, draft, setDraft, draftErrors, draftError, creating, addLabel, fieldPrefix,
+  submitDraft, setAdding, resetDraft, visibleRows, empty, openAdd, onDelete, diffs, addedRows,
+  onAcceptAll, onRejectAll, handleGridKeyDown, pendingRows, rowErrors, diffByRow, onUpdate, editing,
+  cellErrors, activeFocus, diffCellByKey, setEditing, commitEdit, cancelEdit, cellRefs, setFocus,
+  applyCellWrite, locale, beginEdit, openSource, setOpenSource, onAcceptRow, onRejectRow,
+  confirmDelete, performDelete, setConfirmDelete }: RecordGridViewState) {
 
   // `idle` and `loading` render the same busy block — from the reader's
   // side, "not started" and "in flight" are the same wait
@@ -601,7 +543,74 @@ export function RecordGrid({
               )}
             </TableRow>
           </TableHeader>
-          <TableBody>
+          <RecordGridRows visibleRows={visibleRows} columns={columns} pendingRows={pendingRows}
+            rowErrors={rowErrors} reviewing={reviewing} diffByRow={diffByRow} onUpdate={onUpdate}
+            editing={editing} cellErrors={cellErrors} activeFocus={activeFocus} fieldPrefix={fieldPrefix}
+            diffCellByKey={diffCellByKey} setEditing={setEditing} commitEdit={commitEdit}
+            cancelEdit={cancelEdit} cellRefs={cellRefs} setFocus={setFocus} applyCellWrite={applyCellWrite}
+            locale={locale} beginEdit={beginEdit} openSource={openSource} setOpenSource={setOpenSource}
+            showActionsColumn={showActionsColumn} onAcceptRow={onAcceptRow} onRejectRow={onRejectRow}
+            confirmDelete={confirmDelete} performDelete={performDelete} setConfirmDelete={setConfirmDelete}
+            columnSpan={columnSpan} addedRows={addedRows} />
+          {hasFooter && (
+            <TableFooter>
+              <TableRow role="row" className="border-t-2 border-border">
+                {columns.map((column) => (
+                  <TableCell
+                    key={column.id}
+                    role="gridcell"
+                    className={`px-3 py-2 text-sm font-semibold text-foreground ${alignmentClass(column)}`}
+                  >
+                    {column.footerValue ? formatRecordGridValue(column, column.footerValue(visibleRows), locale) : ''}
+                  </TableCell>
+                ))}
+                {showActionsColumn && <TableCell role="gridcell" />}
+              </TableRow>
+            </TableFooter>
+          )}
+        </Table>
+      </div>
+
+      {onCreate &&
+        !reviewing &&
+        (addForm ?? (
+          <button
+            type="button"
+            onClick={openAdd}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
+          >
+            <RecordGridActionGlyph>
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </RecordGridActionGlyph>
+            {addLabel}
+          </button>
+        ))}
+    </div>
+  )
+
+}
+
+function RecordGridActionGlyph({ children }: { children: import('react').ReactNode }) {
+ return (<svg
+                              viewBox="0 0 24 24"
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden
+                            >{children}</svg>)
+}
+
+function RecordGridRows({ visibleRows, columns, pendingRows, rowErrors, reviewing, diffByRow,
+  onUpdate, editing, cellErrors, activeFocus, fieldPrefix, diffCellByKey, setEditing, commitEdit,
+  cancelEdit, cellRefs, setFocus, applyCellWrite, locale, beginEdit, openSource, setOpenSource,
+  showActionsColumn, onAcceptRow, onRejectRow, confirmDelete, performDelete, setConfirmDelete,
+  columnSpan, addedRows }: Pick<RecordGridViewState,
+  "visibleRows" | "columns" | "pendingRows" | "rowErrors" | "reviewing" | "diffByRow" | "onUpdate" | "editing" | "cellErrors" | "activeFocus" | "fieldPrefix" | "diffCellByKey" | "setEditing" | "commitEdit" | "cancelEdit" | "cellRefs" | "setFocus" | "applyCellWrite" | "locale" | "beginEdit" | "openSource" | "setOpenSource" | "onAcceptRow" | "onRejectRow" | "confirmDelete" | "performDelete" | "setConfirmDelete" | "addedRows"> & { showActionsColumn: boolean; columnSpan: number }) {
+ return (<TableBody>
             {visibleRows.map((row) => {
               const rowLabel = recordGridRowLabel(columns, row)
               const pending = row.id in pendingRows
@@ -782,19 +791,10 @@ export function RecordGrid({
                             onClick={() => setConfirmDelete(row.id)}
                             className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                           >
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden
-                            >
+                            <RecordGridActionGlyph>
                               <polyline points="3 6 5 6 21 6" />
                               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
+                            </RecordGridActionGlyph>
                           </button>
                         )}
                       </TableCell>
@@ -855,50 +855,5 @@ export function RecordGrid({
                   </TableRow>
                 )
               })}
-          </TableBody>
-          {hasFooter && (
-            <TableFooter>
-              <TableRow role="row" className="border-t-2 border-border">
-                {columns.map((column) => (
-                  <TableCell
-                    key={column.id}
-                    role="gridcell"
-                    className={`px-3 py-2 text-sm font-semibold text-foreground ${alignmentClass(column)}`}
-                  >
-                    {column.footerValue ? formatRecordGridValue(column, column.footerValue(visibleRows), locale) : ''}
-                  </TableCell>
-                ))}
-                {showActionsColumn && <TableCell role="gridcell" />}
-              </TableRow>
-            </TableFooter>
-          )}
-        </Table>
-      </div>
-
-      {onCreate &&
-        !reviewing &&
-        (addForm ?? (
-          <button
-            type="button"
-            onClick={openAdd}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            {addLabel}
-          </button>
-        ))}
-    </div>
-  )
+          </TableBody>)
 }

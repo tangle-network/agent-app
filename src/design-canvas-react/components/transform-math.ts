@@ -243,27 +243,6 @@ export function snapRotation(angleDeg: number, thresholdDeg = 5): number {
 }
 
 // ---------------------------------------------------------------------------
-// Nudge delta
-// ---------------------------------------------------------------------------
-
-/**
- * Convert a keyboard arrow event into a {dx, dy} nudge in document px.
- * Shift multiplies by 10 (the "big nudge" convention).
- */
-export function nudgeDelta(
-  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
-  shift: boolean,
-): { dx: number; dy: number } {
-  const step = shift ? 10 : 1
-  switch (key) {
-    case 'ArrowLeft':  return { dx: -step, dy: 0 }
-    case 'ArrowRight': return { dx: step,  dy: 0 }
-    case 'ArrowUp':    return { dx: 0,     dy: -step }
-    case 'ArrowDown':  return { dx: 0,     dy: step }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Marquee hit-test
 // ---------------------------------------------------------------------------
 

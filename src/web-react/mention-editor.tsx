@@ -235,7 +235,6 @@ export async function loadMentionEditor(): Promise<{
  */
 export function createMentionEditor(tiptap: TiptapModules): ComponentType<MentionEditorProps> {
   const { EditorContent, useEditor } = tiptap.react
-  const { exitSuggestion } = tiptap.suggestion
 
   return function MentionEditor({
     value,
@@ -360,64 +359,8 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
             onMentionsChangeRef.current?.(mentions)
           }
         },
-        extensions: [
-          buildComposerStarterKit(tiptap),
-          buildMentionExtension(tiptap, trigger, {
-            char: trigger,
-            allowSpaces: false,
-            // Items are fetched by this component (so it can model loading and
-            // error states), not by the suggestion plugin.
-            items: () => [],
-            command: ({ editor, range, props }) => {
-              const item = props as unknown as MentionItem
-              editor
-                .chain()
-                .focus()
-                .insertContentAt(range, [
-                  {
-                    type: 'mention',
-                    attrs: {
-                      id: item.id,
-                      label: item.label,
-                      kind: item.kind ?? null,
-                    },
-                  },
-                  { type: 'text', text: ' ' },
-                ])
-                .run()
-              knownRef.current.set(item.id, item)
-            },
-            render: () => ({
-              onStart: (props: SuggestionProps) => {
-                openRef.current = true
-                onMentionMenuOpenChangeRef.current?.(true)
-                commandRef.current = props.command
-                setOpen(true)
-                setQuery(props.query)
-              },
-              onUpdate: (props: SuggestionProps) => {
-                commandRef.current = props.command
-                setQuery(props.query)
-              },
-              onKeyDown: (props: SuggestionKeyDownProps) => {
-                if (props.event.key === 'Escape') {
-                  exitSuggestion(props.view)
-                  return true
-                }
-                return listRef.current?.onKeyDown(props.event) ?? false
-              },
-              onExit: () => {
-                openRef.current = false
-                onMentionMenuOpenChangeRef.current?.(false)
-                commandRef.current = null
-                setOpen(false)
-                setItems([])
-                setLoading(false)
-                setErrored(false)
-              },
-            }),
-          }),
-        ],
+        extensions: createComposerMentionExtensions(tiptap, trigger, { knownRef, openRef,
+          onMentionMenuOpenChangeRef, commandRef, setOpen, setQuery, listRef, setItems, setLoading, setErrored }),
       },
       [],
     )
@@ -554,4 +497,73 @@ export function createMentionEditor(tiptap: TiptapModules): ComponentType<Mentio
       </div>
     )
   }
+}
+
+
+function createComposerMentionExtensions(tiptap: TiptapModules, trigger: string, { knownRef,
+  openRef, onMentionMenuOpenChangeRef, commandRef, setOpen, setQuery, listRef, setItems, setLoading,
+  setErrored }: { knownRef: { current: Map<string, MentionItem> }; openRef: { current: boolean };
+  onMentionMenuOpenChangeRef: { current: MentionEditorProps['onMentionMenuOpenChange'] };
+  commandRef: { current: ((item: MentionItem) => void) | null }; setOpen: (value: boolean) => void;
+  setQuery: (value: string) => void; listRef: { current: MentionListHandle | null };
+  setItems: (value: MentionItem[]) => void; setLoading: (value: boolean) => void; setErrored: (value: boolean) => void }) {
+  const { exitSuggestion } = tiptap.suggestion
+  return [
+          buildComposerStarterKit(tiptap),
+          buildMentionExtension(tiptap, trigger, {
+            char: trigger,
+            allowSpaces: false,
+            // Items are fetched by this component (so it can model loading and
+            // error states), not by the suggestion plugin.
+            items: () => [],
+            command: ({ editor, range, props }) => {
+              const item = props as unknown as MentionItem
+              editor
+                .chain()
+                .focus()
+                .insertContentAt(range, [
+                  {
+                    type: 'mention',
+                    attrs: {
+                      id: item.id,
+                      label: item.label,
+                      kind: item.kind ?? null,
+                    },
+                  },
+                  { type: 'text', text: ' ' },
+                ])
+                .run()
+              knownRef.current.set(item.id, item)
+            },
+            render: () => ({
+              onStart: (props: SuggestionProps) => {
+                openRef.current = true
+                onMentionMenuOpenChangeRef.current?.(true)
+                commandRef.current = props.command
+                setOpen(true)
+                setQuery(props.query)
+              },
+              onUpdate: (props: SuggestionProps) => {
+                commandRef.current = props.command
+                setQuery(props.query)
+              },
+              onKeyDown: (props: SuggestionKeyDownProps) => {
+                if (props.event.key === 'Escape') {
+                  exitSuggestion(props.view)
+                  return true
+                }
+                return listRef.current?.onKeyDown(props.event) ?? false
+              },
+              onExit: () => {
+                openRef.current = false
+                onMentionMenuOpenChangeRef.current?.(false)
+                commandRef.current = null
+                setOpen(false)
+                setItems([])
+                setLoading(false)
+                setErrored(false)
+              },
+            }),
+          }),
+        ]
 }

@@ -8,7 +8,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function requireString(args: Record<string, unknown>, name: string): string {
+export function requireMcpString(args: Record<string, unknown>, name: string): string {
   const value = args[name]
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`${name} is required and must be a non-empty string`)

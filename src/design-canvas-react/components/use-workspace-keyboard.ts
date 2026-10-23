@@ -2,10 +2,10 @@
 import { useRef, type Dispatch, type SetStateAction } from 'react'
 import { addElementCommand, setAttrsCommand, multiSetAttrsCommand, deleteElementCommand, groupElementsCommand, ungroupElementCommand, type MultiSetAttrsEntry } from '../engine/commands'
 import { findElement, type SceneElement } from '../../design-canvas/model'
-import type { SceneCommand, SnapResult } from '../contracts'
+import type { SceneCommand, CanvasSnapResult } from '../contracts'
 import type { WorkspaceViewProps } from './Workspace'
 import { NO_MARQUEE, type MarqueeState, type GestureMode } from './workspace-gesture-state'
-import { nudgeDelta as nudgeDeltaMath } from './transform-math'
+import { nudgeDelta as nudgeDeltaMath } from '../engine/selection'
 
 const DUPLICATE_OFFSET = 10
 
@@ -15,7 +15,7 @@ type WorkspaceKeyboardOptions = Pick<WorkspaceViewProps, 'stack' | 'activePage' 
   gestureRef: { current: GestureMode }
   spaceHeldRef: { current: boolean }
   setMarquee: Dispatch<SetStateAction<MarqueeState>>
-  setActiveSnap: Dispatch<SetStateAction<SnapResult | null>>
+  setActiveSnap: Dispatch<SetStateAction<CanvasSnapResult | null>>
   editingElementId: string | null
   setEditingElementId: Dispatch<SetStateAction<string | null>>
 }

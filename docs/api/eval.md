@@ -4,23 +4,7 @@
 
 Source: `src/eval/index.ts`
 
-34 exports.
-
-### `AskVerdict`
-
-`interface`
-
-```ts
-interface AskVerdict
-```
-
-### `assertGateDiscriminates`
-
-`function` — `calibrateGate`, but throws instead of reporting.
-
-```ts
-<TInput>(name: string, gate: GateFn<TInput>, cases: readonly CalibrationCase<TInput>[]) => Promise<CalibrationReport>
-```
+23 exports.
 
 ### `calibrateGate`
 
@@ -126,70 +110,6 @@ interface DecidePersonaTurnOpts
 type GateFn
 ```
 
-### `gradeAnswer`
-
-`function`
-
-```ts
-(text: string, ask: ParityAsk) => AskVerdict
-```
-
-### `LaneAnswer`
-
-`interface` — One lane's answer to one ask.
-
-```ts
-interface LaneAnswer
-```
-
-### `measureWithControl`
-
-`function` — Measure something, but only after proving the instrument can register a non-zero — because an absence is a claim about the measurement first.
-
-```ts
-<TValue>(opts: { readonly measure: () => TValue | Promise<TValue>; readonly control: () => TValue | Promise<TValue>; re…
-```
-
-### `ParityAsk`
-
-`interface` — Parity eval: the same asks through two or more lanes of one app (for example the Router turn and the sandbox turn), graded the same way, so a lane change is judged by numbers rather than by feel.
-
-```ts
-interface ParityAsk
-```
-
-### `parityGate`
-
-`function` — The release bar: every lane at or above `minCorrect` of its asks, with no fabrication and no failed turn.
-
-```ts
-(report: ParityReport, bar: { minCorrectRatio: number; maxFabricated?: number | undefined; maxFailed?: number | undefin…
-```
-
-### `ParityLane`
-
-`type`
-
-```ts
-type ParityLane
-```
-
-### `ParityReport`
-
-`interface`
-
-```ts
-interface ParityReport
-```
-
-### `ProbeReport`
-
-`interface`
-
-```ts
-interface ProbeReport
-```
-
 ### `producedFromToolEvents`
 
 `function` — Bridge the app-tool side channel's produced events into the runtime-event shape agent-eval's `extractProducedState` reads.
@@ -212,14 +132,6 @@ interface ProducedState
 
 ```ts
 (input: ScorecardWiringInput) => ScorecardWiringResult
-```
-
-### `runParityEval`
-
-`function` — Ask every lane every question, one ask at a time per lane (lanes run in parallel), and grade each answer the same way.
-
-```ts
-(options: { asks: readonly ParityAsk[]; lanes: Record<string, ParityLane>; style?: string | undefined; }) => Promise<Pa…
 ```
 
 ### `RuntimeEventLike`

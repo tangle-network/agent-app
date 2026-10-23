@@ -236,12 +236,7 @@ function isMediaCatalog(value: unknown): value is MediaModelCatalogResponse {
     ))
   })
 }
-
-/**
- * The composer card. The host owns its width (the card fills its container) and
- * the heading above it; this owns the prompt, the controls, and the POST.
- */
-export function StudioComposer({
+function useStudioComposerViewState({
   workspaceId,
   onGenerated,
   variant = 'home',
@@ -446,6 +441,228 @@ export function StudioComposer({
     && !catalogLoading
     && !catalogError
   const canSubmit = Boolean(workspaceId) && modelReady && Boolean(prompt.trim()) && !isSubmitting
+  const { selectModel, chooseModel, setOption, attachReference, removeReference,
+    generate } = createStudioGenerationActions({ setSelectedModels, type, referenceImageUrl,
+    setReferenceImageUrl, setOptionValues, modelId, workspaceId, submitLockRef, isSubmitting, prompt,
+    modelReady, setIsSubmitting, setError, values, onGenerated, setPrompt, referenceSupported, audioSupported })
+
+  const notice = error
+  const laneLabel = SEGMENTS.find((segment) => segment.type === type)!.label
+  // An empty curated lane can reflect catalog or curation policy, not an outage.
+  const blockedReasons = [...new Set(curatedModels.map((model) => model.reason?.trim()).filter(Boolean))]
+  const sharedBlockReason = curatedModels.every((model) => Boolean(model.reason?.trim())) && blockedReasons.length === 1
+    ? blockedReasons[0]
+    : undefined
+  const laneDownMessage = curatedModels.length === 0
+    ? `No ${laneLabel.toLowerCase()} models are available`
+    : sharedBlockReason ?? `${laneLabel} models are unavailable`
+  const loadingModels = Boolean(workspaceId) && (catalogLoading || (!catalog && !catalogError))
+  const modelStatus = loadingModels ? 'Loading media models…' : catalogError ?? (laneDown ? laneDownMessage : null)
+  const showModelMenu = catalogReady && curatedModels.length > 0
+  // The trigger draws the same brand the picker rows do: the maker, else the host.
+  const triggerBrand = modelOption?.maker?.trim() || modelOption?.provider
+  const pickerModels = useMemo(() => curatedModels.map((model) => pickerModel(model, type)), [curatedModels, type])
+  // The trigger names none on a dead lane: a model name there reads as a
+  // working choice the user could send. A model the catalog does not list
+  // (an image-to-video sibling) reads as its id.
+  const modelDisplayName = laneDown ? 'Unavailable' : modelOption?.name || modelId || 'Select a model'
+  const modelUnavailable = laneDown || modelOption?.status === 'unavailable'
+  const canReloadModels = Boolean(workspaceId) && !loadingModels && Boolean(catalogError || (catalogReady && curatedModels.length === 0))
+  const { settingParams, settings } = createStudioGenerationSettings({ type, params, values, options, setOption, modelId })
+  if (audioSupported) {
+    const audioOn = (values.audio ?? audioMeta?.default) === true
+    settings.splice(Math.min(2, settings.length), 0, {
+      key: 'audio',
+      label: 'Audio',
+      summary: audioOn ? 'Audio on' : 'Audio off',
+      value: audioOn,
+      choices: [],
+      onSelect: (next) => setOption('audio', next),
+      onToggle: () => setOption('audio', !audioOn),
+      icon: AudioLines,
+    })
+  }
+
+  function reloadModels() {
+    if (!workspaceId || catalogLoading || catalogPendingRef.current) return
+    catalogPendingRef.current = true
+    setCatalogLoading(true)
+    setCatalogRequest((current) => current + 1)
+  }
+  return { variant, className, prompt, setPrompt, generate, modelStatus, laneWarningId, type,
+    loadingModels, canReloadModels, reloadModels, catalogError, setType, bandRef, showModelMenu,
+    laneDown, modelId, chooseModel, pickerModels, laneLabel, modelDisplayName, modelUnavailable,
+    triggerBrand, settings, referenceSupported, referenceImageUrl, attachReference, removeReference,
+    pickReferenceImage, canSubmit, sendTone, notice }
+}
+
+type StudioComposerViewState = ReturnType<typeof useStudioComposerViewState>
+
+export function StudioComposer(props: StudioComposerProps) {
+  const view = useStudioComposerViewState(props)
+  return <StudioComposerView {...view} />
+}
+
+function StudioComposerView({ variant, className, prompt, setPrompt, generate, modelStatus,
+  laneWarningId, type, loadingModels, canReloadModels, reloadModels, catalogError, setType, bandRef,
+  showModelMenu, laneDown, modelId, chooseModel, pickerModels, laneLabel, modelDisplayName,
+  modelUnavailable, triggerBrand, settings, referenceSupported, referenceImageUrl, attachReference,
+  removeReference, pickReferenceImage, canSubmit, sendTone, notice }: StudioComposerViewState) {
+  return ((
+    <section
+      data-variant={variant}
+      className={`studio-composer-card @container/studio-composer rounded-2xl border bg-[var(--well,var(--color-card))] p-2.5 shadow-raised transition ${focusFieldWithin} ${className ?? ''}`}
+    >
+      {/* The textarea draws no outline of its own: the section is the field, and
+          its focusFieldWithin (focus-within: border and ring) is the indicator. */}
+      <textarea
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey) return
+          event.preventDefault()
+          void generate()
+        }}
+        rows={3}
+        aria-label="Prompt"
+        aria-describedby={modelStatus ? laneWarningId : undefined}
+        placeholder={type === 'speech' ? 'Write the words to speak…' : `Describe the ${type} you want to create…`}
+        className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
+      />
+      {modelStatus && (
+        <div id={laneWarningId} role="status" className="flex flex-wrap items-center gap-2 px-1.5 pb-3 pt-1.5 text-[14px] text-muted-foreground">
+          <span className="flex min-w-0 max-w-full items-start gap-2">
+            {!loadingModels && <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={2} />}
+            <span className="min-w-0">{modelStatus}</span>
+          </span>
+          {canReloadModels && (
+            <button type="button" onClick={reloadModels} className="rounded-md px-1 font-medium text-foreground underline underline-offset-4 hover:decoration-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+              {catalogError ? 'Retry models' : 'Refresh models'}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 @[640px]/studio-composer:flex-nowrap">
+        <MediaTypeSegments value={type} segments={SEGMENTS} onChange={setType} />
+
+        <ComposerBand bandRef={bandRef} resetKey={type}>
+          {showModelMenu && (
+            <div className="flex-none">
+              <ModelPicker
+                // A dead lane has no sendable model, so nothing in the menu is
+                // marked chosen. An attached reference runs the unlisted
+                // image-to-video sibling; its listed parent is the row shown
+                // as chosen, and picking it again keeps the pairing.
+                value={laneDown ? '' : textToVideoSibling(modelId) ?? modelId}
+                onChange={chooseModel}
+                models={pickerModels}
+                // Every row of a lane is shown at once: a lane carries a
+                // handful of models, never the hundreds the chat catalog does.
+                priorityGroup={{ label: `${laneLabel} models`, match: () => true }}
+                aria-label={`Model: ${modelDisplayName}${modelUnavailable ? ' (unavailable)' : ''}`}
+                triggerContent={(
+                  <span className="contents">
+                    {modelUnavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
+                    {!laneDown && triggerBrand && (
+                      <span className="shrink-0" aria-hidden><ProviderLogo provider={triggerBrand} size={16} /></span>
+                    )}
+                    <span className="max-w-[160px] truncate leading-normal">{modelDisplayName}</span>
+                  </span>
+                )}
+              />
+            </div>
+          )}
+
+          {settings.length > 0 && (
+            <div className="studio-pill-in flex-none">
+              <GenerationSettings settings={settings} bandRef={bandRef} resetKey={`${type}:${modelId}`} />
+            </div>
+          )}
+
+          {referenceSupported && (
+            <div key={`${type}-reference`} className="studio-pill-in flex-none">
+              <ReferencePill
+                url={referenceImageUrl}
+                onAttach={attachReference}
+                onRemove={removeReference}
+                pick={pickReferenceImage}
+                bandRef={bandRef}
+              />
+            </div>
+          )}
+        </ComposerBand>
+
+        <button
+          type="button"
+          aria-label="Generate"
+          title="Generate"
+          disabled={!canSubmit}
+          onClick={() => void generate()}
+          className={`ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
+        >
+          <ArrowUp className="h-4 w-4" strokeWidth={2} />
+        </button>
+      </div>
+
+      {notice && (
+        <p className="px-1.5 pt-1.5 text-[14px] text-destructive">
+          {notice}
+        </p>
+      )}
+    </section>
+  ))
+}
+
+
+
+/** A text-typed field's value, or `undefined` so the field is omitted entirely
+ *  — `String(undefined)` puts the literal `"undefined"` on the wire, which the
+ *  provider will try to honour. These fields are typed `string` by the
+ *  `/api/generate` contract, so a numeric published value is rendered as its
+ *  digits; the type-sensitive fields (`duration`, `audio`, `speed`) never pass
+ *  through here. */
+function asText(value: ModelOptionValue | undefined): string | undefined {
+  return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : undefined
+}
+
+/** A duration passes through as published: the string `'5'`, the string `'8s'`,
+ *  or the number `5`. Only a boolean (which no lane publishes here) is refused. */
+function asWireScalar(value: ModelOptionValue | undefined): string | number | undefined {
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined
+}
+
+/** A setting's choices: the published values, plus the current value when it is a
+ *  legal off-enum one (a custom gpt-image-2 size), so the row reports what is
+ *  actually selected instead of falling back to a dash. */
+function choicesForSetting(
+  param: string,
+  meta: ModelOptionMetadata | undefined,
+  value: ModelOptionValue | undefined,
+): OptionChoice[] {
+  if (!meta) return []
+  const choices = choicesFor(param, meta).map((choice) => ({
+    value: choice,
+    label: optionValueLabel(param, choice),
+  }))
+  if (value === undefined || choices.some((choice) => choice.value === value)) return choices
+  return [...choices, { value, label: `${optionValueLabel(param, value)} · custom` }]
+}
+
+
+function createStudioGenerationActions({ setSelectedModels, type, referenceImageUrl,
+  setReferenceImageUrl, setOptionValues, modelId, workspaceId, submitLockRef, isSubmitting, prompt,
+  modelReady, setIsSubmitting, setError, values, onGenerated, setPrompt, referenceSupported,
+  audioSupported }: { setSelectedModels: (value: (current: Partial<Record<ComposerType,
+  string>>) => Partial<Record<ComposerType, string>>) => void; type: ComposerType;
+  referenceImageUrl: string | null; setReferenceImageUrl: (url: string | null) => void;
+  setOptionValues: (value: (current: Record<ComposerType, Record<string,
+  ModelOptionValue>>) => Record<ComposerType, Record<string, ModelOptionValue>>) => void;
+  modelId: string; workspaceId: StudioComposerProps['workspaceId'];
+  submitLockRef: { current: boolean }; isSubmitting: boolean; prompt: string; modelReady: boolean;
+  setIsSubmitting: (value: boolean) => void; setError: (error: string | null) => void;
+  values: Record<string, ModelOptionValue>; onGenerated: StudioComposerProps['onGenerated'];
+  setPrompt: (prompt: string) => void; referenceSupported: boolean; audioSupported: boolean }) {
 
   function selectModel(id: string) {
     setSelectedModels((current) => ({ ...current, [type]: id }))
@@ -558,29 +775,14 @@ export function StudioComposer({
       setIsSubmitting(false)
     }
   }
+  return { selectModel, chooseModel, setOption, attachReference, removeReference, generate }
+}
 
-  const notice = error
-  const laneLabel = SEGMENTS.find((segment) => segment.type === type)!.label
-  // An empty curated lane can reflect catalog or curation policy, not an outage.
-  const blockedReasons = [...new Set(curatedModels.map((model) => model.reason?.trim()).filter(Boolean))]
-  const sharedBlockReason = curatedModels.every((model) => Boolean(model.reason?.trim())) && blockedReasons.length === 1
-    ? blockedReasons[0]
-    : undefined
-  const laneDownMessage = curatedModels.length === 0
-    ? `No ${laneLabel.toLowerCase()} models are available`
-    : sharedBlockReason ?? `${laneLabel} models are unavailable`
-  const loadingModels = Boolean(workspaceId) && (catalogLoading || (!catalog && !catalogError))
-  const modelStatus = loadingModels ? 'Loading media models…' : catalogError ?? (laneDown ? laneDownMessage : null)
-  const showModelMenu = catalogReady && curatedModels.length > 0
-  // The trigger draws the same brand the picker rows do: the maker, else the host.
-  const triggerBrand = modelOption?.maker?.trim() || modelOption?.provider
-  const pickerModels = useMemo(() => curatedModels.map((model) => pickerModel(model, type)), [curatedModels, type])
-  // The trigger names none on a dead lane: a model name there reads as a
-  // working choice the user could send. A model the catalog does not list
-  // (an image-to-video sibling) reads as its id.
-  const modelDisplayName = laneDown ? 'Unavailable' : modelOption?.name || modelId || 'Select a model'
-  const modelUnavailable = laneDown || modelOption?.status === 'unavailable'
-  const canReloadModels = Boolean(workspaceId) && !loadingModels && Boolean(catalogError || (catalogReady && curatedModels.length === 0))
+
+function createStudioGenerationSettings({ type, params, values, options, setOption,
+  modelId }: { type: ComposerType; params: string[]; values: Record<string, ModelOptionValue>;
+  options: ModelOptionsMetadata | undefined; setOption: (param: string,
+  value: ModelOptionValue) => void; modelId: string }) {
 
   // Put the visible video defaults first; extra model parameters stay behind
   // More. The model's own metadata supplies every choice and wire-typed value.
@@ -617,162 +819,5 @@ export function StudioComposer({
       } : {}),
     }
   })
-  if (audioSupported) {
-    const audioOn = (values.audio ?? audioMeta?.default) === true
-    settings.splice(Math.min(2, settings.length), 0, {
-      key: 'audio',
-      label: 'Audio',
-      summary: audioOn ? 'Audio on' : 'Audio off',
-      value: audioOn,
-      choices: [],
-      onSelect: (next) => setOption('audio', next),
-      onToggle: () => setOption('audio', !audioOn),
-      icon: AudioLines,
-    })
-  }
-
-  function reloadModels() {
-    if (!workspaceId || catalogLoading || catalogPendingRef.current) return
-    catalogPendingRef.current = true
-    setCatalogLoading(true)
-    setCatalogRequest((current) => current + 1)
-  }
-
-  return (
-    <section
-      data-variant={variant}
-      className={`studio-composer-card @container/studio-composer rounded-2xl border bg-[var(--well,var(--color-card))] p-2.5 shadow-raised transition ${focusFieldWithin} ${className ?? ''}`}
-    >
-      {/* The textarea draws no outline of its own: the section is the field, and
-          its focusFieldWithin (focus-within: border and ring) is the indicator. */}
-      <textarea
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey) return
-          event.preventDefault()
-          void generate()
-        }}
-        rows={3}
-        aria-label="Prompt"
-        aria-describedby={modelStatus ? laneWarningId : undefined}
-        placeholder={type === 'speech' ? 'Write the words to speak…' : `Describe the ${type} you want to create…`}
-        className="block min-h-[66px] w-full resize-none border-0 bg-transparent px-1.5 pb-1 pt-1.5 text-[14.5px] leading-relaxed outline-none placeholder:text-muted-foreground"
-      />
-      {modelStatus && (
-        <div id={laneWarningId} role="status" className="flex flex-wrap items-center gap-2 px-1.5 pb-3 pt-1.5 text-[14px] text-muted-foreground">
-          <span className="flex min-w-0 max-w-full items-start gap-2">
-            {!loadingModels && <TriangleAlert aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={2} />}
-            <span className="min-w-0">{modelStatus}</span>
-          </span>
-          {canReloadModels && (
-            <button type="button" onClick={reloadModels} className="rounded-md px-1 font-medium text-foreground underline underline-offset-4 hover:decoration-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-              {catalogError ? 'Retry models' : 'Refresh models'}
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 @[640px]/studio-composer:flex-nowrap">
-        <MediaTypeSegments value={type} segments={SEGMENTS} onChange={setType} />
-
-        <ComposerBand bandRef={bandRef} resetKey={type}>
-          {showModelMenu && (
-            <div className="flex-none">
-              <ModelPicker
-                // A dead lane has no sendable model, so nothing in the menu is
-                // marked chosen. An attached reference runs the unlisted
-                // image-to-video sibling; its listed parent is the row shown
-                // as chosen, and picking it again keeps the pairing.
-                value={laneDown ? '' : textToVideoSibling(modelId) ?? modelId}
-                onChange={chooseModel}
-                models={pickerModels}
-                // Every row of a lane is shown at once: a lane carries a
-                // handful of models, never the hundreds the chat catalog does.
-                priorityGroup={{ label: `${laneLabel} models`, match: () => true }}
-                aria-label={`Model: ${modelDisplayName}${modelUnavailable ? ' (unavailable)' : ''}`}
-                triggerContent={(
-                  <span className="contents">
-                    {modelUnavailable && <TriangleAlert aria-hidden className="h-3.5 w-3.5 shrink-0 text-warning" strokeWidth={2} />}
-                    {!laneDown && triggerBrand && (
-                      <span className="shrink-0" aria-hidden><ProviderLogo provider={triggerBrand} size={16} /></span>
-                    )}
-                    <span className="max-w-[160px] truncate leading-normal">{modelDisplayName}</span>
-                  </span>
-                )}
-              />
-            </div>
-          )}
-
-          {settings.length > 0 && (
-            <div className="studio-pill-in flex-none">
-              <GenerationSettings settings={settings} bandRef={bandRef} resetKey={`${type}:${modelId}`} />
-            </div>
-          )}
-
-          {referenceSupported && (
-            <div key={`${type}-reference`} className="studio-pill-in flex-none">
-              <ReferencePill
-                url={referenceImageUrl}
-                onAttach={attachReference}
-                onRemove={removeReference}
-                pick={pickReferenceImage}
-                bandRef={bandRef}
-              />
-            </div>
-          )}
-        </ComposerBand>
-
-        <button
-          type="button"
-          aria-label="Generate"
-          title="Generate"
-          disabled={!canSubmit}
-          onClick={() => void generate()}
-          className={`ml-auto inline-flex h-8 w-8 flex-none items-center justify-center rounded-full ${sendTone === 'primary' ? 'bg-primary text-primary-foreground' : 'bg-foreground text-background'} transition ${sendTone === 'primary' ? 'hover:bg-primary/90' : 'hover:opacity-90'} disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card`}
-        >
-          <ArrowUp className="h-4 w-4" strokeWidth={2} />
-        </button>
-      </div>
-
-      {notice && (
-        <p className="px-1.5 pt-1.5 text-[14px] text-destructive">
-          {notice}
-        </p>
-      )}
-    </section>
-  )
-}
-
-/** A text-typed field's value, or `undefined` so the field is omitted entirely
- *  — `String(undefined)` puts the literal `"undefined"` on the wire, which the
- *  provider will try to honour. These fields are typed `string` by the
- *  `/api/generate` contract, so a numeric published value is rendered as its
- *  digits; the type-sensitive fields (`duration`, `audio`, `speed`) never pass
- *  through here. */
-function asText(value: ModelOptionValue | undefined): string | undefined {
-  return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : undefined
-}
-
-/** A duration passes through as published: the string `'5'`, the string `'8s'`,
- *  or the number `5`. Only a boolean (which no lane publishes here) is refused. */
-function asWireScalar(value: ModelOptionValue | undefined): string | number | undefined {
-  return typeof value === 'string' || typeof value === 'number' ? value : undefined
-}
-
-/** A setting's choices: the published values, plus the current value when it is a
- *  legal off-enum one (a custom gpt-image-2 size), so the row reports what is
- *  actually selected instead of falling back to a dash. */
-function choicesForSetting(
-  param: string,
-  meta: ModelOptionMetadata | undefined,
-  value: ModelOptionValue | undefined,
-): OptionChoice[] {
-  if (!meta) return []
-  const choices = choicesFor(param, meta).map((choice) => ({
-    value: choice,
-    label: optionValueLabel(param, choice),
-  }))
-  if (value === undefined || choices.some((choice) => choice.value === value)) return choices
-  return [...choices, { value, label: `${optionValueLabel(param, value)} · custom` }]
+  return { settingParams, settings }
 }

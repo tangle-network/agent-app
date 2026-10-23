@@ -4,15 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-58 exports.
-
-### `addProfileKnowledgeDocument`
-
-`function`
-
-```ts
-(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; content: string; act…
-```
+47 exports.
 
 ### `admitProfileTurn`
 
@@ -30,28 +22,12 @@ Source: `src/agent-profiles/index.ts`
 (consentedBaseline: AgentProfile, selected: AgentProfile) => AgentProfile
 ```
 
-### `createDrizzleSelfMountStorage`
-
-`function` — A drizzle-backed SelfMountStorage against any table with the standard shape (scope primary key + mounted JSON text column).
-
-```ts
-(db: any, table: SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name: "scop…
-```
-
 ### `createInMemorySelfMountStorage`
 
 `function` — Non-durable default for tests and single-instance products.
 
 ```ts
 () => SelfMountStorage
-```
-
-### `createKVSelfMountStorage`
-
-`function` — A KV-backed SelfMountStorage (Cloudflare KV, any namespace).
-
-```ts
-(kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void>; }, prefix: string, bas…
 ```
 
 ### `createMountProfileChangeTool`
@@ -150,14 +126,6 @@ readonly ["skills"]
 interface ProductSelfMountConfig
 ```
 
-### `PROFILE_CHANGE_POLICY`
-
-`const` — The decision table used by every write path; products may narrow access, never widen it.
-
-```ts
-{ readonly textEdit: { readonly admission: "automatic"; readonly conversation: "same"; readonly destructive: false; };…
-```
-
 ### `PROFILE_MEMORY_PREFIX`
 
 `const` — Workspace-shared memories live under this prefix in the workspace store.
@@ -246,14 +214,6 @@ interface ProfileBindingKey
 class ProfileConflictError
 ```
 
-### `ProfileKnowledgeDocument`
-
-`interface`
-
-```ts
-interface ProfileKnowledgeDocument
-```
-
 ### `ProfileKnowledgeEvent`
 
 `interface` — Remove events name only adds they observed; a concurrent add survives.
@@ -302,28 +262,12 @@ interface ProfileRevisionStore
 (content: string, identityContext?: string | undefined) => string
 ```
 
-### `profileSwitchInputHashFromContentHash`
-
-`function` — A source identity joins the command hash without entering the receipt row.
-
-```ts
-(contentHash: string, identityContext?: string | undefined) => string
-```
-
 ### `ProfileSwitchReceipt`
 
 `interface`
 
 ```ts
 interface ProfileSwitchReceipt
-```
-
-### `profileTextChange`
-
-`function`
-
-```ts
-(revision: ProfileRevision, changes: { name?: string | undefined; description?: string | null | undefined; systemPrompt…
 ```
 
 ### `ProfileToolContext`
@@ -358,14 +302,6 @@ interface ProfileToolTurn
 interface ProfileTurnPin
 ```
 
-### `projectKnowledgeDocuments`
-
-`function`
-
-```ts
-(events: readonly ProfileKnowledgeEvent[]) => ProfileKnowledgeDocument[]
-```
-
 ### `promoteRevision`
 
 `function`
@@ -398,22 +334,6 @@ interface ProposeRevisionInput
 (store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…
 ```
 
-### `removeProfileKnowledgeDocument`
-
-`function`
-
-```ts
-(input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; documentId: string; actorRole: "member"…
-```
-
-### `rollbackProfileBinding`
-
-`function` — One-step rollback moves this member/channel to its previous immutable revision.
-
-```ts
-(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; conversationId?: string | undefined;…
-```
-
 ### `SelfMountSkillEntry`
 
 `interface`
@@ -428,14 +348,6 @@ interface SelfMountSkillEntry
 
 ```ts
 interface SelfMountStorage
-```
-
-### `selfMountTable`
-
-`function` — Create (or use) the standard self-mount table in a drizzle/D1 database.
-
-```ts
-(tableName: string) => SQLiteTableWithColumns<{ name: string; schema: undefined; columns: { scope: SQLiteColumn<{ name:…
 ```
 
 ### `serializeProfileRevisionDiff`

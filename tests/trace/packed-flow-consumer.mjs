@@ -23,9 +23,10 @@ try {
   const fromPack = createRequire(join(scratch,'package.json'))
   const fromOwner = createRequire(join(root,'package.json'))
   const load = (require,id) => import(pathToFileURL(require.resolve(id)).href)
-  const { buildFlowTrace, composeMissionFlowTrace, stepActivityFlowTrace } = await load(fromPack,'@tangle-network/agent-app/trace')
+  const { buildFlowTrace, stepActivityFlowTrace } = await load(fromPack,'@tangle-network/agent-app/trace')
   const surfaces = await load(fromPack,'@tangle-network/agent-app/web-react')
   for (const removed of ['FlowWaterfall','waterfallLayout']) assert.equal(removed in surfaces,false,removed)
+  assert.equal('composeMissionFlowTrace' in await load(fromPack,'@tangle-network/agent-app/trace'),false)
   if (!runtimeOnly) {
     // Type-only APIs require a real downstream compiler; runtime namespace checks cannot prove them.
     const compilerManifest = fromOwner.resolve('typescript/package.json')
@@ -37,10 +38,11 @@ try {
     }
     const retained = compile("import type {MissionActivityLaneProps} from '@tangle-network/agent-app/web-react'; import type {FlowTrace,FlowSpan} from '@tangle-network/agent-app/trace'; export type Retained=MissionActivityLaneProps; const span:FlowSpan={kind:'tool',name:'retained',startMs:0,endMs:1}; const trace:FlowTrace={spans:[span],totalMs:1,promptTokens:0,completionTokens:0,toolCalls:1}; void trace;")
     assert.equal(retained.status,0,retained.stdout+retained.stderr)
-    const retired = compile("import type {FlowWaterfallProps,WaterfallRow} from '@tangle-network/agent-app/web-react'; export type Removed=[FlowWaterfallProps,WaterfallRow];")
+    const retired = compile("import type {FlowWaterfallProps,WaterfallRow} from '@tangle-network/agent-app/web-react'; import type {MissionFlowStep} from '@tangle-network/agent-app/trace'; export type Removed=[FlowWaterfallProps,WaterfallRow,MissionFlowStep];")
     assert.notEqual(retired.status,0,'Removed type exports must fail downstream compilation')
     assert.match(retired.stdout,/FlowWaterfallProps/)
     assert.match(retired.stdout,/WaterfallRow/)
+    assert.match(retired.stdout,/MissionFlowStep/)
     assert.match(retired.stdout,/TS(2305|2724)/,'The compiler must reject removed named exports')
   }
   const { FlowWaterfall } = await load(fromOwner,'@tangle-network/charts/react')
@@ -63,11 +65,10 @@ try {
   const observed = []
   for (const status of statuses) {
     const expected = ['running','pending'].includes(status.toLowerCase()) ? 'running' : status==='completed' ? 'done' : 'failed'
-    const trace = composeMissionFlowTrace({steps:[{id:'step',intent:'Domain result',status,startedAt:0,durationMs:1000}],startedAt:0})
-    assert.equal(trace.spans[0].status,expected,`Mission ${status}`)
-    assert.equal(html(trace).includes('data-span-kind="failed"'),expected==='failed')
     const lane = stepActivityFlowTrace([{taskId:'task',tool:'worker',detail:'Domain result',status,startedAt:new Date(0).toISOString(),...(expected==='running'?{}:{durationMs:1000})}],{startedAt:0,nowMs:2000})
     assert.equal(lane.spans[0].status,expected,`Lane ${status}`)
+    assert.equal(html(lane).includes('data-span-kind="failed"'),expected==='failed')
+    assert.equal(lane.spans[0].meta.status,status,'Observed domain status stays in producer metadata')
     if(expected==='running')assert.equal(lane.spans[0].endMs,2000)
     observed.push({status,expected,renderedFailure:expected==='failed'})
   }

@@ -213,7 +213,7 @@ import { eq } from 'drizzle-orm'
 import { sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 /** Create (or use) the standard self-mount table in a drizzle/D1 database. */
-export function selfMountTable(tableName: string) {
+function selfMountTable(tableName: string) {
   return sqliteTable(tableName, {
     scope: text('scope').primaryKey(),
     mounted: text('mounted').notNull(),
@@ -223,7 +223,7 @@ export function selfMountTable(tableName: string) {
 /** A drizzle-backed SelfMountStorage against any table with the standard
  *  shape (scope primary key + mounted JSON text column). Works with the
  *  tables every product creates via {@link selfMountTable}. */
-export function createDrizzleSelfMountStorage(
+function createDrizzleSelfMountStorage(
   db: DrizzleLike,
   table: ReturnType<typeof selfMountTable>,
   baseline: string,
@@ -254,7 +254,7 @@ export function createDrizzleSelfMountStorage(
 }
 
 /** A KV-backed SelfMountStorage (Cloudflare KV, any namespace). */
-export function createKVSelfMountStorage(
+function createKVSelfMountStorage(
   kv: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> },
   prefix: string,
   baseline: string,

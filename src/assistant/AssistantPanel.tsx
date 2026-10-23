@@ -312,8 +312,7 @@ export function nextModelSelection(
   if (defaultSlug != null && id === defaultSlug) return null;
   return id || null;
 }
-
-export function AssistantPanel({
+function useAssistantPanelViewState({
   chat,
   userId,
   onClose,
@@ -497,75 +496,33 @@ export function AssistantPanel({
       chatRef.current.reset();
     }
   };
+  return { layout, onClose, toggleRef, effectiveBalance, formatMoney, context, chat, setView,
+    historyButtonRef, toggleHistory, view, logRef, handleConversationScroll, threads, state,
+    deleteThread, transcriptView, toolRenderers, renderConfirmedResult, setStarterSeed, errorView,
+    navigate, low, showContinue, onComposerSend, streaming, starterSeed, composerSeed,
+    onComposerSeedApplied, composerAttachments, pickerModels, pickerValue, models }
+}
 
-  return (
+type AssistantPanelViewState = ReturnType<typeof useAssistantPanelViewState>
+
+export function AssistantPanel(props: AssistantPanelProps) {
+  const view = useAssistantPanelViewState(props)
+  return <AssistantPanelView {...view} />
+}
+
+function AssistantPanelView({ layout, onClose, toggleRef, effectiveBalance, formatMoney, context,
+  chat, setView, historyButtonRef, toggleHistory, view, logRef, handleConversationScroll, threads,
+  state, deleteThread, transcriptView, toolRenderers, renderConfirmedResult, setStarterSeed,
+  errorView, navigate, low, showContinue, onComposerSend, streaming, starterSeed, composerSeed,
+  onComposerSeedApplied, composerAttachments, pickerModels, pickerValue, models }: AssistantPanelViewState) {
+  return ((
     <div className="relative flex h-full min-h-0 flex-col bg-card">
       {/* History sits on the outer edge, under the floating toggle's spot: a
           second click right after opening toggles history, never resets the
           conversation. */}
-      <ShellHeader as="header" className="gap-2 bg-transparent">
-        {layout === "docked" && (
-          <AssistantPanelToggle open onToggle={onClose} buttonRef={toggleRef} />
-        )}
-        <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h2 className="truncate font-semibold text-[length:var(--font-size-base)] text-foreground leading-tight">
-              Assistant
-            </h2>
-            {effectiveBalance != null && (
-              <span
-                aria-label="Your credit balance"
-                className="shrink-0 text-muted-foreground text-xs tabular-nums"
-              >
-                {formatMoney(effectiveBalance)}
-              </span>
-            )}
-          </div>
-          {context && (
-            <p
-              className="truncate text-muted-foreground text-xs leading-snug"
-              title={`The assistant sees ${context.path}`}
-            >
-              <span className="sr-only">Looking at </span>
-              {context.label}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            chat.reset();
-            setView("chat");
-          }}
-          aria-label="New chat"
-          title="New chat"
-          className={HEADER_BUTTON}
-        >
-          <MessageSquarePlus aria-hidden="true" className="h-[18px] w-[18px]" />
-        </button>
-        <button
-          ref={historyButtonRef}
-          type="button"
-          onClick={toggleHistory}
-          aria-label="Chat history"
-          aria-pressed={view === "history"}
-          title="Chat history"
-          className={`${HEADER_BUTTON} ${view === "history" ? "bg-[var(--accent-surface-soft)] text-foreground" : ""}`}
-        >
-          <History aria-hidden="true" className="h-[18px] w-[18px]" />
-        </button>
-        {layout === "sheet" && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close assistant"
-            title="Close assistant"
-            className={HEADER_BUTTON}
-          >
-            <X aria-hidden="true" className="h-[18px] w-[18px]" />
-          </button>
-        )}
-      </ShellHeader>
+      <AssistantPanelHeader layout={layout} onClose={onClose} toggleRef={toggleRef}
+        effectiveBalance={effectiveBalance} formatMoney={formatMoney} context={context} chat={chat}
+        setView={setView} historyButtonRef={historyButtonRef} toggleHistory={toggleHistory} view={view} />
 
       <div
         ref={logRef}
@@ -692,5 +649,72 @@ export function AssistantPanel({
         />
       </div>
     </div>
-  );
+  ))
+}
+
+function AssistantPanelHeader({ layout, onClose, toggleRef, effectiveBalance, formatMoney, context,
+  chat, setView, historyButtonRef, toggleHistory, view }: Pick<AssistantPanelViewState, "layout" | "onClose" | "toggleRef" | "effectiveBalance" | "formatMoney" | "context" | "chat" | "setView" | "historyButtonRef" | "toggleHistory" | "view">) {
+  return (<ShellHeader as="header" className="gap-2 bg-transparent">
+        {layout === "docked" && (
+          <AssistantPanelToggle open onToggle={onClose} buttonRef={toggleRef} />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="truncate font-semibold text-[length:var(--font-size-base)] text-foreground leading-tight">
+              Assistant
+            </h2>
+            {effectiveBalance != null && (
+              <span
+                aria-label="Your credit balance"
+                className="shrink-0 text-muted-foreground text-xs tabular-nums"
+              >
+                {formatMoney(effectiveBalance)}
+              </span>
+            )}
+          </div>
+          {context && (
+            <p
+              className="truncate text-muted-foreground text-xs leading-snug"
+              title={`The assistant sees ${context.path}`}
+            >
+              <span className="sr-only">Looking at </span>
+              {context.label}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            chat.reset();
+            setView("chat");
+          }}
+          aria-label="New chat"
+          title="New chat"
+          className={HEADER_BUTTON}
+        >
+          <MessageSquarePlus aria-hidden="true" className="h-[18px] w-[18px]" />
+        </button>
+        <button
+          ref={historyButtonRef}
+          type="button"
+          onClick={toggleHistory}
+          aria-label="Chat history"
+          aria-pressed={view === "history"}
+          title="Chat history"
+          className={`${HEADER_BUTTON} ${view === "history" ? "bg-[var(--accent-surface-soft)] text-foreground" : ""}`}
+        >
+          <History aria-hidden="true" className="h-[18px] w-[18px]" />
+        </button>
+        {layout === "sheet" && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close assistant"
+            title="Close assistant"
+            className={HEADER_BUTTON}
+          >
+            <X aria-hidden="true" className="h-[18px] w-[18px]" />
+          </button>
+        )}
+      </ShellHeader>)
 }

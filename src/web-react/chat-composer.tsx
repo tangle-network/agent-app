@@ -88,8 +88,7 @@ const LINE_HEIGHT = 24
 const TEXTAREA_PADDING_Y = 8
 
 const DEFAULT_SEND_FAILURE = "Message not sent. Your draft is still here — try again."
-
-export function ChatComposer({
+function useChatComposerViewState({
   onSend,
   onSendParts,
   onSendFailed,
@@ -333,8 +332,38 @@ export function ChatComposer({
       className="w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 text-foreground placeholder:text-muted-foreground disabled:opacity-50"
     />
   )
+  return { className, focusWithin, onAttach, handleDragEnter, handleDragLeave, handleDragOver,
+    handleDrop, dragOver, dropTitle, dropDescription, showAbove, controls, dictateError,
+    setDictateError, failedSend, setFailedSend, retryFailedSend, sendBlockedByStream, disabled,
+    selectedSkillId, eligibleSkills, onSelectedSkillChange, contextItems, pendingFiles, folderChips,
+    fileChips, onRetryFile, onRemoveFile, cardRef, floating, mention, textareaInput, MentionEditor,
+    text, setText, send, placeholder, autoFocus, inputMinHeight, maxHeight, registerRichFocus,
+    handleSlashKeyDown, setMentionSuggestionOpen, slashOpen, slashListId, slashFiltered,
+    slashActiveIndex, ingestPastedFiles, fileInputRef, accept, handleFileChange, onAttachFolder,
+    folderInputRef, handleFolderChange, showInline, trailing, onDictate, dictation, isStreaming,
+    sendVariant, onCancel, canSend, sendLabel, sendTone, textareaRef, slashPanelRef, skillQuery,
+    hasSkills, setSlashActive, pickSlash, focusShortcut }
+}
 
-  return (
+type ChatComposerViewState = ReturnType<typeof useChatComposerViewState>
+
+export function ChatComposer(props: ChatComposerProps) {
+  const view = useChatComposerViewState(props)
+  return <ChatComposerView {...view} />
+}
+
+function ChatComposerView({ className, focusWithin, onAttach, handleDragEnter, handleDragLeave,
+  handleDragOver, handleDrop, dragOver, dropTitle, dropDescription, showAbove, controls,
+  dictateError, setDictateError, failedSend, setFailedSend, retryFailedSend, sendBlockedByStream,
+  disabled, selectedSkillId, eligibleSkills, onSelectedSkillChange, contextItems, pendingFiles,
+  folderChips, fileChips, onRetryFile, onRemoveFile, cardRef, floating, mention, textareaInput,
+  MentionEditor, text, setText, send, placeholder, autoFocus, inputMinHeight, maxHeight,
+  registerRichFocus, handleSlashKeyDown, setMentionSuggestionOpen, slashOpen, slashListId,
+  slashFiltered, slashActiveIndex, ingestPastedFiles, fileInputRef, accept, handleFileChange,
+  onAttachFolder, folderInputRef, handleFolderChange, showInline, trailing, onDictate, dictation,
+  isStreaming, sendVariant, onCancel, canSend, sendLabel, sendTone, textareaRef, slashPanelRef,
+  skillQuery, hasSkills, setSlashActive, pickSlash, focusShortcut }: ChatComposerViewState) {
+  return ((
     <div
       className={`relative ${className ?? ''}`}
       onFocus={focusWithin}
@@ -464,7 +493,88 @@ export function ChatComposer({
       )}
 
       {pendingFiles.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <ComposerPendingFileChips folderChips={folderChips} fileChips={fileChips} onRetryFile={onRetryFile} onRemoveFile={onRemoveFile} />
+      )}
+
+      {/* Two rows inside one card: the message gets the full width, and every
+          affordance that acts on it — attach, the controls slot, send — sits on
+          its own row beneath. A single row would make the textarea share its
+          line with the buttons, which is what squeezed the input and pushed the
+          controls out of the card in the first place. */}
+      {/* `focusFieldWithin` makes the card a field: with brand's interaction
+          tokens it carries the well fill (`--well`), field border, hover glow
+          and focus ring. Under a brand without the ladder, tokens.css sets
+          `--well` to the card color. */}
+      <ComposerInputCard cardRef={cardRef} floating={floating} mention={mention}
+        textareaInput={textareaInput} MentionEditor={MentionEditor} text={text} setText={setText}
+        send={send} placeholder={placeholder} disabled={disabled} autoFocus={autoFocus}
+        inputMinHeight={inputMinHeight} maxHeight={maxHeight} registerRichFocus={registerRichFocus}
+        handleSlashKeyDown={handleSlashKeyDown} setMentionSuggestionOpen={setMentionSuggestionOpen}
+        slashOpen={slashOpen} slashListId={slashListId} slashFiltered={slashFiltered}
+        slashActiveIndex={slashActiveIndex} onAttach={onAttach} ingestPastedFiles={ingestPastedFiles}
+        fileInputRef={fileInputRef} accept={accept} handleFileChange={handleFileChange}
+        onAttachFolder={onAttachFolder} folderInputRef={folderInputRef}
+        handleFolderChange={handleFolderChange} showInline={showInline} controls={controls}
+        trailing={trailing} onDictate={onDictate} dictation={dictation} isStreaming={isStreaming}
+        sendVariant={sendVariant} onCancel={onCancel} canSend={canSend} sendLabel={sendLabel} sendTone={sendTone} />
+
+      {/* The slash menu ports through PopoverSurface like every canonical
+          popover: the composer docks inside horizontally scrolling rails, and
+          an in-place panel there is a panel the host clips away. It anchors
+          to the current input card and opens above. Focus never leaves the input —
+          rows are mousedown-swallowed so a click can't blur it. */}
+      <PopoverSurface
+        open={slashOpen}
+        id={slashListId}
+        role="listbox"
+        triggerRef={mention ? cardRef : textareaRef}
+        panelRef={slashPanelRef}
+        className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
+      >
+        <div className="max-h-80 overflow-y-auto overscroll-contain">
+          {slashFiltered.length === 0 && (
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+              {skillQuery !== undefined ? 'No matching skills' : hasSkills ? 'No matching commands or skills' : 'No matching commands'}
+            </div>
+          )}
+          {slashFiltered.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected={index === slashActiveIndex}
+              id={`${slashListId}-${index}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseMove={() => setSlashActive(index)}
+              onClick={() => pickSlash(item.id)}
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+                index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
+              }`}
+            >
+              <span className="shrink-0 font-medium text-foreground">{item.label}</span>
+              <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+            </button>
+          ))}
+        </div>
+      </PopoverSurface>
+
+      {focusShortcut && (
+        // A touch screen has no keyboard to press the shortcut on.
+        <div className="mt-1.5 flex justify-end px-1 [@media(pointer:coarse)]:hidden">
+          <span className="text-xs text-muted-foreground">
+            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-xs">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
+            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-xs">L</kbd>
+            <span className="ml-1">to focus</span>
+          </span>
+        </div>
+      )}
+    </div>
+  ))
+}
+
+function ComposerPendingFileChips({ folderChips, fileChips, onRetryFile,
+  onRemoveFile }: Pick<ChatComposerViewState, "folderChips" | "fileChips" | "onRetryFile" | "onRemoveFile">) {
+  return (<div className="mb-2 flex flex-wrap gap-1.5">
           {[...folderChips, ...fileChips].map((f) => {
             const isError = f.status === 'error'
             return (
@@ -517,19 +627,17 @@ export function ChatComposer({
               </span>
             )
           })}
-        </div>
-      )}
+        </div>)
+}
 
-      {/* Two rows inside one card: the message gets the full width, and every
-          affordance that acts on it — attach, the controls slot, send — sits on
-          its own row beneath. A single row would make the textarea share its
-          line with the buttons, which is what squeezed the input and pushed the
-          controls out of the card in the first place. */}
-      {/* `focusFieldWithin` makes the card a field: with brand's interaction
-          tokens it carries the well fill (`--well`), field border, hover glow
-          and focus ring. Under a brand without the ladder, tokens.css sets
-          `--well` to the card color. */}
-      <div
+function ComposerInputCard({ cardRef, floating, mention, textareaInput, MentionEditor, text,
+  setText, send, placeholder, disabled, autoFocus, inputMinHeight, maxHeight, registerRichFocus,
+  handleSlashKeyDown, setMentionSuggestionOpen, slashOpen, slashListId, slashFiltered,
+  slashActiveIndex, onAttach, ingestPastedFiles, fileInputRef, accept, handleFileChange,
+  onAttachFolder, folderInputRef, handleFolderChange, showInline, controls, trailing, onDictate,
+  dictation, isStreaming, sendVariant, onCancel, canSend, sendLabel,
+  sendTone }: Pick<ChatComposerViewState, "cardRef" | "floating" | "mention" | "textareaInput" | "MentionEditor" | "text" | "setText" | "send" | "placeholder" | "disabled" | "autoFocus" | "inputMinHeight" | "maxHeight" | "registerRichFocus" | "handleSlashKeyDown" | "setMentionSuggestionOpen" | "slashOpen" | "slashListId" | "slashFiltered" | "slashActiveIndex" | "onAttach" | "ingestPastedFiles" | "fileInputRef" | "accept" | "handleFileChange" | "onAttachFolder" | "folderInputRef" | "handleFolderChange" | "showInline" | "controls" | "trailing" | "onDictate" | "dictation" | "isStreaming" | "sendVariant" | "onCancel" | "canSend" | "sendLabel" | "sendTone">) {
+  return (<div
         ref={cardRef}
         data-testid="composer-card"
         className={`flex flex-col gap-1.5 rounded-2xl border bg-[var(--well,var(--color-card))] px-3 py-2.5 ${focusFieldWithin} ${
@@ -746,58 +854,5 @@ export function ChatComposer({
             )}
           </div>
         </div>
-      </div>
-
-      {/* The slash menu ports through PopoverSurface like every canonical
-          popover: the composer docks inside horizontally scrolling rails, and
-          an in-place panel there is a panel the host clips away. It anchors
-          to the current input card and opens above. Focus never leaves the input —
-          rows are mousedown-swallowed so a click can't blur it. */}
-      <PopoverSurface
-        open={slashOpen}
-        id={slashListId}
-        role="listbox"
-        triggerRef={mention ? cardRef : textareaRef}
-        panelRef={slashPanelRef}
-        className={`w-80 overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
-      >
-        <div className="max-h-80 overflow-y-auto overscroll-contain">
-          {slashFiltered.length === 0 && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">
-              {skillQuery !== undefined ? 'No matching skills' : hasSkills ? 'No matching commands or skills' : 'No matching commands'}
-            </div>
-          )}
-          {slashFiltered.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              role="option"
-              aria-selected={index === slashActiveIndex}
-              id={`${slashListId}-${index}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onMouseMove={() => setSlashActive(index)}
-              onClick={() => pickSlash(item.id)}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-                index === slashActiveIndex ? 'bg-accent' : 'hover:bg-accent'
-              }`}
-            >
-              <span className="shrink-0 font-medium text-foreground">{item.label}</span>
-              <span className="truncate text-xs text-muted-foreground">{item.description}</span>
-            </button>
-          ))}
-        </div>
-      </PopoverSurface>
-
-      {focusShortcut && (
-        // A touch screen has no keyboard to press the shortcut on.
-        <div className="mt-1.5 flex justify-end px-1 [@media(pointer:coarse)]:hidden">
-          <span className="text-xs text-muted-foreground">
-            <kbd className="rounded border border-border bg-background px-1 py-0.5 text-xs">{IS_APPLE_PLATFORM ? 'Cmd' : 'Ctrl'}</kbd>
-            <kbd className="ml-0.5 rounded border border-border bg-background px-1 py-0.5 text-xs">L</kbd>
-            <span className="ml-1">to focus</span>
-          </span>
-        </div>
-      )}
-    </div>
-  )
+      </div>)
 }

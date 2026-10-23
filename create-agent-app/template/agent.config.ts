@@ -109,5 +109,3 @@ export const config = defineAgentApp({
   // MODEL — omit to resolve from env (TANGLE_API_KEY) at boot via
   // resolveTangleModelConfig. Pin here only if you need a fixed model.
 })
-
-export type Config = typeof config

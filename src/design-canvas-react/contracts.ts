@@ -108,7 +108,7 @@ export interface SnapTargets {
 }
 
 /** Define the result of a snap operation including coordinates and active snap lines */
-export interface SnapResult {
+export interface CanvasSnapResult {
   x: number
   y: number
   /** Lines to render while the gesture holds the snap. */
@@ -123,7 +123,7 @@ export interface SnapEngine {
    *  removes the dragged elements' own geometry. */
   collectTargets(state: EditorSceneState, excludeIds: string[]): SnapTargets
   /** Snap a moving AABB. Threshold is SCREEN pixels, divided by zoom. */
-  apply(bounds: Bounds, targets: SnapTargets, thresholdPx: number, zoom: number): SnapResult
+  apply(bounds: Bounds, targets: SnapTargets, thresholdPx: number, zoom: number): CanvasSnapResult
 }
 
 // ---------------------------------------------------------------------------

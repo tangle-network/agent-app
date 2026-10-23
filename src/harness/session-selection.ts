@@ -1,5 +1,5 @@
 /** Pure session admission. Harness identity is not deployment availability. */
-export interface HarnessAvailability<H extends string> {
+export interface SelectionAvailability<H extends string> {
   /** Server-owned selection for new sessions. An empty list disables all starts. */
   readonly newSessions: readonly H[]
   /** Includes draining harnesses. Omission uses newSessions, never all known IDs. */
@@ -12,7 +12,7 @@ export interface SessionHarnessSelectionInput<H extends string> {
   workspaceDefault?: unknown
   fallback?: H
   /** Omit only when the caller deliberately admits every known harness. */
-  availability?: HarnessAvailability<H>
+  availability?: SelectionAvailability<H>
 }
 
 export interface SessionHarnessSelection<H extends string> {

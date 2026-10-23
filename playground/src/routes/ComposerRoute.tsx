@@ -72,6 +72,24 @@ export function ComposerRoute() {
     { id: 'f1', name: 'q3-metrics.csv', kind: 'file', status: 'ready' },
     { id: 'f2', name: 'design-assets', kind: 'folder', fileCount: 12, status: 'uploading' },
   ]
+  const phoneComposer = (<ChatComposer
+              onSend={() => {}}
+              placeholder="Ask about compliance, filings, or regulations..."
+              onAttach={() => {}}
+              controls={<ComposerModeControls planMode={{ enabled: phonePlan, setEnabled: setPhonePlan }} />}
+              trailing={
+                <AgentSessionControls
+                  models={models}
+                  model={phoneModel}
+                  onModelChange={setPhoneModel}
+                  harness={phoneHarness}
+                  onHarnessChange={setPhoneHarness}
+                  effort={phoneEffort}
+                  onEffortChange={setPhoneEffort}
+                />
+              }
+            />)
+
 
   return (
     <div className="h-full w-full overflow-y-auto bg-background">
@@ -147,23 +165,7 @@ export function ComposerRoute() {
             the chip. playground/scripts/composer-row-overlap.mjs measures it. */}
         <Demo title="Phone width (358px card) — Plan chip, model picker, attach">
           <div data-composer-overlap="phone" className="w-[358px]">
-            <ChatComposer
-              onSend={() => {}}
-              placeholder="Ask about compliance, filings, or regulations..."
-              onAttach={() => {}}
-              controls={<ComposerModeControls planMode={{ enabled: phonePlan, setEnabled: setPhonePlan }} />}
-              trailing={
-                <AgentSessionControls
-                  models={models}
-                  model={phoneModel}
-                  onModelChange={setPhoneModel}
-                  harness={phoneHarness}
-                  onHarnessChange={setPhoneHarness}
-                  effort={phoneEffort}
-                  onEffortChange={setPhoneEffort}
-                />
-              }
-            />
+            {phoneComposer}
           </div>
         </Demo>
 
@@ -172,23 +174,7 @@ export function ComposerRoute() {
             even the actions group's own line. Send must wrap below the picker. */}
         <Demo title="Small phone (256px card) — model picker and Send">
           <div data-composer-overlap="small-phone" className="w-[256px]">
-            <ChatComposer
-              onSend={() => {}}
-              placeholder="Ask about compliance, filings, or regulations..."
-              onAttach={() => {}}
-              controls={<ComposerModeControls planMode={{ enabled: phonePlan, setEnabled: setPhonePlan }} />}
-              trailing={
-                <AgentSessionControls
-                  models={models}
-                  model={phoneModel}
-                  onModelChange={setPhoneModel}
-                  harness={phoneHarness}
-                  onHarnessChange={setPhoneHarness}
-                  effort={phoneEffort}
-                  onEffortChange={setPhoneEffort}
-                />
-              }
-            />
+            {phoneComposer}
           </div>
         </Demo>
 

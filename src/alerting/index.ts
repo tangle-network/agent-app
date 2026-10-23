@@ -7,12 +7,9 @@
  */
 
 export {
-  checkSlackCredential,
   postSlackAlert,
   type SlackAlertFailure,
   type SlackAlertOptions,
   type SlackAlertOutcome,
-  type SlackCredentialCheckOptions,
-  type SlackCredentialVerdict,
   type SlackFailureReason,
 } from './slack'

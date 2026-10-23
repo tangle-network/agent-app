@@ -225,13 +225,7 @@ function RectNode({ element, ...rest }: ElementNodeProps & { element: RectElemen
   return (
     <Rect
       ref={ref}
-      name={element.id}
-      x={element.x}
-      y={element.y}
-      width={element.width}
-      height={element.height}
-      rotation={element.rotation}
-      opacity={element.opacity}
+      {...canvasElementFrame(element)}
       fill={element.fill}
       stroke={element.stroke}
       strokeWidth={element.strokeWidth}
@@ -361,13 +355,7 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
     return (
       <Rect
         ref={ref as React.RefObject<Konva.Rect>}
-        name={element.id}
-        x={element.x}
-        y={element.y}
-        width={element.width}
-        height={element.height}
-        rotation={element.rotation}
-        opacity={element.opacity}
+        {...canvasElementFrame(element)}
         fill={render.brokenFill}
         stroke={render.brokenStroke}
         strokeWidth={1}
@@ -410,13 +398,7 @@ function ImageNode({ element, ...rest }: ElementNodeProps & { element: ImageElem
   return (
     <KonvaImage
       ref={ref as React.RefObject<Konva.Image>}
-      name={element.id}
-      x={element.x}
-      y={element.y}
-      width={element.width}
-      height={element.height}
-      rotation={element.rotation}
-      opacity={element.opacity}
+      {...canvasElementFrame(element)}
       image={img}
       {...cropProps}
       {...drag}
@@ -447,13 +429,7 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
     return (
       <Rect
         ref={ref as React.RefObject<Konva.Rect>}
-        name={element.id}
-        x={element.x}
-        y={element.y}
-        width={element.width}
-        height={element.height}
-        rotation={element.rotation}
-        opacity={element.opacity}
+        {...canvasElementFrame(element)}
         fill={render.placeholderFill}
         stroke={render.placeholderStroke}
         strokeWidth={1}
@@ -465,13 +441,7 @@ function VideoNode({ element, ...rest }: ElementNodeProps & { element: VideoElem
   return (
     <KonvaImage
       ref={ref as React.RefObject<Konva.Image>}
-      name={element.id}
-      x={element.x}
-      y={element.y}
-      width={element.width}
-      height={element.height}
-      rotation={element.rotation}
-      opacity={element.opacity}
+      {...canvasElementFrame(element)}
       image={img}
       {...drag}
     />
@@ -502,4 +472,10 @@ function GroupNode({ element, ...rest }: ElementNodeProps & { element: GroupElem
       ))}
     </Group>
   )
+}
+
+
+/** Scene geometry is identical for a rectangle and its image/video replacement. */
+function canvasElementFrame(element: Pick<ImageElement, 'id' | 'x' | 'y' | 'width' | 'height' | 'rotation' | 'opacity'>) {
+  return { name: element.id, x: element.x, y: element.y, width: element.width, height: element.height, rotation: element.rotation, opacity: element.opacity }
 }
