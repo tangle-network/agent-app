@@ -110,7 +110,7 @@ describe('sandbox liveness during a planned host restart', () => {
       expect(Date.now() - started).toBeLessThan(1_500)
       const egressReads = peer.requests.filter(path => path === 'GET /v1/sandboxes/restart-box')
       const envWrites = peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))
-      expect(kind === 'egress' ? egressReads.length : envWrites.length).toBeGreaterThan(2)
+      expect(kind === 'egress' ? egressReads.length : envWrites.length).toBeGreaterThan(kind === 'egress' ? 3 : 2)
       if (kind === 'egress') expect(envWrites).toHaveLength(0)
       expect(peer.requests.filter(path => path.endsWith('/process/spawn'))).toHaveLength(0)
       expect(lifecycleRequests(peer.requests)).toEqual([])
