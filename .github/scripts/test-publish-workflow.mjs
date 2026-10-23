@@ -58,7 +58,7 @@ const producerJobs = readJobs(fs.readFileSync(path.join(workflowDirectory, 'prep
 const job = (name) => {
   check(jobs.has(name), `missing ${name} job`)
   if (name === 'package_release') {
-    check(jobs.get(name).join('\n').includes('uses: tangle-network/agent-app/.github/workflows/prepare-publish.yml@main'), 'release producer is not bound to reviewed main')
+    check(/uses: tangle-network\/agent-app\/\.github\/workflows\/prepare-publish\.yml@[0-9a-f]{40}/.test(jobs.get(name).join('\n')), 'release producer is not bound to immutable reviewed controls')
     check(producerJobs.has(name), 'release producer workflow is missing')
     return producerJobs.get(name).join('\n')
   }
@@ -114,15 +114,7 @@ const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
   [...workflow.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)]
     .map((match) => ({ file, name: match[1], ref: match[2] })),
 )
-// The credential runner group admits the reviewed catalog deployment only at
-// main. Third-party actions and the package release controls stay immutable.
-const trustedControls = new Set([
-  'tangle-network/agent-app/.github/workflows/deploy-catalog.yml',
-  'tangle-network/agent-app/.github/workflows/prepare-publish.yml',
-])
-check(actionRefs.every(({ name, ref }) =>
-  (trustedControls.has(name) && ref === 'main') || /^[0-9a-f]{40}$/.test(ref),
-), 'actions must be pinned; only group-restricted release/deploy controls follow main')
+check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'actions and trusted workflow controls must be pinned to immutable commits')
 for (const [name, pin] of Object.entries(pins)) {
   const refs = actionRefs.filter((action) => action.name === name)
   check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
