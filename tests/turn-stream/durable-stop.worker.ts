@@ -29,12 +29,15 @@ function routes(env: Env) {
   return createChatTurnRoutes({ projectId: 'durable-stop-fixture', store: messages(env),
     turnStore: createDurableObjectTurnEventStore(env.TURNS, { secret: env.TURN_STREAM_AUTH_SECRET }),
     turnTrace: false, log: (message, meta) => console.info('[durable-stop-fixture]', message, JSON.stringify(meta ?? {})),
-    authorize: async ({ request, threadId }) => {
+    authorize: async ({ request, intent, body, threadId: runningThreadId }) => {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
       const { results } = await env.CHAT.prepare('SELECT user_id, workspace_id, role FROM members WHERE token = ?')
         .bind(token).all<{ user_id: string; workspace_id: string; role: string }>()
       const member = results[0]
       if (!member) return { ok: false as const, response: new Response('Unauthorized', { status: 401 }) }
+      const threadId = intent === 'running' ? runningThreadId
+        : intent === 'turn' || intent === 'cancel' ? body?.threadId : undefined
+      if (!threadId) return { ok: false as const, response: new Response('Forbidden', { status: 403 }) }
       const thread = await env.CHAT.prepare('SELECT workspace_id FROM threads WHERE id = ?')
         .bind(threadId).all<{ workspace_id: string }>()
       if (member.role !== 'editor' || thread.results[0]?.workspace_id !== member.workspace_id) {
