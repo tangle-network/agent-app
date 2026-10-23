@@ -23,26 +23,29 @@ it('dispatches a fresh turn before its lock and refuses an answered retry withou
     },
   }
   let requests = 0
-  let received!: () => void
-  const modelStarted = new Promise<void>(resolve => { received = resolve })
+  let acquisitions = 0
+  const requestStarts: Array<() => void> = []
+  const modelStarted = (number: number) => requests >= number ? Promise.resolve()
+    : new Promise<void>(resolve => { requestStarts[number - 1] = resolve })
   const server = createServer((request, response) => {
     request.resume()
-    request.on('end', () => { requests++; received(); response.end('A persisted answer.') })
+    request.on('end', () => { requests++; requestStarts[requests - 1]?.(); response.end('A persisted answer.') })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  const policyRows: Array<string | undefined | null> = []
+  const policyRows: Array<{ id: string | undefined | null; inserted: boolean | undefined }> = []
   const pending: Promise<unknown>[] = []
   const routes = createChatTurnRoutes({
     projectId: 'dispatch-reuse', store, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false,
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
     dispatchFirst: { billing: 'model-service', when: args => {
-      policyRows.push(args.userMessageId)
+      policyRows.push({ id: args.userMessageId, inserted: args.userMessageInserted })
       return !args.userMessageId
     } },
     turnLock: {
       acquire: async args => {
-        if (!args.userMessageId) await modelStarted
+        const attempt = ++acquisitions
+        if (!args.userMessageId) await modelStarted(attempt)
         return { acquired: true as const, handle: args.identity.sessionId }
       },
       release: () => {},
@@ -74,8 +77,8 @@ it('dispatches a fresh turn before its lock and refuses an answered retry withou
     expect(retry.status).toBe(409)
     expect(await retry.json()).toEqual({ error: 'already answered' })
     await Promise.all(pending)
-    expect(policyRows).toEqual([undefined, user.id])
-    expect(requests).toBe(1)
+    expect(requests, 'HTTP model requests').toBe(1)
+    expect(policyRows).toEqual([{ id: undefined, inserted: undefined }, { id: user.id, inserted: false }])
     expect(database.prepare('SELECT role,content FROM message ORDER BY rowid').all()).toEqual([
       { role: 'user', content: 'Answer once.' }, { role: 'assistant', content: 'A persisted answer.' },
     ])

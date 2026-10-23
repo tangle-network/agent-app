@@ -276,7 +276,8 @@ export interface ChatTurnProduceArgs<TContext> {
   /** True when this turn's own insert created `userMessageId`, so no earlier
    *  attempt can have answered it; false when retry-dedup reused the row or no
    *  row was written. A gate that refuses an already-answered retry can skip
-   *  its read when this is true. Undefined until `userMessageId` resolves. */
+   *  its read when this is true. Already false for a reused row at dispatch
+   *  policy and lock acquisition; undefined for a fresh row until insertion. */
   userMessageInserted?: boolean
   /**
    * Transfer completion ownership to a product-owned durable runner. The
