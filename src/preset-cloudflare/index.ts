@@ -78,6 +78,9 @@ export {
   type NativeCompletionWorkflowPayload,
 } from './native-completion-workflow'
 
+export * from './native-completion-store'
+export * from './native-completion-owner'
+
 export {
   renderCloudflareHeadersFile,
   type CloudflareHeadersRule,

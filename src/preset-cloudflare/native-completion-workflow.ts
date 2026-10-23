@@ -61,6 +61,8 @@ export interface NativeCompletionWorkflowOptions<
   finalizeBuffer?(payload: TPayload, receipt: NativeCompletionReceipt, messageId: TMessageId): Promise<void>
   /** Release the product lock only after every terminal effect completed. */
   releaseLock(payload: TPayload): Promise<void>
+  /** Durable trace delivery/final markers after the finished turn lock is released. */
+  afterRelease?(payload: TPayload, receipt: NativeCompletionReceipt): Promise<void>
   /** Default: 5 s for the first two minutes, 15 s until thirty minutes, then 30 s. */
   pollDelay?: CloudflareWorkflowSleepDuration | ((attempt: number) => CloudflareWorkflowSleepDuration)
   stepName?: string
@@ -134,5 +136,6 @@ export async function runNativeCompletionWorkflow<
     ))
   }
   await options.step.do(`${name}:release-lock`, () => options.releaseLock(options.event.payload))
+  await options.afterRelease?.(options.event.payload, receipt)
   return receipt
 }

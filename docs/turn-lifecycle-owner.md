@@ -34,6 +34,12 @@ The agent-app turn store is the only source of a turn's lifecycle. Every other p
 
 Why this rather than reconciling the five: each extra place is another writer of "done", and every incident above came from two writers disagreeing. A fenced single writer makes "exactly one terminal state" a property of the store instead of a hope about the sweeps.
 
+## Native completion bindings
+
+`createNativeCompletionOwner` in `/preset-cloudflare` binds an existing admission table, chat message store, Workflow binding and fenced turn lock to the maintained `runNativeCompletionWorkflow` algorithm. A product supplies its authorized Sandbox resolver, reconciliation and settlement effects; the shared owner owns D1 leases, bounded trace checkpoints, deterministic transcript rows, terminal buffers and lock release. The table is supplied by the product, so adoption keeps existing admissions and Workflow payloads readable without copying their storage implementation.
+
+The attached projection may release its thread early only after the exact native ledger reports success, reconciliation completes, and the same deterministic assistant row and terminal buffer have been persisted. Settlement remains with the durable Workflow. An incomplete reconciliation, stopped stream or failure leaves release to that owner. Trace delivery runs after lock release with the original root and span identities; retries cannot keep a completed thread locked. Product settlement callbacks run outside an enclosing shared Workflow step, so products can retain their own named idempotent steps.
+
 ## Tests: today's failures
 
 `SETTLEMENT_SCENARIOS` in `/launch-invariants` is the acceptance set. Each product seeds them into its storage, runs its settlement, and `checkSettlementScenarios` checks the result. Every stopped scenario stopped 12 minutes before the check, so a product that settles within 15 minutes of an owner stopping has already settled it:

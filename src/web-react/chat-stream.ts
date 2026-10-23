@@ -67,15 +67,6 @@ export {
   base64WireLen,
 } from '../chat-routes/wire'
 
-/**
- * A thread id in the server's own format (32 lowercase hex), minted in the
- * browser for a new chat's first turn: send it as both `threadId` and
- * `newThread.id`, and the turn route's `createThread` option creates the thread
- * with the turn, with no thread POST first.
- */
-export function mintThreadId(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
-}
 export {
   buildTurnPhaseEvent,
   isTurnIntentEvent,

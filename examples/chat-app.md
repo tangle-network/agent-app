@@ -556,29 +556,60 @@ short-circuit; `beforeTurn` is the prompt-composition step; `lifecycle` is the
 engine underneath — these only wrap its input, its producer stream, and its
 settle.
 
-## Dispatch first (provisional)
+## Declare Router and Sandbox backends
 
-`dispatchFirst` starts `produce`, and so the model call, right after the
-history read, while the lock, the history recheck, the user-row insert,
-`contextGate` and `beforeTurn` run beside it. Nothing it emits reaches the
-member, the turn buffer or the transcript until that chain commits; a refusal
-aborts `args.admissionSignal`, rejects `args.admitted` and writes no assistant
-row. On Creative production that chain held about 780 ms of every turn's p50
-before the model was called (2026-10-21, n=32).
+The Router backend starts its model call after authorization, overlapping the
+lock, user insert and gates. The model service enforces spend before paying a
+provider. Output remains buffered until admission commits. Refusal cancels
+`args.admissionSignal`, rejects `args.admitted` and leaves no assistant row.
+Tools and durable effects must await `args.admitted`; `beforeTurn` cannot patch
+a prompt already dispatched. Reused user rows finish admission before another
+model call, so duplicate refusals do not spend on another answer.
 
 ```ts
 createChatTurnRoutes({
-  // The Router holds spend fail-closed before it calls a provider; a seat check runs in contextGate.
-  dispatchFirst: { billing: 'model-service', when: (args) => args.context.lane === 'router' },
-  contextGate: async (args) => (await hasSeat(args.context) ? { proceed: true } : { proceed: false, response: noSeat() }),
-  produce: async (args) => createRouterTurnProducer({ ...turnOptions(args), signal: args.admissionSignal }),
-  // Rows the producer writes wait for `await args.admitted`; beforeTurn returns no patch.
+  // The other required fields supply authorization, persistence and replay.
+  produce: {
+    when: args => args.context.lane === 'router',
+    router: args => createRouterTurnProducer({ ...turnOptions(args), signal: args.admissionSignal }),
+    sandbox: args => createSandboxTurn(args),
+  },
 })
 ```
 
-`when` must return false for a producer whose dispatch is keyed by the turn's
-execution id (a box session): two sends on one thread share that id, and the
-refused one would reach the winner's execution before the lock refused it.
+`when` selects a backend; omit it for a Router-only product. The Sandbox
+backend and an ordinary `produce(args)` function start after admission. They
+may use the committed user row and `beforeTurn` patches as before. Declare
+only a per-request Router model call in `router`; Sandbox execution sharing a
+thread's native execution id belongs in `sandbox`.
+
+## Bind shared storage and request resources
+
+A product with D1 and the authenticated TurnStream binding can pass them
+through the existing `turnStore` field. The route builds replay storage and a
+thread lock; an explicit `turnLock` still supplies product handoff/reconciliation.
+
+```ts
+turnStore: { db: env.DB, lock: { namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET } } },
+```
+
+Every request seam receives the bound `args.waitUntil` from `turn(request, ctx)`.
+An opaque acquisition can return its lifetime to the route instead of adding an
+app-owned take/release holder:
+
+```ts
+afterAuthorize: args => ({
+  resource: acquireTurnResource(args),
+  dispose: resource => resource.close(),
+}),
+produce: async args => buildProducer(await args.earlyResource),
+```
+
+The second route generic names that resource type. Disposal runs once after
+completion, stream failure, cancellation, handoff or refusal, including when
+acquisition completes after refusal. Acquisition cleans up any partial resource
+before rejecting. A legacy release function keeps its existing behavior: it
+runs only when the turn ends before the producer takes ownership.
 
 ## Carry the effective profile into Sandbox execution
 

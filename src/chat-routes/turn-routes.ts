@@ -5,9 +5,9 @@
  *   body parse/validate      → `/web` `parseJsonObjectBody` + `./wire`
  *   turn identity            → `/stream` `resolveChatTurn` + agent-runtime `/durable`
  *                              `deriveExecutionId`
- *   producer                 → injected seam (sandbox lane via
- *                              `createSandboxChatProducer`; router lane is the
- *                              product's own `ChatTurnProducer`)
+ *   producer                 → function after admission, or declared Router
+ *                              and Sandbox backends. Router model calls overlap
+ *                              admission by default; tools wait for commit.
  *   turn engine              → agent-runtime `/durable` `handleChatTurn` (verbatim)
  *   durability               → `/stream` turn-buffer tap, wired BY DEFAULT
  *                              (tee + drain keeps the turn running after a
@@ -60,7 +60,8 @@ import { createIntelligenceTurnTraceSink } from '../turn-trace/otel'
 import { storeSupportsDraftPersistence, type AssistantDraftStore, type DraftPersistenceTuning } from './draft-persistence'
 import { startTurnPrefetch } from './turn-prefetch'
 import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgressCallback } from './turn-admission'
-import { createAdmittedTurnRunner, type AfterAuthorizeWork } from './turn-execution'
+import { createAdmittedTurnRunner } from './turn-execution'
+import { earlyTurnWork, type AfterAuthorizeWork } from './early-turn-work'
 import {
   INTENT_LINE_TIMEOUT_MS,
   INTENT_LINE_HISTORY_MESSAGES,
@@ -81,47 +82,22 @@ import {
   type TurnIntentEvent,
   type TurnRoutePhase,
 } from './turn-progress'
-import { bindTurnThreadCreation } from './minted-thread'
 import { ChatTurnInputError } from './wire'
+import { resolveTurnStorage } from './route-storage'
 
 export * from './turn-route-contracts'
 
-/** What a turn started before `produce`: the product's `afterAuthorize` release and the route's own (a dispatch-first producer). */
-function earlyTurnWork(
-  release: ChatTurnAfterAuthorizeRelease | undefined,
-  log: (message: string, meta?: Record<string, unknown>) => void,
-): AfterAuthorizeWork {
-  let free = release
-  let also: Array<() => void> = []
-  return {
-    handOff: () => { free = undefined; also = [] },
-    add: (more) => { also.push(more) },
-    release: async () => {
-      const product = free
-      const route = also
-      free = undefined
-      also = []
-      for (const stop of route) stop()
-      if (!product) return
-      try {
-        await product()
-      } catch (err) {
-        log('[chat-routes] afterAuthorize release failed', { error: err instanceof Error ? err.message : String(err) })
-      }
-    },
-  }
-}
-
 /** Parse and validate the body, then authorize the caller. */
-async function admitTurn<TContext, TThread>(
-  request: Request, trace: TurnTrace, options: CreateChatTurnRoutesOptions<TContext, TThread>,
+async function admitTurn<TContext, TResource>(
+  request: Request, trace: TurnTrace, options: CreateChatTurnRoutesOptions<TContext, TResource>,
+  waitUntil: ChatTurnRequestContext['waitUntil'],
 ): Promise<({ ok: true } & AdmittedTurn<TContext>) | { ok: false; response: Response }> {
   const parse = trace.start('admission.parse', 'admission')
   const [rawBody, badBody] = await parseJsonObjectBody(request)
   if (badBody) return { ok: false, response: badBody }
   let parsed: ParsedTurnBody
   try {
-    parsed = validateTurnBody(rawBody, options.maxInlinePartBytes)
+    parsed = validateTurnBody(rawBody)
   } catch (err) {
     if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
     throw err
@@ -130,7 +106,7 @@ async function admitTurn<TContext, TThread>(
   const prefetch = options.prefetch && startTurnPrefetch(options.prefetch, { request, body: parsed.payload, trace })
   let handedOff = false
   try {
-    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, intent: 'turn', body: parsed.payload, trace, span, createThread: options.createThread && bindTurnThreadCreation(options.createThread, parsed.payload), ...(prefetch ? { identified: prefetch.identified } : {}) }))
+    const auth = await trace.measure('admission.authorize', 'admission', (span) => options.authorize({ request, waitUntil, intent: 'turn', body: parsed.payload, trace, span, ...(prefetch ? { identified: prefetch.identified } : {}) }))
     if (!auth.ok) return { ok: false, response: auth.response }
     // Check the named model before side effects; the producer checks the unnamed model.
     const refusal = await namedModelRefusal(options.modelPolicy, parsed.payload, trace)
@@ -146,24 +122,15 @@ async function admitTurn<TContext, TThread>(
 
 
 /** Build chat turn routes to handle and validate incoming chat requests with optional logging */
-export function createChatTurnRoutes<TContext = void, TThread = unknown>(
-  options: CreateChatTurnRoutesOptions<TContext, TThread>,
+export function createChatTurnRoutes<TContext = void, TResource = unknown>(
+  input: CreateChatTurnRoutesOptions<TContext, TResource>,
 ): ChatTurnRoutes {
+  const options = resolveTurnStorage(input)
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
-  // Incremental persistence is on whenever the store can patch a row. An
-  // EXPLICIT opt-in against a store that cannot is a wiring bug, so it fails
-  // here — at construction — instead of silently degrading every turn.
+  // A patch-capable store always keeps durable in-flight history on the shared cadence.
   const draftStore: AssistantDraftStore = options.store
-  if (options.incrementalPersistence && !storeSupportsDraftPersistence(draftStore)) {
-    throw new Error(
-      'incrementalPersistence requires a store with updateMessage() — `/chat-store`\'s createChatStore has it; a product store must implement it or omit the option',
-    )
-  }
-  const draftTuning: DraftPersistenceTuning | null =
-    options.incrementalPersistence === false || !storeSupportsDraftPersistence(draftStore)
-      ? null
-      : (options.incrementalPersistence ?? {})
+  const draftTuning: DraftPersistenceTuning | null = storeSupportsDraftPersistence(draftStore) ? {} : null
 
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
 
@@ -219,10 +186,11 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
     // shapes: a refusal is always a plain HTTP response that reveals nothing
     // beyond what it says, and nothing runs for a caller who is not admitted.
     // The turn's clock starts at the request, so admission is inside its trace.
-    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }), options)
+    const requestContext = ctx?.waitUntil ? { ...ctx, waitUntil: ctx.waitUntil.bind(ctx) } : ctx
+    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }), options, requestContext?.waitUntil)
     if (!admitted.ok) return admitted.response
-    if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, ctx, admitted)
-    return progressFirstTurn(request, ctx, admitted)
+    if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, requestContext, admitted)
+    return progressFirstTurn(request, requestContext, admitted)
   }
 
 
@@ -319,13 +287,14 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
   }
 
   /** Start the product's `afterAuthorize` work for an admitted turn. Never throws. */
-  function startAfterAuthorize(request: Request, admitted: AdmittedTurn<TContext>): AfterAuthorizeWork {
-    let release: ChatTurnAfterAuthorizeRelease | undefined
+  function startAfterAuthorize(request: Request, admitted: AdmittedTurn<TContext>, waitUntil: ChatTurnRequestContext['waitUntil']): AfterAuthorizeWork<TResource> {
+    let release: ChatTurnAfterAuthorizeRelease<TResource> | undefined
     const { parsed, auth, trace } = admitted
     if (options.afterAuthorize) {
       try {
         const started = options.afterAuthorize({
           request,
+          waitUntil,
           body: parsed.payload,
           tenantId: auth.tenantId,
           userId: auth.userId,
@@ -333,7 +302,7 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
           context: auth.context,
           trace,
         })
-        if (typeof started === 'function') release = started
+        if (started) release = started
       } catch (err) {
         log('[chat-routes] afterAuthorize failed; the turn goes on without it', { error: err instanceof Error ? err.message : String(err) })
       }
@@ -349,7 +318,7 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
     progress?: TurnProgressCallback,
     startedIntent?: Promise<string | null>,
   ): Promise<Response> {
-    const early = startAfterAuthorize(request, admitted)
+    const early = startAfterAuthorize(request, admitted, ctx?.waitUntil)
     try {
       return await runAdmittedTurn(request, ctx, admitted, early, progress, startedIntent)
     } finally {
@@ -375,8 +344,6 @@ export function createChatTurnRoutes<TContext = void, TThread = unknown>(
       store: options.turnStore,
       turnId,
       fromSeq,
-      ...(options.replay?.pollMs !== undefined ? { pollMs: options.replay.pollMs } : {}),
-      ...(options.replay?.timeoutMs !== undefined ? { timeoutMs: options.replay.timeoutMs } : {}),
     })
     const body = new ReadableStream<Uint8Array>({
       async pull(controller) {

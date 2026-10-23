@@ -23,10 +23,9 @@ import { createWarmCache, type WarmCacheOptions, type WarmCacheSource } from '..
  * seat or balance read depends on more than the user (a workspace, an
  * organization) must pass `key`, or one scope's verdict admits another.
  *
- * `windowMs` has no default. Platform sends apps no billing webhook, so the
- * window is how long a seat or balance change made on Platform can go unseen
- * by admission. Creative ships 5 minutes (`5 * 60_000`); the window for other
- * apps is Drew's call.
+ * Passing verdicts are kept for five minutes by default, capped by the paid
+ * period. `windowMs` declares a product entitlement freshness requirement; it
+ * does not enable caching. Spend is still enforced live by the model service.
  */
 
 /** A Platform read's verdict: only `allowed` decides admission. */
@@ -46,8 +45,8 @@ export interface BillableTurnAdmissionOptions<
 > {
   /** The cache URL's host, one per product, such as `billing-admission.creative.internal`. */
   namespace: string
-  /** How long a passing verdict is kept. Required: see the module note. */
-  windowMs: number
+  /** A product entitlement freshness limit. Default five minutes, capped by `paidThrough`. */
+  windowMs?: number
   readSeat(input: Input): Promise<Seat>
   readBalance(input: Input): Promise<Balance>
   /** The deployment environment in the cache key (see {@link WarmCacheOptions.env}). */
@@ -66,8 +65,8 @@ export interface AdmitBillableTurnOptions {
 }
 
 export type BillableTurnAdmissionResult<Seat, Balance> =
-  | { source: WarmCacheSource }
-  | { source: 'platform'; seat: Seat; balance?: Balance }
+  | { source: WarmCacheSource; allowed: true; paidThrough: string | null }
+  | { source: 'platform'; allowed: boolean; paidThrough: string | null; seat: Seat; balance?: Balance }
 
 export interface BillableTurnAdmission<Input extends { userId: string }, Seat, Balance> {
   /**
@@ -87,13 +86,14 @@ export function createBillableTurnAdmission<
   Seat extends BillableTurnSeatVerdict,
   Balance extends BillableTurnVerdict,
 >(options: BillableTurnAdmissionOptions<Input, Seat, Balance>): BillableTurnAdmission<Input, Seat, Balance> {
-  if (!(Number.isFinite(options.windowMs) && options.windowMs > 0)) {
+  const windowMs = options.windowMs ?? 5 * 60_000
+  if (!(Number.isFinite(windowMs) && windowMs > 0)) {
     throw new Error('createBillableTurnAdmission: windowMs must be a positive number of milliseconds')
   }
   const verdicts = createWarmCache<{ paidThrough: string | null }>(options.namespace, { isolate: false, env: options.env })
   const keyOf = options.key ?? ((input: Input) => input.userId)
   const heldMs = (paidThrough: string | null | undefined) =>
-    Math.min(options.windowMs, paidThrough ? Date.parse(paidThrough) - Date.now() : Infinity)
+    Math.min(windowMs, paidThrough ? Date.parse(paidThrough) - Date.now() : Infinity)
 
   return {
     heldMs,
@@ -102,7 +102,7 @@ export function createBillableTurnAdmission<
       const key = keyOf(input)
       const warm = input.refresh ? null : await verdicts.read(key)
       if (warm && (warm.value.paidThrough === null || Date.parse(warm.value.paidThrough) > Date.now())) {
-        return { source: warm.source }
+        return { source: warm.source, allowed: true, paidThrough: warm.value.paidThrough }
       }
       const track = input.track ?? (<T>(_name: string, work: Promise<T>) => work)
       const mapError = input.mapError ?? ((error: unknown): never => { throw error })
@@ -114,18 +114,18 @@ export function createBillableTurnAdmission<
       const seat = seatSettled.value
       if (!seat.allowed) {
         await verdicts.forget(key)
-        return { source: 'platform', seat }
+        return { source: 'platform', allowed: false, paidThrough: seat.paidThrough ?? null, seat }
       }
       if (balanceSettled.status === 'rejected') throw balanceSettled.reason
       const balance = balanceSettled.value
       if (!balance.allowed) {
         await verdicts.forget(key)
-        return { source: 'platform', seat, balance }
+        return { source: 'platform', allowed: false, paidThrough: seat.paidThrough ?? null, seat, balance }
       }
       const paidThrough = seat.paidThrough ?? null
       const ttlMs = heldMs(paidThrough)
       if (ttlMs > 0) await verdicts.write(key, { paidThrough }, ttlMs)
-      return { source: 'platform', seat, balance }
+      return { source: 'platform', allowed: true, paidThrough, seat, balance }
     },
   }
 }

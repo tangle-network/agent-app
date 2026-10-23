@@ -67,7 +67,7 @@ export async function namedModelRefusal(
   return decision.allowed ? null : Response.json({ code: 'model_policy_denied', error: decision.reason }, { status: 403 })
 }
 
-export function validateTurnBody(body: Record<string, unknown>, maxInlinePartBytes: number | undefined): ParsedTurnBody {
+export function validateTurnBody(body: Record<string, unknown>): ParsedTurnBody {
   const threadId = typeof body.threadId === 'string' ? body.threadId.trim() : ''
   if (!threadId) throw new ChatTurnInputError('Missing threadId')
   const rawContent = body.content ?? body.message ?? ''
@@ -84,7 +84,7 @@ export function validateTurnBody(body: Record<string, unknown>, maxInlinePartByt
   if (!content && fileParts.length === 0 && mentions.length === 0 && !hasAttachments) {
     throw new ChatTurnInputError('Missing content (send text, parts, mentions, attachments, or any combination)')
   }
-  assertPromptPartsWithinCap(fileParts, maxInlinePartBytes)
+  assertPromptPartsWithinCap(fileParts)
   let turnId: string | undefined
   try {
     turnId = normalizeClientTurnId(body.turnId)
