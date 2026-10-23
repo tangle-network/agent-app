@@ -155,7 +155,7 @@
         {
           "name": "admitProfileTurn",
           "kind": "function",
-          "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; observedManagedPlanD…",
+          "signature": "(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; expectedRevisionId?:…",
           "doc": null
         },
         {
@@ -2514,6 +2514,7 @@
         "sandbox",
         "stream",
         "tools",
+        "turn-stream",
         "turn-trace",
         "web"
       ],
@@ -2772,6 +2773,12 @@
           "doc": "Convert a Uint8Array of bytes into a base64-encoded string"
         },
         {
+          "name": "cancelChatTurn",
+          "kind": "function",
+          "signature": "<TContext>(request: Request, options: { authorize: (args: ChatTurnAuthorizeArgs) => Promise<ChatTurnAuthorization<TCont…",
+          "doc": "Existing product Stop, composed with the same authorization and storage owner as chat."
+        },
+        {
           "name": "ChatAttachmentInput",
           "kind": "interface",
           "signature": "interface ChatAttachmentInput",
@@ -2838,22 +2845,40 @@
           "doc": "Define arguments required to authorize a chat turn based on intent and request details"
         },
         {
+          "name": "ChatTurnCancelArgs",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelArgs",
+          "doc": "Product identity and editor access have already been checked before target is called."
+        },
+        {
+          "name": "ChatTurnCancelOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelOptions",
+          "doc": null
+        },
+        {
+          "name": "ChatTurnCancelRequest",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelRequest",
+          "doc": null
+        },
+        {
+          "name": "ChatTurnCancelSource",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelSource",
+          "doc": "Structural public Sandbox API; addressing always comes from the captured receipt."
+        },
+        {
+          "name": "ChatTurnCancelTarget",
+          "kind": "interface",
+          "signature": "interface ChatTurnCancelTarget",
+          "doc": "Application fields are projected once; the shared owner never infers OAuth or source-key authority."
+        },
+        {
           "name": "ChatTurnCompleteInput",
           "kind": "interface",
           "signature": "interface ChatTurnCompleteInput",
           "doc": "What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit)."
-        },
-        {
-          "name": "ChatTurnCreateThreadOptions",
-          "kind": "interface",
-          "signature": "interface ChatTurnCreateThreadOptions",
-          "doc": "The `createThread` route option: who may create a thread from a minted id, and how the row is written."
-        },
-        {
-          "name": "ChatTurnCreateThreadResult",
-          "kind": "type",
-          "signature": "type ChatTurnCreateThreadResult",
-          "doc": "What `args.createThread` answers: the created row, or the response refusing the turn (404 or 409)."
         },
         {
           "name": "ChatTurnExecutionLimits",
@@ -2878,6 +2903,12 @@
           "kind": "interface",
           "signature": "interface ChatTurnHeartbeat",
           "doc": "Keepalive emitted while the producer is quiet (long tool calls, first-token wait) so client watchdogs stay re-armed."
+        },
+        {
+          "name": "ChatTurnHybridConfiguration",
+          "kind": "type",
+          "signature": "type ChatTurnHybridConfiguration",
+          "doc": null
         },
         {
           "name": "ChatTurnInputError",
@@ -2964,12 +2995,6 @@
           "doc": "Which model served, and what it took to get there."
         },
         {
-          "name": "ChatTurnNewThread",
-          "kind": "interface",
-          "signature": "interface ChatTurnNewThread",
-          "doc": "The body field a minted first turn carries."
-        },
-        {
           "name": "ChatTurnPartInput",
           "kind": "type",
           "signature": "type ChatTurnPartInput",
@@ -3036,22 +3061,34 @@
           "doc": "`ChatTurnProducer` plus the persisted projection the assembly reads after drain."
         },
         {
+          "name": "ChatTurnRouterBackend",
+          "kind": "type",
+          "signature": "type ChatTurnRouterBackend",
+          "doc": null
+        },
+        {
+          "name": "ChatTurnRouterConfiguration",
+          "kind": "type",
+          "signature": "type ChatTurnRouterConfiguration",
+          "doc": "The route supplies request tracing, cancellation and the admission fence."
+        },
+        {
           "name": "ChatTurnRoutes",
           "kind": "interface",
           "signature": "interface ChatTurnRoutes",
           "doc": "Define routes to run, replay, and list running chat turns with streaming and reconnect support"
         },
         {
+          "name": "ChatTurnSandboxBackend",
+          "kind": "type",
+          "signature": "type ChatTurnSandboxBackend",
+          "doc": null
+        },
+        {
           "name": "ChatTurnTextPartInput",
           "kind": "interface",
           "signature": "interface ChatTurnTextPartInput",
           "doc": "Wire contract between the chat client (composer + `streamChatTurn`) and the assembled server vertical (`createChatTurnRoutes`)."
-        },
-        {
-          "name": "ChatTurnThreadOwner",
-          "kind": "interface",
-          "signature": "interface ChatTurnThreadOwner",
-          "doc": "Who a created thread belongs to: the tenant (workspace) and member `authorize` resolved."
         },
         {
           "name": "ChatTurnTraceOptions",
@@ -3116,7 +3153,7 @@
         {
           "name": "createChatTurnRoutes",
           "kind": "function",
-          "signature": "<TContext = void, TThread = unknown>(options: CreateChatTurnRoutesOptions<TContext, TThread>) => ChatTurnRoutes",
+          "signature": "<TContext = void, TResource = unknown>(input: CreateChatTurnRoutesOptions<TContext, TResource>) => ChatTurnRoutes",
           "doc": "Build chat turn routes to handle and validate incoming chat requests with optional logging"
         },
         {
@@ -3152,7 +3189,7 @@
         {
           "name": "createRouterTurnProducer",
           "kind": "function",
-          "signature": "(options: RouterTurnProducerOptions) => ChatTurnRouteProducer",
+          "signature": "(options: RouterTurnProducerOptions) => Omit<ChatTurnRouteProducer, \"stream\"> & { stream: AsyncGenerator<ProducerWireEv…",
           "doc": null
         },
         {
@@ -3552,6 +3589,12 @@
           "doc": "Product persistence for the one admission that authorizes this observer."
         },
         {
+          "name": "NativeCompletionHandoffOptions",
+          "kind": "interface",
+          "signature": "interface NativeCompletionHandoffOptions",
+          "doc": null
+        },
+        {
           "name": "NativeCompletionObservation",
           "kind": "type",
           "signature": "type NativeCompletionObservation",
@@ -3582,6 +3625,12 @@
           "doc": "One exact turn receipt before an admission's ordered aggregate."
         },
         {
+          "name": "NativeTurnTimingFacts",
+          "kind": "interface",
+          "signature": "interface NativeTurnTimingFacts",
+          "doc": "Serializable route observations for an admission that transfers terminal authority to a durable native owner."
+        },
+        {
           "name": "normalizeChatPromptForSandbox",
           "kind": "function",
           "signature": "(prompt: string | readonly ChatTurnPartInput[]) => string | PromptInputPart[]",
@@ -3598,6 +3647,12 @@
           "kind": "function",
           "signature": "(options: NativeCompletionObservationOptions) => Promise<NativeCompletionObservation>",
           "doc": "Observe only the turns admitted under `executionId`."
+        },
+        {
+          "name": "observeTurnCancellation",
+          "kind": "function",
+          "signature": "<TContext, TResource>(source: AsyncIterable<ChatRouteEvent>, args: ChatTurnProduceArgs<TContext, TResource>, cancel: Ch…",
+          "doc": "Internal route observation of the same product Stop target."
         },
         {
           "name": "OOXML_PRESENTATION_MACRO_ENABLED_MIME",
@@ -13607,6 +13662,12 @@
           "doc": null
         },
         {
+          "name": "DelegatedTurnKeyLease",
+          "kind": "interface",
+          "signature": "interface DelegatedTurnKeyLease",
+          "doc": "One turn owns its claimed/inline key and any revoked-key replacement until it calls `revoke`."
+        },
+        {
           "name": "DelegatedTurnKeys",
           "kind": "interface",
           "signature": "interface DelegatedTurnKeys",
@@ -14361,7 +14422,10 @@
         "crypto",
         "knowledge",
         "sandbox",
+        "stream",
         "tools",
+        "turn-stream",
+        "turn-trace",
         "web"
       ],
       "error": null,
@@ -14407,6 +14471,24 @@
           "kind": "function",
           "signature": "(opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor",
           "doc": "The {@link KnowledgeStateAccessor} over the preset D1 schema — the seam that lets the declarative `satisfiedBy` rules resolve with ZERO consumer code: - `config(path)` reads the supplied workspace co…"
+        },
+        {
+          "name": "createD1NativeCompletionStore",
+          "kind": "function",
+          "signature": "<TPayload extends NativeCompletionPayload>(db: D1Like, table: string) => { read: (executionId: string) => Promise<{ pay…",
+          "doc": null
+        },
+        {
+          "name": "createNativeCompletionOwner",
+          "kind": "function",
+          "signature": "<TPayload extends NativeCompletionPayload, TSource extends NativeCompletionSessionSource>(options: NativeCompletionOwne…",
+          "doc": null
+        },
+        {
+          "name": "createNativeCompletionTraceSink",
+          "kind": "function",
+          "signature": "(attached: TurnTraceSink) => { own: (rootSpanId: string) => void; sink: TurnTraceSink; }",
+          "doc": "A handed-off projection must never export the durable owner's root early."
         },
         {
           "name": "createPresetDrizzleSchema",
@@ -14508,6 +14590,54 @@
           "name": "EnsureCloudflareWorkflowInstanceResult",
           "kind": "interface",
           "signature": "interface EnsureCloudflareWorkflowInstanceResult",
+          "doc": null
+        },
+        {
+          "name": "NATIVE_CHECKPOINT_MAX_BYTES",
+          "kind": "const",
+          "signature": "number",
+          "doc": null
+        },
+        {
+          "name": "nativeCompletionCheckpoint",
+          "kind": "function",
+          "signature": "(trace: TurnTrace, timing: NativeCompletionTimingSource, turnStartedAt: number) => NativeCompletionCheckpoint",
+          "doc": "Build a checkpoint without ending or replacing the original request trace."
+        },
+        {
+          "name": "NativeCompletionCheckpoint",
+          "kind": "interface",
+          "signature": "interface NativeCompletionCheckpoint",
+          "doc": "Absolute event clocks retain both request and post-admission origins."
+        },
+        {
+          "name": "NativeCompletionOwnerOptions",
+          "kind": "interface",
+          "signature": "interface NativeCompletionOwnerOptions",
+          "doc": "Binding to the existing native completion owner."
+        },
+        {
+          "name": "NativeCompletionPayload",
+          "kind": "interface",
+          "signature": "interface NativeCompletionPayload",
+          "doc": "Server-authorized identities."
+        },
+        {
+          "name": "nativeCompletionTerminalTrace",
+          "kind": "function",
+          "signature": "(checkpoint: NativeCompletionCheckpoint, endedAt: number, error?: string | undefined) => TurnTraceSnapshot",
+          "doc": "Reuse the trace owner's reducer, retaining every original exported identity."
+        },
+        {
+          "name": "NativeCompletionTimingSource",
+          "kind": "interface",
+          "signature": "interface NativeCompletionTimingSource",
+          "doc": null
+        },
+        {
+          "name": "nativeCompletionWorkflowId",
+          "kind": "function",
+          "signature": "(executionId: string, prefix: string) => Promise<string>",
           "doc": null
         },
         {
@@ -16038,6 +16168,7 @@
       "id": "./rollout",
       "source": "src/rollout/index.ts",
       "dependsOn": [
+        "chat-routes",
         "signoff",
         "turn-trace"
       ],
@@ -16133,6 +16264,7 @@
       "id": "./rollout/cli",
       "source": "src/rollout/cli.ts",
       "dependsOn": [
+        "chat-routes",
         "signoff",
         "turn-trace"
       ],
@@ -16162,6 +16294,7 @@
       "id": "./rollout/d1",
       "source": "src/rollout/d1.ts",
       "dependsOn": [
+        "chat-routes",
         "signoff",
         "turn-trace"
       ],
@@ -16170,7 +16303,7 @@
         {
           "name": "createD1TurnTimingStore",
           "kind": "function",
-          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…",
+          "signature": "(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; readObservedFa…",
           "doc": null
         },
         {
@@ -16184,6 +16317,12 @@
           "kind": "const",
           "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;\"",
           "doc": "Apply once through the product migration runner to existing tables; historical rows stay NULL."
+        },
+        {
+          "name": "ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL",
+          "kind": "const",
+          "signature": "\"ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;\"",
+          "doc": "Additive upgrade for a table created before durable native timing transfer."
         },
         {
           "name": "ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL",
@@ -20821,6 +20960,18 @@
       "error": null,
       "exports": [
         {
+          "name": "CachePruneOptions",
+          "kind": "interface",
+          "signature": "interface CachePruneOptions",
+          "doc": null
+        },
+        {
+          "name": "CachePruneResult",
+          "kind": "interface",
+          "signature": "interface CachePruneResult",
+          "doc": null
+        },
+        {
           "name": "CdpResponseSource",
           "kind": "interface",
           "signature": "interface CdpResponseSource",
@@ -21019,6 +21170,12 @@
           "doc": null
         },
         {
+          "name": "pruneSignoffCache",
+          "kind": "function",
+          "signature": "(cacheDir: string, options?: CachePruneOptions) => Promise<CachePruneResult>",
+          "doc": "Bound idle trees and stores by age first, then allocated physical bytes."
+        },
+        {
           "name": "QUIET_CHROMIUM_ARGS",
           "kind": "const",
           "signature": "readonly string[]",
@@ -21163,6 +21320,12 @@
           "doc": "The hermetic install that precedes every step."
         },
         {
+          "name": "SignoffPhase",
+          "kind": "type",
+          "signature": "type SignoffPhase",
+          "doc": null
+        },
+        {
           "name": "SignoffRepoFacts",
           "kind": "interface",
           "signature": "interface SignoffRepoFacts",
@@ -21173,6 +21336,12 @@
           "kind": "interface",
           "signature": "interface SignoffReport",
           "doc": null
+        },
+        {
+          "name": "SignoffSelection",
+          "kind": "interface",
+          "signature": "interface SignoffSelection",
+          "doc": "Declared scope, including dependency steps brought into a partial run."
         },
         {
           "name": "SignoffShuffleSpec",
@@ -25388,7 +25557,7 @@
         {
           "name": "peekDurableTurnLock",
           "kind": "function",
-          "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: \"workspace\"; threadId?: string | undef…",
           "doc": "Read a channel's active turn lock without changing it."
         },
         {
@@ -25618,7 +25787,9 @@
     {
       "id": "./turn-trace",
       "source": "src/turn-trace/index.ts",
-      "dependsOn": [],
+      "dependsOn": [
+        "redact"
+      ],
       "error": null,
       "exports": [
         {
@@ -25721,6 +25892,18 @@
           "name": "TURN_SPAN_KINDS",
           "kind": "const",
           "signature": "readonly TurnSpanKind[]",
+          "doc": null
+        },
+        {
+          "name": "TurnPhaseTiming",
+          "kind": "interface",
+          "signature": "interface TurnPhaseTiming",
+          "doc": "Domain-named phases and concurrent work over the turn's existing clock and D1 counter."
+        },
+        {
+          "name": "TurnPhaseTimingOptions",
+          "kind": "interface",
+          "signature": "interface TurnPhaseTimingOptions",
           "doc": null
         },
         {
@@ -28745,12 +28928,6 @@
           "kind": "interface",
           "signature": "interface MessageAttachmentsProps",
           "doc": null
-        },
-        {
-          "name": "mintThreadId",
-          "kind": "function",
-          "signature": "() => string",
-          "doc": "A thread id in the server's own format (32 lowercase hex), minted in the browser for a new chat's first turn: send it as both `threadId` and `newThread.id`, and the turn route's `createThread` option…"
         },
         {
           "name": "missingAnswerHint",

@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-36 exports.
+47 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -60,6 +60,30 @@ interface CloudflareWorkflowStepLike
 
 ```ts
 (opts: PresetKnowledgeAccessorOptions) => KnowledgeStateAccessor
+```
+
+### `createD1NativeCompletionStore`
+
+`function`
+
+```ts
+<TPayload extends NativeCompletionPayload>(db: D1Like, table: string) => { read: (executionId: string) => Promise<{ pay…
+```
+
+### `createNativeCompletionOwner`
+
+`function`
+
+```ts
+<TPayload extends NativeCompletionPayload, TSource extends NativeCompletionSessionSource>(options: NativeCompletionOwne…
+```
+
+### `createNativeCompletionTraceSink`
+
+`function` — A handed-off projection must never export the durable owner's root early.
+
+```ts
+(attached: TurnTraceSink) => { own: (rootSpanId: string) => void; sink: TurnTraceSink; }
 ```
 
 ### `createPresetDrizzleSchema`
@@ -196,6 +220,70 @@ interface DrizzleSqliteCoreLike
 
 ```ts
 interface EnsureCloudflareWorkflowInstanceResult
+```
+
+### `NATIVE_CHECKPOINT_MAX_BYTES`
+
+`const`
+
+```ts
+number
+```
+
+### `nativeCompletionCheckpoint`
+
+`function` — Build a checkpoint without ending or replacing the original request trace.
+
+```ts
+(trace: TurnTrace, timing: NativeCompletionTimingSource, turnStartedAt: number) => NativeCompletionCheckpoint
+```
+
+### `NativeCompletionCheckpoint`
+
+`interface` — Absolute event clocks retain both request and post-admission origins.
+
+```ts
+interface NativeCompletionCheckpoint
+```
+
+### `NativeCompletionOwnerOptions`
+
+`interface` — Binding to the existing native completion owner.
+
+```ts
+interface NativeCompletionOwnerOptions
+```
+
+### `NativeCompletionPayload`
+
+`interface` — Server-authorized identities.
+
+```ts
+interface NativeCompletionPayload
+```
+
+### `nativeCompletionTerminalTrace`
+
+`function` — Reuse the trace owner's reducer, retaining every original exported identity.
+
+```ts
+(checkpoint: NativeCompletionCheckpoint, endedAt: number, error?: string | undefined) => TurnTraceSnapshot
+```
+
+### `NativeCompletionTimingSource`
+
+`interface`
+
+```ts
+interface NativeCompletionTimingSource
+```
+
+### `nativeCompletionWorkflowId`
+
+`function`
+
+```ts
+(executionId: string, prefix: string) => Promise<string>
 ```
 
 ### `NativeCompletionWorkflowOptions`

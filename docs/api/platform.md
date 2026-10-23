@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-141 exports.
+142 exports.
 
 ### `AdminGuardOptions`
 
@@ -476,6 +476,14 @@ type DelegatedTurnKeyEvent
 
 ```ts
 interface DelegatedTurnKeyInput
+```
+
+### `DelegatedTurnKeyLease`
+
+`interface` — One turn owns its claimed/inline key and any revoked-key replacement until it calls `revoke`.
+
+```ts
+interface DelegatedTurnKeyLease
 ```
 
 ### `DelegatedTurnKeys`

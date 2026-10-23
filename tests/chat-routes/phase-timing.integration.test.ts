@@ -82,6 +82,6 @@ it('keeps domain phase clocks and SQL counts on each concurrent route trace', as
         expect(work.parentSpanId).toBe(snapshot.rootSpanId)
       }
     }
-    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM message').get()?.n).toBe(4)
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM message').get()).toEqual({ n: 4 })
   } finally { sqlite.close() }
 })

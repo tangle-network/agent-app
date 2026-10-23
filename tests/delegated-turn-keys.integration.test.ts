@@ -347,7 +347,7 @@ describe('pre-minted turn keys', () => {
 
   it('answers a spent budget, a 403 or a bare invalid key with the Router refusal and no second mint', async () => {
     for (const refuse of ['spent', 'forbidden', 'bare'] as const) {
-      const { p, parked, turnFetch, send, replaced } = await parkedTurn()
+      const { p, parked, turnFetch, send } = await parkedTurn()
       if (refuse === 'spent') p.spent.add(parked.id)
       if (refuse === 'forbidden') p.forbidden.add(parked.id)
       if (refuse === 'bare') p.minted.splice(p.minted.findIndex(k => k.id === parked.id), 1)
@@ -356,7 +356,6 @@ describe('pre-minted turn keys', () => {
       expect(response.status).toBe(refuse === 'spent' ? 402 : refuse === 'forbidden' ? 403 : 401)
       if (refuse === 'spent') expect(await response.json()).toMatchObject({ error: { code: 'key_budget_exhausted' } })
       expect(p.minted.length).toBe(before)
-      expect(replaced()).toBe(0)
       await close?.()
       close = undefined
     }

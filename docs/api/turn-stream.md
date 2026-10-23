@@ -179,7 +179,7 @@ interface MemoryTurnStreamSocket
 `function` — Read a channel's active turn lock without changing it.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…
+(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: "workspace"; threadId?: string | undef…
 ```
 
 ### `pruneStaleThreads`

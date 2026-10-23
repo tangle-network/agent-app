@@ -47,9 +47,9 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
   const signals: AbortSignal[] = []
   const refusals: unknown[] = []
   const seen: Array<{ id: string | null | undefined; admitted: boolean; locked: boolean; gates: number }> = []
-  const requestStarts: Array<() => void> = []
+  const requestStarts: Array<Array<() => void>> = []
   const modelStarted = (number: number) => requests >= number ? Promise.resolve()
-    : new Promise<void>(resolve => { requestStarts[number - 1] = resolve })
+    : new Promise<void>(resolve => { (requestStarts[number - 1] ??= []).push(resolve) })
   let resourceReady!: () => void
   const resourceStarted = new Promise<void>(resolve => { resourceReady = resolve })
   let releaseResource: (() => void) | undefined
@@ -75,7 +75,8 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
         database.prepare('INSERT INTO resource_disposal VALUES (?)').run(request.url!)
         response.end('disposed')
       } else {
-        requests++; requestStarts[requests - 1]?.()
+        requests++
+        for (const resolve of requestStarts[requests - 1] ?? []) resolve()
         if (options.backend === 'router-data') {
           const delta = requests === 1 ? { tool_calls: [{ index: 0, id: 'write', function: { name: 'write_record', arguments: '{}' } }] }
             : { content: 'A persisted answer.' }
@@ -130,6 +131,7 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
       events: (async function* () {
         const text = await fetch(origin).then(response => response.text())
         database.prepare('INSERT INTO effect VALUES (?)').run(args.userMessageId!)
+        yield { type: 'message.part.updated', data: { part: { type: 'text' }, delta: text } }
         yield { type: 'result', data: { finalText: text } }
       })(),
       model: 'sandbox/model',
@@ -576,7 +578,7 @@ it.each([undefined, 'matching'] as const)('reads real D1 replay/running state wi
   try {
     const buffer = createD1TurnEventStore(h.durable!.d1)
     await buffer.setStatus('running-read', 'running', 'thread')
-    await buffer.append('finished-read', [{ seq: 0, event: JSON.stringify({ type: 'text', text: 'Persisted replay answer.' }) }])
+    await buffer.append('finished-read', [{ seq: 1, event: JSON.stringify({ type: 'text', text: 'Persisted replay answer.' }) }])
     await buffer.setStatus('finished-read', 'complete', 'thread')
     const running = await h.running()
     expect(running.status).toBe(200)

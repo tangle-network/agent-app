@@ -202,7 +202,13 @@ it('projects an asynchronous domain outcome once into the HTTP route transcript 
     const wire = await response.text()
     await Promise.all(pending)
     expect(wire.match(/Domain follow-up\./g)).toHaveLength(1)
-    expect(wire.match(/Domain refusal\./g)).toHaveLength(1)
+    const frames = wire.trim().split('\n').map(line => JSON.parse(line) as { type: string; data?: Record<string, unknown> })
+    // One visible error and one terminal failure carry the same durable reason.
+    for (const type of ['error', 'session.run.failed']) {
+      expect(frames.filter(frame => frame.type === type)).toEqual([expect.objectContaining({
+        data: expect.objectContaining({ code: 'domain_refused', message: 'Domain refusal.' }),
+      })])
+    }
     const assistant = database.prepare("SELECT content,parts FROM message WHERE role='assistant'").all()
     expect(assistant).toHaveLength(1)
     expect(assistant[0]!.content).toBe('Model answer.\n\nDomain follow-up.')

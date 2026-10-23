@@ -40,7 +40,7 @@ it.each(cases)('cancels the exact dispatch and fails closed for $mode', async ({
     dispatchToken: 'dispatch-original', executionId: 'execution-original', product: { retained: true },
     run: { state: mode === 'pending' ? 'pending' : 'running', sandboxId: 'fixture-box', sessionId: 'session-original', executionId: 'execution-original' } }
   await store.appendMessage({ id: 'user-row', threadId: 'thread', role: 'user', content: 'Answer once.',
-    parts: [{ type: 'text', text: 'Answer once.', turnId: 'client-turn' }], extras: { metadata } })
+    parts: [{ type: 'text', text: 'Answer once.' }], extras: { metadata } })
   const calls: Array<{ path: string; body?: Record<string, unknown> }> = []
   let targetReads = 0
   const server = createServer((request, response) => {

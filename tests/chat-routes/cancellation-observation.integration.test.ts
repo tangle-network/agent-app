@@ -131,7 +131,7 @@ it.each(['stopped', 'superseded'])('rechecks a fast terminal HTTP response and r
     await body
     await Promise.all(h.pending)
     expect(h.reads()).toBeGreaterThanOrEqual(2)
-    expect(h.signals[0].aborted).toBe(true)
+    expect(h.signals[0]?.aborted).toBe(true)
     expect(h.sql.prepare('SELECT role FROM message').all()).toEqual([{ role: 'user' }])
     expect(h.sourceClosed()).toBe(1)
   } finally { await h.close() }
@@ -145,7 +145,7 @@ it('observes Stop during ordinary async construction and tracks late producer cl
     await h.httpStarted
     h.setStatus('stopped')
     await body
-    expect(h.signals[0].aborted).toBe(true)
+    expect(h.signals[0]?.aborted).toBe(true)
     let settled = false
     const cleanup = Promise.all(h.pending).then(() => { settled = true })
     await new Promise<void>(resolve => setImmediate(resolve))
@@ -167,7 +167,7 @@ it('retains a generic source iterator finally on the actual host while its real 
     h.setStatus('stopped')
     await h.retirementStarted
     await body
-    expect(h.signals[0].aborted).toBe(true)
+    expect(h.signals[0]?.aborted).toBe(true)
     let settled = false
     const continuations = Promise.all(h.pending).then(() => { settled = true })
     await new Promise<void>(resolve => setImmediate(resolve))
