@@ -3,7 +3,14 @@ import { fileURLToPath } from 'node:url'
 import { it } from 'vitest'
 import { createTestHarness } from 'wrangler'
 
-interface BindingCall { channel: string; id: string; locationHint?: string }
+interface BindingCall {
+  channel: string
+  id: string
+  locationHint?: string
+  path?: string
+  fetchMs?: number
+  handlerMs?: number
+}
 interface Receipt {
   outcome?: string
   report?: { legacyReady?: boolean }
@@ -75,15 +82,16 @@ it('prewarms the default turn lock before send, reuses receipts, and preserves a
     assert.equal(chat.status, 200, JSON.stringify(chat))
     assert.match(chat.body.text ?? '', /Local integration answer/)
     const warmLockMs = lockMs(chat.timing)
+    console.info(JSON.stringify({
+      proof: 'local-workerd-lock-prewarm', initialization: 'injected240ms DO constructor barrier; not measured Cloudflare cold start',
+      coldAdmissionLockMs: coldLockMs, warmedAdmissionLockMs: warmLockMs, targetMs: 100,
+      coldServerTiming: cold.timing, prewarmServerTiming: warm.timing, warmedServerTiming: chat.timing,
+      coldBindingCalls: cold.body.bindingCalls, prewarmBindingCalls: warm.body.bindingCalls, warmedBindingCalls: chat.body.bindingCalls,
+    }))
     assert(warmLockMs < 100, `Prewarmed actual route admission.lock must be <100ms: ${warmLockMs}`)
     assertChannel(warm.body, 'proof-warmed')
     assertChannel(chat.body, 'proof-warmed')
     assert(chat.body.bindingCalls.every(call => call.id === id), 'Warm and send must reach the same named object')
-    console.info(JSON.stringify({
-      proof: 'local-workerd-lock-prewarm', initialization: 'injected240ms DO constructor barrier; not measured Cloudflare cold start',
-      coldAdmissionLockMs: coldLockMs, warmedAdmissionLockMs: warmLockMs, targetMs: 100,
-      coldServerTiming: cold.timing, warmedServerTiming: chat.timing,
-    }))
 
     const failed = await invoke('/prewarm/proof-retry?wrongSecret=1')
     assert.equal(step(failed.body)?.outcome, 'failed', JSON.stringify(failed))

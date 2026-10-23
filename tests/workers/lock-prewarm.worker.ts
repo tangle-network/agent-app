@@ -19,10 +19,27 @@ export class ColdStartTurnStreamDO extends TurnStreamDO {
     // initialization finishes, as real DO initialization must. No protocol is replaced.
     state.blockConcurrencyWhile(async () => { await new Promise(resolve => setTimeout(resolve, 240)) })
   }
+
+  async fetch(request: Request): Promise<Response> {
+    // The constructor barrier finishes before this handler begins. This measures
+    // only the real handler, not activation or the binding's transport/queue.
+    const started = performance.now()
+    const response = await super.fetch(request)
+    const headers = new Headers(response.headers)
+    headers.set('x-local-proof-do-ms', String(performance.now() - started))
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
 }
 
 interface Env { DB: D1Database; TURN_STREAM_DO: TurnStreamNamespaceLike; TURN_STREAM_AUTH_SECRET: string }
-interface BindingCall { channel: string; id: string; locationHint?: string }
+interface BindingCall {
+  channel: string
+  id: string
+  locationHint?: string
+  path?: string
+  fetchMs?: number
+  handlerMs?: number
+}
 const calls: BindingCall[] = []
 const factories = new Map<string, ReturnType<typeof createPrewarm>>()
 const validWorkspace = (value: string) => /^proof-[a-z0-9-]+$/.test(value)
@@ -32,8 +49,25 @@ function observedNamespace(namespace: TurnStreamNamespaceLike): TurnStreamNamesp
   return {
     idFromName(name) { const id = namespace.idFromName(name); names.set(id, name); return id },
     get(id, options) {
-      calls.push({ channel: names.get(id) ?? '', id: String(id), ...options })
-      return namespace.get(id, options)
+      const call: BindingCall = { channel: names.get(id) ?? '', id: String(id), ...options }
+      calls.push(call)
+      const stub = namespace.get(id, options)
+      return {
+        async fetch(input, init) {
+          // Record only the path and elapsed times, never capabilities, headers
+          // or bodies. The request and response are delegated unchanged.
+          call.path = new URL(typeof input === 'string' ? input : input.url).pathname
+          const started = performance.now()
+          try {
+            const response = await stub.fetch(input, init)
+            const handlerMs = response.headers.get('x-local-proof-do-ms')
+            if (handlerMs !== null && Number.isFinite(Number(handlerMs))) call.handlerMs = Number(handlerMs)
+            return response
+          } finally {
+            call.fetchMs = performance.now() - started
+          }
+        },
+      }
     },
   }
 }
