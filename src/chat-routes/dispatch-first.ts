@@ -6,6 +6,7 @@
  */
 import type { TurnTrace } from '../turn-trace/recorder'
 import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
+import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
 export class TurnAdmissionRefusedError extends Error {
@@ -136,9 +137,13 @@ export function selectTurnProducer<TContext, TResource = unknown>(
   args: ChatTurnProduceArgs<TContext, TResource>,
 ) {
   if (typeof produce === 'function') return { produce, router: false }
-  if (produce.when?.(args) ?? true) return { produce: produce.router, router: true }
+  if (produce.when?.(args) ?? true) return {
+    produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => routerRouteProducer(await produce.router(final), final),
+    router: true,
+  }
   if (!produce.sandbox) throw new Error('The turn selected the Sandbox backend without a Sandbox producer')
-  return { produce: produce.sandbox, router: false }
+  const sandbox = produce.sandbox
+  return { produce: async (final: ChatTurnProduceArgs<TContext, TResource>) => sandboxRouteProducer(await sandbox(final)), router: false }
 }
 
 /** A reused user row must pass duplicate/refusal checks before another model call. */

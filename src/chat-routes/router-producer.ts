@@ -8,7 +8,7 @@
  * `stream` generator drains in order, so a slow consumer never drops a frame
  * and the engine never waits on the consumer.
  */
-import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
+import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import { redactErrorMessage } from '../redact/index'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
@@ -24,8 +24,9 @@ export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent' | 'sys
   systemPrompt: RouterTurnPrompt | Promise<RouterTurnPrompt>
   /** Final admission: model text may start earlier, but every tool waits for this request's committed domain state. */
   admitted?: Promise<unknown>
-  /** Observe the finished turn (placement records, metrics, billing). */
-  onOutcome?: (outcome: RouterTurnOutcome) => void
+  /** Observe the finished turn or supply domain-authored final text/failure; projection and persistence stay shared. */
+  onOutcome?: (outcome: RouterTurnOutcome) => void | { trailingText?: string; failure?: RouterTurnFailure } |
+    Promise<void | { trailingText?: string; failure?: RouterTurnFailure }>
   /** Observe each engine event after the producer has projected it (a box speculator, metrics). A throw is ignored. */
   onEvent?: (event: RouterTurnEvent) => void
   /** Retire product resources once, including initialization failure and cancellation before the stream is read. */
@@ -142,9 +143,15 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Ch
         }
       },
     })
-  }).then(result => {
+  }).then(async result => {
     outcome = result
-    options.onOutcome?.(result)
+    const final = await options.onOutcome?.(result)
+    if (final && final.trailingText) {
+      result.text += final.trailingText
+      parts.push({ type: 'text', text: final.trailingText })
+      push({ type: 'text', text: final.trailingText })
+    }
+    if (final && final.failure) result.failure = final.failure
     if (result.failure) {
       push({ type: 'error', data: { message: result.failure.message, code: result.failure.code } })
     }

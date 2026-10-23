@@ -5,6 +5,8 @@ import type { SandboxInstance } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
 import { createHybridTurnProducer } from '../../src/chat-routes/hybrid-producer'
 import { createRouterTurnProducer } from '../../src/chat-routes/router-producer'
+import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-routes/index'
+import { createMemoryTurnEventStore } from '../../src/stream/index'
 
 // Real HTTP Router -> producer -> engine tool loop -> sandbox_run -> product box seam.
 // The upstream deliberately substitutes code for the member's output contract.
@@ -158,4 +160,62 @@ it.each(['prompt failure', 'unread stream cancellation', 'unread stream throw'])
     expect(revokes).toBe(1)
     expect(disposals).toBe(1)
   } finally { database.close() }
+})
+
+
+it('projects an asynchronous domain outcome once into the HTTP route transcript and persisted SQLite row', async () => {
+  const database = new DatabaseSync(':memory:')
+  database.exec('CREATE TABLE message(id TEXT PRIMARY KEY, role TEXT, content TEXT, parts TEXT); CREATE TABLE outcome_calls(value TEXT)')
+  const store: ChatTurnMessageStore = {
+    async listMessages() { return [] },
+    async appendMessage(input) {
+      const id = crypto.randomUUID()
+      database.prepare('INSERT INTO message VALUES (?,?,?,?)').run(id, input.role, input.content, JSON.stringify(input.parts ?? []))
+      return { id }
+    },
+  }
+  const server = createServer((request, response) => {
+    request.resume()
+    request.on('end', () => {
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(`data: ${JSON.stringify({ model: 'served/model', choices: [{ delta: { content: 'Model answer.' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const pending: Promise<unknown>[] = []
+  let completed: { failed: boolean; failureReason?: string } | undefined
+  const routes = createChatTurnRoutes({
+    projectId: 'domain-outcome', store, turnStore: createMemoryTurnEventStore(), turnTrace: false,
+    authorize: async () => ({ ok: true, tenantId: 'workspace', userId: 'member', context: {} }),
+    produce: () => createRouterTurnProducer({ apiKey: 'test-key', model: 'model', systemPrompt: 'Answer.', userMessage: 'Hello.',
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      onOutcome: async () => {
+        database.prepare('INSERT INTO outcome_calls VALUES (?)').run('settled')
+        return { trailingText: '\n\nDomain follow-up.', failure: { code: 'domain_refused', message: 'Domain refusal.' } }
+      },
+    }),
+    onTurnComplete: async info => { completed = info }, log: () => {},
+  })
+  try {
+    const response = await routes.turn(new Request('http://app.test/chat', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ threadId: 'thread', content: 'Hello.' }) }), { waitUntil: promise => { pending.push(promise) } })
+    const wire = await response.text()
+    await Promise.all(pending)
+    expect(wire.match(/Domain follow-up\./g)).toHaveLength(1)
+    expect(wire.match(/Domain refusal\./g)).toHaveLength(1)
+    const assistant = database.prepare("SELECT content,parts FROM message WHERE role='assistant'").all()
+    expect(assistant).toHaveLength(1)
+    expect(assistant[0]!.content).toBe('Model answer.\n\nDomain follow-up.')
+    const parts = JSON.parse(String(assistant[0]!.parts))
+    expect(parts.filter((part: { type: string }) => part.type === 'text').map((part: { text: string }) => part.text).join(''))
+      .toBe('Model answer.\n\nDomain follow-up.')
+    expect(database.prepare('SELECT * FROM outcome_calls').all()).toHaveLength(1)
+    expect(completed?.failed).toBe(true)
+    expect(completed?.failureReason).toContain('Domain refusal.')
+  } finally {
+    await Promise.all(pending)
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    database.close()
+  }
 })

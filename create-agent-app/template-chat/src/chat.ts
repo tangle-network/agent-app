@@ -146,7 +146,15 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
   interface Admission { handle: unknown; started: boolean; producer?: ChatTurnRouteProducer; userMessageId?: string }
   const admissions = new Map<string, Admission>()
   const lane = overrides.produce ? null : createHybridLane(env)
-  const produce = overrides.produce ?? lane!.produce
+  // Native Sandbox execution keeps the backend-terminal ownership check.
+  // Router option data goes directly to the shared route before its lock.
+  const nativeProduce = async (args: ChatTurnProduceArgs<void>) => {
+    const admission = admissions.get(args.executionId)
+    if (!admission) throw new Error('Turn admission is unavailable')
+    admission.started = true
+    admission.producer = await (overrides.produce ?? lane!.produce.sandbox)(args)
+    return admission.producer
+  }
   const routes = createChatTurnRoutes<void>({
     turnLock: {
       acquire: async args => {
@@ -182,13 +190,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
         await store.updateMessage(args.userMessageId, { extras: { turnStreamId: args.turnStreamId, backendTerminal: false } })
       }
     },
-    produce: async args => {
-      const admission = admissions.get(args.executionId)
-      if (!admission) throw new Error('Turn admission is unavailable')
-      admission.started = true
-      admission.producer = await produce(args)
-      return admission.producer
-    },
+    produce: overrides.produce ? nativeProduce : { ...lane!.produce, sandbox: nativeProduce },
     interactions: {
       resolveConnection: async ({ request, intent, body }) => {
         const session = await requireUser(request)

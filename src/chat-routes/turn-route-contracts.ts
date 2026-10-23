@@ -12,6 +12,22 @@ import type { TurnStreamAuth, TurnStreamNamespaceLike } from '../turn-stream/ada
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
 import type { TurnRoutePhase } from './turn-progress'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
+import type { RouterTurnProducerOptions } from './router-producer'
+import type { HybridTurnProducerOptions } from './hybrid-producer'
+import type { SandboxChatProducerOptions } from './sandbox-producer'
+
+/** The route supplies request tracing, cancellation and the admission fence.
+ * Domain callbacks supply model, credentials, policy, tools and prompt data. */
+export type ChatTurnRouterConfiguration = Omit<RouterTurnProducerOptions, 'trace' | 'traceId' | 'signal' | 'userMessage' | 'history'> & {
+  userMessage?: RouterTurnProducerOptions['userMessage']
+  history?: RouterTurnProducerOptions['history']
+}
+export type ChatTurnHybridConfiguration = Omit<HybridTurnProducerOptions, 'trace' | 'traceId' | 'signal' | 'userMessage' | 'history'> & {
+  userMessage?: HybridTurnProducerOptions['userMessage']
+  history?: HybridTurnProducerOptions['history']
+}
+export type ChatTurnRouterBackend = ChatTurnRouteProducer | ChatTurnRouterConfiguration | ChatTurnHybridConfiguration
+export type ChatTurnSandboxBackend = ChatTurnRouteProducer | SandboxChatProducerOptions
 
 /** Usage receipt persisted onto the assistant message (the flattened
  *  `step-finish` shape `/chat-store`'s columns mirror). */
@@ -339,7 +355,7 @@ export type ChatTurnLockResult =
 /** Async acquire/release wrapped around the turn. `acquire` runs before any
  *  side effect; `release` runs once when the turn settles — including on a
  *  short-circuit or a throw. */
-export interface ChatTurnLock<TContext> {
+export interface ChatTurnLock<TContext, TResource = unknown> {
   acquire(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnLockResult | Promise<ChatTurnLockResult>
   release(handle: unknown): void | Promise<void>
   /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
@@ -435,6 +451,8 @@ export interface ChatTurnCompleteInput<TContext> {
   finalText: string
   context: TContext
   failed: boolean
+  /** Final producer receipt, when it reports usage; absent counts remain unknown. */
+  usage?: ChatTurnUsage
   failureReason?: string
   /** Typed reason of a failed turn, when its terminal error event names one. */
   failureCode?: string
@@ -538,23 +556,24 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    * Router calls start before the lock by default, after authorize has verified
    * identity/access. The model service enforces spend before paying a provider.
    * Output stays buffered until admission commits; a refusal cancels the call.
-   * The Router producer must pass admissionSignal to its model call and await
-   * admitted before tools, durable effects or reading beforeTurn's mutations.
+   * Return Router/Hybrid producer options to bind tracing, cancellation and
+   * tool admission automatically. A custom Router producer must pass
+   * admissionSignal and await admitted before tools or durable effects.
    * beforeTurn cannot patch a Router prompt already sent.
    *
    * when selects the Router backend (default true); false selects sandbox,
    * which always starts after admission. A function also starts after admission.
    * Reused user rows always finish admission before either backend starts. */
   produce: ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
-    router(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+    router(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouterBackend | Promise<ChatTurnRouterBackend>
     when?(args: ChatTurnProduceArgs<TContext, TResource>): boolean
-    sandbox?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+    sandbox?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnSandboxBackend | Promise<ChatTurnSandboxBackend>
   }
   /** Single-flight lock acquired before durable effects and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
    *  no lock. */
-  turnLock?: ChatTurnLock<TContext>
+  turnLock?: ChatTurnLock<TContext, TResource>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.

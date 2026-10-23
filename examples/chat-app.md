@@ -562,17 +562,19 @@ The Router backend starts its model call after authorization, overlapping the
 lock, user insert and gates. The model service enforces spend before paying a
 provider. Output remains buffered until admission commits. Refusal cancels
 `args.admissionSignal`, rejects `args.admitted` and leaves no assistant row.
-Tools and durable effects must await `args.admitted`; `beforeTurn` cannot patch
-a prompt already dispatched. Reused user rows finish admission before another
-model call, so duplicate refusals do not spend on another answer.
+Router and Hybrid option data automatically bind tracing, cancellation and the
+tool admission fence. Custom producers must await `args.admitted` before tools
+or durable effects. `beforeTurn` cannot patch a prompt already dispatched.
+Reused user rows finish admission before another model call, so duplicate
+refusals do not spend on another answer.
 
 ```ts
 createChatTurnRoutes({
   // The other required fields supply authorization, persistence and replay.
   produce: {
     when: args => args.context.lane === 'router',
-    router: args => createRouterTurnProducer({ ...turnOptions(args), signal: args.admissionSignal }),
-    sandbox: args => createSandboxTurn(args),
+    router: args => turnOptions(args), // Router or Hybrid producer options
+    sandbox: args => sandboxOptions(args), // Sandbox options, or a custom producer
   },
 })
 ```
@@ -582,6 +584,14 @@ backend and an ordinary `produce(args)` function start after admission. They
 may use the committed user row and `beforeTurn` patches as before. Declare
 only a per-request Router model call in `router`; Sandbox execution sharing a
 thread's native execution id belongs in `sandbox`.
+
+Router options default `userMessage` to the request prompt's text and `history`
+to the prior user/assistant messages. Explicit domain-authored values override
+those defaults. Shared tracing, cancellation and admission stay bound to this
+request. A Router/Hybrid option object is distinguished from a custom producer
+by the producer's asynchronous `stream`.
+An options object's existing `admitted` promise can add a domain prerequisite;
+tools await both that promise and the route's admission commitment.
 
 ## Bind shared storage and request resources
 

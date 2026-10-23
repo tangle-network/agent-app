@@ -31,8 +31,9 @@
  *
  * `threadExtraColumns`/`messageExtraColumns` merge product columns into the
  * table definitions (the `/missions` opaque-extras pattern: the store writes
- * `extras` values verbatim in the SAME insert statement and never reads,
- * validates, or defaults them).
+ * `extras` values verbatim in the SAME insert statement and never infers their
+ * meaning). A product declaring a `metadata` column may use the store
+ * metadata merge-patch operation; its fields remain opaque product data.
  *
  * SERVER-side module (D1/libsql/better-sqlite3 behind a worker or server
  * route) — but free of `node:` builtins on purpose: D1 workers have none.

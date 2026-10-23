@@ -96,12 +96,15 @@ export interface DelegatedTurnKeys {
   /**
    * This turn's key: the slot's parked key, taken exactly once, else a fresh mint with a unique name. Then the
    * next turn's key is minted and parked through `waitUntil` (the Worker's `ctx.waitUntil`), off this turn's path.
-   * Pass `value.fetchImpl` to the producer and call `value.revoke()` when the turn ends, including refusals.
+   * Pass `value` as the shared Router producer's `apiKey`; the producer owns fallback fetch and cleanup.
+   * Direct HTTP callers use `value.fetchImpl` and close `value.revoke()` themselves, including refusals.
    */
   forTurn(input: DelegatedTurnKeyInput & { turnId: string; waitUntil?: (promise: Promise<unknown>) => void }):
     Promise<DelegatedKeyOutcome<DelegatedTurnKeyLease>>
   /** Mint and park a key for the slot's next turn, e.g. when a member session opens. Never throws. */
   park(input: DelegatedTurnKeyInput): Promise<boolean>
+  /** Retire only the parked key matching this exact slot and scope after a live domain refusal. Never throws. */
+  forget(input: Pick<DelegatedTurnKeyInput, 'slot' | 'scope' | 'payerId'>): Promise<void>
   /** Mint inline, as a turn did before pre-minting. */
   mint(input: DelegatedTurnKeyInput & { turnId: string }): Promise<DelegatedKeyOutcome<DelegatedTurnKey>>
 }
@@ -278,6 +281,14 @@ VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(slot) DO NOTHING RETURNING slot`)
       return outcome.succeeded ? { succeeded: true, value: lease(input, outcome.value) } : outcome
     },
     park,
+    async forget(input) {
+      if (!db) return
+      try {
+        const row = await db.prepare(`DELETE FROM ${table} WHERE slot = ?1 AND scope = ?2 RETURNING key_id`)
+          .bind(input.slot, await scopeDigest(input.scope)).first<{ key_id: string }>()
+        if (row) await retire(input, row.key_id)
+      } catch { /* a refused turn never hands out the slot; its key expires if retirement is unavailable */ }
+    },
     mint: (input) => mint(input, false),
   }
 }

@@ -110,14 +110,14 @@ export async function produceChatTurnWithIntelligence(
   // Freeze scalar metadata before an asynchronous producer can change context.
   const snapshot: ChatTurnIntelligenceOptions = { ...options }
   const producer = await options.produce()
-  return {
-    stream: observeChatTurnStream(producer.stream, snapshot),
-    finalText: () => producer.finalText(),
-    get assistantParts() { return producer.assistantParts?.bind(producer) },
-    get draftParts() { return producer.draftParts?.bind(producer) },
-    get usage() { return producer.usage?.bind(producer) },
-    get model() { return producer.model },
-    get modelFailover() { return producer.modelFailover?.bind(producer) },
-    get modelAttribution() { return producer.modelAttribution?.bind(producer) },
-  }
+  const stream = observeChatTurnStream(producer.stream, snapshot)
+  // The wrapper owns only its stream. Read every other capability on the original
+  // receiver, including future getters and class methods that use private state.
+  return new Proxy(Object.create(producer) as ChatTurnRouteProducer, {
+    get(_target, property) {
+      if (property === 'stream') return stream
+      const value: unknown = Reflect.get(producer, property, producer)
+      return typeof value === 'function' ? value.bind(producer) : value
+    },
+  })
 }

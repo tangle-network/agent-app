@@ -18,16 +18,14 @@
 
 import { config } from '../agent.config'
 import {
-  createHybridTurnProducer,
   createSandboxChatProducer,
   normalizeChatPromptForSandbox,
-  routerTurnHistory,
   startHybridBox,
   turnCarriesFiles,
-  turnPromptText,
   type ChatTurnAfterAuthorizeArgs,
   type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
+  type ChatTurnHybridConfiguration,
   type SandboxUploadSink,
 } from '@tangle-network/agent-app/chat-routes'
 import type { SidecarInteractionsConnection } from '@tangle-network/agent-app/interactions'
@@ -207,30 +205,34 @@ export function createHybridLane(env: AppEnv) {
       // A turn that ends before `produce` leaves the box to idle out.
       return () => { started.delete(threadId) }
     },
-    async produce(args: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> {
-      const { body, identity, prompt, priorMessages, trace } = args
-      const box = started.get(identity.sessionId)
-      started.delete(identity.sessionId)
-      const apiKey = env.TANGLE_API_KEY?.trim()
-      if (!apiKey || turnCarriesFiles(prompt)) return sandboxProduce(args)
-      const model = body.model ?? env.MODEL_NAME ?? config.model.default
-      const baseUrl = routerBaseUrl(env)
-      const scope = { workspaceId: identity.tenantId, userId: identity.userId }
-      return createHybridTurnProducer({
-        apiKey,
-        model,
-        ...(baseUrl ? { baseUrl } : {}),
-        systemPrompt: config.systemPrompt,
-        userMessage: turnPromptText(prompt),
-        history: routerTurnHistory(priorMessages),
-        ...(trace ? { trace } : {}),
-        box: {
-          acquire: () => acquire(scope, trace),
-          ...(box ? { started: box } : {}),
-          // The box agent keeps its own session per thread, so a sandbox-lane turn on the same thread never collides with it.
-          runTask: sandboxPromptRunner(shell, { model, harness: config.harness, sessionId: `sandbox-run-${identity.sessionId}` }),
-        },
-      })
+    produce: {
+      when: ({ prompt }: ChatTurnProduceArgs<void>) => Boolean(env.TANGLE_API_KEY?.trim()) && !turnCarriesFiles(prompt),
+      router(args: ChatTurnProduceArgs<void>): ChatTurnHybridConfiguration {
+        const { body, identity, trace } = args
+        const box = started.get(identity.sessionId)
+        started.delete(identity.sessionId)
+        const apiKey = env.TANGLE_API_KEY?.trim()
+        if (!apiKey) throw new Error('Router credentials are not configured')
+        const model = body.model ?? env.MODEL_NAME ?? config.model.default
+        const baseUrl = routerBaseUrl(env)
+        const scope = { workspaceId: identity.tenantId, userId: identity.userId }
+        return {
+          apiKey,
+          model,
+          ...(baseUrl ? { baseUrl } : {}),
+          systemPrompt: { profile: { prompt: { systemPrompt: config.systemPrompt } } },
+          box: {
+            acquire: () => acquire(scope, trace),
+            ...(box ? { started: box } : {}),
+            // The box agent keeps its own session per thread, so a sandbox-lane turn on the same thread never collides with it.
+            runTask: sandboxPromptRunner(shell, { model, harness: config.harness, sessionId: `sandbox-run-${identity.sessionId}` }),
+          },
+        }
+      },
+      sandbox(args: ChatTurnProduceArgs<void>) {
+        started.delete(args.identity.sessionId)
+        return sandboxProduce(args)
+      },
     },
   }
 }

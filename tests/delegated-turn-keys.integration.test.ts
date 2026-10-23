@@ -227,6 +227,20 @@ describe('pre-minted turn keys', () => {
     expect(p.revoked.has(stored()[0]!.key_id)).toBe(false)
   })
 
+  it('forgets only the exact parked slot and scope and revokes the removed child once', async () => {
+    const { p, keys, stored } = await setup()
+    const input = { slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000 }
+    await keys.park(input)
+    const parked = stored()[0]!.key_id
+    await keys.forget({ ...input, scope: scope(['another-model']) })
+    await keys.forget({ ...input, slot: 'another-slot' })
+    expect(stored()[0]!.key_id).toBe(parked)
+    expect(p.revoked.has(parked)).toBe(false)
+    await Promise.all([keys.forget(input), keys.forget(input)])
+    expect(stored()).toEqual([])
+    expect(p.revocationCalls.filter(id => id === parked)).toHaveLength(1)
+  })
+
   it('retires a replacement that finishes minting after the turn closes', async () => {
     const { p, parked, turnFetch, send } = await parkedTurn()
     p.revoked.add(parked.id)

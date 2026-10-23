@@ -803,6 +803,7 @@ function createTurnEngine<TContext, TResource>(
               finalText,
               context,
               failed: state.runFailed,
+              usage: state.producer?.usage?.(),
               assistantMessageId: assistantRowId(),
               ...(state.runFailed ? { failureReason: failureReasonOf(state.lastFailureData) } : {}),
               ...(state.runFailed && failureCodeOf(state.lastFailureData) ? { failureCode: failureCodeOf(state.lastFailureData) } : {}),
