@@ -1,10 +1,14 @@
-import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { join, resolve } from 'node:path'
+import type { Readable } from 'node:stream'
+import { fileURLToPath } from 'node:url'
+import { build } from 'tsup'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { formatSignoffLine, formatSignoffReport, peakConcurrency } from './report'
 import { runSignoff } from './run'
+import type { SignoffReport } from './types'
 
 /**
  * End to end, against a real git repository, with real subprocesses. Nothing is
@@ -101,6 +105,105 @@ function logStep(name: string): string {
  * `hangs` fixture below).
  */
 const E2E_TIMEOUT_MS = 120_000
+
+describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
+  let directory: string
+  let cli: string
+
+  beforeAll(async () => {
+    directory = mkdtempSync(join(tmpdir(), 'signoff-cli-pipe-'))
+    // Compile the real bin entrypoint without depending on a prior package build.
+    // Its external packages resolve through the actual installed dependencies.
+    symlinkSync(resolve('node_modules'), join(directory, 'node_modules'), 'dir')
+    await build({
+      entry: { cli: fileURLToPath(new URL('./cli.ts', import.meta.url)) },
+      outDir: directory, outExtension: () => ({ js: '.mjs' }),
+      format: ['esm'], platform: 'node', bundle: true, splitting: false,
+      dts: false, config: false, silent: true,
+    })
+    cli = join(directory, 'cli.mjs')
+  }, E2E_TIMEOUT_MS)
+
+  afterAll(() => rmSync(directory, { recursive: true, force: true }))
+
+  function slowRead(stream: Readable): Promise<string> {
+    return new Promise((done, reject) => {
+      const chunks: Buffer[] = []
+      stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk)
+        stream.pause()
+        setTimeout(() => stream.resume(), 5)
+      })
+      stream.once('end', () => done(Buffer.concat(chunks).toString('utf8')))
+      stream.once('error', reject)
+    })
+  }
+
+  async function runCli(args: string[]) {
+    const child = spawn(process.execPath, [cli, ...args], {
+      stdio: ['ignore', 'pipe', 'pipe'], signal: AbortSignal.timeout(E2E_TIMEOUT_MS),
+    })
+    const [status, stdout, stderr] = await Promise.all([
+      new Promise<number | null>((done, reject) => {
+        child.once('close', done)
+        child.once('error', reject)
+      }),
+      slowRead(child.stdout), slowRead(child.stderr),
+    ])
+    return { status, stdout, stderr }
+  }
+
+  it('delivers the complete large failure report to a slow pipe after cleanup', async () => {
+    const repo = fixtureRepo({ steps: `[{ name: 'large failure', run: 'node failure.mjs' }]` })
+    const payload = JSON.stringify({ detail: 'x'.repeat(1024 * 1024), last: 'PIPE-FAILURE-DETAIL-END' })
+    writeFileSync(join(repo, 'failure.mjs'),
+      `process.stdout.write(${JSON.stringify(payload)}, () => { process.exitCode = 17 })\n`)
+    git(['add', 'failure.mjs'], repo)
+    git(['commit', '--quiet', '-m', 'large failure output'], repo)
+    const cacheDir = temp('signoff-cli-cache-')
+    const json = join(temp('signoff-cli-report-'), 'report.json')
+    const result = await runCli([repo, '--source', 'head', '--cache-dir', cacheDir, '--json', json])
+    const report = JSON.parse(readFileSync(json, 'utf8')) as SignoffReport
+
+    expect(result.status).toBe(1)
+    expect(report.steps[0]?.attempts[0]?.output).toBe(payload)
+    expect(existsSync(report.workspace)).toBe(false)
+    expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+    expect(Buffer.byteLength(result.stdout)).toBe(Buffer.byteLength(`${formatSignoffReport(report)}\n`))
+    expect(result.stdout).toBe(`${formatSignoffReport(report)}\n`)
+  })
+
+  it('preserves success status and releases the clean tree and cache lease', async () => {
+    const repo = fixtureRepo({ steps: `[{ name: 'pass', run: 'node -e ""' }]` })
+    const cacheDir = temp('signoff-cli-cache-')
+    const json = join(temp('signoff-cli-report-'), 'report.json')
+    const result = await runCli([repo, '--source', 'head', '--cache-dir', cacheDir, '--json', json])
+    const report = JSON.parse(readFileSync(json, 'utf8')) as SignoffReport
+
+    expect(result.status).toBe(0)
+    expect(report.ok).toBe(true)
+    expect(result.stdout).toBe(`${formatSignoffReport(report)}\n`)
+    expect(existsSync(report.workspace)).toBe(false)
+    expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+  })
+
+  it('delivers a complete config error to a slow stderr pipe with exit 2 and cleanup', async () => {
+    const repo = fixtureRepo({ steps: `[{ name: 'unused', run: 'node -e ""' }]` })
+    const message = `CONFIG-ERROR-${'x'.repeat(1024 * 1024)}-END`
+    writeFileSync(join(repo, 'signoff.config.mjs'), `throw new Error(${JSON.stringify(message)})\n`)
+    git(['add', 'signoff.config.mjs'], repo)
+    git(['commit', '--quiet', '-m', 'invalid config'], repo)
+    const cacheDir = temp('signoff-cli-cache-')
+    const result = await runCli([repo, '--source', 'head', '--cache-dir', cacheDir])
+
+    expect(result.status).toBe(2)
+    expect(readdirSync(join(cacheDir, 'trees'))).toEqual([])
+    expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+    // Node may also emit environment warnings; the entire error must survive.
+    expect(Buffer.byteLength(result.stderr)).toBeGreaterThanOrEqual(Buffer.byteLength(`${message}\n`))
+    expect(result.stderr).toContain(`${message}\n`)
+  })
+})
 
 describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
   it('prunes an expired cached store before installing a fresh clean tree', async () => {

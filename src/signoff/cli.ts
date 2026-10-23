@@ -173,10 +173,11 @@ export async function runSignoffCli(argv: readonly string[]): Promise<number> {
 /* c8 ignore start — process wiring, exercised by the bin itself */
 if (invokedAsScript(import.meta.url, process.argv[1])) {
   runSignoffCli(process.argv.slice(2))
-    .then((code) => process.exit(code))
+    // Forced exit can discard the report while stdout/stderr pipes are draining.
+    .then((code) => { process.exitCode = code })
     .catch((err: unknown) => {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`)
-      process.exit(2)
+      process.exitCode = 2
     })
 }
 /* c8 ignore stop */
