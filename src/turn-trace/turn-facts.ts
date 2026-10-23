@@ -13,6 +13,8 @@ export interface MeasuredTurnFacts {
   firstTextMs?: number
   /** The model that served the turn. */
   model?: string
+  /** The terminal event's readable code and explanation, before product serialization. */
+  failureCode?: string
 }
 
 /** Turns kept; a lifecycle hook reads its turn's facts within the same request, so a small window is enough. */

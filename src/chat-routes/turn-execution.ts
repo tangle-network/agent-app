@@ -11,6 +11,7 @@ import {
 import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
 import { noteMeasuredTurnFacts } from '../turn-trace/turn-facts'
+import { redactErrorMessage } from '../redact/index'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
@@ -75,13 +76,17 @@ function modelAttributionFields(attribution: ChatTurnModelAttribution | undefine
 /** The lifecycle's timing for a settled turn, noted for the rollout timing store so it can fill a product row that
  *  omits it (rollout/d1 `record`). */
 function settledTurnTiming(turnStreamId: string, at: { requestAt: number; startedAt: number; firstVisibleAt?: number;
-  firstTextAt?: number; model?: string }, trace: TurnTraceSummary) {
+  firstTextAt?: number; model?: string; failure?: { data?: Record<string, unknown>; error: unknown } }, trace: TurnTraceSummary) {
   const measured = {
     admissionMs: at.startedAt - at.requestAt,
     ...(at.firstVisibleAt === undefined ? {} : { firstVisibleMs: at.firstVisibleAt - at.startedAt }),
     ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
   }
-  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}) })
+  const reason = at.failure ? failureReasonOf(at.failure.data) ?? redactErrorMessage(at.failure.error, 'chat turn failed') : undefined
+  const code = at.failure ? failureCodeOf(at.failure.data) : undefined
+  const failureCode = reason ? redactErrorMessage(code && !reason.startsWith(code) ? `${code}: ${reason}` : reason) : undefined
+  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}),
+    ...(failureCode ? { failureCode } : {}) })
   return { ...measured, trace }
 }
 
@@ -363,7 +368,7 @@ export function createAdmittedTurnRunner<TContext>({
       const lifecycle = options.lifecycle
       const durationMs = Date.now() - turnStartedAtMs
       const timing = settledTurnTiming(turnStreamId, { requestAt: trace.startedAt, startedAt: turnStartedAtMs,
-        firstVisibleAt: firstVisibleAtMs, firstTextAt: firstTextAtMs, model: producer?.model }, snapshot.summary)
+        firstVisibleAt: firstVisibleAtMs, firstTextAt: firstTextAtMs, model: producer?.model, failure: failed ? { data: lastFailureData, error: terminalError } : undefined }, snapshot.summary)
       try {
         if (!lifecycle) {
           // No hooks to run; the trace still goes to its sink below.
