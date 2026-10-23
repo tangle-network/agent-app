@@ -318,9 +318,11 @@ export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
    *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
   admitted?: Promise<ChatTurnProduceArgs<TContext, TResource>>
-  /** Aborts on confirmed product Stop/supersession when `cancel` is configured. A fresh Router backend also
-   *  aborts on admission refusal or when the route stops reading it. Pass it to the model transport;
-   *  Router/Sandbox option data binds it automatically. Early Router handoff waits for `admitted`. */
+  /** Effective execution signal: product Stop/supersession, opted-in durable Stop/control loss,
+   *  and optional request-disconnect cancellation.
+   *  A fresh Router backend also aborts on admission refusal or when the route stops reading it.
+   *  Pass it to producer I/O; Router/Sandbox option data binds it automatically.
+   *  Early Router handoff waits for `admitted`. */
   admissionSignal?: AbortSignal
 }
 
@@ -361,11 +363,19 @@ export type ChatTurnGateResult =
    *  the route releases its lock. */
   | { proceed: 'handoff'; response: Response }
 
+/** This owner's cancellation observation: the signal aborts on Stop or control loss.
+ *  Closing observation does not release the lock or establish remote completion. */
+export interface ChatTurnCancellation {
+  signal: AbortSignal
+  /** Close this owner's observation; never release the durable lock or claim remote work stopped. */
+  close(): void | Promise<void>
+}
+
 /** Single-flight lock verdict — acquired (with an opaque handle passed back to
  *  `release`), or already held (short-circuit with the product's 409-style
  *  `Response`). */
 export type ChatTurnLockResult =
-  | { acquired: true; handle?: unknown }
+  | { acquired: true; handle?: unknown; cancellation?: ChatTurnCancellation }
   | { acquired: false; response: Response }
 
 /** Async acquire/release wrapped around the turn. `acquire` runs before any

@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-304 exports.
+307 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -444,6 +444,22 @@ interface ChatTurnAuthorizeArgs
 
 ```ts
 interface ChatTurnCancelArgs
+```
+
+### `ChatTurnCancelControlResult`
+
+`interface` — Acknowledges durable intent only; the execution owner still reconciles actual completion and side effects.
+
+```ts
+interface ChatTurnCancelControlResult
+```
+
+### `ChatTurnCancellation`
+
+`interface` — This owner's cancellation observation: the signal aborts on Stop or control loss.
+
+```ts
+interface ChatTurnCancellation
 ```
 
 ### `ChatTurnCancelOptions`
@@ -2116,6 +2132,14 @@ interface SandboxUploadSink
 
 ```ts
 interface SniffResult
+```
+
+### `StaleTurnLockOwnerProbeResult`
+
+`interface` — A positive abandoned verdict covers the exact outer producer and every registered child/effect owner.
+
+```ts
+interface StaleTurnLockOwnerProbeResult
 ```
 
 ### `StaleTurnLockSandboxProbeResult`

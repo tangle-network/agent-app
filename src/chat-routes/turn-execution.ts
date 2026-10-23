@@ -143,7 +143,11 @@ async function runAdmittedTurn<TContext, TResource>({
     request,
     waitUntil: ctx?.waitUntil,
     earlyResource: early.resource,
-    admissionSignal: state.cancellationAbort?.signal,
+    admissionSignal: AbortSignal.any([
+      state.executionAbort.signal,
+      ...(state.cancellationAbort ? [state.cancellationAbort.signal] : []),
+      ...(ctx?.cancelOnDisconnect ? [request.signal] : []),
+    ]),
     body: payload,
     identity,
     context,
@@ -166,6 +170,16 @@ async function runAdmittedTurn<TContext, TResource>({
     if (!acquired.acquired) return acquired.response
     state.lockAcquired = true
     state.lockHandle = acquired.handle
+    if (acquired.cancellation) {
+      const cancellation = acquired.cancellation
+      const abort = () => state.executionAbort.abort(cancellation.signal.reason)
+      if (cancellation.signal.aborted) abort()
+      else cancellation.signal.addEventListener('abort', abort, { once: true })
+      state.closeCancellation = async () => {
+        cancellation.signal.removeEventListener('abort', abort)
+        await cancellation.close()
+      }
+    }
   }
   progress?.('preparing', progressMessages.preparing)
 
@@ -359,6 +373,8 @@ async function runAdmittedTurn<TContext, TResource>({
   }
 }
 interface AdmittedTurnState<TContext> {
+  executionAbort: AbortController
+  closeCancellation: (() => Promise<void>) | undefined
   draft: AssistantDraftWriter | undefined
   tap: BufferedTurnTap | undefined
   nativeTiming: NativeTimingTransfer | undefined
@@ -386,6 +402,7 @@ interface AdmittedTurnState<TContext> {
 
 function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
   return {
+    executionAbort: new AbortController(), closeCancellation: undefined,
     draft: undefined,
     tap: undefined,
     nativeTiming: undefined,
@@ -705,7 +722,9 @@ function createTurnEngine<TContext, TResource>(
             yield* state.producer.stream
           }
           let source: AsyncIterable<ChatRouteEvent> = producerStream()
-          if (options.cancel && state.cancellationAbort) {
+          // A durable owner connection already carries exact authenticated Stop.
+          // Keep metadata observation only for existing non-adopting targets.
+          if (options.cancel && state.cancellationAbort && !state.closeCancellation) {
             source = observeTurnCancellation(source, produceArgs, options.cancel, state.cancellationAbort)
           }
           if (ctx?.cancelOnDisconnect) {

@@ -1,3 +1,5 @@
+import type { TurnCancellationIdentity } from '../turn-stream/cancellation'
+
 /**
  * Recovery policy for a `ChatTurnLock` whose holder died.
  *
@@ -14,7 +16,11 @@
  * probes — which box key, which session id, which sidecar endpoint — in the
  * product.
  *
- * The rules, in precedence order:
+ * A supplied exact Router owner probe replaces the native rules: live and
+ * unknown hold; positive outer + child abandonment observes the same terminal
+ * grace and exact release fence. A native session cannot attest to a Router owner.
+ *
+ * The native rules, in precedence order:
  *
  * 1. The session probe answered and the execution is TERMINAL ⇒ release, once
  *    the lock is past a short grace period. The authority on "is this turn
@@ -48,6 +54,13 @@ export type StaleTurnLockSandboxProbeResult =
 export type StaleTurnLockSessionProbeResult =
   | { reachable: true; terminal: boolean; diagnostics?: Record<string, unknown> }
   | { reachable: false; reason?: string }
+
+/** A positive abandoned verdict covers the exact outer producer and every registered child/effect owner. */
+export interface StaleTurnLockOwnerProbeResult {
+  identity: TurnCancellationIdentity
+  status: 'live' | 'abandoned' | 'unknown'
+  diagnostics?: Record<string, unknown>
+}
 
 /**
  * Minimum age a lock must reach before the "sandbox unreachable ⇒ nothing can
@@ -96,6 +109,11 @@ export interface ReconcileStaleTurnLockOptions {
   /** When the held lock was acquired (epoch ms). The grace period is measured
    *  from here, so it must be the LOCK's start, not the turn's. */
   lockStartedAt: number
+  /** Router ownership replaces native-only inference. Missing/uncertain outer or child evidence must stay unknown. */
+  owner?: {
+    identity: TurnCancellationIdentity
+    probe(identity: TurnCancellationIdentity): Promise<StaleTurnLockOwnerProbeResult>
+  }
   /** Is the box there and running? Never provisions — a peek, not an ensure.
    *  A throw is treated as unreachable, same as `absent`. */
   probeSandbox(): Promise<StaleTurnLockSandboxProbeResult>
@@ -149,6 +167,7 @@ function messageOf(err: unknown): string {
 export async function reconcileStaleTurnLock(
   options: ReconcileStaleTurnLockOptions,
 ): Promise<ReconcileStaleTurnLockResult> {
+  if (options.owner) return reconcileTurnOwner(options)
   let sandbox: StaleTurnLockSandboxProbeResult
   try {
     sandbox = await options.probeSandbox()
@@ -224,6 +243,29 @@ export async function reconcileStaleTurnLock(
     released,
     diagnostics: { ...diagnostics, lockAgeMs, terminalReleaseGraceMs: terminalGraceMs, released, observedAt },
   }
+}
+
+async function reconcileTurnOwner(options: ReconcileStaleTurnLockOptions): Promise<ReconcileStaleTurnLockResult> {
+  const owner = options.owner!
+  // The observation fence is captured before the authority read, as on the native path.
+  const observedAt = (options.now ?? Date.now)()
+  let evidence: StaleTurnLockOwnerProbeResult
+  try { evidence = await owner.probe(owner.identity) }
+  catch (error) { return { released: false, diagnostics: { ownerStatus: 'unknown', ownerProbeError: messageOf(error) } } }
+  const keys = ['workspaceId', 'threadId', 'scope', 'executionId', 'lockId', 'turnStreamId'] as const
+  if (!evidence?.identity || keys.some(key => evidence.identity[key] !== owner.identity[key])) {
+    return { released: false, diagnostics: { ownerStatus: 'unknown', releaseWithheld: 'OWNER_IDENTITY_MISMATCH' } }
+  }
+  const status = evidence.status === 'abandoned' || evidence.status === 'live' ? evidence.status : 'unknown'
+  const diagnostics = { ...(evidence.diagnostics ?? {}), ownerStatus: status }
+  if (status !== 'abandoned') return { released: false, diagnostics }
+  const terminalGraceMs = options.terminalGraceMs ?? DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS
+  const lockAgeMs = observedAt - options.lockStartedAt
+  if (lockAgeMs < terminalGraceMs) return { released: false, diagnostics: {
+    ...diagnostics, lockAgeMs, terminalReleaseGraceMs: terminalGraceMs, releaseWithheld: 'LOCK_WITHIN_TERMINAL_GRACE_PERIOD',
+  } }
+  const released = await options.release({ observedAt })
+  return { released, diagnostics: { ...diagnostics, lockAgeMs, terminalReleaseGraceMs: terminalGraceMs, observedAt, released } }
 }
 
 /**

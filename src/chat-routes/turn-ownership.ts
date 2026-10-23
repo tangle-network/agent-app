@@ -12,6 +12,7 @@ interface OwnershipState {
   lockAcquired: boolean
   lockReleased: boolean
   lockHandle: unknown
+  closeCancellation?: () => Promise<void>
 }
 
 /** One transfer of terminal authority, retaining the route only as a live projector. */
@@ -44,6 +45,8 @@ export function createChatTurnOwnership(state: OwnershipState,
             if (!registrationFailed) throw err
             log('[chat-routes] draft close failed after native timing refusal', { turnId: turnStreamId,
               error: err instanceof Error ? err.message : String(err) })
+          } finally {
+            await state.closeCancellation?.()
           }
         }
       })()
@@ -53,6 +56,11 @@ export function createChatTurnOwnership(state: OwnershipState,
   const releaseLock = async (): Promise<void> => {
     if (state.completionHandoff || !state.lockAcquired || state.lockReleased) return
     state.lockReleased = true
+    // Expected cooperative completion must not interpret its own release as
+    // external loss of execution authority. A close failure must not skip release.
+    try { await state.closeCancellation?.() }
+    catch (err) { log('[chat-routes] turn cancellation close failed', { turnId: turnStreamId,
+      error: err instanceof Error ? err.message : String(err) }) }
     try {
       await options.turnLock!.release(state.lockHandle)
     } catch (err) {
