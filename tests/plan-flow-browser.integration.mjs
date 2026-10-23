@@ -16,14 +16,16 @@ const db = new Database(path.join(scratch, 'plans.sqlite'))
 db.exec(`CREATE TABLE plans(id TEXT PRIMARY KEY, followup INTEGER, pending INTEGER);
   CREATE TABLE requests(plan_id TEXT, method TEXT, target TEXT);
   CREATE TABLE attached(plan_id TEXT PRIMARY KEY, receipt TEXT);
-  INSERT INTO plans VALUES('retry',1,0),('terminal',0,0),('pending',0,1),('next',0,0),('stale-plan',1,0),('stale-revision',1,0),('stale-client',1,0),('stale-unmount',1,0),('stale-aba',1,0),('stale-error',1,0),('sticky',1,0);`)
+  INSERT INTO plans VALUES('retry',1,0),('terminal',0,0),('pending',0,1),('next',0,0),('stale-plan',1,0),('stale-revision',1,0),('stale-unmount',1,0),('stale-aba',1,0),('stale-error',1,0),('sticky',1,0),('inline-auto',1,0),('inline-manual',1,0);`)
 const fixture = `import React, { useCallback, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createDurablePlanDecisionClient, useDurablePlanFlow } from './src/web-react/durable-plan-flow';
 const id = new URLSearchParams(location.search).get('case');
-const initial = {planId:id,revision:1,status:'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'};
-function Controller({selected,epoch,onUpdated}){
- const client=useMemo(()=>createDurablePlanDecisionClient({url:'/plan?epoch='+epoch}),[epoch]);
+const initial = {planId:id,revision:1,status:id==='inline-manual'?'pending':'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'};
+function Controller({selected,onUpdated}){
+ const memoClient=useMemo(()=>createDurablePlanDecisionClient({url:'/plan'}),[]);
+ // Recreated factories, URL/body functions and callbacks are valid public hook inputs.
+ const client=id.startsWith('inline-')?createDurablePlanDecisionClient({url:()=>'/plan',body:()=>({source:'inline-browser-proof'})}):memoClient;
  const [attached,setAttached]=useState(false);
  const attachFollowUp=async(receipt,plan,decision)=>{
   const response=await fetch('/attach',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({receipt,plan,decision})});
@@ -37,16 +39,15 @@ function Controller({selected,epoch,onUpdated}){
  <button onClick={()=>void flow.decide('approved')}>Continue plan</button></main>;
 }
 function Application(){
- const [selected,setSelected]=useState(initial),[epoch,setEpoch]=useState(0),[mounted,setMounted]=useState(true),[updates,setUpdates]=useState(0);
+ const [selected,setSelected]=useState(initial),[mounted,setMounted]=useState(true),[updates,setUpdates]=useState(0);
  const onUpdated=()=>setUpdates(value=>value+1);
  return <><output data-updates>{updates}</output>
  <button onClick={()=>setUpdates(value=>value+1)}>Render parent</button>
  <button onClick={()=>setSelected({...initial,planId:'next',status:'pending'})}>Change plan</button>
  <button onClick={()=>setSelected({...initial,revision:2,status:'pending'})}>Change revision</button>
- <button onClick={()=>setEpoch(value=>value+1)}>Change client</button>
  <button onClick={()=>setSelected({...initial,status:'pending'})}>Return plan</button>
  <button onClick={()=>setMounted(false)}>Unmount plan</button>
- {mounted&&<Controller selected={selected} epoch={epoch} onUpdated={onUpdated}/>}</>;
+ {mounted&&<Controller selected={selected} onUpdated={onUpdated}/>}</>;
 }
 createRoot(document.getElementById('root')).render(<Application/>);`
 const bundle = await build({ stdin: { contents: fixture, resolveDir: root, sourcefile: 'plan-client.tsx', loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
@@ -75,8 +76,8 @@ const server = createServer(async (request, response) => {
       if (request.method === 'POST') db.prepare('UPDATE plans SET pending=0,followup=1 WHERE id=?').run(id)
       const current = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
       const finish = () => response.end(JSON.stringify({plan:{planId:id,revision:Number(url.searchParams.get('revision')??1),status:'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'},idempotent:true,
-        ...(current.pending ? {effectPending:true}:{}), ...(current.followup && url.searchParams.get('epoch')!=='1' ? {followUp:{receiptId:'receipt-'+id,turnId:'turn-'+id,state:'running'}}:{})}))
-      if (id.startsWith('stale-') && request.method==='GET' && url.searchParams.get('epoch')==='0' && url.searchParams.get('revision')==='1') {
+        ...(current.pending ? {effectPending:true}:{}), ...(current.followup ? {followUp:{receiptId:'receipt-'+id,turnId:'turn-'+id,state:'running'}}:{})}))
+      if (id.startsWith('stale-') && request.method==='GET' && url.searchParams.get('revision')==='1') {
         const entries=held.get(id)??[]; entries.push({finish,response}); held.set(id,entries)
       } else finish()
       return
@@ -100,6 +101,22 @@ try {
   const page = await browser.newPage()
   const browserErrors = []
   page.on('pageerror', error => browserErrors.push(String(error)))
+  if(process.env.PLAN_BROWSER_REGRESSION!=='inline-manual'){
+    await page.goto(base+'/?case=inline-auto')
+    await page.waitForFunction(()=>document.querySelector('[data-attached]')?.textContent==='true'&&document.querySelector('[data-restoring]')?.textContent==='false',undefined,{timeout:5000})
+    await page.getByRole('button',{name:'Render parent',exact:true}).click({clickCount:3})
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+    assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='inline-auto' AND target='/plan'").get().n,1,'inline autoRestore stays bounded across parent renders')
+    assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='inline-auto' AND target='/attach'").get().n,1)
+    assert.equal(await page.locator('[data-error]').textContent(),'')
+  }
+  await page.goto(base+'/?case=inline-manual')
+  await page.getByRole('button',{name:'Continue plan',exact:true}).click()
+  await page.waitForFunction(()=>document.querySelector('[data-attached]')?.textContent==='true',undefined,{timeout:5000})
+  assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='inline-manual' AND target='/plan'").get().n,1,'inline decide applies once')
+  assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='inline-manual' AND target='/attach'").get().n,1)
+  assert.equal(await page.locator('[data-updates]').textContent(),'1')
+  assert.equal(await page.locator('[data-error]').textContent(),'')
   await page.goto(base+'/?case=retry')
   await page.locator('[data-error]').filter({hasText:'notifying the agent'}).waitFor()
   assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='retry' AND target='/attach'").get().n,2)
@@ -137,7 +154,7 @@ try {
   }
   // Slow authority responses must never update or attach an obsolete context.
   const settle=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
-  for (const [id,action] of [['stale-plan','Change plan'],['stale-revision','Change revision'],['stale-client','Change client'],['stale-unmount','Unmount plan'],['stale-aba','Change plan'],['stale-error','Change plan']]) {
+  for (const [id,action] of [['stale-plan','Change plan'],['stale-revision','Change revision'],['stale-unmount','Unmount plan'],['stale-aba','Change plan'],['stale-error','Change plan']]) {
     await page.goto(base+'/?case='+id)
     await page.waitForFunction(()=>document.querySelector('[data-restoring]')?.textContent==='true')
     await waitHeld(id,1)
@@ -146,7 +163,6 @@ try {
       await page.getByRole('button',{name:'Return plan',exact:true}).click()
       await page.waitForFunction(()=>document.querySelector('[data-restoring]')?.textContent==='false')
     }
-    if(id==='stale-client') await page.waitForFunction(()=>document.querySelector('[data-restoring]')?.textContent==='false')
     const updates=await page.locator('[data-updates]').textContent()
     const responseSettled=page.waitForResponse(response=>new URL(response.url()).pathname==='/plan'&&new URL(response.url()).searchParams.get('planId')===id)
     if(id==='stale-error') { const item=held.get(id)[0]; item.response.writeHead(503); item.response.end(JSON.stringify({error:'Old authority unavailable'})) }
@@ -164,7 +180,7 @@ try {
   }
   assert.deepEqual(errors,[])
   assert.deepEqual(browserErrors,[])
-  console.log(JSON.stringify({proof:'plan-flow-browser',cases:10,attachmentRequests:db.prepare("SELECT count(*) AS n FROM requests WHERE target='/attach'").get().n,plansAttached:db.prepare('SELECT count(*) AS n FROM attached').get().n,serverErrors:errors,browserErrors}))
+  console.log(JSON.stringify({proof:'plan-flow-browser',cases:11,attachmentRequests:db.prepare("SELECT count(*) AS n FROM requests WHERE target='/attach'").get().n,plansAttached:db.prepare('SELECT count(*) AS n FROM attached').get().n,serverErrors:errors,browserErrors}))
 } finally {
   for(const entries of held.values()) for(const item of entries) item.response.destroy()
   await browser?.close()

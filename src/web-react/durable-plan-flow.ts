@@ -108,10 +108,6 @@ function parseDecisionResult(value: unknown): DurablePlanDecisionResult | null {
   }
 }
 
-async function responseBody(response: Response): Promise<Record<string, unknown>> {
-  return recordOf(await response.json().catch(() => null)) ?? {}
-}
-
 /** Browser client for the shared durable-plan route. The route URL and all
  * product routing fields are injected; workspace/session identity is still
  * resolved and authorized on the server. */
@@ -123,7 +119,7 @@ export function createDurablePlanDecisionClient(
     typeof options.url === 'function' ? options.url(input) : options.url
 
   const read = async (response: Response): Promise<DurablePlanDecisionResult> => {
-    const body = await responseBody(response)
+    const body = recordOf(await response.json().catch(() => null)) ?? {}
     const result = parseDecisionResult(body)
     if (response.ok && result) return result
     const currentPlan = readPlan(body.plan) ?? undefined
@@ -243,6 +239,8 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
   const [restoreRetry, setRestoreRetry] = useState(0)
   const advanceRestore = useCallback(() => setRestoreRetry(value => value + 1), [])
   const lifetime = useRef<object | null>(null)
+  const latest = useRef(options)
+  useLayoutEffect(() => { latest.current = options })
   useLayoutEffect(() => {
     lifetime.current = {}
     restoration.current = { restored: null, inFlight: null, attempts: new Map() }
@@ -258,13 +256,14 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
       lifetime.current = null
       restoration.current = { restored: null, inFlight: null, attempts: new Map() }
     }
-  }, [options.plan.planId, options.plan.revision, options.client])
+  }, [options.plan.planId, options.plan.revision])
 
   useEffect(() => setPlan(options.plan), [options.plan])
 
   const apply = useCallback(async (result: DurablePlanDecisionResult, context: object, decision?: DurablePlanDecision) => {
     const active = () => lifetime.current === context
     if (!active()) return
+    const options = latest.current
     setPlan(result.plan)
     options.onUpdated?.(result.plan)
     if (!active()) return
@@ -304,7 +303,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
         advanceRestore()
       }
     }
-  }, [options.attachFollowUp, options.onUpdated, options.autoRestore, advanceRestore])
+  }, [advanceRestore])
 
   const decide = useCallback(async (decision: DurablePlanDecision, feedback?: string) => {
     const context = lifetime.current
@@ -313,7 +312,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     setDeciding(decision)
     setError(null)
     try {
-      const result = await options.client.decide({
+      const result = await latest.current.client.decide({
         planId: plan.planId,
         revision: plan.revision,
         decision,
@@ -326,7 +325,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
       if (lifetime.current !== context) return null
       if (cause instanceof DurablePlanClientError && cause.currentPlan) {
         setPlan(cause.currentPlan)
-        options.onUpdated?.(cause.currentPlan)
+        latest.current.onUpdated?.(cause.currentPlan)
       }
       setError(cause instanceof Error ? cause.message : 'Could not decide the plan.')
       return null
@@ -336,7 +335,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
         setDeciding(null)
       }
     }
-  }, [apply, options.client, options.onUpdated, plan.planId, plan.revision])
+  }, [apply, plan.planId, plan.revision])
 
   const restore = useCallback(async () => {
     const context = lifetime.current
@@ -344,7 +343,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     setRestoring(true)
     setError(null)
     try {
-      const result = await options.client.current({ planId: plan.planId, revision: plan.revision })
+      const result = await latest.current.client.current({ planId: plan.planId, revision: plan.revision })
       if (lifetime.current !== context) return null
       await apply(result, context)
       return lifetime.current === context ? result : null
@@ -355,7 +354,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     } finally {
       if (lifetime.current === context) setRestoring(false)
     }
-  }, [apply, options.client, plan.planId, plan.revision])
+  }, [apply, plan.planId, plan.revision])
 
   const retryAttach = useCallback(() => {
     restoration.current.attempts.set(planDecisionKey(plan), 0)
