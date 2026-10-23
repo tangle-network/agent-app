@@ -28,6 +28,8 @@ it.each([
   { mode: 'plain', code: undefined },
   { mode: 'provision', code: 'sandbox_unavailable' },
   { mode: 'execution', code: 'sandbox_failed' },
+  { mode: 'runner-timeout', code: 'sandbox_failed' },
+  { mode: 'acquire-timeout', code: 'sandbox_unavailable' },
   { mode: 'empty', code: 'sandbox_empty' },
   { mode: 'success', code: undefined },
   { mode: 'anonymous', code: undefined },
@@ -46,6 +48,8 @@ it.each([
   let modelCalls = 0
   let boxReads = 0
   let executions = 0
+  let lateReply: ReturnType<typeof setTimeout> | undefined
+  let lateExecutionCompleted = false
   const executedCallIds: Array<unknown> = []
   const requests: Array<Record<string, unknown>> = []
   let baseUrl = ''
@@ -58,15 +62,21 @@ it.each([
       if (path === '/v1/sandboxes/computer') {
         boxReads++
         if (mode === 'provision') return json({ code: 'COMPUTER_UNAVAILABLE', message: 'Fixture placement refused' }, 409)
-        return json({ id: 'computer', status: 'running', filesystemIncarnationId: 'hybrid-fixture',
+        const box = { id: 'computer', status: 'running', filesystemIncarnationId: 'hybrid-fixture',
           filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
-          connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/computer/runtime` } })
+          connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/computer/runtime` } }
+        if (mode === 'acquire-timeout') { lateReply = setTimeout(() => json(box), 2_500); return }
+        return json(box)
       }
       if (path.endsWith('/runtime/process/spawn')) {
         executions++
         const input = JSON.parse(body) as { env?: Record<string, unknown> }
         executedCallIds.push(input.env?.GTM_FIXTURE_CALL_ID)
         if (mode === 'execution') return json({ code: 'EXECUTION_REFUSED', message: 'Fixture execution refused' }, 409)
+        if (mode === 'runner-timeout') {
+          lateReply = setTimeout(() => { lateExecutionCompleted = true; json({ answer: 'Late answer' }) }, 2_500)
+          return
+        }
         return json({ data: { exitCode: 0, stdout: mode === 'empty' ? '' : 'Computer answer', stderr: '' } })
       }
       requests.push(JSON.parse(body))
@@ -104,12 +114,17 @@ it.each([
         ...(mode === 'continuation-collision' ? { continueFrom: { messages: [...prior,
           { role: 'user', content: 'Help me understand the document.' }], hops: 1, text: '' } } : {}),
         speculateOn: 'A question', box: {
+          ...(['runner-timeout', 'acquire-timeout'].includes(mode) ? { timeoutMs: 1_000 } : {}),
           acquire: async () => {
             const box = await client.get('computer')
             if (!box) throw new Error('Computer absent')
             return box
           },
-          runTask: async (box, task, { timeoutMs, callId }) => (await box.exec(task, { timeoutMs, env: { GTM_FIXTURE_CALL_ID: callId ?? 'missing' } })).stdout,
+          runTask: async (box, task, { timeoutMs, callId }) => mode === 'runner-timeout'
+            // Real product HTTP I/O intentionally ignores the signal and per-call timeout.
+            ? (await fetch(`${baseUrl}/v1/sandboxes/computer/runtime/process/spawn`, { method: 'POST',
+              body: JSON.stringify({ env: { GTM_FIXTURE_CALL_ID: callId } }) })).text()
+            : (await box.exec(task, { timeoutMs, env: { GTM_FIXTURE_CALL_ID: callId ?? 'missing' } })).stdout,
         },
       })
       return { ...producer, stream: (async function* () {
@@ -128,6 +143,7 @@ it.each([
     await Promise.all(pending)
     expect(wire).toContain('Here is the available answer.')
     expect(completions).toEqual(['complete'])
+    if (mode === 'runner-timeout') expect(lateExecutionCompleted).toBe(false)
     const assistant = (await store.listMessages('thread')).find(message => message.role === 'assistant')!
     expect(assistant.content).toBe('Here is the available answer.')
     const parts = assistant.parts as Array<Record<string, unknown>>
@@ -141,7 +157,7 @@ it.each([
       expect(messages.some(message => message.role === 'tool' && message.content.includes(code))).toBe(true)
     }
     expect(boxReads > 0).toBe(mode !== 'plain')
-    expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision')
+    expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision' && mode !== 'acquire-timeout')
     if (executions) {
       const expectedCallIds = collisionHistory ? ['sandbox_run-0_']
         : mode === 'anonymous-repeat' ? ['sandbox_run-0', 'sandbox_run-1']
@@ -160,6 +176,7 @@ it.each([
     }
     expect(sqlite.prepare('SELECT status FROM turn_status').get()).toMatchObject({ status: 'complete' })
   } finally {
+    clearTimeout(lateReply)
     chatDb.$client.close(); sqlite.close(); await close(peer)
   }
 }, 20_000)
