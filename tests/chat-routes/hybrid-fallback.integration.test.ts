@@ -1,5 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { setTimeout as delay } from 'node:timers/promises'
 import { Sandbox } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
 import { createHybridTurnProducer } from '../../src/chat-routes/hybrid-producer'
@@ -156,7 +157,7 @@ it('passes effective cancellation into real tool HTTP I/O and keeps cancellation
   try {
     await started
     abort.abort(new Error('Member cancelled'))
-    await closed
+    await Promise.race([closed, delay(1_000).then(() => { throw new Error('Tool HTTP request did not observe cancellation') })])
     await drain
     expect(events.find(event => event.type === 'error')).toMatchObject({ data: { code: 'turn_aborted' } })
     expect(events.filter(event => event.type === 'notice')).toEqual([])

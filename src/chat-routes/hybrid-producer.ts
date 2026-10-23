@@ -30,6 +30,8 @@
  *
  * The trace passes through: model calls, tool calls, the box claim and the box
  * run are recorded under the turn's `trace` when the route gives one.
+ * A typed computer failure also emits a persisted warning; the Router keeps
+ * answering without relying on the model to explain that failure faithfully.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import { noticePart } from '../interactions/contract'
