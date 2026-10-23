@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
@@ -11,6 +12,7 @@ type RestartCase = { probe?: number; sessions?: number; permanent?: boolean; pro
  * method, clock or lifecycle implementation is replaced. No paid calls. */
 async function boundary(test: RestartCase) {
   const requests: string[] = []
+  const boxName = `restart-prefetch-${randomUUID()}`
   let probes = 0
   let sessionReads = 0
   let boxReads = 0
@@ -24,8 +26,8 @@ async function boundary(test: RestartCase) {
       return json({ code, message: 'The sandbox host is restarting its agent; retry shortly.', retryUntil: Date.now() + 1_000 }, 503)
     }
     const box = {
-      id: 'restart-box', name: 'restart-prefetch-box', status: 'running', metadata: { harness: 'opencode' },
-      filesystemIncarnationId: test.prefetch ? 'restart-prefetch-incarnation' : 'restart-fixture-incarnation',
+      id: 'restart-box', name: boxName, status: 'running', metadata: { harness: 'opencode' },
+      filesystemIncarnationId: test.prefetch ? `${boxName}-incarnation` : 'restart-fixture-incarnation',
       filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
       connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/restart-box/runtime` },
       egressPolicy: { mode: 'open' }, egressPolicySource: 'sandbox',
@@ -60,7 +62,7 @@ async function boundary(test: RestartCase) {
   expect(box.connection?.runtimeUrl, 'SDK accepted the real ready-incarnation connection').toBe(`${baseUrl}/v1/sandboxes/restart-box/runtime`)
   const shell: SandboxRuntimeConfig = {
     credentials: () => ({ apiKey: 'local-restart-prefetch-fixture', baseUrl }),
-    name: () => 'restart-prefetch-box', metadata: harness => ({ harness }),
+    name: () => boxName, metadata: harness => ({ harness }),
     connectedIntegrationIds: async () => [],
     env: async () => ({}), files: async () => [], secrets: async () => [],
     profile: () => { throw new Error('Reuse must not create a cold profile') },
@@ -70,7 +72,7 @@ async function boundary(test: RestartCase) {
     provisionTimeoutMs: 1_000,
   }
   return { client, box, requests,
-    ensure: () => ensureWorkspaceSandbox(shell, { workspaceId: 'restart-prefetch-workspace', harness: 'opencode' }),
+    ensure: () => ensureWorkspaceSandbox(shell, { workspaceId: boxName, harness: 'opencode' }),
     close: async () => {
       server.closeAllConnections()
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
