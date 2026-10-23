@@ -48,10 +48,10 @@ function deferred<T>() {
   const promise = new Promise<T>(done => { resolve = done })
   return { promise, resolve }
 }
-async function bounded<T>(promise: Promise<T>, label: string): Promise<T> {
+async function bounded<T>(promise: Promise<T>, label: string, onTimeout?: () => void): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try { return await Promise.race([promise, new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), 10_000)
+    timer = setTimeout(() => { onTimeout?.(); reject(new Error(`Timed out: ${label}`)) }, 10_000)
   })]) } finally { clearTimeout(timer) }
 }
 function modelCase() {
@@ -87,10 +87,7 @@ const peer = createServer((request, response) => {
       delta: { content: 'The request is complete.' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
   })
 })
-await new Promise<void>(ready => peer.listen(0, '127.0.0.1', ready))
-const address = peer.address()
-assert(address && typeof address === 'object')
-const modelUrl = `http://127.0.0.1:${address.port}`
+let modelUrl = ''
 function start() {
   return new Miniflare(convertV4MiniflareOptions({ durableObjectsPersist: resolve(directory, 'objects'),
     d1Persist: resolve(directory, 'sqlite'), workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
@@ -101,18 +98,31 @@ function start() {
       d1Databases: { CHAT: 'chat' }, bindings: { MODEL_URL: modelUrl, TURN_STREAM_AUTH_SECRET: 'isolated-local-durable-stop-fixture-secret' },
     }] }))
 }
-let runtime = start()
+let runtime: Runtime | undefined
 const identity = (name: string): TurnCancellationIdentity => ({ workspaceId: 'workspace', threadId: name, scope: 'thread',
   executionId: `execution-${name}`, lockId: `lock-${name}`, turnStreamId: `stream-${name}` })
 async function request(path: string, input: unknown, authorized: boolean | string = true) {
-  return runtime.dispatchFetch(`http://fixture.test${path}`, { method: 'POST', headers: {
-    'content-type': 'application/json', ...(authorized ? { Authorization: `Bearer ${typeof authorized === 'string' ? authorized : 'fixture-authorized-member'}` } : {}),
-  }, body: JSON.stringify(input) })
+  const abort = new AbortController()
+  const operation = (async () => {
+    if (!runtime) throw new Error('The fixture runtime has not started')
+    const response = await runtime.dispatchFetch(`http://fixture.test${path}`, { method: 'POST', signal: abort.signal, headers: {
+      'content-type': 'application/json', ...(authorized ? { Authorization: `Bearer ${typeof authorized === 'string' ? authorized : 'fixture-authorized-member'}` } : {}),
+    }, body: JSON.stringify(input) })
+    // The turn intentionally streams until Stop; every other protocol response
+    // must finish its body inside the same bound as its request headers.
+    if (path === '/turn') return response
+    const body = await response.arrayBuffer()
+    return new Response(body.byteLength ? body : null, { status: response.status, headers: response.headers })
+  })()
+  return bounded(operation, `${path} response`, () => abort.abort(new Error(`Timed out: ${path} response`)))
 }
 async function json<T>(path: string, input: unknown): Promise<T> {
-  const response = await bounded(request(path, input), path)
-  assert.equal(response.status, 200, `${path}: ${await response.clone().text()}`)
-  return response.json() as Promise<T>
+  return bounded((async () => {
+    const response = await request(path, input)
+    const body = await response.text()
+    assert.equal(response.status, 200, `${path}: ${body}`)
+    return JSON.parse(body) as T
+  })(), `${path} JSON body`)
 }
 async function peek(input: TurnCancellationIdentity, query = '') {
   return (await json<{ active: DurableTurnLock | null }>(`/peek${query}`, input)).active
@@ -121,7 +131,16 @@ async function acquire(input: TurnCancellationIdentity, query = '') {
   const result = await json<{ acquired: boolean }>(`/lock${query}`, input)
   assert(result.acquired, 'Fixture must acquire the actual durable lock')
 }
+let primaryFailed = false
 try {
+  await new Promise<void>((ready, reject) => {
+    peer.once('error', reject)
+    peer.listen(0, '127.0.0.1', () => { peer.removeListener('error', reject); ready() })
+  })
+  const address = peer.address()
+  assert(address && typeof address === 'object')
+  modelUrl = `http://127.0.0.1:${address.port}`
+  runtime = start()
   let database = await runtime.getD1Database('CHAT', 'stop-fixture')
   await database.exec('CREATE TABLE messages(id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, parts TEXT);\nCREATE TABLE effects(turn_id TEXT, code TEXT);\nCREATE TABLE owner_evidence(workspace_id TEXT, thread_id TEXT, scope TEXT, execution_id TEXT, lock_id TEXT, turn_stream_id TEXT PRIMARY KEY, status TEXT);\nCREATE TABLE child_holds(execution_id TEXT PRIMARY KEY, lock_id TEXT, turn_stream_id TEXT, status TEXT);')
   await database.exec("CREATE TABLE members(token TEXT PRIMARY KEY, user_id TEXT, workspace_id TEXT, role TEXT);\nINSERT INTO members VALUES ('fixture-authorized-member','member','workspace','editor'),('viewer-member','viewer','workspace','viewer'),('foreign-editor','foreign','other-workspace','editor');\nCREATE TABLE threads(id TEXT PRIMARY KEY, workspace_id TEXT);\nINSERT INTO threads VALUES ('route-stop','workspace'),('route-transport-loss','workspace'),('route-external-release','workspace'),('route-complete','workspace');\nCREATE TABLE control_targets(thread_id TEXT PRIMARY KEY, client_turn_id TEXT, metadata TEXT);\nCREATE TABLE target_reads(thread_id TEXT, kind TEXT);\nCREATE TABLE forbidden_effects(kind TEXT);")
@@ -277,6 +296,9 @@ try {
     const response = await bounded(request('/turn', { threadId: thread, turnId: clientTurnId, content: 'Read my request.' }), 'route response')
     assert.equal(response.status, 200)
     const wire = response.text()
+    // Observe rejection at creation even while the scenario is waiting for
+    // admission/settlement; its deciding await below still reports the error.
+    void wire.catch(() => {})
     await bounded(active.entered.promise, 'real Router model request')
     await bounded(active.admitted.promise, 'actual lock/control and captured target registration')
     const lock = await peek(identity(thread))
@@ -345,9 +367,31 @@ try {
     consumerLockSha256: createHash('sha256').update(readFileSync(resolve(consumerRoot, 'pnpm-lock.yaml'))).digest('hex'),
     miniflareEntry: realpathSync(wrangler.resolve('miniflare')), wranglerEntry: dirname(consumer.resolve('wrangler/package.json')),
     compatibilityDate, actualDO: true, actualSQLite: true, actualRouterHTTP: true, paidCalls: 0 }))
+} catch (error) {
+  primaryFailed = true
+  throw error
 } finally {
-  peer.closeAllConnections()
-  await runtime.dispose()
-  await new Promise<void>((resolve, reject) => peer.close(error => error ? reject(error) : resolve()))
-  rmSync(directory, { recursive: true, force: true })
+  const cleanupErrors: unknown[] = []
+  try {
+    // Stop accepting before aborting existing calls: their lifecycle failure
+    // must not open another held settlement request during runtime disposal.
+    const peerClosed = new Promise<void>((resolve, reject) => {
+      if (!peer.listening) { resolve(); return }
+      peer.close(error => error ? reject(error) : resolve())
+    })
+    peer.closeAllConnections()
+    const disposed = Promise.resolve().then(() => runtime?.dispose())
+    const results = await Promise.allSettled([
+      bounded(disposed, 'Miniflare disposal'), bounded(peerClosed, 'HTTP peer closure'),
+    ])
+    for (const result of results) if (result.status === 'rejected') cleanupErrors.push(result.reason)
+  } catch (error) { cleanupErrors.push(error) }
+  finally {
+    try { rmSync(directory, { recursive: true, force: true }) }
+    catch (error) { cleanupErrors.push(error) }
+  }
+  if (cleanupErrors.length) {
+    if (primaryFailed) console.error('Durable Stop cleanup also failed:', cleanupErrors.map(error => error instanceof Error ? error.message : String(error)))
+    else throw new AggregateError(cleanupErrors, 'Durable Stop fixture cleanup failed')
+  }
 }
