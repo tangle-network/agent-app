@@ -1,0 +1,283 @@
+# Shared release phases; native commands retain each app's deployment authority.
+# docs/app-release-workflow.md owns the adapter and evidence contract.
+name: Release agent app
+on:
+  workflow_call:
+    inputs:
+      environment: {type: string, required: true}
+      release-runs-on: {type: string, required: true}
+      suites-runs-on: {type: string, required: true}
+      preflight-command: {type: string, required: true}
+      release-command: {type: string, required: true}
+      suites-command: {type: string, required: true}
+      release-env: {type: string, default: '{}'}
+      node-version-file: {type: string, default: .nvmrc}
+      release-timeout-minutes: {type: number, default: 40}
+      suites-timeout-minutes: {type: number, default: 45}
+    secrets:
+      CLOUDFLARE_API_TOKEN: {required: false}
+      CLOUDFLARE_ACCOUNT_ID: {required: false}
+      CLOUDFLARE_TANGLE_ZONE_ID: {required: false}
+      APP_TOOL_SECRET: {required: false}
+      SANDBOX_API_KEY: {required: false}
+      SANDBOX_PRODUCTION_API_KEY: {required: false}
+      SANDBOX_PREVIOUS_API_KEY: {required: false}
+      TANGLE_API_KEY: {required: false}
+      TAX_PLATFORM_SERVICE_TOKEN: {required: false}
+      SMOKE_PLATFORM_EMAIL: {required: false}
+      SMOKE_PLATFORM_PASSWORD: {required: false}
+      GTM_AGENT_SERVICE_TOKEN: {required: false}
+      CRON_SECRET: {required: false}
+      GTM_OWNER_ASK_CLIENT_ID: {required: false}
+      GTM_OWNER_ASK_CLIENT_SECRET: {required: false}
+      GTM_CHAT_SMOKE_EMAIL: {required: false}
+      GTM_CHAT_SMOKE_PASSWORD: {required: false}
+      PLATFORM_WORKFLOW_SMOKE_EMAIL: {required: false}
+      PLATFORM_WORKFLOW_SMOKE_PASSWORD: {required: false}
+    outputs:
+      source-sha: {value: '${{ jobs.release.outputs.source-sha }}'}
+      deployed: {value: '${{ jobs.release.outputs.deployed }}'}
+      qualified-served-sha: {value: '${{ jobs.release.outputs.qualified-served-sha }}'}
+      release-result: {value: '${{ jobs.release.outputs.result }}'}
+      suites-result: {value: '${{ jobs.suites.outputs.result }}'}
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ${{ fromJSON(inputs.release-runs-on) }}
+    timeout-minutes: ${{ inputs.release-timeout-minutes }}
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      issues: read
+    # Repository-scoped, identical to the existing production writer group.
+    # This job alone holds the lock; post-release suites do not delay writers.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    outputs:
+      source-sha: ${{ github.sha }}
+      result: ${{ steps.summary.outputs.result }}
+      deployed: ${{ steps.native.outputs.deployed }}
+      qualified-served-sha: ${{ steps.qualified.outputs.served }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require immutable merged source and production event
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref }}
+          SOURCE_EVENT: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$DEFAULT_BRANCH"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          case "$SOURCE_EVENT" in push|workflow_dispatch) ;; *) exit 1 ;; esac
+          case "$SOURCE_REF" in "refs/heads/$DEFAULT_BRANCH"|refs/tags/v*) ;; *) exit 1 ;; esac
+          # checkout fetch-depth:0 already populated this private tracking ref.
+          # Native release owns its authenticated fresh-source/non-rewind barrier.
+          git merge-base --is-ancestor HEAD "refs/remotes/origin/$DEFAULT_BRANCH"
+          test -z "$(git status --porcelain)"
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+      - name: Record release start
+        id: clock
+        shell: bash
+        run: echo "started=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Install, types, lint, build and bundle qualification
+        env:
+          PREFLIGHT_COMMAND: ${{ inputs.preflight-command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -euo pipefail -c "$PREFLIGHT_COMMAND"
+      - name: Native release, served smoke and compatible artifact recovery
+        id: native
+        # Only this step gets the caller's explicitly named credentials.
+        # Environment protections and same-name environment secrets still apply.
+        env:
+          RELEASE_COMMAND: ${{ inputs.release-command }}
+          RELEASE_ENV: ${{ inputs.release-env }}
+          SHIP_GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_TANGLE_ZONE_ID: ${{ secrets.CLOUDFLARE_TANGLE_ZONE_ID }}
+          APP_TOOL_SECRET: ${{ secrets.APP_TOOL_SECRET }}
+          SANDBOX_API_KEY: ${{ secrets.SANDBOX_API_KEY }}
+          SANDBOX_PRODUCTION_API_KEY: ${{ secrets.SANDBOX_PRODUCTION_API_KEY }}
+          SANDBOX_PREVIOUS_API_KEY: ${{ secrets.SANDBOX_PREVIOUS_API_KEY }}
+          TANGLE_API_KEY: ${{ secrets.TANGLE_API_KEY }}
+          TAX_PLATFORM_SERVICE_TOKEN: ${{ secrets.TAX_PLATFORM_SERVICE_TOKEN }}
+          SMOKE_PLATFORM_EMAIL: ${{ secrets.SMOKE_PLATFORM_EMAIL }}
+          SMOKE_PLATFORM_PASSWORD: ${{ secrets.SMOKE_PLATFORM_PASSWORD }}
+          GTM_AGENT_SERVICE_TOKEN: ${{ secrets.GTM_AGENT_SERVICE_TOKEN }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GTM_OWNER_ASK_CLIENT_ID: ${{ secrets.GTM_OWNER_ASK_CLIENT_ID }}
+          GTM_OWNER_ASK_CLIENT_SECRET: ${{ secrets.GTM_OWNER_ASK_CLIENT_SECRET }}
+          GTM_CHAT_SMOKE_EMAIL: ${{ secrets.GTM_CHAT_SMOKE_EMAIL }}
+          GTM_CHAT_SMOKE_PASSWORD: ${{ secrets.GTM_CHAT_SMOKE_PASSWORD }}
+          PLATFORM_WORKFLOW_SMOKE_EMAIL: ${{ secrets.PLATFORM_WORKFLOW_SMOKE_EMAIL }}
+          PLATFORM_WORKFLOW_SMOKE_PASSWORD: ${{ secrets.PLATFORM_WORKFLOW_SMOKE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Public native configuration only; secrets never travel in inputs.
+          # Reject overrides of credential names, PATH and runtime controls.
+          node --input-type=module <<'NODE'
+          import { spawnSync } from 'node:child_process'
+          const values = JSON.parse(process.env.RELEASE_ENV)
+          if (!values || Array.isArray(values) || typeof values !== 'object') throw Error('release-env must be an object')
+          const allowed = new Set(['GTM_SHIP_SECRETS', 'SANDBOX_PRODUCTION_BILLING_OWNER_ID'])
+          for (const [key, value] of Object.entries(values)) {
+            if (!allowed.has(key) || typeof value !== 'string') throw Error('unsupported public release-env key')
+          }
+          const nativeEnv = { ...process.env, ...values }
+          const secretNames = ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_TANGLE_ZONE_ID',
+            'APP_TOOL_SECRET', 'SANDBOX_API_KEY', 'SANDBOX_PRODUCTION_API_KEY', 'SANDBOX_PREVIOUS_API_KEY',
+            'TANGLE_API_KEY', 'TAX_PLATFORM_SERVICE_TOKEN', 'SMOKE_PLATFORM_EMAIL', 'SMOKE_PLATFORM_PASSWORD',
+            'GTM_AGENT_SERVICE_TOKEN', 'CRON_SECRET', 'GTM_OWNER_ASK_CLIENT_ID', 'GTM_OWNER_ASK_CLIENT_SECRET',
+            'GTM_CHAT_SMOKE_EMAIL', 'GTM_CHAT_SMOKE_PASSWORD', 'PLATFORM_WORKFLOW_SMOKE_EMAIL', 'PLATFORM_WORKFLOW_SMOKE_PASSWORD']
+          for (const name of secretNames) if (!nativeEnv[name]) delete nativeEnv[name]
+          const result = spawnSync('bash', ['-euo', 'pipefail', '-c', process.env.RELEASE_COMMAND], {
+            stdio: 'inherit', env: nativeEnv,
+          })
+          if (result.error) throw result.error
+          process.exit(result.status ?? 1)
+          NODE
+      - name: Require explicit native deployment outcome
+        id: qualified
+        env:
+          DEPLOYED: ${{ steps.native.outputs.deployed }}
+          EXPECTED_SHA: ${{ github.sha }}
+          NATIVE_QUALIFIED_SHA: ${{ steps.native.outputs.qualified-served-sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Adapter success means its served SHA and smoke/canary passed.
+          # A native, proven already-served skip is not a new deployment.
+          case "$DEPLOYED" in
+            true)
+              test "$NATIVE_QUALIFIED_SHA" = "$EXPECTED_SHA"
+              echo "served=$NATIVE_QUALIFIED_SHA" >> "$GITHUB_OUTPUT"
+              ;;
+            false) echo 'Native forward-only release reported a no-op.' ;;
+            *) echo '::error::Native release did not report deployed=true|false; served state unverified.'; exit 1 ;;
+          esac
+      - name: Release phase summary
+        id: summary
+        if: always()
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          RELEASE_RESULT: ${{ job.status }}
+          DEPLOYED: ${{ steps.native.outputs.deployed }}
+          QUALIFIED_SERVED: ${{ steps.qualified.outputs.served }}
+        shell: bash
+        run: |
+          echo "result=$RELEASE_RESULT" >> "$GITHUB_OUTPUT"
+          printf 'Source: `%s`\n\nRelease: %s; deployed: %s; qualified served: `%s`\n' "$SOURCE_SHA" "$RELEASE_RESULT" "${DEPLOYED:-unknown}" "${QUALIFIED_SERVED:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain sanitized release-phase receipt
+        if: always()
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/agent-app-release.json
+          SOURCE_SHA: ${{ github.sha }}
+          RELEASE_RESULT: ${{ job.status }}
+          DEPLOYED: ${{ steps.native.outputs.deployed }}
+          QUALIFIED_SERVED: ${{ steps.qualified.outputs.served }}
+          STARTED_AT: ${{ steps.clock.outputs.started }}
+          NATIVE_SERVED_AT: ${{ steps.native.outputs.served-at }}
+          NATIVE_RECOVERY: ${{ steps.native.outputs.recovery }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          const e = process.env
+          writeFileSync(e.RECEIPT_PATH, JSON.stringify({
+            schema: 'agent-app.release/v1', repository: e.GITHUB_REPOSITORY,
+            runId: e.GITHUB_RUN_ID, attempt: e.GITHUB_RUN_ATTEMPT,
+            sourceSha: e.SOURCE_SHA, releaseResult: e.RELEASE_RESULT,
+            deployed: e.DEPLOYED || 'unknown', qualifiedServedSha: e.QUALIFIED_SERVED || null,
+            startedAt: e.STARTED_AT || null, servedAt: e.NATIVE_SERVED_AT || null,
+            recovery: e.NATIVE_RECOVERY || 'unknown',
+            qualifiedAt: e.QUALIFIED_SERVED ? new Date().toISOString() : null,
+          }, null, 2) + '\n')
+          NODE
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: agent-app-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-app-release.json
+          if-no-files-found: warn
+          retention-days: 30
+  suites:
+    needs: [release]
+    # A failed release still gets its post-merge test signal. Never block or
+    # roll back a served release because this later suite is red.
+    if: ${{ always() && !cancelled() && needs.release.result != 'cancelled' }}
+    runs-on: ${{ fromJSON(inputs.suites-runs-on) }}
+    timeout-minutes: ${{ inputs.suites-timeout-minutes }}
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.summary.outputs.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+      - name: Full post-release suites from the native owner
+        env:
+          SUITES_COMMAND: ${{ inputs.suites-command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -euo pipefail -c "$SUITES_COMMAND"
+      - name: Suite phase result
+        id: summary
+        if: always()
+        env:
+          SUITES_RESULT: ${{ job.status }}
+        shell: bash
+        run: echo "result=$SUITES_RESULT" >> "$GITHUB_OUTPUT"
+  safety-net-issue:
+    needs: [release, suites]
+    if: ${{ always() && (needs.release.result == 'failure' || needs.suites.result == 'failure') }}
+    runs-on: ${{ fromJSON(inputs.suites-runs-on) }}
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          RELEASE_RESULT: ${{ needs.release.result }}
+          SUITES_RESULT: ${{ needs.suites.result }}
+          DEPLOYED: ${{ needs.release.outputs.deployed }}
+          QUALIFIED_SERVED: ${{ needs.release.outputs.qualified-served-sha }}
+        with:
+          script: |
+            const title = 'Post-merge safety net is red on ' + context.payload.repository.default_branch
+            const body = [
+              `Source: ${context.sha}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `Release: ${process.env.RELEASE_RESULT}; suites: ${process.env.SUITES_RESULT}.`,
+              `Deployed: ${process.env.DEPLOYED || 'unknown'}; qualified served: ${process.env.QUALIFIED_SERVED || 'unknown'}.`,
+              'Fix forward. A suite failure does not revert source or roll back a healthy release.',
+              'Native canary recovery preserves additive migrations and restores only compatible deployed artifacts.',
+            ].join('\n')
+            const existing = await github.paginate(github.rest.issues.listForRepo, { ...context.repo, state: 'open', per_page: 100 })
+            const issue = existing.find(value => !value.pull_request && value.title === title)
+            if (issue) await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body })
+            else await github.rest.issues.create({ ...context.repo, title, body })
