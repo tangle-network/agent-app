@@ -160,7 +160,7 @@ export async function provisionWorkspaceSandbox(
       try {
         if (readyResult.status === 'rejected') throw readyResult.reason
         const ready = readyResult.value
-        if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe))).succeeded) {
+        if ((await measure('liveness', () => isReusableBox(ready, shell.livenessProbe, resumeTimeout))).succeeded) {
           if (!trustedBoxes.has(ready)) await gateBeforeUse()
           const finalBox = await measure('finalize', () => finalizeExistingBox(shell, client, ready, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv, prefetch))
           if (trustedBoxes.has(ready)) trustedBoxes.add(finalBox)
@@ -235,7 +235,7 @@ export async function provisionWorkspaceSandbox(
       } else {
         try {
           const box = await refreshRuntimeConnection(client, resumed.value)
-          if ((await isReusableBox(box, shell.livenessProbe)).succeeded) {
+          if ((await isReusableBox(box, shell.livenessProbe, resumeTimeout)).succeeded) {
             return rememberRunningBox(name, await finalizeExistingBox(shell, client, box, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv))
           }
           // The box resumed but is unresponsive: one full stop→resume cycle is

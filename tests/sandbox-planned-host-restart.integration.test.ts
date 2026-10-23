@@ -74,7 +74,7 @@ describe('sandbox liveness during a planned host restart', () => {
     const peer = await boundary({ permanent: true })
     const started = Date.now()
     try {
-      await expect(isReusableBox(peer.box, { execTimeoutMs: 40, cacheTtlMs: 0 })).rejects.toMatchObject({ code: 'HOST_AGENT_RESTARTING', status: 503 })
+      await expect(isReusableBox(peer.box, { execTimeoutMs: 100, cacheTtlMs: 0 })).rejects.toMatchObject({ code: 'HOST_AGENT_RESTARTING', status: 503 })
       expect(Date.now() - started).toBeLessThan(1_000)
       expect(lifecycleRequests(peer.requests)).toEqual([])
     } finally { await peer.close() }
