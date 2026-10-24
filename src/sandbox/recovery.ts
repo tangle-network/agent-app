@@ -1,3 +1,5 @@
+import { reconcileWorkspaceSandboxOriginal, type WorkspaceSandboxOriginalRecoveryOptions, type WorkspaceSandboxOriginalRecoveryResult } from './recovery-original'
+
 /**
  * What an app does after the platform hands back a sandbox it cannot use.
  *
@@ -68,6 +70,7 @@ export type WorkspaceSandboxRecoveryCode = keyof typeof CODES
  * declined to lose.
  */
 const ACTIONS = {
+  original_recovered: { replacementChosen: false },
   confirmation_required: { replacementChosen: false, canDecide: true },
   deletion_declined: { replacementChosen: false, canDecide: true },
   replacement_authorized: { replacementChosen: false },
@@ -110,6 +113,15 @@ export interface WorkspaceSandboxRecoveryState<Snapshot extends WorkspaceSandbox
   replacementBoxKey?: string
   replacementSandboxId?: string
   confirmedAt?: string
+  /** Verified historical key of the original; never the current generation key. */
+  originalBoxKey?: string
+  originalRecovered?: {
+    snapshotId: string
+    snapshotCreatedAt: string
+    suspendedAt: string
+    filesystemIncarnationId?: string
+    verifiedAt: string
+  }
 }
 
 export type WorkspaceSandboxRecoveryDecision = 'replace' | 'decline'
@@ -227,6 +239,17 @@ export function isWorkspaceSandboxRecoveryState(
     && !!asNonEmptyString(value.detectedAt)
     && isSnapshotAssessment(value.snapshot)
     && isWorkspaceSandboxRecoveryAction(value.action)
+    && (value.action !== 'original_recovered' || (
+      !!asNonEmptyString(value.originalBoxKey)
+      && isRecord(value.originalRecovered)
+      && !!asNonEmptyString(value.originalRecovered.snapshotId)
+      && typeof value.originalRecovered.snapshotCreatedAt === 'string'
+      && Number.isFinite(Date.parse(value.originalRecovered.snapshotCreatedAt))
+      && typeof value.originalRecovered.suspendedAt === 'string'
+      && Number.isFinite(Date.parse(value.originalRecovered.suspendedAt))
+      && typeof value.originalRecovered.verifiedAt === 'string'
+      && Number.isFinite(Date.parse(value.originalRecovered.verifiedAt))
+    ))
 }
 
 export function workspaceSandboxRecoveryFromError(
@@ -242,6 +265,9 @@ export function workspaceSandboxRecoveryFromError(
 /** What to tell the person waiting. Never names the product, so an app can
  *  surface it verbatim. */
 export function workspaceSandboxRecoveryMessage(recovery: WorkspaceSandboxRecoveryState): string {
+  if (recovery.action === 'original_recovered') {
+    return 'The original sandbox was recovered with its committed saved work. The pending replacement is no longer selected.'
+  }
   if (recovery.code === WORKSPACE_SANDBOX_MISSING) {
     return 'The sandbox behind this workspace no longer exists on the platform. A replacement is being provisioned and your saved work is restored into it.'
   }
@@ -266,6 +292,7 @@ export function workspaceSandboxRecoveryMessage(recovery: WorkspaceSandboxRecove
 export function workspaceSandboxRecoveryRecommendedActions(
   recovery: WorkspaceSandboxRecoveryState,
 ): string[] {
+  if (recovery.action === 'original_recovered') return ['Continue with the recovered original sandbox.']
   if (!CODES[recovery.code].snapshotUsable) {
     return ['Retry after the replacement sandbox finishes provisioning.']
   }
@@ -306,6 +333,7 @@ export function workspaceSandboxRecoveryDiagnostic(
 export function preferredWorkspaceSandboxRecoveryBoxKey(
   recovery: WorkspaceSandboxRecoveryState | undefined,
 ): string | undefined {
+  if (recovery?.action === 'original_recovered') return recovery.originalBoxKey
   if (!recovery?.replacementBoxKey) return undefined
   return ACTIONS[recovery.action].replacementChosen ? recovery.replacementBoxKey : undefined
 }
@@ -314,7 +342,7 @@ export function preferredWorkspaceSandboxRecoveryBoxKey(
 export function shouldRestoreWorkspaceSandboxRecovery(
   recovery: WorkspaceSandboxRecoveryState | undefined,
 ): boolean {
-  if (!recovery) return false
+  if (!recovery || recovery.action === 'original_recovered') return false
   if (!CODES[recovery.code].snapshotUsable) return false
   return !!preferredWorkspaceSandboxRecoveryBoxKey(recovery)
     && recovery.snapshot.availability === 'available'
@@ -326,6 +354,9 @@ export function shouldRestoreWorkspaceSandboxRecovery(
 export interface WorkspaceSandboxRecoveryStore<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
   read: (workspaceId: string) => Promise<WorkspaceSandboxRecoveryState<Snapshot> | undefined>
   write: (workspaceId: string, recovery: WorkspaceSandboxRecoveryState<Snapshot>) => Promise<void>
+  /** Atomic first record. Required with compareAndSet for original reconciliation.
+   * Return false if any recovery already exists; never overwrite it. */
+  insertIfAbsent?: (workspaceId: string, recovery: WorkspaceSandboxRecoveryState<Snapshot>) => Promise<boolean>
   /** Commit a transition only while the exact recovery read above remains current. */
   compareAndSet?: (
     workspaceId: string,
@@ -337,6 +368,8 @@ export interface WorkspaceSandboxRecoveryStore<Snapshot extends WorkspaceSandbox
 export interface WorkspaceSandboxRecoveryManager<Snapshot extends WorkspaceSandboxSnapshot = WorkspaceSandboxSnapshot> {
   read: WorkspaceSandboxRecoveryStore<Snapshot>['read']
   record: WorkspaceSandboxRecoveryStore<Snapshot>['write']
+  /** Reconcile before choosing a box key; unverified/conflict must not provision. */
+  reconcileOriginal: (args: WorkspaceSandboxOriginalRecoveryOptions) => Promise<WorkspaceSandboxOriginalRecoveryResult<Snapshot>>
   /** Only a pending/declined recovery for this sandbox accepts a new decision.
    * Replacement requires a fresh, nonblank key; decline needs no key. */
   decide: (args: {
@@ -372,7 +405,25 @@ export function createWorkspaceSandboxRecoveryManager<Snapshot extends Workspace
 
   return {
     read: workspaceId => store.read(workspaceId),
-    record: (workspaceId, recovery) => store.write(workspaceId, recovery),
+    async record(workspaceId, recovery) {
+      const current = await store.read(workspaceId)
+      if (current) {
+        const currentPolicy = ACTIONS[current.action]
+        if (current.sandboxId === recovery.sandboxId && recovery.code === WORKSPACE_SANDBOX_MISSING
+          && (current.action === 'original_recovered'
+            || (currentPolicy.replacementChosen && !('completedAs' in currentPolicy))))
+          throw new Error('Sandbox recovery changed; reload before recording a replacement')
+        await transition(workspaceId, current, recovery)
+      } else if (store.insertIfAbsent) {
+        if (!await store.insertIfAbsent(workspaceId, recovery))
+          throw new Error('Sandbox recovery changed; reload before recording a replacement')
+      } else {
+        // Preserve legacy recording only. Reconciliation refuses stores without
+        // both atomic ports, so a first-write race cannot opt into that policy.
+        await store.write(workspaceId, recovery)
+      }
+    },
+    reconcileOriginal: args => reconcileWorkspaceSandboxOriginal(store, args),
     async decide({ workspaceId, sandboxId, decision, replacementBoxKey }) {
       const current = await store.read(workspaceId)
       if (!current || current.sandboxId !== sandboxId || !('canDecide' in ACTIONS[current.action])) return undefined
