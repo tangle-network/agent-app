@@ -1,4 +1,6 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { ChatTurnStoreBindings } from './route-storage'
+import type { NativeCompletionHandoffOptions, NativeTurnTimingFacts } from './native-turn-timing'
 import type { ChatMessageValues } from '../chat-store/core'
 import type { ChatTurnPrefetch, ChatTurnPrefetchIdentity } from './turn-prefetch'
 import type { ChatTurnIdentity, ChatTurnProducer } from '@tangle-network/agent-runtime/durable'
@@ -7,11 +9,28 @@ import type { InteractionAnswerRoute, InteractionAnswerRouteOptions } from '../i
 import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import type { ModelPolicy } from '../policy-filters/index'
 import type { PersistedChatMessageForTurn, TurnEventStore } from '../stream/index'
+import type { D1LikeForTurns } from '../stream/turn-buffer'
+import type { TurnStreamAuth } from '../turn-stream/adapters'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
-import type { DraftPersistenceTuning } from './draft-persistence'
-import type { ChatTurnCreateThreadOptions, ChatTurnCreateThreadResult, ChatTurnThreadOwner } from './minted-thread'
 import type { TurnRoutePhase } from './turn-progress'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
+import type { RouterTurnProducerOptions } from './router-producer'
+import type { HybridTurnProducerOptions } from './hybrid-producer'
+import type { SandboxChatProducerOptions } from './sandbox-producer'
+import type { ChatTurnCancelOptions, ChatTurnCancelRequest } from './cancellation'
+
+/** The route supplies request tracing, cancellation and the admission fence.
+ * Domain callbacks supply model, credentials, policy, tools and prompt data. */
+export type ChatTurnRouterConfiguration = Omit<RouterTurnProducerOptions, 'trace' | 'traceId' | 'signal' | 'userMessage' | 'history'> & {
+  userMessage?: RouterTurnProducerOptions['userMessage']
+  history?: RouterTurnProducerOptions['history']
+}
+export type ChatTurnHybridConfiguration = Omit<HybridTurnProducerOptions, 'trace' | 'traceId' | 'signal' | 'userMessage' | 'history'> & {
+  userMessage?: HybridTurnProducerOptions['userMessage']
+  history?: HybridTurnProducerOptions['history']
+}
+export type ChatTurnRouterBackend = ChatTurnRouteProducer | ChatTurnRouterConfiguration | ChatTurnHybridConfiguration
+export type ChatTurnSandboxBackend = ChatTurnRouteProducer | SandboxChatProducerOptions
 
 /** Usage receipt persisted onto the assistant message (the flattened
  *  `step-finish` shape `/chat-store`'s columns mirror). */
@@ -55,6 +74,10 @@ export interface ChatTurnMessageStore {
  *  drain. `createSandboxChatProducer` returns this; a router-lane producer
  *  may omit the optional members (finalText persists as a single text part). */
 export interface ChatTurnRouteProducer extends ChatTurnProducer {
+  /** Pending resource retirement after stream termination. The route tracks it
+   *  with the request's waitUntil, including when admission refuses an early
+   *  Router call. Cleanup must handle and report its own failures. */
+  cleanup?: Promise<void>
   /** Actual backend result/done was observed; transport EOF/error alone is not completion. */
   terminalObserved?(): boolean
   assistantParts?(): Array<Record<string, unknown>>
@@ -108,6 +131,8 @@ export type ChatTurnAuthorization<TContext> =
       tenantId: string
       userId: string
       context: TContext
+      /** Omit for existing callers; a full execution authorization may name its intent explicitly. */
+      intent?: 'turn'
       /** When `false`, skip the `role:'user'` message insert for this turn — for
        *  a product-dispatched / synthetic turn (e.g. a follow-up the product
        *  raised itself) that must not surface a new user row. Composes with —
@@ -124,14 +149,23 @@ export type ChatTurnAuthorization<TContext> =
        *  handle that arm rather than assume a string. */
       insertUserMessage?: boolean
     }
+  | {
+      ok: true
+      /** Identity/access for this operation only; it cannot start a turn. */
+      intent: 'replay' | 'running' | 'cancel'
+      tenantId: string
+      userId: string
+    }
   | { ok: false; response: Response }
 
 /** Define arguments required to authorize a chat turn based on intent and request details */
-export interface ChatTurnAuthorizeArgs<TThread = unknown> {
+export interface ChatTurnAuthorizeArgs {
   request: Request
-  intent: 'turn' | 'replay' | 'running'
-  /** Parsed, validated POST body (turn intent only). */
-  body?: ChatTurnRequestPayload
+  /** This request's bound host continuation, when supplied to turn(request, ctx). */
+  waitUntil?: ChatTurnRequestContext['waitUntil']
+  intent: 'turn' | 'replay' | 'running' | 'cancel'
+  /** Parsed, validated POST body for a turn or cancellation. */
+  body?: ChatTurnRequestPayload | ChatTurnCancelRequest
   /** The buffered turn id being replayed (replay intent only). */
   turnId?: string
   /** The thread whose running turns are being discovered (running intent only). */
@@ -141,10 +175,6 @@ export interface ChatTurnAuthorizeArgs<TThread = unknown> {
   trace?: TurnTrace
   /** The `admission.authorize` span (turn intent only): the parent for those child spans, so they nest under it. */
   span?: TurnSpan
-  /** Turn intent with the route's `createThread` option set: create the turn's thread from the id the client minted.
-   *  Call it only where the product's own thread read missed; it answers 404 when the body names no valid minted
-   *  thread or the member is outside the arm, and 409 when the id already exists anywhere (see `./minted-thread`). */
-  createThread?(owner: ChatTurnThreadOwner): Promise<ChatTurnCreateThreadResult<TThread>>
   /** Turn intent with the route's `prefetch` option set: call it as soon as the caller's identity is verified, before
    *  the rest of the checks, so the prefetch reads beside them (see `./turn-prefetch`). */
   identified?(identity: ChatTurnPrefetchIdentity): void
@@ -153,6 +183,8 @@ export interface ChatTurnAuthorizeArgs<TThread = unknown> {
 /** What `prepareTurn` receives: the admitted turn, before the conversation loads. */
 export interface ChatTurnPrepareArgs<TContext> {
   request: Request
+  /** This request's bound host continuation, when supplied to turn(request, ctx). */
+  waitUntil?: ChatTurnRequestContext['waitUntil']
   /** Parsed, validated POST body. */
   body: ChatTurnRequestPayload
   tenantId: string
@@ -171,6 +203,8 @@ export type ChatTurnPrepareResult = { ok: true } | { ok: false; response: Respon
 /** What `afterAuthorize` receives: the admitted turn, before the conversation loads and before any lock, read or write. */
 export interface ChatTurnAfterAuthorizeArgs<TContext> {
   request: Request
+  /** This request's bound host continuation, when supplied to turn(request, ctx). */
+  waitUntil?: ChatTurnRequestContext['waitUntil']
   /** Parsed, validated POST body. */
   body: ChatTurnRequestPayload
   tenantId: string
@@ -183,7 +217,12 @@ export interface ChatTurnAfterAuthorizeArgs<TContext> {
 }
 
 /** Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it. */
-export type ChatTurnAfterAuthorizeRelease = () => void | Promise<void>
+export type ChatTurnAfterAuthorizeRelease<TResource = unknown> = (() => void | Promise<void>) | {
+  /** Acquisition must clean up any partial resource when it rejects. */
+  resource: Promise<TResource>
+  /** Called once when this turn ends, including a refusal before acquisition resolves. */
+  dispose(resource: TResource): void | Promise<void>
+}
 
 /** Trusted per-turn limits supplied by a server adapter, never by the body. */
 export interface ChatTurnExecutionLimits {
@@ -205,8 +244,12 @@ export interface ChatTurnRequestContext {
 }
 
 /** Define the arguments required to produce a chat turn with context and messaging details */
-export interface ChatTurnProduceArgs<TContext> {
+export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
   request: Request
+  /** The opaque resource afterAuthorize started; the route disposes it at this turn's end. */
+  earlyResource?: Promise<TResource>
+  /** This request's bound host continuation, when supplied to turn(request, ctx). */
+  waitUntil?: ChatTurnRequestContext['waitUntil']
   body: ChatTurnRequestPayload
   identity: ChatTurnIdentity
   context: TContext
@@ -250,30 +293,36 @@ export interface ChatTurnProduceArgs<TContext> {
   /** True when this turn's own insert created `userMessageId`, so no earlier
    *  attempt can have answered it; false when retry-dedup reused the row or no
    *  row was written. A gate that refuses an already-answered retry can skip
-   *  its read when this is true. Already false for a reused row at dispatch
-   *  policy and lock acquisition; undefined for a fresh row until insertion. */
+   *  its read when this is true. Already false for a reused row at backend
+   *  selection and lock acquisition; undefined for a fresh row until insertion. */
   userMessageInserted?: boolean
   /**
    * Transfer completion ownership to a product-owned durable runner. The
-   * product MUST first register that runner durably, then await this callback
-   * before dispatching native execution. Once it resolves, this route remains
-   * a live event projector only: it no longer writes or settles the assistant
+   * product MUST register that runner durably, then await this callback before
+   * dispatching native execution. When timing transfer is used, persist the initial
+   * timingFacts snapshot on the existing admission before registering that runner.
+   * A callback rejection after registration retains durable ownership. Once it
+   * resolves, this route remains a live event projector only: it no longer writes or settles the assistant
    * transcript, lifecycle hooks, lock, or replay-buffer status.
    *
    * Optional for source compatibility with synthetic producers. Every
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
-  handoffCompletion?: () => Promise<void>
+  handoffCompletion?: (options?: NativeCompletionHandoffOptions) => Promise<void>
+  /** Serializable observations only; snapshots never predict events after handoff. */
+  timingFacts?: () => NativeTurnTimingFacts
   /** What the route's `prefetch` read for this turn's admitted identity; set only when `prefetch` is configured. */
   prefetched?: Promise<unknown>
-  /** Set only under `dispatchFirst`, where `produce` starts before the lock. Resolves to the final args (with
+  /** Set for a fresh Router backend, which starts before the lock. Resolves to the final args (with
    *  `userMessageId`, after `contextGate` and `beforeTurn`) once the admission chain commits, or rejects with
    *  `TurnAdmissionRefusedError` when the turn is refused. Start the model call at once; write nothing durable,
    *  and read nothing `beforeTurn` adds to `context`, until it resolves. */
-  admitted?: Promise<ChatTurnProduceArgs<TContext>>
-  /** Set only under `dispatchFirst`: aborts when the turn is refused after `produce` started, or when the route stops
-   *  reading the producer (a disconnect under `cancelOnDisconnect`). Pass it to the model call. Under `dispatchFirst`,
-   *  `handoffCompletion` resolves only after `admitted` does. */
+  admitted?: Promise<ChatTurnProduceArgs<TContext, TResource>>
+  /** Effective execution signal: product Stop/supersession, opted-in durable Stop/control loss,
+   *  and optional request-disconnect cancellation.
+   *  A fresh Router backend also aborts on admission refusal or when the route stops reading it.
+   *  Pass it to producer I/O; Router/Sandbox option data binds it automatically.
+   *  Early Router handoff waits for `admitted`. */
   admissionSignal?: AbortSignal
 }
 
@@ -314,18 +363,26 @@ export type ChatTurnGateResult =
    *  the route releases its lock. */
   | { proceed: 'handoff'; response: Response }
 
+/** This owner's cancellation observation: the signal aborts on Stop or control loss.
+ *  Closing observation does not release the lock or establish remote completion. */
+export interface ChatTurnCancellation {
+  signal: AbortSignal
+  /** Close this owner's observation; never release the durable lock or claim remote work stopped. */
+  close(): void | Promise<void>
+}
+
 /** Single-flight lock verdict — acquired (with an opaque handle passed back to
  *  `release`), or already held (short-circuit with the product's 409-style
  *  `Response`). */
 export type ChatTurnLockResult =
-  | { acquired: true; handle?: unknown }
+  | { acquired: true; handle?: unknown; cancellation?: ChatTurnCancellation }
   | { acquired: false; response: Response }
 
 /** Async acquire/release wrapped around the turn. `acquire` runs before any
  *  side effect; `release` runs once when the turn settles — including on a
  *  short-circuit or a throw. */
-export interface ChatTurnLock<TContext> {
-  acquire(args: ChatTurnProduceArgs<TContext>): ChatTurnLockResult | Promise<ChatTurnLockResult>
+export interface ChatTurnLock<TContext, TResource = unknown> {
+  acquire(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnLockResult | Promise<ChatTurnLockResult>
   release(handle: unknown): void | Promise<void>
   /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
    *  and while `prepareTurn` and the history read run. Never awaited; a failure
@@ -420,6 +477,8 @@ export interface ChatTurnCompleteInput<TContext> {
   finalText: string
   context: TContext
   failed: boolean
+  /** Final producer receipt, when it reports usage; absent counts remain unknown. */
+  usage?: ChatTurnUsage
   failureReason?: string
   /** Typed reason of a failed turn, when its terminal error event names one. */
   failureCode?: string
@@ -456,18 +515,17 @@ export interface ChatTurnTraceOptions<TContext> {
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
-export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown> {
+export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknown> {
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
   projectId: string
   /** Authenticate + authorize the caller for a turn or a replay. The only
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
-  authorize(args: ChatTurnAuthorizeArgs<TThread>): Promise<ChatTurnAuthorization<TContext>>
-  /** A new chat's first turn creates its thread from an id the client minted (`mintThreadId` in `/web-react`), so the
-   *  client skips the thread POST: `authorize` receives `args.createThread` and calls it where its thread read missed.
-   *  Omit → an unknown thread stays the product's 404. */
-  createThread?: ChatTurnCreateThreadOptions<TThread>
+  authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
+  /** Resolve the exact authenticated stop target. Without this capability,
+   *  cancel returns 405 before parsing or authorization. */
+  cancel?: ChatTurnCancelOptions<TContext>
   /** Read the turn's prompt inputs (profile, knowledge, catalogs) while `authorize` finishes: started when `authorize`
    *  calls `args.identified`, or once it allows the turn. Read only: no writes, nothing paid or external beyond what
    *  the verified identity allows. `produce` receives the result as `args.prefetched` only for an allowed turn of that
@@ -485,20 +543,21 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
   prepareTurn?(args: ChatTurnPrepareArgs<TContext>): ChatTurnPrepareResult | Promise<ChatTurnPrepareResult>
   /** Start the work this turn will need, the moment `authorize` and `modelPolicy` have admitted it, so that work overlaps
    *  `prepareTurn`, the history read, the lock, the history recheck and the user-row insert instead of following them: the
-   *  workspace box, the keys a producer mints, a session ensure. Keep what it starts on `args.context`; `produce` receives
-   *  that object and awaits it.
+   *  workspace box, the keys a producer mints, a session ensure. Return `{resource, dispose}` to hand the route an
+   *  opaque acquisition promise: `produce` receives it as `args.earlyResource`, and the route disposes the value once
+   *  when the turn ends, including a refusal before acquisition resolves. Acquisition owns partial-failure cleanup.
    *
    *  Admission has not finished, so the seam must start only work that the turn's refusal leaves harmless: a held lock
    *  (409), a changed history, a gate's answer or a throw all end the turn without `produce`, and the work already
    *  started runs on. Start nothing a second request for the same thread could not safely repeat, and nothing that
    *  writes product state.
    *
-   *  Not awaited, and it must return synchronously: start the work and return, never wait for it. It may return a release
-   *  function; the route calls it once, only if the turn ends without `produce` (the chain above, or a throw before the
+   *  Not awaited, and it must return synchronously: start the work and return, never wait for it. It may return a
+   *  legacy release function; the route calls it once, only if the turn ends without `produce` (the chain above, or a throw before the
    *  engine took the turn), so a product frees credentials or leases the unused work holds. Once `produce` runs, the
    *  work belongs to `produce` and the route never calls the release. A throw is logged and the turn goes on without
    *  the early work. Omit → nothing starts early. */
-  afterAuthorize?(args: ChatTurnAfterAuthorizeArgs<TContext>): void | ChatTurnAfterAuthorizeRelease
+  afterAuthorize?(args: ChatTurnAfterAuthorizeArgs<TContext>): void | ChatTurnAfterAuthorizeRelease<TResource>
   /** Product admission policy over the model a turn NAMES. When the request
    *  body carries a `model`, it is checked here — after `authorize`, before
    *  the conversation loads, the lock is taken, or any row is written — and a
@@ -518,35 +577,29 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
    *  `createDurableObjectTurnEventStore(env.TURN_STREAM_DO)` in production,
    *  `createMemoryTurnEventStore()` in tests). Wired by default — every turn
    *  is buffered and replayable. */
-  turnStore: TurnEventStore
-  /** Build the turn's event stream. Sandbox lane: `streamSandboxPrompt(...)`
-   *  wrapped in `createSandboxChatProducer`. Router/openai-compat lane: the
-   *  product's own producer. May be async (box resolution). */
-  produce(args: ChatTurnProduceArgs<TContext>): ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
-  /**
-   * Start `produce`, and so the model call, right after the history read, while the lock, the history recheck, the
-   * user-row insert, `contextGate` and `beforeTurn` run (see `./dispatch-first`). Nothing it emits reaches the member,
-   * the turn buffer or the transcript before that chain commits; a refusal aborts it through `args.admissionSignal`
-   * and drops its output. `produce` receives `args.admitted` for the final args.
+  turnStore: TurnEventStore | ChatTurnStoreBindings
+  /** Build the turn stream after admission, or declare its execution backends.
+   * Router calls start before the lock by default, after authorize has verified
+   * identity/access. The model service enforces spend before paying a provider.
+   * Output stays buffered until admission commits; a refusal cancels the call.
+   * Return Router/Hybrid producer options to bind tracing, cancellation and
+   * tool admission automatically. A custom Router producer must pass
+   * admissionSignal and await admitted before tools or durable effects.
+   * beforeTurn cannot patch a Router prompt already sent.
    *
-   * Opt in only by naming where billing is enforced before any provider is paid: `'authorize'` (the product's
-   * balance and spend checks run there) or `'model-service'` (the Tangle Router holds the spend and refuses an
-   * unfunded key before it calls a provider, fail-closed). Entitlement gates the model service cannot know (a seat,
-   * a plan feature) belong in `contextGate`, which then runs while the model starts and holds its output until it
-   * passes. `beforeTurn` may still mutate `context` but must not return a patch, since the prompt has already been
-   * sent; a patch throws. Omit → `produce` runs after admission.
-   *
-   * `when` picks the turns that dispatch first (default all). Return false for a producer whose dispatch is keyed by
-   * the turn's `executionId` (a box session): two sends on one thread resolve the same id, and the refused duplicate
-   * would reach the winner's execution before the lock refused it. A Router call per request is safe; the refused
-   * duplicate costs only the call its `admissionSignal` cancels.
-   */
-  dispatchFirst?: { billing: 'authorize' | 'model-service'; when?: (args: ChatTurnProduceArgs<TContext>) => boolean }
-  /** Single-flight lock acquired before any side effect and released once when
+   * when selects the Router backend (default true); false selects sandbox,
+   * which always starts after admission. A function also starts after admission.
+   * Reused user rows always finish admission before either backend starts. */
+  produce: ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
+    router(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouterBackend | Promise<ChatTurnRouterBackend>
+    when?(args: ChatTurnProduceArgs<TContext, TResource>): boolean
+    sandbox?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnSandboxBackend | Promise<ChatTurnSandboxBackend>
+  }
+  /** Single-flight lock acquired before durable effects and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
    *  no lock. */
-  turnLock?: ChatTurnLock<TContext>
+  turnLock?: ChatTurnLock<TContext, TResource>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
@@ -556,7 +609,8 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
    *    insert was suppressed with nothing to reuse. (`turnLock.acquire` is the
    *    only seam that sees it `undefined`.)
    *  - `{proceed:false}` releases the lock and returns the product's `Response`
-   *    verbatim: `beforeTurn` and `produce` never run, no assistant row is
+   *    verbatim: `beforeTurn` and an ordinary/Sandbox producer never run; an
+   *    early Router call is cancelled and discarded. No assistant row is
    *    written, and the user row already inserted is KEPT — a real user turn
    *    whose assistant side is the gate's own response.
    *  - `{proceed:'handoff'}` releases the route-acquired lock, returns the
@@ -567,7 +621,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
    *    doubles as the one place that runs after the user row exists and before
    *    the producer, which is where per-turn analytics and readiness
    *    precomputation belong. A gate that never gates is a valid consumer. */
-  contextGate?(args: ChatTurnProduceArgs<TContext>): ChatTurnGateResult | Promise<ChatTurnGateResult>
+  contextGate?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnGateResult | Promise<ChatTurnGateResult>
   /** Observe the assembled producer input and optionally augment it (rewrite
    *  the prompt / prior messages) before the producer runs. Omit → no change.
    *
@@ -583,7 +637,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
    *  the span never opened. Telemetry for a failure in this seam belongs in the
    *  seam, not in `lifecycle`. */
   beforeTurn?(
-    args: ChatTurnProduceArgs<TContext>,
+    args: ChatTurnProduceArgs<TContext, TResource>,
     /** `span` is the `admission.before_turn` span: the parent for a product's own child spans. */
     seam?: { span: TurnSpan },
   ): ChatTurnInputPatch | void | Promise<ChatTurnInputPatch | void>
@@ -612,30 +666,6 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
   transformFinalText?(text: string): string | Promise<string>
-  /** Incremental persistence of the assistant row WHILE the turn streams
-   *  (`./draft-persistence`), so a viewer arriving mid-run is served from
-   *  durable storage instead of the streaming gateway's hot event buffer.
-   *
-   *  This is what lets the gateway keep that hot buffer SHORT at scale: its
-   *  Redis footprint is one sorted set per session refreshed on every push, so
-   *  memory grows LINEARLY with `ttl x concurrent sessions`. Stretching the
-   *  TTL to cover late viewers buys memory proportional to the increase and
-   *  still serves nothing past the new horizon. The buffer stays a reconnect
-   *  window; durable storage — kept at most one cadence interval stale by this
-   *  option — is the history tier.
-   *
-   *  Enabled by DEFAULT whenever `store.updateMessage` exists (every
-   *  `/chat-store` consumer); a store without it keeps today's exact
-   *  single-write behavior. Pass `false` to opt out, or an object to tune the
-   *  cadence. Wiring it against a store that cannot patch rows throws at route
-   *  construction rather than silently no-op'ing. */
-  incrementalPersistence?: false | DraftPersistenceTuning
-  /** Deterministic durable row id for this turn's assistant message. Default
-   *  `assistant:<executionId>` — already stable across retries because
-   *  `deriveExecutionId` is. Override only if the product's message ids have a
-   *  format constraint; it MUST stay deterministic per turn or a re-entered
-   *  turn will duplicate its row instead of converging. */
-  draftMessageId?(args: { identity: ChatTurnIdentity; executionId: string; threadId: string }): string
   /** Post-processing after a turn settles (billing, titles, audit). Fires with
    *  `failed:true` + `failureReason` when the turn carried a terminal error
    *  event (model 402 / rate-limit / server error) instead of a clean
@@ -663,14 +693,6 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TThread = unknown>
   /** Compose the interaction-answer endpoints (`/interactions`). Omit when the
    *  product has no sidecar ask channel. */
   interactions?: InteractionAnswerRouteOptions
-  /** Byte budget for inline prompt parts. Default `INLINE_PARTS_MAX_BYTES`. */
-  maxInlinePartBytes?: number
-  /** Per-flush coalescer for the turn buffer. Default `coalesceDeltas` (this
-   *  assembly streams the client vocabulary's `{type:'text'|'reasoning',
-   *  text}` lines, which it merges). A producer streaming raw
-   *  `message.part.updated` events passes `coalesceChatStreamEvents`. */
-  coalesceTurnEvents?: (events: unknown[]) => unknown[]
-  replay?: { pollMs?: number; timeoutMs?: number }
   /** Text for the route's own stages on a progress-first stream (`./turn-progress`).
    *  Omitted stages keep `TURN_ROUTE_PHASE_MESSAGES`. */
   progressMessages?: Partial<Record<TurnRoutePhase, string>>
@@ -722,6 +744,8 @@ export interface ChatTurnRoutes {
    *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
    *  authorized (`./turn-progress`). */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
+  /** POST — stop the exact authorized execution; unavailable unless configured. */
+  cancel(request: Request): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>

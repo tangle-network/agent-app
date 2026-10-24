@@ -8,7 +8,7 @@
  * - `createChatTables` (./schema) — the table factory; per-divergence
  *   rationale lives in its docblock.
  * - `createChatStore` (./store) — list/get/create/rename/pin/delete/bulk-
- *   delete threads + list/append messages, with access control as an injected
+ *   delete threads + message CRUD and declared-metadata merge patches, with access control as an injected
  *   callback seam.
  * - `ChatMessagePart` (./parts) — the canonical stored `parts` vocabulary both
  *   transport lanes (harness `message.part.updated`, router openai-compat)

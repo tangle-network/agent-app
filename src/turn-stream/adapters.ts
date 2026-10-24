@@ -5,7 +5,8 @@
  * Products provide workspace authorization and their binding's TURN_STREAM_AUTH_SECRET.
  */
 
-import { reconcileStaleTurnLock, type ReconcileStaleTurnLockOptions } from '../chat-routes/stale-turn-lock'
+import { connectDurableTurnCancellation, type TurnCancellationConnection, type TurnCancellationIdentity } from './cancellation'
+import { reconcileStaleTurnLock, type ReconcileStaleTurnLockOptions, type StaleTurnLockOwnerProbeResult } from '../chat-routes/stale-turn-lock'
 import type { TurnEventStore, TurnStatus } from '../stream/turn-buffer'
 import {
   TURN_STREAM_PATHS,
@@ -18,8 +19,10 @@ import {
   type DurableTurnLock,
   type TurnLockAcquireResult,
   type TurnLockReleaseInput,
+  type TurnLockInterruptedReleaseInput,
   type TurnLockScope,
   type TurnStreamEvent,
+  type TurnStreamTokenClaims,
 } from './core'
 
 // ── structural namespace ────────────────────────────────────────────────────
@@ -29,10 +32,16 @@ export interface TurnStreamStubLike {
   fetch(input: Request | string, init?: RequestInit): Promise<Response>
 }
 
+/** Cloudflare placement hints. A hint affects only a channel's first creation, never an existing object's location. */
+export type TurnStreamLocationHint = 'wnam' | 'enam' | 'sam' | 'weur' | 'eeur' | 'apac' | 'apac-ne' | 'apac-se' | 'oc' | 'afr' | 'me'
+
+/** The default matches the application D1 region unless its binding descriptor names another region. */
+export const DEFAULT_TURN_LOCK_LOCATION_HINT: TurnStreamLocationHint = 'enam'
+
 /** The surface of `DurableObjectNamespace` the adapters use. */
 export interface TurnStreamNamespaceLike {
   idFromName(name: string): unknown
-  get(id: unknown): TurnStreamStubLike
+  get(id: unknown, options?: { locationHint?: string }): TurnStreamStubLike
 }
 
 const INTERNAL_ORIGIN = 'https://turn-stream.internal'
@@ -51,13 +60,14 @@ async function postJson<T>(
   path: string,
   body: unknown,
   auth: TurnStreamAuth,
+  claims?: TurnStreamTokenClaims,
 ): Promise<{ status: number; body: T }> {
   const stub = namespace.get(namespace.idFromName(channelKey))
   const response = await stub.fetch(`${INTERNAL_ORIGIN}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(channelKey, auth.secret),
+      [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(channelKey, auth.secret, undefined, undefined, claims),
     },
     body: JSON.stringify(body),
   })
@@ -70,8 +80,9 @@ async function postJsonOk<T>(
   path: string,
   body: unknown,
   auth: TurnStreamAuth,
+  claims?: TurnStreamTokenClaims,
 ): Promise<T> {
-  const result = await postJson<T>(namespace, channelKey, path, body, auth)
+  const result = await postJson<T>(namespace, channelKey, path, body, auth, claims)
   if (result.status !== 200) {
     throw new Error(`turn-stream ${path} failed with status ${result.status}`)
   }
@@ -152,6 +163,7 @@ export interface AcquireDurableTurnLockInput {
   turnId?: string
   /** Supply to reclaim/retry with a stable id; default mints a UUID. */
   lockId?: string
+  cancellation?: { turnStreamId: string }
 }
 
 /** Acquire a durable turn lock in the specified namespace with given input parameters */
@@ -183,10 +195,10 @@ export async function acquireDurableTurnLock(
  */
 export async function peekDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
-  input: { workspaceId: string; threadId: string; scope: TurnLockScope },
+  input: { workspaceId: string } & ({ scope: 'workspace'; threadId?: string } | { scope: TurnLockScope; threadId: string }),
   auth: TurnStreamAuth,
 ): Promise<DurableTurnLock | null> {
-  const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
+  const key = turnLockChannelKey(input.workspaceId, input.threadId ?? '', input.scope)
   const result = await postJson<{ active?: DurableTurnLock | null }>(namespace, key, TURN_STREAM_PATHS.lockPeek, {
     scope: input.scope,
     threadId: input.threadId,
@@ -206,15 +218,7 @@ export async function releaseDurableTurnLock(
 }
 
 /** Define input parameters to release an interrupted durable turn lock in a workspace or thread */
-export interface ReleaseInterruptedDurableTurnLockInput {
-  workspaceId: string
-  threadId: string
-  /** Try only this scope; omit to try workspace then thread (a stop button
-   *  doesn't know which lane the wedged turn ran on). */
-  scope?: TurnLockScope
-  interruptedAt: number
-  turnId?: string
-}
+export type ReleaseInterruptedDurableTurnLockInput = TurnLockInterruptedReleaseInput
 
 /** Fenced out-of-band release — the DO refuses a successor lock (started
  *  after `interruptedAt`) and a turnId mismatch. Returns whether any scope
@@ -232,7 +236,8 @@ export async function releaseInterruptedDurableTurnLock(
       threadId: input.threadId,
       interruptedAt: input.interruptedAt,
       ...(input.turnId ? { turnId: input.turnId } : {}),
-    }, auth)
+      ...(input.recovery ? { recovery: input.recovery } : {}),
+    }, auth, input.recovery ? { purpose: 'turn-recovery', identity: input.recovery } : undefined)
     if (result.released) return true
   }
   return false
@@ -252,6 +257,8 @@ export interface ReconcileStaleDurableTurnLockOptions
   threadId: string
   /** The lock the acquire attempt was refused on. */
   active: DurableTurnLock
+  /** Cancellable Router locks require positive exact outer + child quiescence; native-only probes cannot attest it. */
+  probeOwner?(identity: TurnCancellationIdentity): Promise<StaleTurnLockOwnerProbeResult>
 }
 
 /**
@@ -264,10 +271,14 @@ export interface ReconcileStaleDurableTurnLockOptions
 export async function reconcileStaleDurableTurnLock(
   options: ReconcileStaleDurableTurnLockOptions,
 ): Promise<{ released: boolean; diagnostics: Record<string, unknown> }> {
-  const { namespace, auth, workspaceId, threadId, active, ...policy } = options
+  const { namespace, auth, workspaceId, threadId, active, probeOwner, ...policy } = options
+  const owner = active.cancellation ? { workspaceId: active.workspaceId, threadId: active.threadId, scope: active.scope,
+    executionId: active.executionId, lockId: active.lockId, turnStreamId: active.cancellation.turnStreamId } : undefined
   return reconcileStaleTurnLock({
     ...policy,
     lockStartedAt: active.startedAt,
+    ...(owner ? { owner: { identity: owner,
+      probe: probeOwner ?? (async (identity: TurnCancellationIdentity) => ({ identity, status: 'unknown' as const })) } } : {}),
     release: (fence) =>
       releaseInterruptedDurableTurnLock(namespace, {
         workspaceId,
@@ -275,6 +286,7 @@ export async function reconcileStaleDurableTurnLock(
         scope: active.scope,
         interruptedAt: fence.observedAt,
         ...(active.turnId ? { turnId: active.turnId } : {}),
+        ...(owner ? { recovery: owner } : {}),
       }, auth),
   })
 }
@@ -287,17 +299,20 @@ export async function reconcileStaleDurableTurnLock(
 export interface TurnLockSeamArgs<TContext> {
   identity: { tenantId: string; sessionId: string }
   executionId: string
+  turnStreamId?: string
   context: TContext
   body: { turnId?: string }
 }
 
 /** Verdict shape of the vertical's `turnLock.acquire`. */
 export type TurnLockSeamResult =
-  | { acquired: true; handle?: unknown }
+  | { acquired: true; handle?: unknown; cancellation?: TurnCancellationConnection }
   | { acquired: false; response: Response }
 
 /** Define options for creating a durable turn lock with customizable scope and identification methods */
 export interface CreateDurableTurnLockOptions<TContext> {
+  /** New channels use this hint; existing channel IDs and locations are preserved. */
+  locationHint?: TurnStreamLocationHint
   namespace: TurnStreamNamespaceLike
   /** Capability tokens for the DO; pass the worker's
    *  `env.TURN_STREAM_AUTH_SECRET`. The DO validates every request. */
@@ -305,6 +320,8 @@ export interface CreateDurableTurnLockOptions<TContext> {
   /** Which lane serializes this turn: `'workspace'` (shared sandbox — one
    *  turn per workspace) or `'thread'` (router lane — one turn per thread). */
   scopeOf(args: TurnLockSeamArgs<TContext>): TurnLockScope
+  /** Opt the existing lock into durable Stop. Leave native/durable completion lanes on their existing owner. */
+  cancellationOf?(args: TurnLockSeamArgs<TContext>): boolean
   /** Override the execution id the lock records (e.g. a follow-up reclaiming
    *  the execution it already dispatched). Default: the turn's own. */
   lockExecutionIdOf?(args: TurnLockSeamArgs<TContext>): string | undefined
@@ -360,13 +377,21 @@ function defaultRefusalResponse(
 export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOptions<TContext>): {
   acquire(args: TurnLockSeamArgs<TContext>): Promise<TurnLockSeamResult>
   release(handle: unknown): Promise<void>
-  warm(target: { tenantId: string; threadId: string }): Promise<void>
+  warm(target: { tenantId: string; threadId?: string }): Promise<void>
 } {
+  const namespace: TurnStreamNamespaceLike = {
+    idFromName: name => options.namespace.idFromName(name),
+    get: (id, init) => options.namespace.get(id, {
+      ...init, locationHint: options.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT,
+    }),
+  }
   return {
     // Every lock lives on the workspace channel, so this wakes that object
     // (evicted after idle) before the turn's acquire reaches it.
     async warm(target) {
-      await peekDurableTurnLock(options.namespace, { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }, options.auth)
+      await peekDurableTurnLock(namespace, target.threadId
+        ? { workspaceId: target.tenantId, threadId: target.threadId, scope: 'thread' }
+        : { workspaceId: target.tenantId, scope: 'workspace' }, options.auth)
     },
     async acquire(args) {
       const workspaceId = args.identity.tenantId
@@ -374,21 +399,24 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
       const scope = options.scopeOf(args)
       const executionId = options.lockExecutionIdOf?.(args) ?? args.executionId
       const turnId = options.clientTurnIdOf ? options.clientTurnIdOf(args) : args.body.turnId
+      const cancellable = options.cancellationOf?.(args) === true
+      if (cancellable && !args.turnStreamId) throw new Error('Durable cancellation requires the route turnStreamId')
       const input: AcquireDurableTurnLockInput = {
         workspaceId,
         threadId,
         scope,
         executionId,
         ...(turnId ? { turnId } : {}),
+        ...(cancellable ? { cancellation: { turnStreamId: args.turnStreamId! } } : {}),
       }
 
-      let acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
+      let acquired = await acquireDurableTurnLock(namespace, input, options.auth)
       let diagnostics: Record<string, unknown> | undefined
       if (!acquired.acquired && options.reconcile) {
         const reconciled = await options.reconcile(args, acquired.active)
         diagnostics = reconciled.diagnostics
         if (reconciled.released) {
-          acquired = await acquireDurableTurnLock(options.namespace, input, options.auth)
+          acquired = await acquireDurableTurnLock(namespace, input, options.auth)
         }
       }
       if (!acquired.acquired) {
@@ -404,11 +432,20 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
         executionId,
         lockId: acquired.lock.lockId,
       }
-      return { acquired: true, handle }
+      if (!cancellable) return { acquired: true, handle }
+      try {
+        const cancellation = await connectDurableTurnCancellation(options.namespace,
+          { ...handle, turnStreamId: args.turnStreamId! }, options.auth)
+        return { acquired: true, handle, cancellation }
+      } catch (error) {
+        // No producer may run without its control connection. Release only this newly acquired generation.
+        await releaseDurableTurnLock(options.namespace, handle, options.auth)
+        throw error
+      }
     },
     async release(handle) {
       if (!handle) return
-      await releaseDurableTurnLock(options.namespace, handle as TurnLockReleaseInput, options.auth)
+      await releaseDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth)
     },
   }
 }

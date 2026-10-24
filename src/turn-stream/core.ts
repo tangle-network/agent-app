@@ -40,17 +40,34 @@ export const TURN_STREAM_TOKEN_TTL_MS = 60_000
  *  attaches it when forwarding an authorized browser WebSocket handshake. */
 export const TURN_STREAM_TOKEN_HEADER = 'x-turn-stream-token'
 
-/** `v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so
- *  it cannot be extended by editing the token. */
+/** Server control authority is separate from the channel capabilities used by existing viewer forwarders. */
+export interface TurnStreamTokenClaims {
+  purpose: 'turn-control' | 'turn-cancel' | 'turn-recovery'
+  identity: TurnLockReleaseInput & { turnStreamId: string }
+}
+
+function encodeTurnStreamClaims(claims: TurnStreamTokenClaims): string {
+  const { identity, purpose } = claims
+  if (!['turn-control', 'turn-cancel', 'turn-recovery'].includes(purpose)
+    || !identity || !['thread', 'workspace'].includes(identity.scope)
+    || [identity.workspaceId, identity.threadId, identity.executionId, identity.lockId, identity.turnStreamId]
+      .some(value => typeof value !== 'string' || !value.trim())) throw new Error('Invalid turn-stream control claims')
+  return base64UrlEncodeText(JSON.stringify([purpose, identity.workspaceId, identity.threadId, identity.scope,
+    identity.executionId, identity.lockId, identity.turnStreamId]))
+}
+
+/** Legacy v1 channel capabilities remain unchanged. Optional v2 claims bind
+ *  server-only purpose and exact owner identity inside the same signed payload. */
 export async function mintTurnStreamToken(
   channelName: string,
   secret: string,
   now: () => number = Date.now,
   ttlMs: number = TURN_STREAM_TOKEN_TTL_MS,
+  claims?: TurnStreamTokenClaims,
 ): Promise<string> {
   if (!secret || secret.length < 32) throw new Error('turn-stream token secret must be at least 32 characters')
   const expiresAt = now() + ttlMs
-  const payload = `v1.${base64UrlEncodeText(channelName)}.${expiresAt.toString(36)}`
+  const payload = `${claims ? 'v2' : 'v1'}.${base64UrlEncodeText(channelName)}.${expiresAt.toString(36)}${claims ? `.${encodeTurnStreamClaims(claims)}` : ''}`
   return `${payload}.${await hmacSha256Base64Url(payload, secret)}`
 }
 
@@ -62,16 +79,24 @@ export async function verifyTurnStreamToken(
   token: string,
   secret: string,
   now: () => number = Date.now,
+  claims?: TurnStreamTokenClaims,
 ): Promise<boolean> {
   if (!secret || secret.length < 32) return false
   const parts = token.split('.')
-  if (parts.length !== 4 || parts[0] !== 'v1') return false
-  const [, name, expires36, mac] = parts as [string, string, string, string]
+  const version = parts[0]
+  if (!(version === 'v1' && parts.length === 4 || version === 'v2' && parts.length === 5)) return false
+  const name = parts[1]!
+  const expires36 = parts[2]!
+  const mac = parts.at(-1)!
+  if (claims) {
+    try { if (version !== 'v2' || parts[3] !== encodeTurnStreamClaims(claims)) return false }
+    catch { return false }
+  }
   if (name !== base64UrlEncodeText(channelName)) return false
   if (!/^[0-9a-z]+$/.test(expires36)) return false
   const expiresAt = parseInt(expires36, 36)
   if (!Number.isSafeInteger(expiresAt) || expiresAt <= now()) return false
-  const expected = await hmacSha256Base64Url(`v1.${name}.${expires36}`, secret)
+  const expected = await hmacSha256Base64Url(parts.slice(0, -1).join('.'), secret)
   return constantTimeEqual(mac, expected)
 }
 
@@ -169,6 +194,8 @@ export interface DurableTurnLock {
    *  parked on the lock until the task settles. Written only through the DO's
    *  defer seam — the base package never sets it on its own. */
   releasePending?: boolean
+  /** Optional Router control, owned by this exact lock generation. Stop never releases the lock. */
+  cancellation?: { turnStreamId: string; requestedAt?: number }
 }
 
 /** Define input parameters required to acquire a turn-based lock in a workspace thread */
@@ -179,6 +206,7 @@ export interface TurnLockAcquireInput {
   executionId: string
   lockId: string
   turnId?: string
+  cancellation?: { turnStreamId: string }
 }
 
 /** Resolve the result of attempting to acquire a turn lock indicating success or active lock status */
@@ -206,6 +234,8 @@ export interface TurnLockInterruptedReleaseInput {
   scope?: TurnLockScope
   interruptedAt: number
   turnId?: string
+  /** Only after the existing stale policy positively proves this exact Router owner and its children abandoned. */
+  recovery?: TurnLockReleaseInput & { turnStreamId: string }
 }
 
 /** `stored` is what the DO read from storage; expired locks are dead. */
@@ -227,6 +257,7 @@ export function createTurnLock(input: TurnLockAcquireInput, now: number, ttlMs =
     startedAt: now,
     expiresAt: now + ttlMs,
     ...(input.turnId ? { turnId: input.turnId } : {}),
+    ...(input.cancellation ? { cancellation: { turnStreamId: input.cancellation.turnStreamId } } : {}),
   }
 }
 

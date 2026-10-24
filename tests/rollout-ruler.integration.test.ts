@@ -4,8 +4,8 @@ import type { AddressInfo } from 'node:net'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import { build } from 'tsup'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes, createSandboxChatProducer, type ChatTurnMessageStore } from '../src/chat-routes/index'
 import { createD1TurnTimingStore, ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL, ROLLOUT_TURN_TIMING_SCHEMA_SQL, ROLLOUT_TURN_TIMING_VARIANT_MIGRATION_SQL, type D1LikeForRollout } from '../src/rollout/d1'
@@ -15,6 +15,8 @@ import { createMemoryTurnEventStore } from '../src/stream/index'
 // Frozen E8 decision measurement: creative-rollout.result, closed seven-day window
 // 2026-10-13T23:48:49.733Z through 2026-10-20T23:48:49.733Z. No live reads or paid calls.
 const frozen = JSON.parse(readFileSync(new URL('./fixtures/rollout/creative-e8.json', import.meta.url), 'utf8'))
+// Frozen install's prepare builds the exact CLI named by the package bin.
+const cli = fileURLToPath(new URL('../dist/rollout/cli.js', import.meta.url))
 
 it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the deployed commit went live, and narrows on an injected failure breach', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
@@ -26,8 +28,6 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
       } },
       { name: 'all', value: '*', minSamples: 100, kill: { failure_rate_delta: { max: 0.01 } } },
     ] }
-    await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false, config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
-    const cli = join(dir, 'cli.mjs')
     // `from`: 'since' measures from the CLI's `since`, as a product reading only rows at or after it does; an ISO time is a
     // fixed window the instrument chose; absent keeps the frozen seven-day window.
     const run = (breach: boolean, args: string[], from?: string) => {
@@ -129,8 +129,6 @@ it('the shipped CLI completes a narrowing when the measurement HTTP request neve
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    await build({ entry: ['src/rollout/cli.ts'], outDir: dir, format: ['esm'], splitting: false,
-      config: false, silent: true, outExtension: () => ({ js: '.mjs' }) })
     writeFileSync(join(dir, 'wrangler.toml'), '[vars]\nIDS = ""\n')
     writeFileSync(join(dir, 'rollout.config.mjs'), `export default {
       measurementTimeoutMs: 500,
@@ -139,7 +137,7 @@ it('the shipped CLI completes a narrowing when the measurement HTTP request neve
       async measure() { return (await fetch(${JSON.stringify(endpoint)})).json() },
     }`)
     const started = Date.now()
-    const child = spawn('timeout', ['3', process.execPath, join(dir, 'cli.mjs'), dir, '--from', 'w', '--to', ''])
+    const child = spawn('timeout', ['3', process.execPath, cli, dir, '--from', 'w', '--to', ''])
     let output = ''
     child.stdout.on('data', chunk => { output += chunk })
     child.stderr.on('data', chunk => { output += chunk })
@@ -199,7 +197,7 @@ it('a product writer that omits timing still records first visible, admission an
   const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
   const pending: Promise<unknown>[] = []
   const routes = createChatTurnRoutes<Record<string, never>>({
-    projectId: 'timing-default', store, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    projectId: 'timing-default', store, turnStore: createMemoryTurnEventStore(), log: () => {},
     authorize: async () => ({ ok: true, tenantId: 'ws-1', userId: 'u-1', context: {} }),
     produce: () => ({
       model: 'served-model',
@@ -250,7 +248,7 @@ it.each([
   const routes = createChatTurnRoutes({
     projectId: 'failure-default',
     store: { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } },
-    turnStore: createMemoryTurnEventStore(), incrementalPersistence: false, log: () => {},
+    turnStore: createMemoryTurnEventStore(), log: () => {},
     authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }),
     produce: () => createSandboxChatProducer({ errorNotice: true, events: (async function* () {
       yield { type: 'error', data: { code, message } }
@@ -273,5 +271,76 @@ it.each([
       failure_code: failureCode === 'product.refused' ? failureCode
         : `${code}: ${message}`,
     })
+  } finally { sqlite.close() }
+})
+
+it('shared timing lifecycle records real route outcomes and current revision, excluding a gated turn', async () => {
+  const sqlite = new Database(':memory:')
+  sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) } })
+  const before = process.env.DEPLOY_SHA
+  process.env.DEPLOY_SHA = 'not-the-settled-revision'
+  const lifecycle = timing.lifecycle<{ mode: string }>({ rollout: 'defaults', identify: info => ({
+    workspaceId: 'workspace', lane: info.context.mode === 'failure' ? 'sandbox' : 'router', arm: 'control',
+  }) })
+  const pending: Promise<unknown>[] = []
+  const routes = createChatTurnRoutes<{ mode: string }>({
+    projectId: 'lifecycle-default',
+    store: { async listMessages() { return [] }, async appendMessage() { return { id: crypto.randomUUID() } } },
+    turnStore: createMemoryTurnEventStore(), log: () => {},
+    authorize: async args => ({ ok: true, tenantId: 'workspace', userId: 'user', context: { mode: String(args.body?.content) } }),
+    contextGate: args => args.context.mode === 'gated' ? { proceed: false, response: Response.json({ declined: true }) } : { proceed: true },
+    produce: args => createSandboxChatProducer({ events: (async function* () {
+      yield args.context.mode === 'failure'
+        ? { type: 'error', data: { code: 'MODEL_REFUSED', message: 'Outside the allowed models.' } }
+        : { type: 'message.part.updated', data: { part: { type: 'text', text: 'Done.' }, delta: 'Done.' } }
+    })(), model: 'served-model' }),
+    lifecycle,
+  })
+  try {
+    process.env.DEPLOY_SHA = 'settled-revision'
+    for (const mode of ['success', 'failure', 'gated']) {
+      const response = await routes.turn(new Request('https://app.test/api/chat', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ threadId: mode, content: mode }) }),
+      { waitUntil: promise => { pending.push(promise) } })
+      await response.text()
+      await Promise.all(pending)
+    }
+    const rows = sqlite.prepare('SELECT lane, failed, model, revision, arm, failure_code FROM rollout_turn_timing ORDER BY failed').all()
+    expect(rows).toEqual([
+      { lane: 'router', failed: 0, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: null },
+      { lane: 'sandbox', failed: 1, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: 'MODEL_REFUSED: Outside the allowed models.' },
+    ])
+  } finally {
+    if (before === undefined) delete process.env.DEPLOY_SHA
+    else process.env.DEPLOY_SHA = before
+    sqlite.close()
+  }
+})
+
+it('records native settlement facts without an ephemeral route trace, using the shared redacted typed failure', async () => {
+  const sqlite = new Database(':memory:')
+  sqlite.exec(ROLLOUT_TURN_TIMING_SCHEMA_SQL)
+  const timing = createD1TurnTimingStore({ db: { prepare: sql => ({ bind: (...values) => ({
+    run: async () => sqlite.prepare(sql).run(...values),
+    all: async <T>() => ({ results: sqlite.prepare(sql).all(...values) as T[] }),
+  }) }) } })
+  try {
+    const lifecycle = timing.lifecycle<{ model: string }>({ rollout: 'native',
+      identify: ({ context }) => ({ workspaceId: 'workspace', lane: 'sandbox', model: context.model }),
+      revision: () => 'native-settlement-revision',
+    })
+    await lifecycle.onTurnError?.({
+      identity: { tenantId: 'workspace', sessionId: 'thread', userId: 'user', turnIndex: 0 },
+      executionId: 'native-execution', turnStreamId: 'native-unrecorded', context: { model: 'native-served-model' },
+      error: { code: 'NATIVE_REFUSED', message: 'Refused request with Authorization: Bearer native-fixture-secret' }, durationMs: 42,
+    })
+    const row = sqlite.prepare('SELECT model, revision, failed, failure_code FROM rollout_turn_timing').get() as Record<string, unknown>
+    expect(row).toMatchObject({ model: 'native-served-model', revision: 'native-settlement-revision', failed: 1 })
+    expect(row.failure_code).toContain('NATIVE_REFUSED:')
+    expect(row.failure_code).not.toContain('native-fixture-secret')
   } finally { sqlite.close() }
 })

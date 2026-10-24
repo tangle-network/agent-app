@@ -13,6 +13,15 @@
 
 import type { AppDefaultsExemptions } from './app-defaults'
 
+export type SignoffPhase = 'all' | 'release' | 'suites'
+
+/** Declared scope, including dependency steps brought into a partial run. */
+export interface SignoffSelection {
+  readonly requested: readonly string[]
+  readonly prerequisites: readonly string[]
+  readonly excluded: readonly string[]
+}
+
 /** Which bytes get verified. */
 export type SignoffSource =
   /** Exactly the commit that would merge. Uncommitted work is NOT included. */
@@ -42,6 +51,8 @@ export interface SignoffShuffleSpec {
 
 /** One verification step — a CI step, declared by the repo. */
 export interface SignoffStepSpec {
+  /** Required on every step before selecting a partial phase. No name inference. */
+  readonly phase?: Exclude<SignoffPhase, 'all'>
   /** Unique within the config. Names the failure in the report. */
   readonly name: string
   /** Shell command, run from `cwd` inside the clean tree. */
@@ -123,6 +134,7 @@ export type SignoffConfigOrigin =
 export interface LoadedSignoffConfig {
   readonly config: SignoffConfig
   readonly origin: SignoffConfigOrigin
+  readonly selection?: SignoffSelection
 }
 
 /** One execution of a step's command. A shuffled step has several. */
@@ -202,6 +214,9 @@ export interface SignoffHostFacts {
 }
 
 export interface SignoffReport {
+  /** Absent on historical reports, which always ran the full gate. */
+  readonly phase?: SignoffPhase
+  readonly selection?: SignoffSelection
   readonly ok: boolean
   readonly startedAt: string
   readonly repo: SignoffRepoFacts

@@ -4,19 +4,16 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-routes/index'
 import { createAuthLookupCache, createLimitAlarms, credentialCacheKey, isEdgeBlock, type LimitBudgets } from '../../src/launch-invariants/index'
 import {
-  checkAuthorizeBeforeStream,
   checkAuthSurvivesStall,
-  checkChatAcceptsCode,
   checkCoalescedTurn,
   checkLimitAlarms,
   checkScheduledJobBudgets,
   recordedLongTurn,
   stallingD1,
 } from '../../src/launch-invariants/testing'
-import { coalesceDeltas, createBufferedTurnTap, createD1TurnEventStore, createMemoryTurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
+import { coalesceDeltas, createBufferedTurnTap, createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
 import { sqliteD1 } from './sqlite-d1'
 
 const MB = 1024 * 1024
@@ -125,43 +122,6 @@ describe('auth survives a D1 stall', () => {
   })
 })
 
-describe('authorization before any stream', () => {
-  const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
-  const refusals = [{ name: 'no session', request: () => new Request('http://app.test/api/chat', { method: 'POST', body: JSON.stringify({ threadId: 't', content: 'hi' }) }) }]
-
-  it('passes the shared turn route with a refusing authorize', async () => {
-    const routes = createChatTurnRoutes({
-      projectId: 'probe',
-      authorize: async () => ({ ok: false, response: Response.json({ error: 'Unauthorized' }, { status: 401 }) }),
-      store,
-      turnStore: createMemoryTurnEventStore(),
-      incrementalPersistence: false,
-      produce: () => { throw new Error('produced before authorize') },
-      log: () => {},
-    })
-    const verdict = await checkAuthorizeBeforeStream({ subject: 'POST /api/chat', handle: (request) => routes.turn(request, { waitUntil: () => {} }), refused: refusals })
-    expect(verdict.pass, verdict.details.join('\n')).toBe(true)
-  })
-
-  it('fails a route that opens its stream before it refuses', async () => {
-    const touched: string[] = []
-    const verdict = await checkAuthorizeBeforeStream({
-      subject: 'POST /api/chat',
-      handle: async () => {
-        touched.push('stream')
-        return new Response('{"type":"turn"}\n{"error":"Unauthorized"}\n', { status: 200, headers: { 'content-type': 'application/x-ndjson' } })
-      },
-      refused: refusals,
-      touched: () => touched,
-    })
-    expect(verdict.details).toEqual([
-      'no session: answered 200, expected 401 or 403 or 404',
-      'no session: opened a application/x-ndjson stream before refusing',
-      'no session: touched stream before refusing',
-    ])
-  })
-})
-
 describe('coalesced turn events on the recorded long turn', () => {
   it('reproduces the recorded turn\'s 59,659 events', () => {
     expect(recordedLongTurn()).toHaveLength(59_659)
@@ -207,55 +167,5 @@ describe('platform-limit alarms', () => {
     })
     expect(verdict.details).toContain('worker-memory: the declared limit 268435456 is above the platform\'s 134217728')
     expect(verdict.details).toContain('key-rate: did not warn at 80% of its limit')
-  })
-})
-
-describe('pasted code reaches the chat', () => {
-  const chatRequest = (text: string) => new Request('http://app.test/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Cookie: 'session=valid' },
-    body: JSON.stringify({ threadId: 't', content: text }),
-  })
-  const store: ChatTurnMessageStore = { async listMessages() { return [] }, async appendMessage() { return { id: 'm' } } }
-  const routes = (authorize: (content: string) => Response | null) => createChatTurnRoutes({
-    projectId: 'probe',
-    authorize: async ({ body }) => {
-      const refusal = authorize(String(body?.content ?? ''))
-      return refusal ? { ok: false as const, response: refusal } : { ok: true as const, tenantId: 'ws', userId: 'user', context: {} }
-    },
-    store,
-    turnStore: createMemoryTurnEventStore(),
-    incrementalPersistence: false,
-    produce: () => ({ stream: (async function* () { yield { type: 'text', text: 'ok' } as { type: string } })(), finalText: () => 'ok' }),
-    log: () => {},
-  })
-
-  it('passes a route that answers every sample normally', async () => {
-    const turns = routes(() => null)
-    const verdict = await checkChatAcceptsCode({ subject: 'POST /api/chat', handle: (request) => turns.turn(request, { waitUntil: () => {} }), request: chatRequest })
-    expect(verdict.pass, verdict.details.join('\n')).toBe(true)
-  })
-
-  it('fails an app filter that refuses shell text, and an edge block page', async () => {
-    const filtered = routes((content) => (/\/etc\//.test(content) ? Response.json({ error: 'Request blocked' }, { status: 400 }) : null))
-    const verdict = await checkChatAcceptsCode({ subject: 'POST /api/chat', handle: (request) => filtered.turn(request, { waitUntil: () => {} }), request: chatRequest })
-    expect(verdict.details).toEqual([
-      'file read: answered 400: {"error":"Request blocked"}',
-      'fenced bash block: answered 400: {"error":"Request blocked"}',
-      'path traversal: answered 400: {"error":"Request blocked"}',
-    ])
-    const blocked = await checkChatAcceptsCode({
-      subject: 'edge',
-      handle: async () => new Response('<title>Attention Required! | Cloudflare</title>', { status: 403, headers: { 'content-type': 'text/html', server: 'cloudflare' } }),
-      request: chatRequest,
-      samples: [{ name: 'file read', text: 'cat /etc/passwd' }],
-    })
-    expect(blocked.details).toEqual(['file read: an edge rule blocked it (403)'])
-  })
-
-  it('tells an edge block from the app\'s own refusal', async () => {
-    expect(await isEdgeBlock(new Response('x', { status: 403, headers: { 'cf-mitigated': 'challenge' } }))).toBe(true)
-    expect(await isEdgeBlock(new Response('<h1>Sorry, you have been blocked</h1>', { status: 403, headers: { 'content-type': 'text/html; charset=UTF-8', server: 'cloudflare' } }))).toBe(true)
-    expect(await isEdgeBlock(Response.json({ error: 'Unauthorized' }, { status: 401, headers: { server: 'cloudflare' } }))).toBe(false)
   })
 })

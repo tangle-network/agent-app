@@ -18,16 +18,14 @@
 
 import { config } from '../agent.config'
 import {
-  createHybridTurnProducer,
   createSandboxChatProducer,
   normalizeChatPromptForSandbox,
-  routerTurnHistory,
   startHybridBox,
   turnCarriesFiles,
-  turnPromptText,
   type ChatTurnAfterAuthorizeArgs,
   type ChatTurnProduceArgs,
   type ChatTurnRouteProducer,
+  type ChatTurnHybridConfiguration,
   type SandboxUploadSink,
 } from '@tangle-network/agent-app/chat-routes'
 import type { SidecarInteractionsConnection } from '@tangle-network/agent-app/interactions'
@@ -207,50 +205,61 @@ export function createHybridLane(env: AppEnv) {
       // A turn that ends before `produce` leaves the box to idle out.
       return () => { started.delete(threadId) }
     },
-    async produce(args: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> {
-      const { body, identity, prompt, priorMessages, trace } = args
-      const box = started.get(identity.sessionId)
-      started.delete(identity.sessionId)
-      const apiKey = env.TANGLE_API_KEY?.trim()
-      if (!apiKey || turnCarriesFiles(prompt)) return sandboxProduce(args)
-      const model = body.model ?? env.MODEL_NAME ?? config.model.default
-      const baseUrl = routerBaseUrl(env)
-      const scope = { workspaceId: identity.tenantId, userId: identity.userId }
-      return createHybridTurnProducer({
-        apiKey,
-        model,
-        ...(baseUrl ? { baseUrl } : {}),
-        systemPrompt: config.systemPrompt,
-        userMessage: turnPromptText(prompt),
-        history: routerTurnHistory(priorMessages),
-        ...(trace ? { trace } : {}),
-        box: {
-          acquire: () => acquire(scope, trace),
-          ...(box ? { started: box } : {}),
-          // The box agent keeps its own session per thread, so a sandbox-lane turn on the same thread never collides with it.
-          runTask: sandboxPromptRunner(shell, { model, harness: config.harness, sessionId: `sandbox-run-${identity.sessionId}` }),
-        },
-      })
+    produce: {
+      when: ({ prompt }: ChatTurnProduceArgs<void>) => Boolean(env.TANGLE_API_KEY?.trim()) && !turnCarriesFiles(prompt),
+      router(args: ChatTurnProduceArgs<void>): ChatTurnHybridConfiguration {
+        const { body, identity, trace } = args
+        const box = started.get(identity.sessionId)
+        started.delete(identity.sessionId)
+        const apiKey = env.TANGLE_API_KEY?.trim()
+        if (!apiKey) throw new Error('Router credentials are not configured')
+        const model = body.model ?? env.MODEL_NAME ?? config.model.default
+        const baseUrl = routerBaseUrl(env)
+        const scope = { workspaceId: identity.tenantId, userId: identity.userId }
+        return {
+          apiKey,
+          model,
+          ...(baseUrl ? { baseUrl } : {}),
+          systemPrompt: { profile: { prompt: { systemPrompt: config.systemPrompt } } },
+          box: {
+            acquire: () => acquire(scope, trace),
+            ...(box ? { started: box } : {}),
+            // The box agent keeps its own session per thread, so a sandbox-lane turn on the same thread never collides with it.
+            runTask: sandboxPromptRunner(shell, { model, harness: config.harness, sessionId: `sandbox-run-${identity.sessionId}` }),
+          },
+        }
+      },
+      sandbox(args: ChatTurnProduceArgs<void>) {
+        started.delete(args.identity.sessionId)
+        return sandboxProduce(args)
+      },
     },
   }
 }
 
 /**
  * Warm the open workspace's box (`POST /api/chat/prewarm`): the shared route
- * behind `AgentWorkspaceLayout`'s `prewarm`. The default lane answers on the
- * Router and starts the box only when a turn needs it, so with a Router key a
- * warm on open is declined and the speculator starts the box instead.
+ * behind `AgentWorkspaceLayout`'s `prewarm`. Every configured lane wakes its
+ * workspace lock. The Router lane leaves the box to its existing speculator;
+ * it warms only the lock on open/focus, with no paid provisioning.
  */
 export function createPrewarmRoute(env: AppEnv, requireUserId: (request: Request) => Promise<string | null>) {
   return createWorkspacePrewarmRoute<void>({
+    ...(env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET ? { turnStore: {
+      db: env.DB, region: env.D1_REGION,
+      lock: { namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET } },
+    } } : {}),
     authorize: async ({ request }) => {
       const userId = await requireUserId(request)
       if (!userId) return { status: 'denied', response: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
-      if (env.TANGLE_API_KEY?.trim()) return { status: 'declined', reason: 'router_lane' }
-      if (!env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) return { status: 'declined', reason: 'no_sandbox' }
+      if (!env.TURN_STREAM || !env.TURN_STREAM_AUTH_SECRET) return { status: 'declined', reason: 'lock_not_configured' }
+      if (env.TANGLE_API_KEY?.trim() || !env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) {
+        return { status: 'allowed', workspaceId: userId, steps: [] }
+      }
       const scope = { workspaceId: userId, userId }
       return {
         status: 'allowed',
+        workspaceId: scope.workspaceId,
         key: scope.workspaceId,
         warm: async () => {
           const prewarmer = createSandboxPrewarmer(createSandboxShell(env), {

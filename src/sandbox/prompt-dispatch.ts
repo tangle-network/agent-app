@@ -52,6 +52,7 @@ async function* resendRefusedDispatch(
   let firstSeenAt: number | undefined
   for (let attempts = 1; ; attempts += 1) {
     try {
+      signal?.throwIfAborted()
       for await (const event of dispatch()) {
         delivered = true
         yield event
@@ -83,7 +84,9 @@ export async function* streamSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
+  options?.signal?.throwIfAborted()
   const backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
+  options?.signal?.throwIfAborted()
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options?.history)

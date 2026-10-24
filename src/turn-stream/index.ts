@@ -14,3 +14,5 @@ export * from './core'
 export * from './do'
 export * from './adapters'
 export * from './memory'
+
+export * from './cancellation'

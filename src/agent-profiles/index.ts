@@ -123,7 +123,7 @@ export interface ProfileRevisionStore {
 }
 
 export class ProfileConflictError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly code?: 'profile_changed') {
     super(message)
     this.name = 'ProfileConflictError'
   }
@@ -486,6 +486,8 @@ export async function admitProfileTurn(input: {
   key: ProfileBindingKey
   messageId: string
   content: string
+  /** The revision whose prompt this request already dispatched; a different pin is refused before use or write. */
+  expectedRevisionId?: string
   /** Effective ADC plan digest selected by the executor for this revision and turn. */
   observedManagedPlanDigest: string
   /** Required if trusted per-turn attachments change the public profile plan. */
@@ -508,8 +510,13 @@ export async function admitProfileTurn(input: {
       read.key.channel !== input.key.channel)) {
     throw new ProfileAccessError('The admission read does not belong to this message')
   }
+  const assertExpectedRevision = (revisionId: string) => {
+    if (input.expectedRevisionId !== undefined && input.expectedRevisionId !== revisionId) {
+      throw new ProfileConflictError('The agent profile changed while this turn started. Send the message again.', 'profile_changed')
+    }
+  }
   const prior = read ? read.prior : await input.store.getTurnPin(input.key, input.messageId, inputHash)
-  if (prior) return prior
+  if (prior) { assertExpectedRevision(prior.revisionId); return prior }
   const binding = read ? read.binding : await input.store.getBinding(input.key)
   if (!binding) throw new ProfileAccessError('Choose a profile before sending a message')
   // The active pointer can move without the binding version changing, so it is always read live.
@@ -517,6 +524,7 @@ export async function admitProfileTurn(input: {
     ? read?.pinnedRevision ?? await input.store.getRevision(input.key.workspaceId, binding.profileId, binding.pinnedRevisionId)
     : await input.store.getActiveRevision(input.key.workspaceId, binding.profileId)
   if (!revision) throw new ProfileConflictError('The bound profile revision is unavailable')
+  assertExpectedRevision(revision.id)
   if (revision.authorityDigest !== binding.authorityDigest ||
       !/^sha256:[a-f0-9]{64}$/.test(input.observedManagedPlanDigest)) {
     throw new ProfileAccessError('The selected managed plan is not active for this turn')

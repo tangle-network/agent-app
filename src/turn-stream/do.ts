@@ -9,6 +9,7 @@
  * Product storage keys must avoid TURN_STREAM_STORAGE_KEYS.
  */
 
+import { DurableTurnCancellation, readTurnCancellationIdentity, type TurnCancellationIdentity, type TurnCancellationSocketMeta } from './cancellation-do'
 import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
 
 import {
@@ -30,6 +31,7 @@ import {
   type TurnLockAcquireResult,
   type TurnLockScope,
   type TurnStreamEvent,
+  type TurnStreamTokenClaims,
 } from './core'
 
 // ── structural Cloudflare surface ───────────────────────────────────────────
@@ -65,15 +67,7 @@ export interface TurnStreamDOState {
   id?: { name?: string | null }
 }
 
-interface SocketMeta {
-  sessionId: string
-  scope: 'thread' | 'workspace'
-  /** Live fan-out is withheld until the client has run its initial `sync`
-   *  (see {@link TurnStreamDO.webSocketMessage}). This makes replay and live
-   *  delivery mutually exclusive per socket, so frames can neither interleave
-   *  out of order nor drop in the connect race. */
-  synced: boolean
-}
+type SocketMeta = TurnCancellationSocketMeta
 
 // ── request/response plumbing ───────────────────────────────────────────────
 
@@ -140,6 +134,7 @@ export class TurnStreamDO {
   protected readonly state: TurnStreamDOState
   protected readonly env: unknown
   protected readonly options: TurnStreamDOOptions
+  private readonly cancellation: DurableTurnCancellation
 
   // Workspace channel: recent thread.created markers (in-memory, best-effort)
   // + durable responding set (threadId → startedAt) that survives eviction.
@@ -150,6 +145,9 @@ export class TurnStreamDO {
     this.state = state
     this.env = env
     this.options = options
+    this.cancellation = new DurableTurnCancellation(state,
+      input => this.loadActiveLock(Date.now(), turnLockStorageKey(input.scope, input.threadId)),
+      lock => this.state.storage.put(turnLockStorageKey(lock.scope, lock.threadId), lock))
   }
 
   /** The token-verification secret: explicit option first, then the
@@ -187,8 +185,35 @@ export class TurnStreamDO {
       )
     }
     const token = request.headers.get(TURN_STREAM_TOKEN_HEADER) ?? ''
-    if (await verifyTurnStreamToken(name, token, secret)) return null
+    let claims: TurnStreamTokenClaims | undefined
+    if (token.startsWith('v2.')) {
+      const url = new URL(request.url)
+      if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket' && url.searchParams.get('cancellation') === '1') {
+        const identity = readTurnCancellationIdentity(Object.fromEntries(url.searchParams))
+        if (identity) claims = { purpose: 'turn-control', identity }
+      } else if (request.method === 'POST' && url.pathname === TURN_STREAM_PATHS.lockReleaseInterrupted) {
+        const body = await jsonBody(request.clone())
+        if (body?.cancel === true) {
+          const identity = readTurnCancellationIdentity(body)
+          if (identity) claims = { purpose: 'turn-cancel', identity }
+        } else if (body?.recovery && typeof body.recovery === 'object') {
+          const identity = readTurnCancellationIdentity(body.recovery as Record<string, unknown>)
+          if (identity) claims = { purpose: 'turn-recovery', identity }
+        }
+      }
+      // A purpose-bound capability never becomes a legacy channel capability,
+      // including on subclass routes or an ordinary viewer upgrade.
+      if (!claims) return Response.json({ error: 'turn-stream capability does not authorize this operation' }, { status: 401 })
+    }
+    if (await verifyTurnStreamToken(name, token, secret, undefined, claims)) return null
     return Response.json({ error: 'invalid or missing turn-stream capability token' }, { status: 401 })
+  }
+
+  private async authorizeControl(request: Request, purpose: TurnStreamTokenClaims['purpose'], identity: TurnCancellationIdentity): Promise<boolean> {
+    const name = this.state.id?.name
+    const secret = this.resolveAuthSecret()
+    if (typeof name !== 'string' || !secret) return false
+    return verifyTurnStreamToken(name, request.headers.get(TURN_STREAM_TOKEN_HEADER) ?? '', secret, undefined, { purpose, identity })
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -261,6 +286,7 @@ export class TurnStreamDO {
       const active = await this.loadActiveLock(Date.now(), key)
       if (!active?.releasePending || active.executionId !== executionId) continue
       await this.state.storage.delete(key)
+      this.cancellation.released(active)
       return true
     }
     return false
@@ -275,7 +301,12 @@ export class TurnStreamDO {
 
   // ── WebSocket channel ─────────────────────────────────────────────────────
 
-  private handleWebSocketUpgrade(_request: Request, url: URL): Response {
+  private async handleWebSocketUpgrade(request: Request, url: URL): Promise<Response> {
+    const control = url.searchParams.get('cancellation') === '1'
+      ? readTurnCancellationIdentity(Object.fromEntries(url.searchParams)) : null
+    if (url.searchParams.has('cancellation') && !control) return jsonResponse({ error: 'Missing exact cancellation identity' }, 400)
+    if (control && !await this.authorizeControl(request, 'turn-control', control)) return jsonResponse({ error: 'Invalid owner control capability' }, 401)
+    if (control && !await this.cancellation.owns(control)) return jsonResponse({ error: 'Turn ownership changed' }, 409)
     const sessionId = url.searchParams.get('sessionId')
     if (!sessionId) return new Response('Missing sessionId', { status: 400 })
     const scope = url.searchParams.get('scope') === 'workspace' ? 'workspace' : 'thread'
@@ -293,7 +324,7 @@ export class TurnStreamDO {
     // (frames can drop). The client issues a `sync` once open; replay happens
     // there.
     this.state.acceptWebSocket(server)
-    server.serializeAttachment({ sessionId, scope, synced: false } satisfies SocketMeta)
+    server.serializeAttachment({ sessionId, scope, synced: false, ...(control ? { cancellation: control } : {}) } satisfies SocketMeta)
 
     return new Response(null, { status: 101, webSocket: client } as ResponseInit)
   }
@@ -316,6 +347,7 @@ export class TurnStreamDO {
       return
     }
 
+    if (meta.cancellation) { await this.cancellation.sync(ws, meta); return }
     {
       // Replay the current responding state and recent thread-created markers.
       const active = await this.loadActiveThreads()
@@ -418,19 +450,40 @@ export class TurnStreamDO {
 
   // ── chat-turn lock ────────────────────────────────────────────────────────
 
-  /** The live lock under `key` (default: the workspace-scope lock); an
-   *  expired one is deleted and reads as none. */
+  /** The live lock under `key`. Cancellation never extends TTL; an actual
+   *  product child/persistence obligation still vetoes expiry deletion. */
   protected async loadActiveLock(now = Date.now(), key: string = TURN_STREAM_STORAGE_KEYS.lock): Promise<DurableTurnLock | null> {
     const stored = await this.state.storage.get<DurableTurnLock>(key)
     const lock = activeTurnLock(stored, now)
-    if (stored && !lock) await this.state.storage.delete(key)
+    if (stored && !lock) {
+      // Read errors propagate without deleting ownership. The product reads
+      // its own durable registered obligations, never inferred child absence.
+      const deferred = await this.shouldDeferLockRelease(stored.executionId)
+      const current = await this.state.storage.get<DurableTurnLock>(key)
+      if (!current) return null
+      const live = activeTurnLock(current, Date.now())
+      if (live) return live
+      const sameGeneration = current.workspaceId === stored.workspaceId && current.threadId === stored.threadId
+        && current.scope === stored.scope && current.executionId === stored.executionId && current.lockId === stored.lockId
+        && current.startedAt === stored.startedAt && current.expiresAt === stored.expiresAt
+        && current.cancellation?.turnStreamId === stored.cancellation?.turnStreamId
+      if (deferred || !sameGeneration) {
+        // A changed generation is unknown on this observation; the next normal
+        // read evaluates that owner instead of deleting it with stale evidence.
+        return current.scope ? current : { ...current, scope: 'thread' }
+      }
+      await this.state.storage.delete(key)
+      this.cancellation.expired(current)
+    }
     return lock
   }
 
-  private async releaseActiveLock(key: string, input: { executionId: string; lockId?: string }): Promise<boolean> {
+  private async releaseActiveLock(key: string, input: { executionId: string; lockId?: string }, recovery?: TurnCancellationIdentity): Promise<boolean> {
     const active = await this.loadActiveLock(Date.now(), key)
     if (!active || !turnLockMatchesRelease(active, input)) return false
+    if (recovery && !this.cancellation.permitsRecovery(active, recovery)) return false
     await this.state.storage.delete(key)
+    this.cancellation.released(active)
     return true
   }
 
@@ -449,7 +502,7 @@ export class TurnStreamDO {
   private async pruneExpiredThreadLocks(now: number): Promise<void> {
     const threadLocks = await this.state.storage.list<DurableTurnLock>({ prefix: TURN_STREAM_STORAGE_KEYS.threadLockPrefix })
     for (const [key, stored] of threadLocks) {
-      if (!activeTurnLock(stored, now)) await this.state.storage.delete(key)
+      if (!activeTurnLock(stored, now)) await this.loadActiveLock(now, key)
     }
   }
 
@@ -462,6 +515,9 @@ export class TurnStreamDO {
     const scope: TurnLockScope | null =
       body?.scope === 'workspace' ? 'workspace' : body?.scope === 'thread' ? 'thread' : null
     const turnId = stringValue(body?.turnId) ?? undefined
+    const cancellation = body?.cancellation && typeof body.cancellation === 'object'
+      ? stringValue((body.cancellation as Record<string, unknown>).turnStreamId) : null
+    if (body?.cancellation !== undefined && !cancellation) return jsonResponse({ error: 'Missing cancellation turnStreamId' }, 400)
     if (!workspaceId || !threadId || !executionId || !lockId || !scope) {
       return jsonResponse({ error: 'Missing workspaceId, threadId, executionId, lockId, or scope' }, 400)
     }
@@ -472,11 +528,18 @@ export class TurnStreamDO {
     if (active) {
       return jsonResponse({ acquired: false, active } satisfies TurnLockAcquireResult, 409)
     }
-    if (scope === 'thread') await this.pruneExpiredThreadLocks(now)
+    if (scope === 'thread') {
+      await this.pruneExpiredThreadLocks(now)
+      // Product deferral reads can yield to another acquire while pruning an
+      // unrelated expired thread. Recheck the target before claiming it.
+      const current = await this.loadActiveLock(Date.now(), key)
+      if (current) return jsonResponse({ acquired: false, active: current } satisfies TurnLockAcquireResult, 409)
+    }
 
     const lock = createTurnLock(
-      { workspaceId, threadId, scope, executionId, lockId, ...(turnId ? { turnId } : {}) },
-      now,
+      { workspaceId, threadId, scope, executionId, lockId, ...(turnId ? { turnId } : {}),
+        ...(cancellation ? { cancellation: { turnStreamId: cancellation } } : {}) },
+      Date.now(),
       this.options.lockTtlMs ?? TURN_LOCK_TTL_MS,
     )
     await this.state.storage.put(key, lock)
@@ -502,6 +565,12 @@ export class TurnStreamDO {
 
   private async handleLockReleaseInterrupted(request: Request): Promise<Response> {
     const body = await jsonBody(request)
+    if (body?.cancel === true) {
+      const identity = readTurnCancellationIdentity(body)
+      if (!identity) return jsonResponse({ error: 'Missing exact cancellation identity' }, 400)
+      if (!await this.authorizeControl(request, 'turn-cancel', identity)) return jsonResponse({ error: 'Invalid cancellation capability' }, 401)
+      return jsonResponse(await this.cancellation.request(identity))
+    }
     const threadId = stringValue(body?.threadId)
     const interruptedAt =
       typeof body?.interruptedAt === 'number' && Number.isFinite(body.interruptedAt) ? body.interruptedAt : undefined
@@ -513,6 +582,16 @@ export class TurnStreamDO {
 
     const active = await this.loadActiveLock(Date.now(), key)
     if (!active) return jsonResponse({ released: false })
+    const recovery = body?.recovery && typeof body.recovery === 'object'
+      ? readTurnCancellationIdentity(body.recovery as Record<string, unknown>) : null
+    if (body?.recovery !== undefined && (!recovery || !await this.authorizeControl(request, 'turn-recovery', recovery))) {
+      return jsonResponse({ error: 'Invalid owner recovery capability' }, 401)
+    }
+    // Legacy native probes do not attest to a Router owner. Recovery additionally
+    // needs exact positive owner evidence and must not race an owner connection.
+    if (active.cancellation) {
+      if (!recovery || !this.cancellation.permitsRecovery(active, recovery)) return jsonResponse({ released: false })
+    }
     // A deferred product task holds the scope even against an out-of-band
     // release — the box is still being read.
     if (await this.shouldDeferLockRelease(active.executionId)) {
@@ -521,8 +600,9 @@ export class TurnStreamDO {
     if (!interruptedReleaseApplies(active, { threadId, interruptedAt, ...(turnId ? { turnId } : {}) })) {
       return jsonResponse({ released: false })
     }
-    await this.state.storage.delete(key)
-    return jsonResponse({ released: true })
+    // Recheck this generation after a product deferral read; a successor never
+    // inherits the old owner's recovery authority.
+    return jsonResponse({ released: await this.releaseActiveLock(key, { executionId: active.executionId, lockId: active.lockId }, recovery ?? undefined) })
   }
 
   // ── durable turn-event storage (TurnEventStore backing) ───────────────────

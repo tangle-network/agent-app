@@ -4,14 +4,14 @@
 
 Source: `src/rollout/d1.ts`
 
-8 exports.
+10 exports.
 
 ### `createD1TurnTimingStore`
 
 `function`
 
 ```ts
-(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; }) => { record…
+(options: { db: D1LikeForRollout; now?: (() => number) | undefined; measuredFacts?: boolean | undefined; readObservedFa…
 ```
 
 ### `D1LikeForRollout`
@@ -28,6 +28,22 @@ interface D1LikeForRollout
 
 ```ts
 "ALTER TABLE rollout_turn_timing ADD COLUMN first_visible_ms INTEGER;"
+```
+
+### `ROLLOUT_TURN_TIMING_REQUEST_ORIGIN_MIGRATION_SQL`
+
+`const` — Additive upgrade for a table created before durable native timing transfer.
+
+```ts
+"ALTER TABLE rollout_turn_timing ADD COLUMN request_received_at INTEGER;"
+```
+
+### `ROLLOUT_TURN_TIMING_REQUEST_WINDOW_INDEX_MIGRATION_SQL`
+
+`const` — Apply through the product migration runner after request_received_at exists.
+
+```ts
+"\nCREATE INDEX IF NOT EXISTS rollout_turn_timing_by_request_origin ON rollout_turn_timing (rollout, request_received_a…
 ```
 
 ### `ROLLOUT_TURN_TIMING_RULER_MIGRATION_SQL`

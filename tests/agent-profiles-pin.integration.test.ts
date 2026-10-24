@@ -76,4 +76,31 @@ describe('profile turn pin', () => {
     await expect(store.pinTurn({ ...pin, inputHash: `sha256:${'b'.repeat(64)}` }, binding!.version, { priorChecked: true }))
       .rejects.toBeInstanceOf(ProfileConflictError)
   })
+
+  it.each([{ prior: false, cached: false }, { prior: false, cached: true }, { prior: true, cached: false },
+    { prior: true, cached: true }])('refuses a dispatched revision mismatch before using or writing a pin ($prior, cached $cached)', async ({ prior, cached }) => {
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const { database } = d1(sqlite)
+    const store = createD1ProfileRevisionStore(database)
+    const key = { workspaceId: 'workspace', memberId: 'member', channel: 'chat' }
+    try {
+      const revision = await proposeRevision({ store, workspaceId: key.workspaceId, profileId: 'director', expectedRevisionId: null,
+        profile: { name: 'Director', prompt: { systemPrompt: 'The revision whose bytes are dispatched.' } }, knowledgeText: '', planDigest: PLAN,
+        author: { kind: 'person', id: 'owner' }, actorRole: 'owner', reason: 'Initial profile' })
+      await switchProfile({ store, key, messageId: 'switch', content: 'switch profile', choice: { profileId: 'director' },
+        profiles: [{ id: 'director', name: 'Director', status: 'active' }], canSelect: async () => true,
+        prepareAuthority: async () => ({ planDigest: PLAN, healthy: true, conflicts: [] }) })
+      const input = { store, key, messageId: 'message', content: 'Answer using the dispatched revision.', observedManagedPlanDigest: PLAN }
+      if (prior) await admitProfileTurn(input)
+      const read = cached ? await readProfileAdmission(store, key, input.messageId, input.content) : undefined
+      await expect(admitProfileTurn({ ...input, read, expectedRevisionId: 'another-dispatched-revision' }))
+        .rejects.toMatchObject({ name: 'ProfileConflictError', code: 'profile_changed' })
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM agent_profile_turn_pin').get()?.n).toBe(prior ? 1 : 0)
+      const admitted = await admitProfileTurn({ ...input, expectedRevisionId: revision.id })
+      expect(admitted.revisionId).toBe(revision.id)
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM agent_profile_turn_pin').get()?.n).toBe(1)
+    } finally { sqlite.close() }
+  })
+
 })

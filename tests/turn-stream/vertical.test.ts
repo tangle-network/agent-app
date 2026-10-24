@@ -97,7 +97,6 @@ describe('turn-stream × createChatTurnRoutes', () => {
           ],
           'hello world',
         ),
-      replay: { pollMs: 5, timeoutMs: 2000 },
     })
 
     const response = await routes.turn(turnRequest({ threadId: THREAD, content: 'hi' }), {

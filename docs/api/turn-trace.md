@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-26 exports.
+28 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -140,6 +140,22 @@ interface TracedModelFetchOptions
 
 ```ts
 readonly TurnSpanKind[]
+```
+
+### `TurnPhaseTiming`
+
+`interface` — Domain-named phases and concurrent work over the turn's existing clock and D1 counter.
+
+```ts
+interface TurnPhaseTiming
+```
+
+### `TurnPhaseTimingOptions`
+
+`interface`
+
+```ts
+interface TurnPhaseTimingOptions
 ```
 
 ### `TurnSpan`

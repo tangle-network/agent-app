@@ -73,7 +73,7 @@ The default is `working-tree`, and that default **cannot** catch a forgotten `gi
 **A sign-off that authorizes a merge must be `--source head`.** That is the mode whose proof binds to a commit hash somebody else can check out.
 
 **3. Platform differences — CANNOT.**
-The signing host is Linux x86_64, glibc 2.39, ext4, 32 cores, 121 GB. This repo's CI is GitHub-hosted `ubuntu-latest`, whose core count and memory do not appear in the job log, so the hardware gap is known to exist and is not quantified here.
+The signing host is Linux x86_64, glibc 2.39, ext4, 32 cores, 121 GB. CI uses the organization’s self-hosted `ci-public` pool. The signing-host measurements above predate that migration and do not establish the current runner hardware.
 Node major is now pinned and enforced, which removes the one platform variable that had already cost a day. Architecture, libc, filesystem semantics, core count and memory are not pinned and cannot be from inside one machine.
 A per-test timeout that encodes machine speed is the live example of this class: a fleet repo has already lost a CI run to a 20 s budget the same test clears with a 3.3x margin locally, and constraining CPU makes the margin *wider*, not narrower, because the cost is concurrent cold imports. A slow-runner timeout is not reproducible on a fast box, full stop.
 The honest mitigation is not a gate feature: raise or remove per-test timeouts that encode machine speed.

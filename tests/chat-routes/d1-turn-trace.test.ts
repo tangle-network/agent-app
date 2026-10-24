@@ -43,7 +43,7 @@ it('isolates concurrent route counters through detached drains and exports the e
   const pending: Promise<unknown>[] = []
   const observed: Record<string, number> = {}
   const routes = createChatTurnRoutes({
-    projectId: 'd1-app', store, turnStore: createMemoryTurnEventStore(), incrementalPersistence: false,
+    projectId: 'd1-app', store, turnStore: createMemoryTurnEventStore(),
     authorize: async () => {
       await binding.prepare('SELECT 1').first()
       return { ok: true as const, tenantId: 'workspace', userId: 'user', context: {} }
@@ -82,4 +82,96 @@ it('isolates concurrent route counters through detached drains and exports the e
     expect(currentD1QueryCounter()).toBeUndefined()
     expect(engine.prepare('SELECT COUNT(*) AS n FROM messages').get()?.n).toBe(4)
   } finally { engine.close() }
+})
+
+it('records domain phases over actual SQL and concurrent HTTP work on the composed turn trace', async () => {
+  const { createServer } = await import('node:http')
+  const engine = new DatabaseSync(':memory:')
+  engine.exec('CREATE TABLE messages(id INTEGER PRIMARY KEY, thread TEXT, role TEXT, content TEXT)')
+  const binding = withD1LimitAlarms({
+    prepare: (sql: string) => new SqliteStatement(engine, sql),
+    batch: async (statements: SqliteStatement[]) => Promise.all(statements.map(statement => statement.all())),
+  }, createProductLimitAlarms({ product: 'phase-integration' }))
+  const store: ChatTurnMessageStore = {
+    async listMessages(thread) {
+      return (await binding.prepare('SELECT id,role,content FROM messages WHERE thread=?').bind(thread).all()).results as never
+    },
+    async appendMessage(input) {
+      const result = await binding.prepare('INSERT INTO messages(thread,role,content) VALUES (?,?,?)')
+        .bind(input.threadId, input.role, input.content).run()
+      return { id: String(result.meta.lastInsertRowid) }
+    },
+  }
+  const server = createServer((request, response) => {
+    request.resume()
+    request.on('end', () => response.end('Read from the real HTTP boundary.'))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('HTTP listener unavailable')
+  let snapshot: TurnTraceSnapshot | undefined
+  let originalRoot: string | undefined
+  const phaseRows: Record<string, number>[] = []
+  const queryRows: Record<string, number>[] = []
+  const concurrentRows: Record<string, number>[] = []
+  const pending: Promise<unknown>[] = []
+  const routes = createChatTurnRoutes({
+    projectId: 'phase-integration', store, turnStore: createMemoryTurnEventStore(),
+    authorize: async ({ trace, span }) => {
+      originalRoot = trace!.root.id
+      const phases = trace!.timing({ prefix: 'product', kinds: { parallel_sql: 'other', parallel_http: 'network' } })
+      phases.within(span)
+      await binding.prepare('SELECT 1').first()
+      phases.mark('identity')
+      await Promise.all([
+        phases.track('parallel_sql', binding.prepare('SELECT 2').first()),
+        phases.track('parallel_http', fetch(`http://127.0.0.1:${address.port}/read`).then(response => response.text())),
+      ])
+      phases.mark('authorized')
+      return { ok: true as const, tenantId: 'workspace', userId: 'member', context: phases }
+    },
+    produce: ({ context, trace }) => ({
+      stream: (async function* () {
+        const parent = trace!.start('product.producer', 'sandbox')
+        context.within(parent)
+        await binding.prepare('SELECT 3').first()
+        context.mark('ready')
+        parent.end()
+        phaseRows.push(context.phases())
+        queryRows.push(context.queries())
+        concurrentRows.push(context.concurrent())
+        yield { type: 'text' as const, text: 'Counted phases.' }
+      })(),
+      finalText: () => 'Counted phases.',
+    }),
+    turnTrace: { sink: value => { snapshot = value } },
+    log: () => {},
+  })
+  try {
+    const response = await routes.turn(new Request('http://app.test/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ threadId: 'thread', content: 'Measure.' }),
+    }), { waitUntil: work => { pending.push(work) } })
+    await response.text()
+    await Promise.all(pending)
+    expect(Object.keys(phaseRows[0]!).sort()).toEqual(['authorized', 'identity', 'ready'])
+    expect(queryRows[0]).toMatchObject({ identity: 1, authorized: 1 })
+    expect(queryRows[0]!.ready).toBeGreaterThanOrEqual(1)
+    expect(Object.keys(concurrentRows[0]!).sort()).toEqual(['parallel_http', 'parallel_sql'])
+    const serialized = JSON.parse(JSON.stringify(snapshot!)) as TurnTraceSnapshot
+    for (const name of ['identity', 'authorized', 'ready']) {
+      const child = serialized.spans.find(value => value.name === `product.${name}`)!
+      const parent = serialized.spans.find(value => value.spanId === child.parentSpanId)!
+      expect(child.startMs).toBeGreaterThanOrEqual(parent.startMs)
+      expect(child.endMs).toBeLessThanOrEqual(parent.endMs)
+    }
+    const otlp = buildTurnTraceOtelSpans(serialized)
+    expect(otlp.filter(value => value.name === 'agent_app.turn')).toHaveLength(1)
+    expect(otlp[0]!.spanId).toBe(originalRoot)
+    expect(serialized.rootSpanId).toBe(originalRoot)
+    expect(serialized.summary.d1Queries).toBeGreaterThanOrEqual(Object.values(queryRows[0]!).reduce((sum, value) => sum + value, 0))
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+    engine.close()
+  }
 })

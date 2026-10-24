@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.63.5
+
+- fix: fence detached Sandbox admission after cancellation (#1310)
+
+## 0.63.4
+
+- feat: add fenced durable Stop for Router turns (#1309)
+
+## 0.63.3
+
+- perf: prewarm the shared turn lock before send (#1306)
+
+## 0.63.2
+
+- fix(rollout): select request cohorts by origin with indexed ranges (#1308)
+- docs: record published signoff phase consumer proof [skip release]
+
+## 0.63.1
+
+- test: prove sandbox deadlines through real HTTP turns (#1305)
+
+## 0.63.0
+
+- test: retire obsolete router and sandbox mock assertions (#1304)
+- Pin trusted release and adoption workflow controls
+- feat!: default shared chat admission and resource ownership (#1300)
+- Delete obsolete exact action pin mirror from publication check (#1302)
+- docs: refresh generated signoff and current API references (#1303)
+- Share native app release sequencing and post-release suite reporting (#1297)
+- fix(chat): preserve fallback warnings and native timing facts (#1299)
+- feat(signoff): select declared release and suites phases (#1298)
+
+## 0.62.4
+
+- ci: isolate release producers from public PR runners (#1294)
+- fix(signoff): exit after both output streams drain
+- docs(sandbox): refresh generated planned restart API (#1295)
+- fix(signoff): drain CLI report streams before exiting
+- ci: retire hosted verification runners
+
 ## 0.62.3
 
 - test: delete stale Runtime cohort unit after valid adoption (#1290)

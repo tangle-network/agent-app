@@ -57,10 +57,18 @@ export interface NativeCompletionWorkflowOptions<
     receipt: NativeCompletionReceipt,
     messageId: TMessageId,
   ): Promise<NativeCompletionReceipt | void>
+  /**
+   * Record final timing only after settlement (including Vault reconciliation) returned its final verdict.
+   * The callback must be idempotent by turnStreamId and use explicit durable facts, never isolate-local fallback.
+   * Workflow replay reuses this step; an observer outage never reaches it.
+   */
+  recordTiming?(payload: TPayload, receipt: NativeCompletionReceipt, timing: { settledAt: number }): Promise<void>
   /** Optional product buffer completion after successful settlement. */
   finalizeBuffer?(payload: TPayload, receipt: NativeCompletionReceipt, messageId: TMessageId): Promise<void>
   /** Release the product lock only after every terminal effect completed. */
   releaseLock(payload: TPayload): Promise<void>
+  /** Durable trace delivery/final markers after the finished turn lock is released. */
+  afterRelease?(payload: TPayload, receipt: NativeCompletionReceipt): Promise<void>
   /** Default: 5 s for the first two minutes, 15 s until thirty minutes, then 30 s. */
   pollDelay?: CloudflareWorkflowSleepDuration | ((attempt: number) => CloudflareWorkflowSleepDuration)
   stepName?: string
@@ -128,11 +136,17 @@ export async function runNativeCompletionWorkflow<
       options.persistTranscript(options.event.payload, receipt, messageId)
     ))
   }
+  if (options.recordTiming) {
+    await options.step.do(`${name}:record-timing`, () => (
+      options.recordTiming!(options.event.payload, receipt, { settledAt: Date.now() })
+    ))
+  }
   if (options.finalizeBuffer) {
     await options.step.do(`${name}:finalize-buffer`, () => (
       options.finalizeBuffer!(options.event.payload, receipt, messageId)
     ))
   }
   await options.step.do(`${name}:release-lock`, () => options.releaseLock(options.event.payload))
+  await options.afterRelease?.(options.event.payload, receipt)
   return receipt
 }

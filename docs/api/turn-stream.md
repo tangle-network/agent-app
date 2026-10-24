@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-59 exports.
+68 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -52,6 +52,14 @@ number
 
 ```ts
 (namespace: TurnStreamNamespaceLike, workspaceId: string, threadId: string, phase: "start" | "end", auth: TurnStreamAut…
+```
+
+### `connectDurableTurnCancellation`
+
+`function` — One server-owned connection on the existing authenticated DO transport, with retained cancellation replay.
+
+```ts
+(namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
 ### `createDurableObjectTurnEventStore`
@@ -108,6 +116,14 @@ interface CreateDurableTurnLockOptions
 
 ```ts
 interface CreateTurnStreamUpgradeHandlerOptions
+```
+
+### `DEFAULT_TURN_LOCK_LOCATION_HINT`
+
+`const` — The default matches the application D1 region unless its binding descriptor names another region.
+
+```ts
+TurnStreamLocationHint
 ```
 
 ### `DurableTurnLock`
@@ -168,10 +184,10 @@ interface MemoryTurnStreamSocket
 
 ### `mintTurnStreamToken`
 
-`function` — `v1.<base64url-channel>.<exp-ms-36>.<base64url-mac>` — the expiry is inside the signed payload so it cannot be extended by editing the token.
+`function` — Legacy v1 channel capabilities remain unchanged.
 
 ```ts
-(channelName: string, secret: string, now?: () => number, ttlMs?: number) => Promise<string>
+(channelName: string, secret: string, now?: () => number, ttlMs?: number, claims?: TurnStreamTokenClaims | undefined) =…
 ```
 
 ### `peekDurableTurnLock`
@@ -179,7 +195,7 @@ interface MemoryTurnStreamSocket
 `function` — Read a channel's active turn lock without changing it.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; threadId: string; scope: TurnLockScope; }, auth: Tur…
+(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: "workspace"; threadId?: string | undef…
 ```
 
 ### `pruneStaleThreads`
@@ -219,15 +235,23 @@ interface ReconcileStaleDurableTurnLockOptions
 `function` — Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch.
 
 ```ts
-(namespace: TurnStreamNamespaceLike, input: ReleaseInterruptedDurableTurnLockInput, auth: TurnStreamAuth) => Promise<..…
+(namespace: TurnStreamNamespaceLike, input: TurnLockInterruptedReleaseInput, auth: TurnStreamAuth) => Promise<...>
 ```
 
 ### `ReleaseInterruptedDurableTurnLockInput`
 
-`interface` — Define input parameters to release an interrupted durable turn lock in a workspace or thread
+`type` — Define input parameters to release an interrupted durable turn lock in a workspace or thread
 
 ```ts
-interface ReleaseInterruptedDurableTurnLockInput
+type ReleaseInterruptedDurableTurnLockInput
+```
+
+### `requestDurableTurnCancellation`
+
+`function` — The product authorizes Stop first.
+
+```ts
+(namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
 ### `scopeIndexChannelKey`
@@ -284,6 +308,38 @@ number
 
 ```ts
 60000
+```
+
+### `TurnCancellationConnection`
+
+`interface` — Per-owner observation only.
+
+```ts
+interface TurnCancellationConnection
+```
+
+### `TurnCancellationIdentity`
+
+`interface` — One cancellable turn, including the lock generation that grants its producer authority.
+
+```ts
+interface TurnCancellationIdentity
+```
+
+### `TurnCancellationRequestedError`
+
+`class`
+
+```ts
+class TurnCancellationRequestedError
+```
+
+### `TurnControlUnavailableError`
+
+`class`
+
+```ts
+class TurnControlUnavailableError
 ```
 
 ### `turnEventStorageKey`
@@ -422,6 +478,14 @@ interface TurnStreamDOState
 interface TurnStreamEvent
 ```
 
+### `TurnStreamLocationHint`
+
+`type` — Cloudflare placement hints.
+
+```ts
+type TurnStreamLocationHint
+```
+
 ### `TurnStreamNamespaceLike`
 
 `interface` — The surface of `DurableObjectNamespace` the adapters use.
@@ -454,6 +518,14 @@ interface TurnStreamStorage
 interface TurnStreamStubLike
 ```
 
+### `TurnStreamTokenClaims`
+
+`interface` — Server control authority is separate from the channel capabilities used by existing viewer forwarders.
+
+```ts
+interface TurnStreamTokenClaims
+```
+
 ### `TurnStreamUpgradeAuthorization`
 
 `type` — Represent success or failure of a TURN stream upgrade authorization with optional response data
@@ -467,7 +539,7 @@ type TurnStreamUpgradeAuthorization
 `function` — Verify a token for `channelName`: constant-time MAC compare with the exact channel name embedded in the signed payload, plus freshness.
 
 ```ts
-(channelName: string, token: string, secret: string, now?: () => number) => Promise<boolean>
+(channelName: string, token: string, secret: string, now?: () => number, claims?: TurnStreamTokenClaims | undefined) =>…
 ```
 
 ### `workspaceChannelKey`

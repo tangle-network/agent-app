@@ -11,7 +11,7 @@ Source: `src/agent-profiles/index.ts`
 `function`
 
 ```ts
-(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; observedManagedPlanD…
+(input: { store: ProfileRevisionStore; key: ProfileBindingKey; messageId: string; content: string; expectedRevisionId?:…
 ```
 
 ### `bindProfileText`

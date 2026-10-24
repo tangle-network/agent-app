@@ -66,6 +66,8 @@ fallthrough = true
 # BETTER_AUTH_SECRET, TANGLE_API_KEY, SANDBOX_API_KEY, SANDBOX_GATEWAY_URL.
 # See .dev.vars.example for the full list.
 [vars]
+# Match the primary D1 region; hints affect new lock channels only.
+D1_REGION = "enam"
 # Enable only after the deployment payer reviews signup, funding and run policy.
 OPERATOR_RUN_ENABLED = "false"
 BETTER_AUTH_URL = "http://localhost:8787"

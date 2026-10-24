@@ -2,7 +2,8 @@
 /**
  * `agent-app-signoff` — run the local sign-off gate and print the proof.
  *
- * Exits 0 only when every declared step passed in a pristine tree. Exit 1 is a
+ * Exits 0 only when every selected step passed in a pristine tree (default all).
+ * Partial phases are explicitly labelled. Exit 1 is a
  * real failure; exit 2 is a usage or config error, so a script can tell "your
  * code is broken" from "your gate is misconfigured".
  *
@@ -25,7 +26,7 @@ import { runSignoff, type RunSignoffOptions } from './run'
 import { runShellAlignmentCli } from './shell-alignment-cli'
 import { runSurfaceLadderCli } from './surface-ladder-cli'
 import { runWorkspaceSurfaceCli } from './workspace-surface-cli'
-import type { SignoffEvent, SignoffSource } from './types'
+import type { SignoffEvent, SignoffSource, SignoffPhase } from './types'
 
 interface ParsedArgs extends RunSignoffOptions {
   readonly jsonPath?: string
@@ -37,6 +38,7 @@ function usage(): string {
     'Usage: agent-app-signoff [repoDir] [options]',
     '',
     '  --source head|working-tree  bytes to verify (default working-tree)',
+    '  --phase all|release|suites   declared scope (default all; partial requires classification)',
     '  --config <path>             config module (default signoff.config.mjs)',
     '  --seed <n>                  base seed; reproduces a previous run',
     '  --shuffle-runs <n>          override every shuffled step\'s run count',
@@ -71,6 +73,7 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
     repoDir?: string
     configPath?: string
     source?: SignoffSource
+    phase?: SignoffPhase
     seed?: number
     shuffleRuns?: number
     maxParallel?: number
@@ -97,6 +100,8 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
         break
       }
       case '--config': parsed.configPath = take(); break
+      // Validate centrally with the library path, before install.
+      case '--phase': parsed.phase = take() as SignoffPhase; break
       case '--seed': parsed.seed = positiveInt(take(), '--seed'); break
       case '--shuffle-runs': parsed.shuffleRuns = positiveInt(take(), '--shuffle-runs'); break
       case '--max-parallel': parsed.maxParallel = positiveInt(take(), '--max-parallel'); break
@@ -171,12 +176,19 @@ export async function runSignoffCli(argv: readonly string[]): Promise<number> {
 }
 
 /* c8 ignore start — process wiring, exercised by the bin itself */
+function exitAfterOutput(code: number): void {
+  // Drain queued pipe writes, then terminate even if a config retained a handle.
+  process.stdout.write('', () => {
+    process.stderr.write('', () => { process.exit(code) })
+  })
+}
+
 if (invokedAsScript(import.meta.url, process.argv[1])) {
   runSignoffCli(process.argv.slice(2))
-    .then((code) => process.exit(code))
+    .then(exitAfterOutput)
     .catch((err: unknown) => {
       process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`)
-      process.exit(2)
+      exitAfterOutput(2)
     })
 }
 /* c8 ignore stop */

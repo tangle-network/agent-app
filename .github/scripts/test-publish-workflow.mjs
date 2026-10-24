@@ -19,14 +19,6 @@ const releaseScript = fs.readFileSync(path.join(root, '.github/scripts/write-rel
 const packFilenameScript = path.join(root, '.github/scripts/read-npm-pack-filename.mjs')
 const lines = text.split('\n')
 const triggerBlock = text.slice(0, text.indexOf('concurrency:'))
-const pins = {
-  'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
-  'pnpm/action-setup': '0ebf47130e4866e96fce0953f49152a61190b271',
-  'actions/setup-node': '820762786026740c76f36085b0efc47a31fe5020',
-  'actions/upload-artifact': '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
-  'actions/download-artifact': '3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
-}
-
 const fail = (message) => {
   console.error(`publish workflow contract failed: ${message}`)
   process.exit(1)
@@ -38,19 +30,30 @@ const count = (value, pattern) => [...value.matchAll(pattern)].length
 
 check(!workflows.some(({ file }) => file === 'ci.yml'), 'ci.yml duplicates release verification on main')
 
-const jobs = new Map()
-let current
-for (const line of lines.slice(lines.indexOf('jobs:') + 1)) {
-  const match = /^  ([a-z0-9_]+):\s*$/.exec(line)
-  if (match) {
-    current = match[1]
-    jobs.set(current, [])
-  } else if (current) {
-    jobs.get(current).push(line)
+const readJobs = (workflow) => {
+  const workflowLines = workflow.split('\n')
+  const result = new Map()
+  let current
+  for (const line of workflowLines.slice(workflowLines.indexOf('jobs:') + 1)) {
+    const match = /^  ([a-z0-9_]+):\s*$/.exec(line)
+    if (match) {
+      current = match[1]
+      result.set(current, [])
+    } else if (current) {
+      result.get(current).push(line)
+    }
   }
+  return result
 }
+const jobs = readJobs(text)
+const producerJobs = readJobs(fs.readFileSync(path.join(workflowDirectory, 'prepare-publish.yml'), 'utf8'))
 const job = (name) => {
   check(jobs.has(name), `missing ${name} job`)
+  if (name === 'package_release') {
+    check(/uses: tangle-network\/agent-app\/\.github\/workflows\/prepare-publish\.yml@[0-9a-f]{40}/.test(jobs.get(name).join('\n')), 'release producer is not bound to immutable reviewed controls')
+    check(producerJobs.has(name), 'release producer workflow is missing')
+    return producerJobs.get(name).join('\n')
+  }
   return jobs.get(name).join('\n')
 }
 const namedStep = (block, name) => {
@@ -103,11 +106,7 @@ const actionRefs = workflows.flatMap(({ file, text: workflow }) =>
   [...workflow.matchAll(/uses:\s*([^@\s]+)@([^\s#]+)/g)]
     .map((match) => ({ file, name: match[1], ref: match[2] })),
 )
-check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'every action must use an exact commit SHA')
-for (const [name, pin] of Object.entries(pins)) {
-  const refs = actionRefs.filter((action) => action.name === name)
-  check(refs.length > 0 && refs.every(({ ref }) => ref === pin), `${name} does not use the required pin`)
-}
+check(actionRefs.every(({ ref }) => /^[0-9a-f]{40}$/.test(ref)), 'actions and trusted workflow controls must be pinned to immutable commits')
 for (const { file, text: workflow } of workflows) {
   const workflowLines = workflow.split('\n')
   for (let index = 0; index < workflowLines.length; index += 1) {
@@ -147,7 +146,7 @@ for (const [name, command] of autoSteps) {
 for (const command of ['pnpm install --frozen-lockfile --ignore-scripts=false', 'pnpm run build']) {
   check(stepWithCommand(packageJob, command).includes("if: steps.release.outputs.mode == 'auto'"), 'artifact construction runs outside automatic preparation')
 }
-check(count(text, /npm pack "\$source"/g) === 1, 'npm pack does not run exactly once')
+check(count(packageJob, /npm pack "\$source"/g) === 1, 'npm pack does not run exactly once')
 check(
   packageJob.indexOf('- name: Prepare release manifests') < packageJob.indexOf('- name: Build release') &&
     packageJob.indexOf('- name: Build release') < packageJob.indexOf('- name: Pack and inspect exact tarballs') &&

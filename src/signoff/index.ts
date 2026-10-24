@@ -53,6 +53,7 @@
 
 export { runSignoff, type RunSignoffOptions } from './run'
 export { loadSignoffConfig, type LoadSignoffConfigOptions } from './config'
+export { pruneSignoffCache, type CachePruneOptions, type CachePruneResult } from './cache'
 export { formatSignoffReport } from './report'
 export {
   checkShellAlignment,
@@ -137,6 +138,8 @@ export type {
   SignoffInstallSpec,
   SignoffRepoFacts,
   SignoffReport,
+  SignoffPhase,
+  SignoffSelection,
   SignoffShuffleSpec,
   SignoffSource,
   SignoffStepResult,

@@ -10,8 +10,9 @@ import {
 } from '../stream/index'
 import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
-import { noteMeasuredTurnFacts } from '../turn-trace/turn-facts'
-import { redactErrorMessage } from '../redact/index'
+import { noteMeasuredTurnFacts, readableTurnFailure } from '../turn-trace/turn-facts'
+import { createNativeTimingTransfer, type NativeTimingTransfer } from './native-turn-timing'
+import { createChatTurnOwnership } from './turn-ownership'
 import {
   assistantRowIdForTurn,
   createAssistantDraftWriter,
@@ -20,7 +21,8 @@ import {
   type AssistantDraftWriter,
   type DraftPersistenceTuning,
 } from './draft-persistence'
-import { dispatchFirstFor } from './dispatch-first'
+import { dispatchFirstFor, selectTurnProducer } from './dispatch-first'
+import { observeTurnCancellation } from './cancellation'
 import { admissionServerTiming, errorResponse, userPartsWithFiles, type AdmittedTurn, type TurnProgressCallback } from './turn-admission'
 import { abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, tapRawEvents, withStreamHeartbeat } from './turn-event-stream'
 import type {
@@ -35,14 +37,8 @@ import type {
 } from './turn-route-contracts'
 import type { TurnRoutePhase } from './turn-progress'
 import { ChatTurnInputError, type ChatTurnPartInput } from './wire'
-
-/** Work started before `produce` took the turn: `handOff` gives it to `produce`; `release` frees it if nothing took it. */
-export interface AfterAuthorizeWork {
-  handOff(): void
-  release(): Promise<void>
-  /** Free this too if the turn ends before `handOff`. */
-  add(release: () => void): void
-}
+import type { ResolvedChatTurnRoutesOptions } from './route-storage'
+import type { AfterAuthorizeWork } from './early-turn-work'
 
 /** The thread's messages as the turn-identity resolver reads them. */
 async function readTurnHistory(store: CreateChatTurnRoutesOptions<unknown>['store'], threadId: string): Promise<PersistedChatMessageForTurn[]> {
@@ -51,8 +47,8 @@ async function readTurnHistory(store: CreateChatTurnRoutesOptions<unknown>['stor
   }))
 }
 
-interface TurnExecutionOptions<TContext> {
-  options: CreateChatTurnRoutesOptions<TContext>
+interface TurnExecutionOptions<TContext, TResource> {
+  options: ResolvedChatTurnRoutesOptions<TContext, TResource>
   draftStore: AssistantDraftStore
   draftTuning: DraftPersistenceTuning | null
   progressMessages: Record<TurnRoutePhase, string>
@@ -85,25 +81,23 @@ function settledTurnTiming(turnStreamId: string, at: {
     ...(at.firstVisibleAt === undefined ? {} : { firstVisibleMs: at.firstVisibleAt - at.startedAt }),
     ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
   }
-  const reason = at.failure ? failureReasonOf(at.failure.data) ?? redactErrorMessage(at.failure.error, 'chat turn failed') : undefined
-  const code = at.failure ? failureCodeOf(at.failure.data) : undefined
-  const failureCode = reason ? redactErrorMessage(code && reason !== code && !reason.startsWith(`${code}:`) ? `${code}: ${reason}` : reason) : undefined
-  noteMeasuredTurnFacts(turnStreamId, { ...measured, ...(at.model ? { model: at.model } : {}),
+  const failureCode = at.failure ? readableTurnFailure(at.failure.error, at.failure.data) : undefined
+  noteMeasuredTurnFacts(turnStreamId, { requestReceivedAt: at.requestAt, ...measured, ...(at.model ? { model: at.model } : {}),
     ...(failureCode ? { failureCode } : {}) })
   return { ...measured, trace }
 }
 
-export function createAdmittedTurnRunner<TContext>(dependencies: TurnExecutionOptions<TContext>) {
-  return (runAdmittedTurn<TContext>).bind(null, dependencies)
+export function createAdmittedTurnRunner<TContext, TResource>(dependencies: TurnExecutionOptions<TContext, TResource>) {
+  return (runAdmittedTurn<TContext, TResource>).bind(null, dependencies)
 }
 
-async function runAdmittedTurn<TContext>({
+async function runAdmittedTurn<TContext, TResource>({
   options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
-}: TurnExecutionOptions<TContext>,
+}: TurnExecutionOptions<TContext, TResource>,
   request: Request,
   ctx: ChatTurnRequestContext | undefined,
   admitted: AdmittedTurn<TContext>,
-  early: AfterAuthorizeWork,
+  early: AfterAuthorizeWork<TResource>,
   progress?: TurnProgressCallback,
   startedIntent?: Promise<string | null>,
 ): Promise<Response> {
@@ -113,7 +107,7 @@ async function runAdmittedTurn<TContext>({
   const { payload, content, fileParts, mentions, turnId } = parsed
   const { tenantId, userId, context } = auth
 
-  const preparedBatch = await prepareAdmittedTurn(options, trace, log, tenantId, userId, payload, context, request, progress, content, turnId, draftTuning)
+  const preparedBatch = await prepareAdmittedTurn(options, trace, log, tenantId, userId, payload, context, request, progress, content, turnId, draftTuning, ctx?.waitUntil)
   if (preparedBatch instanceof Response) return preparedBatch
   const { turnStreamId, identity, executionId, chatTurn, readHistory, historyBeforeLock } = preparedBatch
 
@@ -134,11 +128,26 @@ async function runAdmittedTurn<TContext>({
   // public field optional preserves existing synthetic producers; this
   // assembled route always supplies it to the real `produce` invocation.
   const state = createAdmittedTurnState<TContext>()
+  if (options.cancel) state.cancellationAbort = new AbortController()
 
-  const { handoffCompletion, releaseLock } = createTurnOwnership(state, log, turnStreamId, options)
+  state.nativeTiming = createNativeTimingTransfer(() => ({
+    turnStreamId, requestReceivedAt: trace.startedAt,
+    ...(state.turnStarted ? { lifecycleStartedAt: state.turnStartedAtMs, admissionMs: state.turnStartedAtMs - trace.startedAt } : {}),
+    ...(state.firstVisibleAtMs === undefined ? {} : { firstVisibleMs: state.firstVisibleAtMs - state.turnStartedAtMs }),
+    ...(state.firstTextAtMs === undefined ? {} : { firstTextMs: state.firstTextAtMs - state.turnStartedAtMs }),
+  }), error => log('[chat-routes] native timing persistence failed', { turnId: turnStreamId,
+    error: error instanceof Error ? error.message : String(error) }))
+  const { handoffCompletion, releaseLock } = createChatTurnOwnership(state, log, turnStreamId, options)
 
-  let produceArgs: ChatTurnProduceArgs<TContext> = {
+  let produceArgs: ChatTurnProduceArgs<TContext, TResource> = {
     request,
+    waitUntil: ctx?.waitUntil,
+    earlyResource: early.resource,
+    admissionSignal: AbortSignal.any([
+      state.executionAbort.signal,
+      ...(state.cancellationAbort ? [state.cancellationAbort.signal] : []),
+      ...(ctx?.cancelOnDisconnect ? [request.signal] : []),
+    ]),
     body: payload,
     identity,
     context,
@@ -147,12 +156,13 @@ async function runAdmittedTurn<TContext>({
     turnStreamId,
     priorMessages: chatTurn.priorMessages, ...(chatTurn.reusedUserMessageId ? { userMessageId: chatTurn.reusedUserMessageId, userMessageInserted: false } : {}),
     handoffCompletion,
+    timingFacts: state.nativeTiming.snapshot,
     trace,
     ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
     ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
   }
-  // Dispatch-first: the model call starts now; its output waits for the chain below to commit (./dispatch-first).
-  const dispatched = dispatchFirstFor(options, produceArgs, trace)
+  const selected = selectTurnProducer(options.produce, produceArgs)
+  const dispatched = dispatchFirstFor(selected, produceArgs, trace)
   if (dispatched) early.add(dispatched.refuse)
   const turnLock = options.turnLock
   if (turnLock) {
@@ -160,6 +170,16 @@ async function runAdmittedTurn<TContext>({
     if (!acquired.acquired) return acquired.response
     state.lockAcquired = true
     state.lockHandle = acquired.handle
+    if (acquired.cancellation) {
+      const cancellation = acquired.cancellation
+      const abort = () => state.executionAbort.abort(cancellation.signal.reason)
+      if (cancellation.signal.aborted) abort()
+      else cancellation.signal.addEventListener('abort', abort, { once: true })
+      state.closeCancellation = async () => {
+        cancellation.signal.removeEventListener('abort', abort)
+        await cancellation.close()
+      }
+    }
   }
   progress?.('preparing', progressMessages.preparing)
 
@@ -265,7 +285,7 @@ async function runAdmittedTurn<TContext>({
     const beforeTurn = options.beforeTurn
     if (beforeTurn) {
       const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
-      if (patch && Object.keys(patch).length && dispatched) throw new Error('beforeTurn cannot patch a dispatchFirst turn: its prompt is already sent')
+      if (patch && Object.keys(patch).length && dispatched) throw new Error('beforeTurn cannot patch a Router turn already dispatched: its prompt is already sent')
       if (patch) produceArgs = { ...produceArgs, ...patch }
     }
     const streamSetup = trace.start('admission.stream_setup', 'admission')
@@ -277,7 +297,7 @@ async function runAdmittedTurn<TContext>({
       store: options.turnStore,
       turnId: turnStreamId,
       scopeId: payload.threadId,
-      coalesce: options.coalesceTurnEvents ?? coalesceDeltas,
+      coalesce: coalesceDeltas,
     })
     const turnMarker = { type: 'turn', turnId: turnStreamId }
     await state.tap.onEvent(turnMarker)
@@ -294,11 +314,9 @@ async function runAdmittedTurn<TContext>({
         ...draftTuning,
         store: draftStore,
         threadId: payload.threadId,
-        messageId: options.draftMessageId
-          ? options.draftMessageId({ identity, executionId, threadId: payload.threadId })
-          : assistantRowIdForTurn(executionId),
+        messageId: assistantRowIdForTurn(executionId),
         snapshot: () => {
-          if (!state.producer) return null
+          if (!state.producer || state.cancellationAbort?.signal.aborted) return null
           return {
             content: state.producer.finalText(),
             ...(state.producer.draftParts ? { parts: state.producer.draftParts() } : {}),
@@ -332,12 +350,11 @@ async function runAdmittedTurn<TContext>({
     }
     streamSetup.end()
 
-    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, request, context, payload, assistantRowId)
+    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId)
 
     // The engine has the turn, and its first pull runs `produce`, which owns whatever `afterAuthorize` started.
+    const { clientBody } = startTurnDrain(result, log, turnStreamId, state, endTrace, exportTrace, trace, ctx, request, fireTerminalLifecycle, releaseLock, runAfterSettle, early.settle)
     early.handOff()
-
-    const { clientBody } = startTurnDrain(result, log, turnStreamId, state, endTrace, exportTrace, trace, ctx, request, fireTerminalLifecycle, releaseLock, runAfterSettle)
 
     return createTurnReplayResponse(result.contentType, clientBody, turnMarker, trace)
   } catch (err) {
@@ -356,13 +373,17 @@ async function runAdmittedTurn<TContext>({
   }
 }
 interface AdmittedTurnState<TContext> {
+  executionAbort: AbortController
+  closeCancellation: (() => Promise<void>) | undefined
   draft: AssistantDraftWriter | undefined
   tap: BufferedTurnTap | undefined
+  nativeTiming: NativeTimingTransfer | undefined
   completionHandoff: boolean
   completionHandoffPromise: Promise<void> | undefined
   lockAcquired: boolean
   lockHandle: unknown
   lockReleased: boolean
+  cancellationAbort?: AbortController
   producer: ChatTurnRouteProducer | undefined
   assistantMessageId: string | null | undefined
   runFailed: boolean
@@ -381,8 +402,10 @@ interface AdmittedTurnState<TContext> {
 
 function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
   return {
+    executionAbort: new AbortController(), closeCancellation: undefined,
     draft: undefined,
     tap: undefined,
+    nativeTiming: undefined,
     completionHandoff: false,
     completionHandoffPromise: undefined,
     lockAcquired: false,
@@ -405,8 +428,8 @@ function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
   }
 }
 
-async function prepareAdmittedTurn<TContext>(
-  options: TurnExecutionOptions<TContext>['options'],
+async function prepareAdmittedTurn<TContext, TResource>(
+  options: TurnExecutionOptions<TContext, TResource>['options'],
   trace: AdmittedTurn<TContext>['trace'],
   log: (message: string, meta?: Record<string, unknown>) => void,
   tenantId: string,
@@ -417,7 +440,8 @@ async function prepareAdmittedTurn<TContext>(
   progress: TurnProgressCallback | undefined,
   content: string,
   turnId: string | undefined,
-  draftTuning: TurnExecutionOptions<TContext>['draftTuning'],
+  draftTuning: TurnExecutionOptions<TContext, TResource>['draftTuning'],
+  waitUntil: ChatTurnRequestContext['waitUntil'],
 ) {
   if (options.turnLock?.warm) {
     // Overlaps the lock's first-use cost with prepareTurn and the history read.
@@ -438,6 +462,7 @@ async function prepareAdmittedTurn<TContext>(
   if (prepareTurn) {
     const prepared = await trace.measure('admission.prepare', 'admission', () => prepareTurn({
       request,
+      waitUntil,
       body: payload,
       tenantId,
       userId,
@@ -510,14 +535,14 @@ async function prepareAdmittedTurn<TContext>(
   return { turnStreamId, identity, executionId, chatTurn, readHistory, historyBeforeLock }
 }
 
-function createTurnSettlement<TContext>(
+function createTurnSettlement<TContext, TResource>(
   state: AdmittedTurnState<TContext>,
   trace: AdmittedTurn<TContext>['trace'],
-  options: TurnExecutionOptions<TContext>['options'],
+  options: TurnExecutionOptions<TContext, TResource>['options'],
   executionId: string,
-  traceSink: TurnExecutionOptions<TContext>['traceSink'],
+  traceSink: TurnExecutionOptions<TContext, TResource>['traceSink'],
   identity: ChatTurnIdentity,
-  traceOptions: TurnExecutionOptions<TContext>['traceOptions'],
+  traceOptions: TurnExecutionOptions<TContext, TResource>['traceOptions'],
   context: TContext,
   turnStreamId: `${string}-${string}-${string}-${string}-${string}`,
   log: (message: string, meta?: Record<string, unknown>) => void,
@@ -605,7 +630,7 @@ function createTurnSettlement<TContext>(
         const attribution = state.producer?.modelAttribution?.()
         const completed: ChatTurnLifecycleComplete<TContext> = {
           identity, executionId, turnStreamId, context, durationMs, ...timing,
-          finalText: state.producer?.finalText() ?? '',
+          finalText: state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
           usage: state.producer?.usage?.() ?? {},
           assistantMessageId: assistantRowId(),
           ...(state.gatedTurn ? { gated: true } : {}),
@@ -661,15 +686,16 @@ function createTurnSettlement<TContext>(
   return { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle }
 }
 
-function createTurnEngine<TContext>(
+function createTurnEngine<TContext, TResource>(
   identity: ChatTurnIdentity,
   ctx: ChatTurnRequestContext | undefined,
   log: (message: string, meta?: Record<string, unknown>) => void,
   state: AdmittedTurnState<TContext>,
-  dispatched: ReturnType<typeof dispatchFirstFor>,
-  produceArgs: ChatTurnProduceArgs<TContext>,
+  dispatched: ReturnType<typeof dispatchFirstFor<TContext, TResource>>,
+  produceArgs: ChatTurnProduceArgs<TContext, TResource>,
   trace: AdmittedTurn<TContext>['trace'],
-  options: TurnExecutionOptions<TContext>['options'],
+  options: TurnExecutionOptions<TContext, TResource>['options'],
+  produce: ReturnType<typeof selectTurnProducer<TContext, TResource>>['produce'],
   request: Request,
   context: TContext,
   payload: AdmittedTurn<TContext>['parsed']['payload'],
@@ -685,8 +711,22 @@ function createTurnEngine<TContext>(
       produce: () => ({
         stream: (async function* () {
           // The product's own admission work: its profile pin, prompt and producer construction.
-          state.producer = await (dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => options.produce(produceArgs)))
-          let source: AsyncIterable<ChatRouteEvent> = state.producer.stream
+          const producerStream = async function* () {
+            const started = dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => produce(produceArgs))
+            if (!dispatched) {
+              const cleanup = started.then(producer => producer.cleanup, () => undefined)
+              ctx?.waitUntil?.(cleanup)
+              void cleanup.catch(() => {})
+            }
+            state.producer = await started
+            yield* state.producer.stream
+          }
+          let source: AsyncIterable<ChatRouteEvent> = producerStream()
+          // A durable owner connection already carries exact authenticated Stop.
+          // Keep metadata observation only for existing non-adopting targets.
+          if (options.cancel && state.cancellationAbort && !state.closeCancellation) {
+            source = observeTurnCancellation(source, produceArgs, options.cancel, state.cancellationAbort)
+          }
           if (ctx?.cancelOnDisconnect) {
             source = abortOnSignal(source, request.signal)
           }
@@ -698,16 +738,23 @@ function createTurnEngine<TContext>(
           }
           for await (const event of source) yield event
         })(),
-        finalText: () => state.producer?.finalText() ?? '',
+        finalText: () => state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
       }),
       onEvent: async (event) => {
+        let timingChanged = false
         if (state.firstVisibleAtMs === undefined && isVisibleOutput(event)) {
           state.firstVisibleAtMs = Date.now()
           trace.markFirstVisible(state.firstVisibleAtMs)
+          timingChanged = true
         }
         if (state.firstTextAtMs === undefined && isVisibleText(event)) {
           state.firstTextAtMs = Date.now()
           trace.markFirstText(state.firstTextAtMs)
+          timingChanged = true
+        }
+        if (timingChanged) {
+          const written = state.nativeTiming?.note()
+          if (written && ctx?.waitUntil) ctx.waitUntil(written)
         }
         if (event.type === 'session.run.failed' || event.type === 'error') {
           state.runFailed = true
@@ -722,7 +769,7 @@ function createTurnEngine<TContext>(
       ...(options.transformFinalText ? { transformFinalText: options.transformFinalText } : {}),
       persistAssistantMessage: ({ finalText }) => trace.measure('persist.assistant', 'persist', async () => {
         if (state.completionHandoff) return
-        if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+        if (state.cancellationAbort?.signal.aborted || (ctx?.cancelOnDisconnect && request.signal.aborted)) {
           await state.draft?.discard()
           state.assistantMessageId = null
           return
@@ -753,6 +800,11 @@ function createTurnEngine<TContext>(
           // no-op on a store without `deleteMessage` (drafting needs only
           // `updateMessage`), and there the draft row genuinely survives.
           state.assistantMessageId = state.draft?.rowId() ?? null
+          return
+        }
+        if (state.cancellationAbort?.signal.aborted) {
+          await state.draft?.discard()
+          state.assistantMessageId = null
           return
         }
         const usage = state.producer?.usage?.() ?? {}
@@ -806,6 +858,7 @@ function createTurnEngine<TContext>(
               finalText,
               context,
               failed: state.runFailed,
+              usage: state.producer?.usage?.(),
               assistantMessageId: assistantRowId(),
               ...(state.runFailed ? { failureReason: failureReasonOf(state.lastFailureData) } : {}),
               ...(state.runFailed && failureCodeOf(state.lastFailureData) ? { failureCode: failureCodeOf(state.lastFailureData) } : {}),
@@ -835,6 +888,7 @@ function startTurnDrain<TContext>(
   fireTerminalLifecycle: (failed: boolean, terminalError: unknown) => Promise<void>,
   releaseLock: () => Promise<void>,
   runAfterSettle: () => Promise<void>,
+  settleResource: () => Promise<void>,
 ) {
   // Tee: one branch to the live client, one drained under waitUntil so the
   // turn (and its buffering via onEvent) runs to completion after a client
@@ -867,11 +921,11 @@ function startTurnDrain<TContext>(
       // observation stop, never a terminal verdict for that owner. The
       // trace is this request's own record, so it ends here.
       endTrace(failed, drainError)
-      await Promise.all([state.tap!.detach(), exportTrace()])
+      await Promise.all([state.tap!.detach(), state.nativeTiming?.flush(), exportTrace()])
       return
     }
     const finalize = trace.start('persist.finalize', 'persist')
-    if (ctx?.cancelOnDisconnect && request.signal.aborted) {
+    if (state.cancellationAbort?.signal.aborted || (ctx?.cancelOnDisconnect && request.signal.aborted)) {
       await state.draft?.discard()
     } else {
       await state.draft?.close()
@@ -889,58 +943,12 @@ function startTurnDrain<TContext>(
     await releaseLock()
     // Both run after the lock is released and inside this waitUntil-tracked drain, so neither holds the next send.
     await Promise.all([exportTrace(), runAfterSettle()])
-  })()
+  })().finally(settleResource)
   if (ctx?.waitUntil) ctx.waitUntil(drained)
   else void drained.catch(() => { })
   return { clientBody }
 }
 
-function createTurnOwnership<TContext>(state: AdmittedTurnState<TContext>, log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: `${string}-${string}-${string}-${string}-${string}`, options: TurnExecutionOptions<TContext>['options']) {
-  const handoffCompletion = (): Promise<void> => {
-    if (!state.completionHandoffPromise) {
-      state.completionHandoffPromise = (async () => {
-        // Switch first: an event arriving while the prior draft write closes
-        // must stay live-only and cannot arm another draft write or renewal.
-        state.completionHandoff = true
-        try {
-          await state.tap?.detach()
-        } catch (err) {
-          log('[chat-routes] turn buffer detach failed', {
-            turnId: turnStreamId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        }
-        // `close` waits for the draft writer's in-flight write. The durable
-        // owner can therefore safely replace that draft after this resolves.
-        await state.draft?.close()
-      })()
-    }
-    return state.completionHandoffPromise
-  }
-
-
-  // Single-flight lock: acquire before any side effect. `release` runs
-  // exactly once — in the drain's `finally` on a normal turn, or right here
-  // on a short-circuit / throw.
-
-  const releaseLock = async (): Promise<void> => {
-    // `handoffCompletion` transfers the route-acquired lock to the durable
-    // owner too. Keep the legacy contextGate `{proceed:'handoff'}` path
-    // unchanged when that callback was never invoked.
-    if (state.completionHandoff || !state.lockAcquired || state.lockReleased) return
-    state.lockReleased = true
-    try {
-      await options.turnLock!.release(state.lockHandle)
-    } catch (err) {
-      log('[chat-routes] turnLock.release failed', {
-        turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-
-  return { handoffCompletion, releaseLock }
-}
 
 function createTurnReplayResponse(
   contentType: string,

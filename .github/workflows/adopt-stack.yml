@@ -16,11 +16,11 @@ permissions:
 
 jobs:
   adopt:
-    uses: tangle-network/agent-eval/.github/workflows/adopt-stack.yml@0f4a9b374159bff54ca09d0b3b644f6cbb105c3f # main on 2026-10-21; the release contract requires exact SHAs
+    uses: tangle-network/agent-eval/.github/workflows/adopt-stack.yml@d1e0b6ced9543ac287e7f9cc457920439363c638
     with:
+      stack-ref: d1e0b6ced9543ac287e7f9cc457920439363c638
       post-pin: pnpm run adopt:sync
       gate: pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm build
       default-branch: main
       merge: true
-      runs-on: ubuntu-latest
     secrets: inherit

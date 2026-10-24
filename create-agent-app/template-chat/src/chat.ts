@@ -116,7 +116,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
    *  `userId`/`workspaceId`. */
   async function authorize(args: {
     request: Request
-    intent: 'turn' | 'replay' | 'running'
+    intent: 'turn' | 'replay' | 'running' | 'cancel'
     body?: Record<string, unknown>
     threadId?: string
   }): Promise<ChatTurnAuthorization<void>> {
@@ -139,14 +139,22 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
   }
 
   const durableLock = env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET
-    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, scopeOf: () => 'workspace',
+    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, locationHint: env.D1_REGION, scopeOf: () => 'workspace',
       onRefused: active => Response.json({ error: { code: 'workspace_turn_in_flight', message: `Execution ${active.executionId} in thread ${active.threadId} still owns this workspace. If observation was lost, the deployment operator must verify that exact backend execution stopped and use a fenced reconciliation adapter; elapsed time or another UUID is not recovery.`, executionId: active.executionId, threadId: active.threadId } }, { status: 409 }),
     })
     : null
   interface Admission { handle: unknown; started: boolean; producer?: ChatTurnRouteProducer; userMessageId?: string }
   const admissions = new Map<string, Admission>()
   const lane = overrides.produce ? null : createHybridLane(env)
-  const produce = overrides.produce ?? lane!.produce
+  // Native Sandbox execution keeps the backend-terminal ownership check.
+  // Router option data goes directly to the shared route before its lock.
+  const nativeProduce = async (args: ChatTurnProduceArgs<void>) => {
+    const admission = admissions.get(args.executionId)
+    if (!admission) throw new Error('Turn admission is unavailable')
+    admission.started = true
+    admission.producer = await (overrides.produce ?? lane!.produce.sandbox)(args)
+    return admission.producer
+  }
   const routes = createChatTurnRoutes<void>({
     turnLock: {
       acquire: async args => {
@@ -182,13 +190,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
         await store.updateMessage(args.userMessageId, { extras: { turnStreamId: args.turnStreamId, backendTerminal: false } })
       }
     },
-    produce: async args => {
-      const admission = admissions.get(args.executionId)
-      if (!admission) throw new Error('Turn admission is unavailable')
-      admission.started = true
-      admission.producer = await produce(args)
-      return admission.producer
-    },
+    produce: overrides.produce ? nativeProduce : { ...lane!.produce, sandbox: nativeProduce },
     interactions: {
       resolveConnection: async ({ request, intent, body }) => {
         const session = await requireUser(request)

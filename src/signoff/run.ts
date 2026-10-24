@@ -26,6 +26,8 @@ import type {
   SignoffHostFacts,
   SignoffInstallResult,
   SignoffReport,
+  SignoffPhase,
+  SignoffSelection,
   SignoffSource,
   SignoffStepResult,
   SignoffStepSpec,
@@ -55,6 +57,8 @@ export interface RunSignoffOptions {
   readonly configPath?: string
   /** Default `working-tree` — verify what you are about to commit. */
   readonly source?: SignoffSource
+  /** Default all. Partial phases run declared steps and their prerequisites. */
+  readonly phase?: SignoffPhase
   /** Run every step even after one fails. Default false. */
   readonly keepGoing?: boolean
   /** Base seed. Pass a previous run's to reproduce it exactly. */
@@ -146,7 +150,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   try {
     await prune(cacheDir)
     tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
-    let loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
+    let loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath, phase: options.phase })
 
     cacheDir = resolve(options.cacheDir ?? loaded.config.cacheDir ?? DEFAULT_CACHE_DIR)
     if (tree.path !== treePath() || (loaded.config.carryFiles?.length ?? 0) > 0) {
@@ -160,10 +164,11 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source, carryFiles: loaded.config.carryFiles })
       // The second load gives the report an origin inside the final selected
       // tree, and keeps config-derived values tied to that same path.
-      loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath })
+      loaded = await loadSignoffConfig({ repoRoot: tree.path, configPath: options.configPath, phase: options.phase })
     }
 
-    const { config, origin } = loaded
+    const { config, origin, selection } = loaded
+    const checkDefaults = options.phase !== 'suites'
     // Validate after loading from the selected tree, before paying for install.
     validateGraph(config.steps.map((step) => ({ name: step.name, needs: step.needs })))
     assertShuffleArgsReachTheRunner(config.steps)
@@ -192,7 +197,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       // reporter, wrangler's prompts) must behave that way here too.
       { CI: 'true' },
       // A step that reads history (agent-app-rollout-check's base) finds the
-      // source checkout here; the clean tree has no .git.
+      // original source checkout here; the detached worktree shares its history.
       { SIGNOFF_SOURCE_REPO: repoRoot, SIGNOFF_TREE: tree.path },
       config.env,
       storeEnvName === null ? undefined : { [storeEnvName]: store.storeDir },
@@ -232,9 +237,10 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         wallStart,
         tree,
         origin,
+        selection,
         host,
         install,
-        steps: [...config.steps.map((step) => step.name), WORKER_DEFAULTS_STEP, APP_DEFAULTS_STEP].map(
+        steps: [...config.steps.map((step) => step.name), ...(checkDefaults ? [WORKER_DEFAULTS_STEP, APP_DEFAULTS_STEP] : [])].map(
           (name): SignoffStepResult => ({
             name,
             status: 'skipped',
@@ -254,7 +260,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
 
     assertNodeTypesVersion(tree.path, nodeRequirement)
 
-    const workerDefaults = runWorkerDefaults(tree.path, config.workerConfigs, options)
+    const workerDefaults = checkDefaults ? [runWorkerDefaults(tree.path, config.workerConfigs, options)] : []
 
     const treeRoot = tree.path
     const outcomes = await runGraph<SignoffStepSpec, readonly SignoffAttempt[]>({
@@ -287,14 +293,15 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
     })
 
     // After the graph, so the build the app's steps made is there to measure the Worker upload from.
-    const appDefaults = runAppDefaults(tree.path, config, options)
-    const steps = [...outcomes.map(toStepResult), workerDefaults, appDefaults]
+    const appDefaults = checkDefaults ? [runAppDefaults(tree.path, config, options)] : []
+    const steps = [...outcomes.map(toStepResult), ...workerDefaults, ...appDefaults]
     return finish({
       ok: steps.every((step) => step.status === 'passed'),
       startedAt,
       wallStart,
       tree,
       origin,
+      selection,
       host,
       install,
       steps,
@@ -406,6 +413,7 @@ function toStepResult(outcome: TaskOutcome<readonly SignoffAttempt[]>): SignoffS
 }
 
 interface FinishInput {
+  readonly selection?: SignoffSelection
   readonly ok: boolean
   readonly startedAt: Date
   readonly wallStart: number
@@ -425,10 +433,14 @@ function finish(input: FinishInput): SignoffReport {
   const serialMs = input.install.durationMs + input.steps.reduce((total, step) => total + step.durationMs, 0)
   const flags = [
     `--source ${input.source}`,
+    ...(input.options.phase && input.options.phase !== 'all' ? [`--phase ${input.options.phase}`] : []),
+    ...(input.options.configPath ? [`--config '${input.options.configPath.replace(/'/g, "'\\''")}'`] : []),
     `--seed ${input.seedBase}`,
     ...(input.keepGoing ? ['--keep-going'] : []),
   ]
   return {
+    phase: input.options.phase ?? 'all',
+    ...(input.selection ? { selection: input.selection } : {}),
     ok: input.ok,
     startedAt: input.startedAt.toISOString(),
     repo: {
