@@ -105,8 +105,15 @@ async function boundary(initial = pending()) {
     identity.workspaceId === workspaceId && identity.boxKey.startsWith(`app:workspace:${workspaceId}:`) }
   // The same boundary can execute against the old source for the semantic red
   // control: no reconcile API then means the old persisted action-only choice.
-  const reconcile = async () => manager.reconcileOriginal?.(options)
-    ?? { status: 'unchanged', recovery: await manager.read(workspaceId) }
+  const reconcile = async () => {
+    if (manager.reconcileOriginal) return manager.reconcileOriginal(options)
+    // Old-source red control still crosses the real SDK/HTTP boundary: it can
+    // observe the recovered original and final snapshot, but its actual old
+    // manager/selector keeps choosing the persisted replacement action.
+    const original = await client.get(initial.sandboxId)
+    await original?.listSnapshots()
+    return { status: 'unchanged', recovery: await manager.read(workspaceId) }
+  }
   return {
     db, store, manager, state, requests, options, reconcile, pauseNextRead,
     async close() {
