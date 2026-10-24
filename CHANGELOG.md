@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.63.11
+
+- fix: preserve archive and release boundaries
+- fix(sandbox): preserve prompt refusal details
+- chore: register integration fixture entrypoints
+- fix(auth): forward password reset session revocation
+
 ## 0.63.10
 
 - ci: keep local and deployment checks, remove PR CI
