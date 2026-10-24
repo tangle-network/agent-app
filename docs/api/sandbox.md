@@ -640,7 +640,7 @@ interface InspectablePrewarmClaimStore
 
 ### `isTerminalPromptEvent`
 
-`function` — Determine if an event is a terminal prompt event with type 'result' or 'done
+`function` — A backend result or terminal event, excluding SDK cleanup after observation loss.
 
 ```ts
 (event: unknown) => boolean
@@ -1320,7 +1320,7 @@ type SandboxPromptConfig
 
 ### `sandboxPromptRunner`
 
-`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+`function` — The shell's unattended runner.
 
 ```ts
 (shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
@@ -1392,7 +1392,7 @@ interface SandboxRestoreSpec
 
 ### `SandboxRunError`
 
-`class` — A typed `sandbox_run` failure.
+`class`
 
 ```ts
 class SandboxRunError
@@ -1400,7 +1400,7 @@ class SandboxRunError
 
 ### `SandboxRunFailureCode`
 
-`type`
+`type` — Typed computer-task outcomes shared by prompt observation and the Router tool.
 
 ```ts
 type SandboxRunFailureCode
