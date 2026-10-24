@@ -132,6 +132,7 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
       : mode === 'recovery' ? ['local/primary', 'local/primary'] : ['local/primary'])
     expect(toolRequests).toEqual(mode === 'fallback' ? [] : ['/work'])
     expect(outcomes).toHaveLength(1)
+    expect(outcomes[0].failure?.code).toBe(failure ?? undefined)
     expect(sqlite.prepare('SELECT * FROM outcomes').all()).toEqual([
       { failure, hops: mode === 'deadline' ? 1 : null, calls: requested.length },
     ])
