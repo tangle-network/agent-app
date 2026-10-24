@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request supersedes its queued catalog check; main keeps
+# every merge's run. Without this, merged PRs left dozens of stale runs queued
+# on the shared ci-public runners (43 on 2026-10-24).
+concurrency:
+  group: component-catalog-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: [self-hosted, ci-public]
