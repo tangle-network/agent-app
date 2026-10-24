@@ -8,10 +8,10 @@ import type { StreamSandboxPromptOptions } from './prompt-options'
 import type { SandboxRuntimeConfig } from './configuration'
 import type { SandboxInstance, TurnDriveResult } from '@tangle-network/sandbox'
 import { streamSandboxPrompt, emitSandboxActivity } from './prompt-dispatch'
+import { assertIsolatedDispatchWithinCap } from './payload-limits'
 import { type Outcome, ok, fail } from './outcome'
 import { isTerminalPromptEvent } from './prompt-events'
 import { SandboxRunError } from './sandbox-run-error'
-import { assertIsolatedDispatchWithinCap } from './payload-limits'
 
 /**
  * Stable identity for a streamed text part, so deltas of one part accumulate
@@ -146,24 +146,18 @@ export async function runSandboxPrompt(
 ): Promise<string> {
   let terminal = false
   let failed = false
-  // What the box reported about its failure, kept as the cause so the turn's durable notice can name it.
-  let reported: unknown
   async function* observed() {
     for await (const event of streamSandboxPrompt(shell, box, message, options)) {
       if (isTerminalPromptEvent(event)) terminal = true
       const raw = event as { type?: string; data?: { success?: unknown; status?: unknown; error?: unknown } }
       if (raw.type === 'error' || (raw.type === 'result' && (raw.data?.success === false
-        || raw.data?.status === 'failed' || raw.data?.status === 'error' || Boolean(raw.data?.error)))) {
-        failed = true
-        reported ??= raw.type === 'error' ? raw.data : raw.data?.error ?? raw.data
-      }
+        || raw.data?.status === 'failed' || raw.data?.status === 'error' || Boolean(raw.data?.error)))) failed = true
       yield event
     }
   }
   const answer = await collectSandboxPromptText(observed(), message, options?.history)
-  const cause = reported === undefined ? undefined : { cause: reported }
-  if (!terminal) throw new SandboxRunError('sandbox_unconfirmed', 'The computer stopped reporting before its completion was confirmed. Its work may still be running.', cause)
-  if (failed) throw new SandboxRunError('sandbox_failed', 'The computer reported a failed execution.', cause)
+  if (!terminal) throw new SandboxRunError('sandbox_unconfirmed', 'The computer stopped reporting before its completion was confirmed. Its work may still be running.')
+  if (failed) throw new SandboxRunError('sandbox_failed', 'The computer reported a failed execution.')
   return answer
 }
 

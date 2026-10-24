@@ -2,7 +2,7 @@
  * The release canary, run as `pnpm canary` runs it, against this app's real Worker served over HTTP: real
  * better-auth sign-up, the real migration in SQLite, the shared hybrid lane, and the real Sandbox SDK.
  * The Router and the sandbox are local protocol peers; the sandbox peer computes the command's digest as a box
- * would. A pass needs both turns; a computer step the box refuses fails the release and names its cause.
+ * would. A pass needs both turns; a failed computer step fails the release, and the log names its recorded cause.
  */
 
 import { spawn } from 'node:child_process'
@@ -39,8 +39,9 @@ async function close(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
 }
 
-/** The Router and the sandbox API over loopback HTTP. A box that `answers` runs the canary's command. */
-async function protocolPeers(computer: 'answers' | 'refuses') {
+/** The Router and the sandbox API over loopback HTTP. A box that `answers` runs the canary's command; one that
+ *  `fails` reports a failed run; an `unplaced` box is refused by the sandbox API before it can run anything. */
+async function protocolPeers(computer: 'answers' | 'fails' | 'unplaced') {
   const dispatched: string[] = []
   let origin = ''
   const server = createServer(async (request, response) => {
@@ -50,6 +51,7 @@ async function protocolPeers(computer: 'answers' | 'refuses') {
     const json = (value: unknown, status = 200) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value))
     const frame = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`
     if (path === '/v1/sandboxes/canary-box') {
+      if (computer === 'unplaced') return json({ code: 'COMPUTER_UNAVAILABLE', message: 'No sandbox host has capacity for canary-box' }, 409)
       return json({ id: 'canary-box', status: 'running', filesystemIncarnationId: 'canary-incarnation',
         filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
         connection: { runtimeUrl: `${origin}/v1/sandboxes/canary-box/runtime` } })
@@ -62,7 +64,7 @@ async function protocolPeers(computer: 'answers' | 'refuses') {
       dispatched.push(task)
       const ids = { executionId: String(request.headers['x-execution-id'] ?? 'canary-execution'), sessionId: input.sessionId }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      if (computer === 'refuses') {
+      if (computer === 'fails') {
         const refusal = { code: 'PAYLOAD_TOO_LARGE', status: 413, message: 'Request body exceeds the 1048576 byte limit' }
         return response.end(frame('execution.started', ids) + frame('error', refusal)
           + frame('result', { ...ids, status: 'failed', error: refusal }))
@@ -135,8 +137,7 @@ async function servedApp(peer: { origin: string }) {
     TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin,
     SANDBOX_API_KEY: 'loopback-only-sandbox-key', SANDBOX_GATEWAY_URL: peer.origin,
   }
-  const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('canary-box')
-  if (!box) throw new Error('The loopback sandbox peer has no canary box')
+  const client = new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin })
   const shell = createSandboxShell(env)
   app = buildChatApp(env, {
     db: drizzle(sqlite) as unknown as ChatDatabase,
@@ -147,7 +148,11 @@ async function servedApp(peer: { origin: string }) {
         apiKey: 'loopback-only-router-key', model: 'requested/canary', baseUrl: peer.origin,
         systemPrompt: 'Use the workspace computer when the member asks for it.',
         box: {
-          acquire: async () => box,
+          acquire: async () => {
+            const box = await client.get('canary-box')
+            if (!box) throw new Error('The loopback sandbox peer has no canary box')
+            return box
+          },
           runTask: sandboxPromptRunner(shell, { model: 'native/canary', sessionId: `sandbox-run-${args.identity.sessionId}` }),
           timeoutMs: 10_000,
         },
@@ -190,15 +195,28 @@ describe('release canary', () => {
     } finally { await served.close(); await peer.close() }
   }, 60_000)
 
-  it('fails the release when the computer step fails, naming the recorded cause', async () => {
-    const peer = await protocolPeers('refuses')
+  it('fails the release when the box reports a failed computer step', async () => {
+    const peer = await protocolPeers('fails')
     const served = await servedApp(peer)
     try {
       const run = await runCanary({ ...member, CANARY_URL: served.origin })
       expect(run.output).toMatch(/canary answer PASS/)
       expect(run.output).toMatch(/canary computer FAIL .*the computer step failed \(sandbox_\w+\)/)
-      // The box's refusal reaches the release log through the transcript's persisted notice.
-      expect(run.output).toContain('Request body exceeds the 1048576 byte limit')
+      expect(peer.dispatched).toHaveLength(1)
+      expect(run.code).toBe(1)
+    } finally { await served.close(); await peer.close() }
+  }, 60_000)
+
+  it('fails the release when the computer cannot be placed, naming the recorded cause', async () => {
+    const peer = await protocolPeers('unplaced')
+    const served = await servedApp(peer)
+    try {
+      const run = await runCanary({ ...member, CANARY_URL: served.origin })
+      expect(run.output).toMatch(/canary answer PASS/)
+      expect(run.output).toMatch(/canary computer FAIL .*the computer step failed \(sandbox_unavailable\)/)
+      // The sandbox API's refusal reaches the release log through the transcript's persisted notice.
+      expect(run.output).toContain('No sandbox host has capacity for canary-box')
+      expect(peer.dispatched).toEqual([])
       expect(run.code).toBe(1)
     } finally { await served.close(); await peer.close() }
   }, 60_000)
