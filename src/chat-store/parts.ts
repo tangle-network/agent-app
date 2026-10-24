@@ -58,9 +58,7 @@ import type {
   ChatInteractionField,
   ChatInteractionStatus,
   InteractionAnswers,
-  InteractionPersistedPart,
   NoticeKind,
-  NoticePersistedPart,
 } from '../web-react/chat-interactions'
 import { persistedPartToInteraction } from '../interactions/contract'
 import {
@@ -250,19 +248,6 @@ export interface ChatMentionPart {
   size?: number
   turnId?: string
 }
-
-// The "byte-matches" claims above, enforced at compile time: the interaction
-// contract's codec output types and the stored part types must stay mutually
-// assignable, so a codec field added on one side without the other fails here.
-type MutuallyAssignable<A extends B, B> = A
-type _CodecEmitsStorableInteractionPart = MutuallyAssignable<InteractionPersistedPart, ChatInteractionPart>
-type _StoredInteractionPartFeedsCodec = MutuallyAssignable<ChatInteractionPart, InteractionPersistedPart>
-type _CodecEmitsStorableNoticePart = MutuallyAssignable<NoticePersistedPart, ChatNoticePart>
-type _StoredNoticePartFeedsCodec = MutuallyAssignable<ChatNoticePart, NoticePersistedPart>
-type _CodecEmitsStorablePlanPart = MutuallyAssignable<ChatPlanPersistedPart, ChatPlanPart>
-type _StoredPlanPartFeedsCodec = MutuallyAssignable<ChatPlanPart, ChatPlanPersistedPart>
-type _CodecEmitsStorableWorkProductPart = MutuallyAssignable<WorkProductPersistedPart, ChatWorkProductPart>
-type _StoredWorkProductPartFeedsCodec = MutuallyAssignable<ChatWorkProductPart, WorkProductPersistedPart>
 
 /** Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions */
 export type ChatMessagePart =

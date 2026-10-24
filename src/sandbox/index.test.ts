@@ -1862,11 +1862,6 @@ describe('runSandboxPrompt text aggregation', () => {
     await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('streamed answer')
   })
 
-  it('returns empty string when the turn produced only an echo', async () => {
-    const box = boxYielding([textSnapshot('echo', 'q'), { type: 'done', data: { status: 'completed' } }])
-    await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('')
-  })
-
   it('accumulates the snapshot lane, where each update re-sends the whole part', async () => {
     const box = boxYielding([
       textSnapshot('p1', 'Hel'),

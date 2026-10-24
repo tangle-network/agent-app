@@ -6,7 +6,7 @@ import { StatusPill } from '@tangle-network/ui/primitives'
 import { MAX_RECOMMENDED_MODELS, sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
 import { ChevronDown, CheckGlyph, SearchGlyph, SparkleGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
-import { CHIP_PICKER_TRIGGER, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+import { CHIP_PICKER_TRIGGER, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
 export interface ModelPickerProps {
   /** Controlled, opaque saved id. Never replaced merely because the catalogue omits it. */

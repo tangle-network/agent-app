@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-283 exports.
+285 exports.
 
 ### `adaptSandboxStream`
 
@@ -1316,6 +1316,22 @@ interface SandboxPrewarmScope
 
 ```ts
 type SandboxPromptConfig
+```
+
+### `SandboxPromptExecutionLimits`
+
+`interface`
+
+```ts
+interface SandboxPromptExecutionLimits
+```
+
+### `sandboxPromptExecutionOptions`
+
+`function`
+
+```ts
+(limits: SandboxPromptExecutionLimits | undefined, effort: "none" | "auto" | "minimal" | "low" | "medium" | "high" | "x…
 ```
 
 ### `sandboxPromptRunner`

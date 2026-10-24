@@ -3,22 +3,18 @@ packages:
 
 autoInstallPeers: false
 strictPeerDependencies: true
-peerDependencyRules:
-  allowedVersions:
-    '@ph0ny/sdk@0.1.2>typescript': '7.0.2'
 
 minimumReleaseAge: 4320
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
 minimumReleaseAgeExclude:
   - '@tangle-network/*'
-  - '@ph0ny/sdk@0.1.2'
 
 overrides:
-  zod: 4.4.3
+  'miniflare>undici': 7.30.1
+  zod@4: 4.6.7
 
 allowBuilds:
-  '@ax-llm/ax': false
   better-sqlite3: true
   cpu-features: false
   esbuild: true

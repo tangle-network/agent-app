@@ -1,4 +1,5 @@
 /** Public contracts for admission, execution, persistence and chat-route hooks. */
+import type { SandboxPromptExecutionLimits } from '../sandbox/prompt-options'
 import type { ChatTurnStoreBindings } from './route-storage'
 import type { NativeCompletionHandoffOptions, NativeTurnTimingFacts } from './native-turn-timing'
 import type { ChatMessageValues } from '../chat-store/core'
@@ -227,10 +228,8 @@ export type ChatTurnAfterAuthorizeRelease<TResource = unknown> = (() => void | P
 }
 
 /** Trusted per-turn limits supplied by a server adapter, never by the body. */
-export interface ChatTurnExecutionLimits {
+export interface ChatTurnExecutionLimits extends SandboxPromptExecutionLimits {
   maxInputTokens?: number
-  maxOutputTokens?: number
-  maxReasoningTokens?: number
   maxToolTokens?: number
   maxToolCalls?: number
   maxProviderCostUsd?: number

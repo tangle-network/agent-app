@@ -6,7 +6,7 @@ import { runForegroundSandboxSingleFlight } from '../sandbox/foreground-single-f
 import { ensureWorkspaceSandbox, peekWorkspaceSandbox, streamSandboxPrompt } from '../sandbox/index'
 import { sandboxPromptRunner } from '../sandbox/sandbox-run-tool'
 import type { SandboxRuntimeConfig } from '../sandbox/configuration'
-import type { StreamSandboxPromptOptions } from '../sandbox/prompt-options'
+import { sandboxPromptExecutionOptions, type StreamSandboxPromptOptions } from '../sandbox/prompt-options'
 import type { ChatTurnStoreBindings } from './route-storage'
 import { turnCarriesFiles } from './hybrid-producer'
 import { normalizeChatPromptForSandbox } from './dispatch-parts'
@@ -63,7 +63,7 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     const scope = { workspaceId: args.identity.tenantId, userId: args.identity.userId }
     if (!bindings) throw new Error('Default sandbox execution requires durable D1 claim bindings')
     return runForegroundSandboxSingleFlight({ claim: createD1PrewarmClaimStore(bindings.db), workspaceId: scope.workspaceId,
-      harness, provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness, trace: args.trace }),
+      trace: args.trace, harness, provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness, trace: args.trace }),
       peek: () => peekWorkspaceSandbox(shell, scope), adopt: ({ box }) => box })
   }
   const modelFor = (args: ChatTurnProduceArgs<TContext, TResource>) => {
@@ -75,11 +75,7 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     model: modelFor(args), harness, sessionId: args.identity.sessionId, executionId: args.executionId,
     turnId: args.executionId, trace: args.trace, signal: args.admissionSignal, detach: true,
     systemPrompt: config.systemPrompt, interactions: config.interactions,
-    effort: args.executionLimits?.maxReasoningTokens === 0 ? 'none' : args.body.effort ?? config.effort,
-    ...(args.executionLimits?.maxOutputTokens !== undefined ? {
-      maxOutputTokens: args.executionLimits.maxOutputTokens, maxTotalOutputTokens: args.executionLimits.maxOutputTokens,
-    } : {}),
-    ...(args.executionLimits?.maxReasoningTokens ? { maxReasoningTokens: args.executionLimits.maxReasoningTokens } : {}),
+    ...sandboxPromptExecutionOptions(args.executionLimits, args.body.effort ?? config.effort),
   })
   return {
     when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false && Boolean(env.TANGLE_API_KEY?.trim()) && !turnCarriesFiles(args.prompt)

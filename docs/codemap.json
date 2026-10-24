@@ -17303,6 +17303,7 @@
         "chat-routes",
         "harness",
         "profile",
+        "redact",
         "runtime",
         "tools",
         "turn-stream",
@@ -18293,6 +18294,18 @@
           "kind": "type",
           "signature": "type SandboxPromptConfig",
           "doc": "Configuration needed to prepare a turn without provisioning a workspace."
+        },
+        {
+          "name": "SandboxPromptExecutionLimits",
+          "kind": "interface",
+          "signature": "interface SandboxPromptExecutionLimits",
+          "doc": null
+        },
+        {
+          "name": "sandboxPromptExecutionOptions",
+          "kind": "function",
+          "signature": "(limits: SandboxPromptExecutionLimits | undefined, effort: \"none\" | \"auto\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"x…",
+          "doc": null
         },
         {
           "name": "sandboxPromptRunner",
