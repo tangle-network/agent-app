@@ -132,7 +132,8 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
       : mode === 'recovery' ? ['local/primary', 'local/primary'] : ['local/primary'])
     expect(toolRequests).toEqual(mode === 'fallback' ? [] : ['/work'])
     expect(outcomes).toHaveLength(1)
-    expect(outcomes[0].failure?.code).toBe(failure ?? undefined)
+    const outcome = outcomes[0]!
+    expect(outcome.failure?.code).toBe(failure ?? undefined)
     expect(sqlite.prepare('SELECT * FROM outcomes').all()).toEqual([
       { failure, hops: mode === 'deadline' ? 1 : null, calls: requested.length },
     ])
@@ -141,11 +142,11 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
     expect(sqlite.prepare('SELECT failed FROM rollout_turn_timing').all()).toEqual([{ failed: Number(Boolean(failure)) }])
     const messages = sqlite.prepare("SELECT parts FROM messages WHERE role = 'assistant'").all() as Array<{ parts: string }>
     expect(messages).toHaveLength(1)
-    const parts = JSON.parse(messages[0].parts) as Array<Record<string, unknown>>
+    const parts = JSON.parse(messages[0]!.parts) as Array<Record<string, unknown>>
     if (failure) expect(parts).toContainEqual(expect.objectContaining({ type: 'notice', code: failure }))
     else expect(parts.filter(part => part.type === 'notice' && part.noticeKind === 'error')).toEqual([])
-    if (mode === 'deadline') expect(outcomes[0].continuation?.messages.some(message => message.role === 'tool')).toBe(true)
-    if (mode === 'recovery') expect(outcomes[0].toolCalls).toEqual([{ callId: 'work-1', toolName: 'work', ok: false }])
+    if (mode === 'deadline') expect(outcome.continuation?.messages.some(message => message.role === 'tool')).toBe(true)
+    if (mode === 'recovery') expect(outcome.toolCalls).toEqual([{ callId: 'work-1', toolName: 'work', ok: false }])
   } finally {
     for (const timer of timers) clearTimeout(timer)
     peer.closeAllConnections()
