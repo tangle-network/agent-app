@@ -23,7 +23,10 @@ import { createDurablePlanDecisionClient, useDurablePlanFlow } from './src/web-r
 const id = new URLSearchParams(location.search).get('case');
 const initial = {planId:id,revision:1,status:['inline-manual','scope-decide'].includes(id)?'pending':'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'};
 function Controller({selected,scope,onUpdated}){
- const memoClient=useMemo(()=>createDurablePlanDecisionClient({url:'/plan?scope='+scope}),[scope]);
+ const memoClient=useMemo(()=>createDurablePlanDecisionClient({
+  url:id==='scope-decide'?()=>'/plan?scope='+scope:'/plan?scope='+scope,
+  ...(id==='scope-decide'?{scopeKey:String(scope)}:{}),
+ }),[scope]);
  // Recreated factories, URL/body functions and callbacks are valid public hook inputs.
  const client=id.startsWith('inline-')?createDurablePlanDecisionClient({url:()=>'/plan',body:()=>({source:'inline-browser-proof'})}):memoClient;
  const [attached,setAttached]=useState(false);
@@ -32,7 +35,7 @@ function Controller({selected,scope,onUpdated}){
   if(!response.ok)throw new Error('Attachment service unavailable');
   setAttached(true);
  };
- const flow=useDurablePlanFlow({plan:selected,client,scopeKey:String(scope),autoRestore:true,attachFollowUp,onUpdated});
+ const flow=useDurablePlanFlow({plan:selected,client,...(id==='scope-error'?{scopeKey:String(scope)}:{}),autoRestore:true,attachFollowUp,onUpdated});
  return <main><h1>Saved plan</h1><output data-error>{flow.error??flow.attachError??''}</output>
  <output data-plan>{flow.plan.planId+':'+flow.plan.revision}</output><output data-attached>{String(attached)}</output><output data-pending>{String(flow.effectPending)}</output><output data-restoring>{String(flow.restoring)}</output>
  <button onClick={flow.retryAttach}>Retry notifying the agent</button>

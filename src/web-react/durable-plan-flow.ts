@@ -40,6 +40,8 @@ export interface DurablePlanCurrentInput {
 
 /** Define methods to obtain and decide durable plan decisions asynchronously */
 export interface DurablePlanDecisionClient {
+  /** Stable transport context, independent of the client object's identity. */
+  readonly scopeKey?: string
   current: (input: DurablePlanCurrentInput) => Promise<DurablePlanDecisionResult>
   decide: (input: DurablePlanDecisionInput) => Promise<DurablePlanDecisionResult>
 }
@@ -60,6 +62,9 @@ export class DurablePlanClientError extends Error {
 /** Define configuration options for creating a durable plan decision client */
 export interface DurablePlanDecisionClientOptions {
   url: string | ((input: DurablePlanCurrentInput | DurablePlanDecisionInput) => string)
+  /** Non-secret endpoint/workspace/authentication identity. Defaults to a
+   * string URL; function URLs and authentication changes need an explicit key. */
+  scopeKey?: string
   body?: Record<string, unknown> | ((input: DurablePlanDecisionInput) => Record<string, unknown>)
   fetchImpl?: typeof fetch
 }
@@ -135,6 +140,7 @@ export function createDurablePlanDecisionClient(
   }
 
   return {
+    scopeKey: options.scopeKey ?? (typeof options.url === 'string' ? options.url : undefined),
     async current(input) {
       const rawUrl = urlFor(input)
       const url = new URL(rawUrl, globalThis.location?.origin ?? 'http://localhost')
@@ -162,7 +168,8 @@ export interface UseDurablePlanFlowOptions {
   client: DurablePlanDecisionClient
   /** Stable, non-secret identity of the endpoint/workspace/authentication
    * context. Change it when that context changes even if the plan does not.
-   * Incidental client object recreation does not change request lifetime. */
+   * Defaults to client.scopeKey. Incidental client object recreation does not
+   * change request lifetime. */
   scopeKey?: string
   /** Must be idempotent by receipt.receiptId. */
   attachFollowUp?: (receipt: DurablePlanFollowUpReceipt, plan: ChatPlan, decision: DurablePlanDecision) => Promise<void> | void
@@ -243,6 +250,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
   const [restoreRetry, setRestoreRetry] = useState(0)
   const advanceRestore = useCallback(() => setRestoreRetry(value => value + 1), [])
   const lifetime = useRef<object | null>(null)
+  const scopeKey = options.scopeKey ?? options.client.scopeKey
   const latest = useRef(options)
   useLayoutEffect(() => { latest.current = options })
   useLayoutEffect(() => {
@@ -260,7 +268,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
       lifetime.current = null
       restoration.current = { restored: null, inFlight: null, attempts: new Map() }
     }
-  }, [options.plan.planId, options.plan.revision, options.scopeKey])
+  }, [options.plan.planId, options.plan.revision, scopeKey])
 
   useEffect(() => setPlan(options.plan), [options.plan])
 
@@ -339,7 +347,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
         setDeciding(null)
       }
     }
-  }, [apply, plan.planId, plan.revision, options.scopeKey])
+  }, [apply, plan.planId, plan.revision, scopeKey])
 
   const restore = useCallback(async () => {
     const context = lifetime.current
@@ -358,7 +366,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     } finally {
       if (lifetime.current === context) setRestoring(false)
     }
-  }, [apply, plan.planId, plan.revision, options.scopeKey])
+  }, [apply, plan.planId, plan.revision, scopeKey])
 
   const retryAttach = useCallback(() => {
     restoration.current.attempts.set(planDecisionKey(plan), 0)
