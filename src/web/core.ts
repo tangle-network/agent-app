@@ -12,10 +12,10 @@ export * from './free-route-limit'
 
 export type JsonObject = Record<string, unknown>
 
-/** Parse + object-narrow a Request body. `[body, null]` on success, `[null,
+/** Parse + object-narrow a Request or Response body. `[body, null]` on success, `[null,
  *  errorResponse]` on a non-object body (callers `if (err) return err`). */
 export async function parseJsonObjectBody(
-  request: Request,
+  request: Pick<Request, 'headers' | 'body' | 'json'>,
   options: { maxBytes?: number } = {},
 ): Promise<[JsonObject, null] | [null, Response]> {
   const maxBytes = options.maxBytes

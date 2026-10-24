@@ -282,6 +282,9 @@ export const DEFAULT_SANDBOX_RESOURCES: SandboxResourceConfig = {
 /** Define options for ensuring a workspace sandbox with provisioning and progress handling */
 export interface EnsureWorkspaceSandboxOptions {
   workspaceId: string
+  /** This caller's lifetime. A cancellation aborts SDK transport and forbids
+   * further lifecycle/recovery steps; it does not prove a remote create absent. */
+  signal?: AbortSignal
   userId?: string
   harness: Harness
   // When set, both the running-reuse and stopped-resume short-circuits are

@@ -37,6 +37,7 @@ export type {
 export type { StorageConfig } from '@tangle-network/sandbox'
 
 export * from './recovery'
+export type { WorkspaceSandboxOriginalRecoveryOptions, WorkspaceSandboxOriginalRecoveryResult } from './recovery-original'
 
 export {
   serializeSandboxProvisioningError,

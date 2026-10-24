@@ -35,8 +35,10 @@ export async function reuseWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
   options: EnsureWorkspaceSandboxOptions,
 ): Promise<SandboxInstance | undefined> {
+  options.signal?.throwIfAborted()
   if (options.forceNew) return undefined
   await hydrateReuseState(shell, options)
+  options.signal?.throwIfAborted()
   if (!hasRecentProbe(shell, options)) return undefined
   return claimWorkspaceSandbox(shell, options, true)
 }
@@ -62,6 +64,7 @@ async function claimWorkspaceSandbox(
   options: EnsureWorkspaceSandboxOptions,
   reuseOnly: boolean,
 ): Promise<SandboxInstance | undefined> {
+  options.signal?.throwIfAborted()
   const { trace } = options
   // A budget refusal must land before any box is created, resumed or kept alive,
   // so it runs ahead of the first attempt and the unbringable-box replacement
@@ -70,6 +73,7 @@ async function claimWorkspaceSandbox(
   // step, so a reuse pays for it once per probe and not once per turn.
   const gate = spendGate(options)
   await hydrateReuseState(shell, options)
+  options.signal?.throwIfAborted()
   if (!hasRecentProbe(shell, options)) await gate()
   const claim = trace?.start('sandbox.claim', 'sandbox', { 'workspace.harness': options.harness }, options.traceParent)
   // Each ensure step is a child of the claim, and the caller's own `measure` still sees it.
@@ -84,6 +88,7 @@ async function claimWorkspaceSandbox(
     : options
   try {
     const box = await bringUpWorkspaceSandbox(shell, traced, gate, reuseOnly)
+    options.signal?.throwIfAborted()
     if (!box) {
       claim?.end({ 'sandbox.reuse_declined': true })
       return undefined
@@ -91,7 +96,9 @@ async function claimWorkspaceSandbox(
     claim?.end({ 'sandbox.id': box.id, ...(trustedBoxes.has(box) ? { 'sandbox.probe_trusted': true } : {}) })
     // A box handed out on a recent probe was observed by the ensure that probed it.
     if (!trustedBoxes.has(box)) await observeProvisionedBox(shell, options, box)
+    options.signal?.throwIfAborted()
     await persistReuseState(shell, box)
+    options.signal?.throwIfAborted()
     return box
   } catch (error) {
     claim?.end(undefined, error)
@@ -148,6 +155,7 @@ async function bringUpWorkspaceSandbox(
   try {
     return await provisionWorkspaceSandbox(shell, options, gate, reuseOnly)
   } catch (err) {
+    options.signal?.throwIfAborted()
     // A box the platform cannot bring up is not a transient failure: the box
     // key is derived from the workspace, so every later call resumes the same
     // dead box and fails the same way. Left alone the workspace never runs

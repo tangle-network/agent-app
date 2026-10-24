@@ -13,6 +13,7 @@
 import type { Harness } from '../harness/index'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import type { PeekWorkspaceSandboxOutcome } from './index'
+import { awaitSandboxRead, waitForSandboxPoll } from './request-cancellation'
 import {
   sandboxPrewarmClaimKey,
   type FencedPrewarmClaimStore,
@@ -65,6 +66,10 @@ export type ForegroundSandboxSingleFlightEvent =
 
 export interface ForegroundSandboxSingleFlightOptions<T> {
   claim: FencedPrewarmClaimStore
+  /** Cancel this caller's waits. `provision` must forward the same signal to
+   * its transport. An aborted owner retains its lease until expiry because a
+   * canceled request does not prove the remote lifecycle operation absent. */
+  signal?: AbortSignal
   workspaceId: string
   harness: Harness
   /**
@@ -73,9 +78,9 @@ export interface ForegroundSandboxSingleFlightOptions<T> {
    * (`reuseWorkspaceSandbox` is that). The box is used only when no other
    * request holds the lease, because a holder may be changing it.
    */
-  reuse?(): Promise<T | undefined>
+  reuse?(signal?: AbortSignal): Promise<T | undefined>
   provision(): Promise<T>
-  peek(): Promise<PeekWorkspaceSandboxOutcome>
+  peek(signal?: AbortSignal): Promise<PeekWorkspaceSandboxOutcome>
   adopt(box: ReadyRunningSandboxOutcome): T | Promise<T>
   onEvent?(event: ForegroundSandboxSingleFlightEvent): void
   wait?(ms: number): Promise<void>
@@ -141,6 +146,7 @@ function safeErrorText(error: unknown): string {
 export async function runForegroundSandboxSingleFlight<T>(
   options: ForegroundSandboxSingleFlightOptions<T>,
 ): Promise<T> {
+  options.signal?.throwIfAborted()
   const key = sandboxPrewarmClaimKey(options)
   const ttlSeconds = positiveNumber(
     options.claimTtlSeconds ?? DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS,
@@ -150,9 +156,7 @@ export async function runForegroundSandboxSingleFlight<T>(
     options.pollIntervalMs ?? DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS,
     'pollIntervalMs',
   )
-  const wait =
-    options.wait ??
-    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  const wait = (ms: number) => waitForSandboxPoll(ms, options.signal, options.wait)
 
   const emit = (event: ForegroundSandboxSingleFlightEvent): void => {
     try {
@@ -169,10 +173,15 @@ export async function runForegroundSandboxSingleFlight<T>(
 
   const provisionAsOwner = async (lease: PrewarmClaimLease): Promise<T> => {
     try {
-      return await options.provision()
+      options.signal?.throwIfAborted()
+      const result = await options.provision()
+      options.signal?.throwIfAborted()
+      return result
     } finally {
       try {
-        await timed('sandbox.lease.release', () => options.claim.releaseLease(lease))
+        if (!options.signal?.aborted) {
+          await timed('sandbox.lease.release', () => options.claim.releaseLease(lease))
+        }
       } catch (error) {
         emit({
           type: 'release-failed',
@@ -186,10 +195,11 @@ export async function runForegroundSandboxSingleFlight<T>(
 
   if (options.reuse) {
     // One read of the lease, beside the reuse, replaces the lease's two writes.
-    const [state, reused] = await Promise.allSettled([
+    const [state, reused] = await awaitSandboxRead(() => Promise.allSettled([
       timed('sandbox.lease.inspect', () => options.claim.inspect(key)),
-      options.reuse(),
-    ])
+      options.reuse!(options.signal),
+    ]), options.signal)
+    options.signal?.throwIfAborted()
     if (reused.status === 'rejected') throw reused.reason
     if (reused.value !== undefined && state.status === 'fulfilled' && state.value.status !== 'held') {
       return reused.value
@@ -198,20 +208,26 @@ export async function runForegroundSandboxSingleFlight<T>(
 
   const initialLease = await timed('sandbox.lease.acquire', () => options.claim.acquireLease(key, ttlSeconds))
   if (initialLease) return provisionAsOwner(initialLease)
+  options.signal?.throwIfAborted()
 
   emit({ type: 'waiting', key, workspaceId: options.workspaceId })
   while (true) {
     await wait(pollIntervalMs)
-    const [peek, claim] = await Promise.all([
-      options.peek(),
+    const [peek, claim] = await awaitSandboxRead(() => Promise.all([
+      options.peek(options.signal),
       options.claim.inspect(key),
-    ])
+    ]), options.signal)
+    options.signal?.throwIfAborted()
 
     if (claim.status === 'held') continue
     if (peek.status === 'warming') {
       throw new SandboxFilesystemNotReadyError(options.workspaceId, 'transitioning')
     }
-    if (isReadyRunningSandbox(peek)) return options.adopt(peek)
+    if (isReadyRunningSandbox(peek)) {
+      const adopted = await options.adopt(peek)
+      options.signal?.throwIfAborted()
+      return adopted
+    }
     if (peek.status === 'running') {
       throw new SandboxFilesystemNotReadyError(
         options.workspaceId,

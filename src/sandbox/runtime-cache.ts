@@ -102,7 +102,10 @@ export function dropTrustedBox(box: SandboxInstance): boolean {
   return trustedBoxes.delete(box)
 }
 
-export function getClientFromCreds(creds: SandboxClientCredentials): Sandbox {
+export function getClientFromCreds(creds: SandboxClientCredentials, signal?: AbortSignal): Sandbox {
+  // Request lifetimes must never enter the isolate client cache: aborting one
+  // caller cannot poison another caller with the same service credentials.
+  if (signal) return new Sandbox({ apiKey: creds.apiKey, baseUrl: creds.baseUrl, signal })
   const fingerprint = `${creds.apiKey} ${creds.baseUrl}`
   if (_cached && _cached.fingerprint === fingerprint) return _cached.client
 
