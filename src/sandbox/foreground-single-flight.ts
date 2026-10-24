@@ -65,6 +65,10 @@ export type ForegroundSandboxSingleFlightEvent =
 
 export interface ForegroundSandboxSingleFlightOptions<T> {
   claim: FencedPrewarmClaimStore
+  /** Cancel this caller's waits. `provision` must forward the same signal to
+   * its transport. An aborted owner retains its lease until expiry because a
+   * canceled request does not prove the remote lifecycle operation absent. */
+  signal?: AbortSignal
   workspaceId: string
   harness: Harness
   /**
@@ -133,6 +137,24 @@ function safeErrorText(error: unknown): string {
   }
 }
 
+/** Cancel the polling delay without leaving a default timer or listener. */
+function waitForForegroundPoll(ms: number, signal?: AbortSignal, wait?: (ms: number) => Promise<void>): Promise<void> {
+  signal?.throwIfAborted()
+  return new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const finish = (error?: unknown) => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', aborted)
+      if (error !== undefined) reject(error)
+      else resolve()
+    }
+    const aborted = () => finish(signal!.reason)
+    signal?.addEventListener('abort', aborted, { once: true })
+    if (wait) Promise.resolve().then(() => wait(ms)).then(() => finish(), finish)
+    else timer = setTimeout(() => finish(), ms)
+  })
+}
+
 /**
  * Run one foreground provision or adopt the ready result from its current
  * owner. An expired retained claim permits takeover. A released claim without
@@ -141,6 +163,7 @@ function safeErrorText(error: unknown): string {
 export async function runForegroundSandboxSingleFlight<T>(
   options: ForegroundSandboxSingleFlightOptions<T>,
 ): Promise<T> {
+  options.signal?.throwIfAborted()
   const key = sandboxPrewarmClaimKey(options)
   const ttlSeconds = positiveNumber(
     options.claimTtlSeconds ?? DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS,
@@ -150,9 +173,7 @@ export async function runForegroundSandboxSingleFlight<T>(
     options.pollIntervalMs ?? DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS,
     'pollIntervalMs',
   )
-  const wait =
-    options.wait ??
-    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  const wait = (ms: number) => waitForForegroundPoll(ms, options.signal, options.wait)
 
   const emit = (event: ForegroundSandboxSingleFlightEvent): void => {
     try {
@@ -169,10 +190,15 @@ export async function runForegroundSandboxSingleFlight<T>(
 
   const provisionAsOwner = async (lease: PrewarmClaimLease): Promise<T> => {
     try {
-      return await options.provision()
+      options.signal?.throwIfAborted()
+      const result = await options.provision()
+      options.signal?.throwIfAborted()
+      return result
     } finally {
       try {
-        await timed('sandbox.lease.release', () => options.claim.releaseLease(lease))
+        if (!options.signal?.aborted) {
+          await timed('sandbox.lease.release', () => options.claim.releaseLease(lease))
+        }
       } catch (error) {
         emit({
           type: 'release-failed',
@@ -190,6 +216,7 @@ export async function runForegroundSandboxSingleFlight<T>(
       timed('sandbox.lease.inspect', () => options.claim.inspect(key)),
       options.reuse(),
     ])
+    options.signal?.throwIfAborted()
     if (reused.status === 'rejected') throw reused.reason
     if (reused.value !== undefined && state.status === 'fulfilled' && state.value.status !== 'held') {
       return reused.value
@@ -198,6 +225,7 @@ export async function runForegroundSandboxSingleFlight<T>(
 
   const initialLease = await timed('sandbox.lease.acquire', () => options.claim.acquireLease(key, ttlSeconds))
   if (initialLease) return provisionAsOwner(initialLease)
+  options.signal?.throwIfAborted()
 
   emit({ type: 'waiting', key, workspaceId: options.workspaceId })
   while (true) {
@@ -206,6 +234,7 @@ export async function runForegroundSandboxSingleFlight<T>(
       options.peek(),
       options.claim.inspect(key),
     ])
+    options.signal?.throwIfAborted()
 
     if (claim.status === 'held') continue
     if (peek.status === 'warming') {

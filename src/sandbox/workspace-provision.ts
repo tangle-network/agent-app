@@ -94,10 +94,14 @@ export async function provisionWorkspaceSandbox(
   )) {
     throw new Error('livenessProbe.execTimeoutMs must be an integer between 100 and 600000')
   }
-  const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId } = options
-  const measure = <T>(stage: string, operation: () => Promise<T>): Promise<T> =>
-    options.measure ? options.measure(`sandbox.ensure.${stage}`, operation) : operation()
-  const resolved = await measure('credentials', () => resolveWorkspaceSandboxClient(shell, workspaceId, userId))
+  const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId, signal } = options
+  const measure = async <T>(stage: string, operation: () => Promise<T>): Promise<T> => {
+    signal?.throwIfAborted()
+    const result = await (options.measure ? options.measure(`sandbox.ensure.${stage}`, operation) : operation())
+    signal?.throwIfAborted()
+    return result
+  }
+  const resolved = await measure('credentials', () => resolveWorkspaceSandboxClient(shell, workspaceId, userId, signal))
   const { scope, client } = resolved
   let name = resolved.name
   let recoveryRestore: SandboxRestoreSpec | null | undefined
@@ -185,6 +189,7 @@ export async function provisionWorkspaceSandbox(
         )
         return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
       } catch (cause) {
+        signal?.throwIfAborted()
         if (refusal.refused) throw refusal.error
         if (reuseOnly) return undefined
         const error = cause instanceof Error ? cause : new Error(String(cause))
@@ -225,6 +230,7 @@ export async function provisionWorkspaceSandbox(
       const runtimeEnv = await measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
       const resumed = await measure('resume', () => resumeStoppedBox(stoppedBox, resumeTimeout, runtimeEnv, onProgress))
       if (!resumed.succeeded) {
+        signal?.throwIfAborted()
         const recovery = await requestSandboxReplacement(
           shell.recoverStoppedSandbox,
           { box: stopped.value, error: resumed.error, scope, boxKey: name },
@@ -253,6 +259,7 @@ export async function provisionWorkspaceSandbox(
           )
           return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv))
         } catch (cause) {
+          signal?.throwIfAborted()
           const error = cause instanceof Error ? cause : new Error(String(cause))
           const recovery = await requestMissingSandboxReplacement(shell, {
             box: stopped.value,
@@ -275,6 +282,7 @@ export async function provisionWorkspaceSandbox(
 
   await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
     ...(onProgress ? { onProgress } : {}),
   }))
   box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
