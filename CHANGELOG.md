@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.15
+
+- fix(sandbox): report why a sandbox prompt produced no answer (#1319)
+
 ## 0.63.14
 
 - ci: release the catalog before full signoff suites
