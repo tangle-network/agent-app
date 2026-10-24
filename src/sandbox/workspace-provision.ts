@@ -278,9 +278,11 @@ export async function provisionWorkspaceSandbox(
 
   // Stage 3 — create fresh.
   signal?.throwIfAborted()
-  const { payload, deferredFiles } = await measure('payload', () => prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal))
+  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal)
 
-  let box = await measure('create', () => client.create(payload))
+  // The client signal aborts each request; the create's own signal also ends
+  // its Retry-After pacing between POSTs, so a canceled caller sends no later create.
+  let box = await measure('create', () => client.create(payload, signal ? { signal } : undefined))
 
   await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
