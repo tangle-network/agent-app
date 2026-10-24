@@ -98,3 +98,7 @@ code. A subsequent `original_recovered` read is not a fresh physical inventory.
 The manager also refuses completing an already bound pending replacement with a
 different physical ID under the same key. Matching pending completion is still
 accepted and an already completed action still returns undefined.
+
+Request cancellation requires Sandbox SDK 0.64.22 or later in the supported
+peer range. Earlier SDKs lack both `SandboxConfig.signal` and `Sandbox.signal`;
+consumers must update their manifest and lockfile before adopting this release.
