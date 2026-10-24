@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.16
+
+- fix: harden dependencies and prompt execution
+
 ## 0.63.15
 
 - fix(sandbox): report why a sandbox prompt produced no answer (#1319)
