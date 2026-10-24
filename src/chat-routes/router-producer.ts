@@ -11,6 +11,7 @@
 import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import { redactErrorMessage } from '../redact/index'
+import { noticePart } from '../interactions/contract'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
@@ -155,6 +156,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
     }
     if (final && final.failure) result.failure = final.failure
     if (result.failure) {
+      parts.push(noticePart('error', 'router-error', result.failure.message, result.failure.code))
       push({ type: 'error', data: { message: result.failure.message, code: result.failure.code } })
     }
   }).finally(async () => {
