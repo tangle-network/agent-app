@@ -1796,6 +1796,7 @@ describe('runSandboxPrompt text aggregation', () => {
       textDelta('p1', 'Hello'),
       textDelta('p1', ' brave'),
       textDelta('p1', ' world'),
+      { type: 'done', data: { status: 'completed' } },
     ])
     await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello brave world')
   })
@@ -1807,6 +1808,7 @@ describe('runSandboxPrompt text aggregation', () => {
       textSnapshot('echo', 'greet me'),
       textDelta('p1', 'Hello'),
       textDelta('p1', ' world'),
+      { type: 'done', data: { status: 'completed' } },
     ])
     await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
   })
@@ -1815,7 +1817,7 @@ describe('runSandboxPrompt text aggregation', () => {
     // streamSandboxPrompt dispatches flattenHistory(message, history); an echo
     // replays that folded string, not the raw message.
     const folded = 'Assistant: prior\n\nUser: greet me'
-    const box = boxYielding([textSnapshot('echo', folded), textDelta('p1', 'Hi there')])
+    const box = boxYielding([textSnapshot('echo', folded), textDelta('p1', 'Hi there'), { type: 'done', data: { status: 'completed' } }])
     await expect(
       runSandboxPrompt(shell(), box, 'greet me', {
         history: [{ role: 'assistant', content: 'prior' }],
@@ -1830,6 +1832,7 @@ describe('runSandboxPrompt text aggregation', () => {
       textDelta('p1', 'Hello'),
       textDelta('p1', ' world'),
       textSnapshot('echo', 'greet me'),
+      { type: 'done', data: { status: 'completed' } },
     ])
     await expect(runSandboxPrompt(shell(), box, 'greet me')).resolves.toBe('Hello world')
   })
@@ -1838,6 +1841,7 @@ describe('runSandboxPrompt text aggregation', () => {
     const box = boxYielding([
       textDelta('p1', 'thinking out loud'),
       textDelta('p2', 'the answer is 42'),
+      { type: 'done', data: { status: 'completed' } },
     ])
     await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('the answer is 42')
   })
@@ -1859,7 +1863,7 @@ describe('runSandboxPrompt text aggregation', () => {
   })
 
   it('returns empty string when the turn produced only an echo', async () => {
-    const box = boxYielding([textSnapshot('echo', 'q')])
+    const box = boxYielding([textSnapshot('echo', 'q'), { type: 'done', data: { status: 'completed' } }])
     await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('')
   })
 
@@ -1868,6 +1872,7 @@ describe('runSandboxPrompt text aggregation', () => {
       textSnapshot('p1', 'Hel'),
       textSnapshot('p1', 'Hello wor'),
       textSnapshot('p1', 'Hello world'),
+      { type: 'done', data: { status: 'completed' } },
     ])
     await expect(runSandboxPrompt(shell(), box, 'q')).resolves.toBe('Hello world')
   })
@@ -1880,6 +1885,7 @@ describe('runSandboxPrompt text aggregation', () => {
       textSnapshot('echo', 'greet me'),
       textDelta('p1', 'Hello'),
       textDelta('p1', ' world'),
+      { type: 'done', data: { status: 'completed' } },
     ]
     async function* standalone() {
       for (const e of events) yield e
@@ -1887,6 +1893,11 @@ describe('runSandboxPrompt text aggregation', () => {
     await expect(collectSandboxPromptText(standalone(), 'greet me')).resolves.toBe(
       await runSandboxPrompt(shell(), boxYielding(events), 'greet me'),
     )
+  })
+
+  it('refuses a stream that ends without a result or terminal confirmation', async () => {
+    const box = boxYielding([textDelta('p1', 'unfinished')])
+    await expect(runSandboxPrompt(shell(), box, 'q')).rejects.toMatchObject({ code: 'sandbox_unconfirmed' })
   })
 
   it('collectSandboxPromptText drops an echo of the folded prompt when given the history', async () => {
