@@ -8,7 +8,7 @@
  *   turn         `createChatTurnRoutes` — body validation, turn identity,
  *                the default turn-buffer tap (replay after a drop), user and
  *                assistant rows persisted with typed parts + usage receipt
- *   producer     the hybrid lane from `src/sandbox.ts`: the Router answers
+ *   producer     the shared default lane: the Router answers
  *                first and escalates to the box through `sandbox_run`
  *   uploads      `createUploadRoute` — small files inline (`data:` URI),
  *                large files into the sandbox workspace by path

@@ -1,10 +1,9 @@
 /**
- * src/sandbox.ts — the config-driven sandbox lane. CODE, not data.
+ * src/sandbox.ts — product sandbox policy and file/interaction access.
  *
- * Everything agent-shaped runs in a Tangle sandbox (a full agent harness:
- * skills, tools, bash, MCP) reached through `@tangle-network/agent-app`'s
- * sandbox helpers. This file turns `agent.config.ts` + env into the three
- * seams the chat vertical needs:
+ * `createChatTurnRoutes` owns Router-first hybrid execution and sandbox fallback.
+ * This file supplies the product policy and the sandbox access that uploads
+ * and interaction answers need:
  *
  *   - `createSandboxShell` — product provisioning, profile and credential policy.
  *     `createChatTurnRoutes` assembles the lane from it.

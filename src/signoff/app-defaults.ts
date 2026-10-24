@@ -465,7 +465,8 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
       { row: trace.row, id: 'turn-trace', optedOut: trace.optedOut },
       { row: firstOutputRow('visible', pin, sources, traceWired, calls, options.exports), id: 'first-visible', optedOut: null },
       { row: firstOutputRow('text', pin, sources, traceWired, calls, options.exports), id: 'first-text', optedOut: null },
-      { row: prewarmRow(sources), id: 'prewarm', optedOut: null },
+      { row: prewarmRow(sources), id: 'prewarm', optedOut: filesMatching(sources, /\bprewarm\s*:\s*false\b/).length
+        ? 'prewarm: false disables the inherited route' : null },
       { row: placementRow(configs), id: 'placement', optedOut: null },
       { row: toolCountRow(), id: null, optedOut: null },
       { row: limitAlarmsRow(sources), id: 'limit-alarms', optedOut: null },
