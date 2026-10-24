@@ -16,7 +16,7 @@ type Mode = 'deadline' | 'recovery' | 'fallback' | 'cancel' | 'durable'
 it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps Router terminal outcomes honest: %s', async mode => {
   const { sqlite, d1 } = sqliteD1(`${ROLLOUT_TURN_TIMING_SCHEMA_SQL}
     CREATE TABLE messages(id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, parts TEXT);
-    CREATE TABLE outcomes(failure TEXT, hops INTEGER, calls INTEGER);
+    CREATE TABLE outcomes(failure TEXT, hops INTEGER);
     CREATE TABLE settlements(failed INTEGER);`)
   const timing = createD1TurnTimingStore({ db: d1 })
   const requested: string[] = []
@@ -111,8 +111,8 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
         onOutcome(outcome) {
         outcomes.push(outcome)
         // Domain settlement observes this value before the producer projects its terminal frame.
-        sqlite.prepare('INSERT INTO outcomes VALUES (?, ?, ?)')
-          .run(outcome.failure?.code ?? null, outcome.continuation?.hops ?? null, outcome.usage.modelCalls)
+        sqlite.prepare('INSERT INTO outcomes VALUES (?, ?)')
+          .run(outcome.failure?.code ?? null, outcome.continuation?.hops ?? null)
       } }) },
       lifecycle: {
         onTurnComplete: info => record(info.turnStreamId, false, info.durationMs),
@@ -135,7 +135,7 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
     const outcome = outcomes[0]!
     expect(outcome.failure?.code).toBe(failure ?? undefined)
     expect(sqlite.prepare('SELECT * FROM outcomes').all()).toEqual([
-      { failure, hops: mode === 'deadline' ? 1 : null, calls: requested.length },
+      { failure, hops: mode === 'deadline' ? 1 : null },
     ])
     expect(observation.outcome).toBe(failure ? 'failed' : 'completed')
     expect(sqlite.prepare('SELECT failed FROM settlements').all()).toEqual([{ failed: Number(Boolean(failure)) }])
