@@ -138,8 +138,9 @@ async function boundary() {
 
 it('inherits the hybrid Router backend and persists a real protocol reply without a produce option', async () => {
   const peer = await boundary()
+  const receipts: Array<{ userMessageId?: string | null; backendTerminal?: boolean }> = []
   try {
-    const response = await peer.routes().turn(peer.turn('first'), { ...peer.ctx,
+    const response = await peer.routes({ lifecycle: { onTurnComplete: receipt => { receipts.push(receipt) } } }).turn(peer.turn('first'), { ...peer.ctx,
       executionLimits: { maxOutputTokens: 321, maxReasoningTokens: 0 },
     })
     expect(response.status).toBe(200)
@@ -151,6 +152,10 @@ it('inherits the hybrid Router backend and persists a real protocol reply withou
     expect(peer.db.sqlite.prepare('SELECT role,content FROM message ORDER BY rowid').all()).toEqual([
       { role: 'user', content: 'Hello.' }, { role: 'assistant', content: 'A default Router answer.' },
     ])
+    expect(receipts).toEqual([expect.objectContaining({
+      userMessageId: peer.db.sqlite.prepare("SELECT id FROM message WHERE role='user'").get()?.id,
+      backendTerminal: true,
+    })])
     // This is an independently constructed factory over the same bindings.
     const next = await peer.routes().turn(peer.turn('second'), peer.ctx)
     expect(next.status).toBe(200)

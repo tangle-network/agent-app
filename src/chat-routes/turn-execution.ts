@@ -193,7 +193,7 @@ async function runAdmittedTurn<TContext, TResource>({
   /** The assistant row this turn ended with. Falls back to the draft writer
    *  so a turn whose producer THREW — skipping `persistAssistantMessage`
    *  entirely — still names the partial row it left behind. */
-  const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx)
+  const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
 
   try {
     if (state.lockAcquired && JSON.stringify(await trace.measure('admission.history_recheck', 'admission', readHistory)) !== historyBeforeLock) {
@@ -547,6 +547,7 @@ function createTurnSettlement<TContext, TResource>(
   turnStreamId: `${string}-${string}-${string}-${string}-${string}`,
   log: (message: string, meta?: Record<string, unknown>) => void,
   ctx: ChatTurnRequestContext | undefined,
+  userMessageId: () => string | null | undefined,
 ) {
   const assistantRowId = (): string | null => state.assistantMessageId ?? state.draft?.rowId() ?? null
 
@@ -611,7 +612,7 @@ function createTurnSettlement<TContext, TResource>(
     // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
     const snapshot = endTrace(failed, terminalError)
     const lifecycle = options.lifecycle
-    const backend = { userMessageId: produceArgs.userMessageId,
+    const backend = { userMessageId: userMessageId(),
       backendTerminal: Boolean(state.producer) && (state.producer?.terminalObserved?.() ?? true) }
     const durationMs = Date.now() - state.turnStartedAtMs
     const timing = settledTurnTiming(turnStreamId, {
