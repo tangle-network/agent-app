@@ -230,8 +230,8 @@ export interface RouterTurnOptions {
   /** At most this many tool calls run. The next one is refused before it runs and the turn ends
    *  with `turn_tool_limit`. */
   maxToolCalls?: number
-  /** Replace the text the model reads for one tool result. `toolName` is the app's name. */
-  renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string
+  /** Replace a domain-specific tool result; return undefined to use the shared serialization and limit. */
+  renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string | undefined
   /**
    * Place the turn before any model call, using `model` as the executed model rather than
    * the optional `requestedModel` hint. A turn placed in the sandbox returns at once
@@ -552,7 +552,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       deadlineMs: deadline,
       ...(options.maxToolTurns !== undefined ? { maxToolTurns: options.maxToolTurns } : {}),
       labelFor: call => byFunction.get(call.toolName)?.name ?? call.toolName,
-      renderResult: (label, outcome) => options.renderToolResult ? options.renderToolResult(label, outcome) : renderResult(outcome, options.toolResultLimit),
+      renderResult: (label, outcome) => options.renderToolResult?.(label, outcome) ?? renderResult(outcome, options.toolResultLimit),
       executeToolCall: async (call: LoopToolCall, context) => {
         const tool = byFunction.get(call.toolName)
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }

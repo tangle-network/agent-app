@@ -54,12 +54,14 @@ export function createSandboxModelSource(options: SandboxChatProducerOptions, lo
   const pendingModelNotices: Array<{ id: string; text: string }> = []
   let modelNoticeCount = 0
 
+  let openAttempts = 0
   let failover: ModelFailoverStreamHandle | undefined
   let source: AsyncIterable<unknown>
   if (options.openEvents) {
+    const open = options.openEvents
     failover = streamWithModelFailover({
       models: chain,
-      open: options.openEvents,
+      open: args => { openAttempts += 1; return open(args) },
       log,
       ...(options.modelPolicy ? { policy: options.modelPolicy } : {}),
       ...(options.openTimeoutMs !== undefined ? { openTimeoutMs: options.openTimeoutMs } : {}),
@@ -116,5 +118,5 @@ export function createSandboxModelSource(options: SandboxChatProducerOptions, lo
       text: `Requested ${sentModel} — the sandbox answered with ${parsed.servedModel} instead.`,
     })
   }
-  return { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState }
+  return { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState, openAttempts: () => openAttempts }
 }

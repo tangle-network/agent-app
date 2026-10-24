@@ -50,6 +50,8 @@ import {
   type ModelFailoverAttempt,
 } from '../model-resolution/failover'
 import type { ModelPolicy } from '../policy-filters/index'
+import { isTerminalPromptEvent } from '../sandbox/prompt-events'
+import { SandboxRunError } from '../sandbox/sandbox-run-error'
 import {
   ModelFailoverTimeoutError,
   type EmptyTurnRetryInfo,
@@ -343,7 +345,9 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
     ? `sandbox-stream: ${message}; ${diagnosticText}`
     : `sandbox-stream: ${message}`
   let code = 'sandbox.stream_failed'
-  if (error instanceof ModelFailoverTimeoutError) {
+  if (error instanceof SandboxRunError) {
+    code = error.code
+  } else if (error instanceof ModelFailoverTimeoutError) {
     code = error.code
   } else if (error instanceof ModelFailoverExhaustedError) {
     code = error.upstreamCode ?? code
@@ -361,7 +365,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   // named more than one model. There is no `enabled` flag on purpose: the class
   // of failure this fixes was a capability that shipped switched off, and a
   // second opt-in on top of supplying the chain would reproduce it exactly.
-  const { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState } = createSandboxModelSource(options, log)
+  const { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState, openAttempts } = createSandboxModelSource(options, log)
 
   const projectionState: SandboxProjectionState = {
     fullText: '',
@@ -375,9 +379,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
   const { timedParts, drainModelNotices, tracker, recordPersistedPart, reasoningClock, partMap, announcedToolArgs, settledTools, usage, promotedFileParts, emitFinalUsage, emitTerminalizedTools, emitErrorNotice, partOrder } = createSandboxProjection(projectionState, pendingModelNotices)
 
+  let observedSourceEvent = false
+  let preflightRefused = false
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
       for await (const raw of source) {
+        observedSourceEvent = true
         const record = asRecord(raw)
         captureEffectiveBackend(asRecord(record?.data))
         yield* drainModelNotices()
@@ -515,7 +522,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'done') {
-          projectionState.terminalObserved = true
+          // SDK transport-loss cleanup emits a failed done without a backend
+          // terminal receipt. Preserve an earlier result, but never unlock on
+          // that synthetic observation ending alone.
+          if (isTerminalPromptEvent(record)) projectionState.terminalObserved = true
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -552,6 +562,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       // body; the downgrade must still be recorded.
       yield* drainModelNotices()
     } catch (streamErr) {
+      // A later fallback refusal cannot clear an earlier unobserved execution.
+      // Count opens at their owner: failover may buffer the first native events.
+      preflightRefused = !observedSourceEvent && openAttempts() === 1
+        && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
       log('[chat-routes] sandbox stream failed', {
         failureNote: diagnostic.failureNote,
@@ -584,7 +598,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   return {
     stream: stream(),
     finalText: () => projectionState.fullText,
-    terminalObserved: () => projectionState.terminalObserved,
+    terminalObserved: () => projectionState.terminalObserved || preflightRefused,
     assistantParts: () => finalizePendingInteractionParts(
       finalizeAssistantParts(partOrder, timedParts(), projectionState.fullText),
       projectionState.interactionOutcome,

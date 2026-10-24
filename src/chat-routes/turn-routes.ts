@@ -83,7 +83,9 @@ import {
   type TurnRoutePhase,
 } from './turn-progress'
 import { ChatTurnInputError } from './wire'
-import { resolveTurnStorage } from './route-storage'
+import { resolveTurnStorage, turnStorageBindings, type ResolvedChatTurnRoutesOptions } from './route-storage'
+import { createDefaultChatBackend, type ChatTurnDefaultBackend } from './default-backend'
+import { createChatPrewarm } from './route-prewarm'
 import { cancelChatTurn } from './cancellation'
 
 export * from './turn-route-contracts'
@@ -129,7 +131,13 @@ async function admitTurn<TContext, TResource>(
 export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   input: CreateChatTurnRoutesOptions<TContext, TResource>,
 ): ChatTurnRoutes {
-  const options = resolveTurnStorage(input)
+  const produce = input.produce
+  const options: ResolvedChatTurnRoutesOptions<TContext, TResource> = {
+    ...input, ...resolveTurnStorage(input),
+    produce: typeof produce === 'function' || (produce && 'router' in produce && typeof produce.router === 'function')
+      ? produce as ResolvedChatTurnRoutesOptions<TContext, TResource>['produce']
+      : createDefaultChatBackend<TContext, TResource>(input.projectId, input.env ?? {}, produce as ChatTurnDefaultBackend | undefined ?? {}, turnStorageBindings(input), input.modelPolicy),
+  }
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
   // A patch-capable store always keeps durable in-flight history on the shared cadence.
@@ -393,6 +401,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   }
 
   return {
+    prewarm: createChatPrewarm(input),
     turn: (request, ctx) => withD1QueryCount(() => turn(request, ctx)),
     cancel: request => cancelChatTurn(request, { authorize: options.authorize, cancel: options.cancel, log }),
     replay,

@@ -30,6 +30,7 @@ import { createChatTurnRoutes } from '@tangle-network/agent-app/chat-routes'
 
 const routes = createChatTurnRoutes({
   projectId: 'acme-agent',
+  env,
   authorize,
   store,
   turnStore: {
@@ -40,9 +41,9 @@ const routes = createChatTurnRoutes({
     },
   },
   produce: {
-    when: args => useRouter(args),
-    router: args => routerOptions(args),
-    sandbox: args => sandboxOptions(args),
+    model: config.model.default,
+    systemPrompt: config.systemPrompt,
+    harness: config.harness,
   },
 })
 
@@ -51,18 +52,24 @@ return routes.turn(request, { waitUntil: work => ctx.waitUntil(work) })
 ```
 
 `turnStore` accepts these bindings or an existing `TurnEventStore`. Bindings
-assemble D1 replay and an authenticated thread lock. A product with native
-handoff or workspace-wide single-flight supplies its existing `turnLock`;
-retain the scaffold's backend-terminal ownership check when adapting that path.
+assemble D1 replay and an authenticated workspace lock. With `env`, the same
+lock is inherited even when the product supplies its own event store. Native
+producers keep the lock until backend termination is observed; lost observation
+never permits another dispatch. `turnLock: false` is the explicit opt-out.
 The buffer serves live reconnect; message storage serves durable history.
 
 ### Prewarm the same lock before send
 
-Pass the same `turnStore` binding descriptor to `createWorkspacePrewarmRoute`
-from `/sandbox`. Its `region` names the app's D1 region and controls the first
-placement of new lock channels. The shared default is ENAM; set another region
-once on the descriptor for a D1 primary elsewhere. A location hint cannot move
-existing objects, and no channel ID changes.
+Mount `routes.prewarm(request)` at the existing POST prewarm route. It uses the
+same bindings and lock as send. The existing `running` authorizer verifies
+access and supplies the workspace identity. It also receives page-open calls
+without a thread: the product may authorize its verified workspace or refuse.
+Any named thread still needs an access check. The inherited handler never provisions paid compute.
+`prewarm: false` disables it. The descriptor's `region` controls first placement
+of lock channels; it cannot move an existing object.
+
+Products needing authenticated workspace-level or paid preparation retain
+`createWorkspacePrewarmRoute` from `/sandbox` with their existing spend authority.
 
 The prewarm authorizer returns `workspaceId` only after verifying the member can
 start a turn in that workspace. Request-body identity is ignored. The route adds
@@ -92,6 +99,20 @@ Mount `routes.replay(request, {turnId})`, `routes.running(request)`, and configu
 handles are separate from client message identifiers. A deliberate retry keeps
 `turnId` and supplies a new `retryAttemptId`; transport retries reuse both.
 See [turn observation](../docs/turn-observation.md) for cursor and terminal rules.
+
+### Backend defaults and overrides
+
+With `env.TANGLE_API_KEY`, the default lane answers through the Router and adds
+`sandbox_run`. Files and deployments without that key use the sandbox lane.
+`produce` can be omitted when `env.MODEL_NAME` supplies the model; a data object
+supplies the product model, prompt, harness, effort, interactions and optional
+existing sandbox `shell`. Provisioning uses the D1 claim store, requiring its
+migration. `produce: { router: false }` explicitly keeps the sandbox lane.
+
+Existing `produce(args)` functions and Router/Sandbox callback declarations
+remain authoritative: a package bump never substitutes a deployment key for a
+product's workspace child key or discards its domain tools. Those consumers
+inherit binding-backed locks and prewarm; migration to backend data is explicit.
 
 ### Authorization remains product policy
 

@@ -6,9 +6,10 @@
  */
 import type { TurnTrace } from '../turn-trace/recorder'
 import type { NativeCompletionHandoffOptions } from './native-turn-timing'
-import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
+import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer } from './turn-route-contracts'
 import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
 import { withProducerStream } from './producer-stream'
+import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
 export class TurnAdmissionRefusedError extends Error {
@@ -133,7 +134,7 @@ function dispatchProducerFirst<TContext, TResource = unknown>(
 
 /** Select once, so admission's context mutations cannot switch execution backends. */
 export function selectTurnProducer<TContext, TResource = unknown>(
-  produce: CreateChatTurnRoutesOptions<TContext, TResource>['produce'],
+  produce: ResolvedChatTurnRoutesOptions<TContext, TResource>['produce'],
   args: ChatTurnProduceArgs<TContext, TResource>,
 ) {
   if (typeof produce === 'function') return { produce, router: false }

@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-307 exports.
+309 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -500,6 +500,22 @@ interface ChatTurnCancelTarget
 
 ```ts
 interface ChatTurnCompleteInput
+```
+
+### `ChatTurnDefaultBackend`
+
+`interface` — Domain data for the default lane, instead of constructing producers or admission hooks.
+
+```ts
+interface ChatTurnDefaultBackend
+```
+
+### `ChatTurnEnvironment`
+
+`interface` — Worker bindings are explicit; no ambient deployment credentials replace product policy.
+
+```ts
+interface ChatTurnEnvironment
 ```
 
 ### `ChatTurnExecutionLimits`

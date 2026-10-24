@@ -3173,7 +3173,7 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `harness`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`
 
 ### `AbortAttachmentWriteFn`
 
@@ -3669,6 +3669,22 @@ interface ChatTurnCancelTarget
 
 ```ts
 interface ChatTurnCompleteInput
+```
+
+### `ChatTurnDefaultBackend`
+
+`interface` — Domain data for the default lane, instead of constructing producers or admission hooks.
+
+```ts
+interface ChatTurnDefaultBackend
+```
+
+### `ChatTurnEnvironment`
+
+`interface` — Worker bindings are explicit; no ambient deployment credentials replace product policy.
+
+```ts
+interface ChatTurnEnvironment
 ```
 
 ### `ChatTurnExecutionLimits`
@@ -22873,7 +22889,7 @@ interface InspectablePrewarmClaimStore
 
 ### `isTerminalPromptEvent`
 
-`function` — Determine if an event is a terminal prompt event with type 'result' or 'done
+`function` — A backend result or terminal event, excluding SDK cleanup after observation loss.
 
 ```ts
 (event: unknown) => boolean
@@ -23553,7 +23569,7 @@ type SandboxPromptConfig
 
 ### `sandboxPromptRunner`
 
-`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+`function` — The shell's unattended runner.
 
 ```ts
 (shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
@@ -23625,7 +23641,7 @@ interface SandboxRestoreSpec
 
 ### `SandboxRunError`
 
-`class` — A typed `sandbox_run` failure.
+`class`
 
 ```ts
 class SandboxRunError
@@ -23633,7 +23649,7 @@ class SandboxRunError
 
 ### `SandboxRunFailureCode`
 
-`type`
+`type` — Typed computer-task outcomes shared by prompt observation and the Router tool.
 
 ```ts
 type SandboxRunFailureCode
