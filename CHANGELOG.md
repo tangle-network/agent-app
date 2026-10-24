@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.14
+
+- ci: release the catalog before full signoff suites
+
 ## 0.63.13
 
 - fix(sandbox): carry caller cancellation through shared provisioning (#1317)
