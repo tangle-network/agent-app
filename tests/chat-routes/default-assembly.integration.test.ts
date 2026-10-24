@@ -7,6 +7,8 @@ import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/str
 import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '../../src/turn-stream/memory'
 import { PREWARM_CLAIM_TABLE_DDL } from '../../src/sandbox/prewarm-claim-d1'
 import { WARM_RECEIPT_TABLE_DDL } from '../../src/sandbox/warm-receipts'
+import { sandboxPromptRunner } from '../../src/sandbox/sandbox-run-tool'
+import { defaultChatShell } from '../../src/chat-routes/default-backend'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
 type RouterPayload = { messages: Array<{ role: string; content: unknown }>; tools?: Array<{ function: { name: string } }> }
@@ -42,7 +44,7 @@ async function boundary() {
         nativeRequests.push(`${request.method} ${request.url}`)
         const input = JSON.parse(body) as { sessionId: string }
         response.writeHead(200, { 'content-type': 'text/event-stream' })
-        response.write(`id: admitted\nevent: execution.started\ndata: ${JSON.stringify({
+        if (request.headers['x-execution-id']) response.write(`id: admitted\nevent: execution.started\ndata: ${JSON.stringify({
           executionId: request.headers['x-execution-id'], sessionId: input.sessionId,
         })}\n\n`)
         // The exact backend execution was admitted, but observation ends without
@@ -183,6 +185,9 @@ it('sends an unavailable default sandbox escalation back through the real Router
     expect(String(receipt?.content)).toContain('sandbox_unavailable')
     expect(text).toContain('The computer was unavailable; no file was read.')
     expect(peer.db.sqlite.prepare("SELECT content FROM message WHERE role='assistant'").get()?.content).toContain('The computer was unavailable')
+    const after = await peer.routes().turn(peer.turn('after-unavailable'), peer.ctx)
+    expect(after.status).toBe(200)
+    await after.text()
   } finally { await peer.close() }
 })
 
@@ -298,3 +303,70 @@ it('keeps the workspace fenced when the real Sandbox SDK synthesizes failed done
     expect(await contender.json()).toMatchObject({ error: { code: 'workspace_turn_in_flight', threadId: 'native-sdk' } })
   } finally { await peer.close() }
 }, 10_000)
+
+it('keeps an unconfirmed SDK sandbox child fenced after the Router finishes its answer', async () => {
+  const peer = await boundary()
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+    if (!box) throw new Error('Local observation box is missing')
+    const shell = defaultChatShell('default-assembly', {
+      TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin,
+    }, { model: 'native/model', systemPrompt: 'Report the confirmed computer result.' })
+    const hybrid = peer.routes({ produce: {
+      router: () => ({
+        apiKey: 'loopback-only-router-key', model: 'requested/default', baseUrl: peer.origin,
+        systemPrompt: 'Use the workspace computer when asked.',
+        box: {
+          acquire: async () => box,
+          runTask: sandboxPromptRunner(shell, { model: 'native/model', sessionId: 'hybrid-native' }),
+          timeoutMs: 5_000,
+        },
+      }),
+    } })
+    const reply = await hybrid.turn(peer.turn('hybrid', 'Please use the computer.'), peer.ctx)
+    expect(reply.status).toBe(200)
+    await reply.text()
+    await peer.flush()
+    expect(peer.nativeRequests.filter(request => request.startsWith('POST'))).toHaveLength(1)
+    expect(peer.requests).toHaveLength(2)
+    const result = peer.requests[1]?.messages.find(message => message.role === 'tool')
+    expect(String(result?.content)).toContain('sandbox_unconfirmed')
+    expect(String(result?.content)).not.toContain('"answer":"Native SDK partial answer."')
+    const contender = await peer.routes().turn(peer.turn('after-hybrid'), peer.ctx)
+    expect(contender.status).toBe(409)
+    expect(await contender.json()).toMatchObject({ error: { code: 'workspace_turn_in_flight', threadId: 'hybrid' } })
+  } finally { await peer.close() }
+}, 10_000)
+
+it('releases workspace admission when the real child prompt preflight refuses an incompatible harness and model', async () => {
+  const peer = await boundary()
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+    if (!box) throw new Error('Local observation box is missing')
+    const shell = defaultChatShell('default-assembly', {
+      TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin,
+    }, { model: 'openai/gpt-5' })
+    const hybrid = peer.routes({ produce: {
+      router: () => ({
+        apiKey: 'loopback-only-router-key', model: 'requested/default', baseUrl: peer.origin,
+        systemPrompt: 'Use the workspace computer when asked.',
+        box: {
+          acquire: async () => box,
+          // Kimi Code is vendor locked. Its real provider preflight must refuse
+          // an OpenAI model before the SDK dispatches any execution.
+          runTask: sandboxPromptRunner(shell, { harness: 'kimi-code', model: 'openai/gpt-5', sessionId: 'refused-child' }),
+        },
+      }),
+    } })
+    const refused = await hybrid.turn(peer.turn('refused-child', 'Please use the computer.'), peer.ctx)
+    await refused.text()
+    await peer.flush()
+    expect(peer.nativeRequests.filter(request => request.startsWith('POST'))).toEqual([])
+    expect(peer.requests).toHaveLength(2)
+    const result = peer.requests[1]?.messages.find(message => message.role === 'tool')
+    expect(String(result?.content)).toContain('sandbox_unavailable')
+    const next = await peer.routes().turn(peer.turn('after-refused-child'), peer.ctx)
+    expect(next.status).toBe(200)
+    expect(await next.text()).toContain('A default Router answer.')
+  } finally { await peer.close() }
+})

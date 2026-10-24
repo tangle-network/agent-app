@@ -21,16 +21,8 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import { runSandboxPrompt, type SandboxRuntimeConfig, type StreamSandboxPromptOptions } from './index'
-
-export type SandboxRunFailureCode = 'sandbox_unavailable' | 'sandbox_failed' | 'sandbox_empty' | 'invalid_arguments'
-
-/** A typed `sandbox_run` failure. `code` and `message` are what the model reads. */
-export class SandboxRunError extends Error {
-  constructor(readonly code: SandboxRunFailureCode, message: string, options?: { cause?: unknown }) {
-    super(message, options)
-    this.name = 'SandboxRunError'
-  }
-}
+import { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
+export { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
@@ -163,8 +155,9 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {
+        if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
-        return fail('sandbox_failed', timedOut
+        return fail('sandbox_unconfirmed', timedOut
           ? `The computer step did not return an answer within ${Math.round(timeoutMs / 1000)} s. Its completion could not be confirmed.`
           : 'The computer step failed to return an answer. Its completion could not be confirmed.', error)
       }

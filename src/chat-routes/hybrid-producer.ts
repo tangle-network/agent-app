@@ -43,7 +43,7 @@ import {
   type EscalationHint,
   type EscalationInput,
 } from '../sandbox/escalation-speculator'
-import { createSandboxRunTool, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
+import { createSandboxRunTool, SandboxRunError, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
 import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
@@ -144,6 +144,8 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   const stop = signal ? AbortSignal.any([abort.signal, signal]) : abort.signal
   void admitted?.catch(error => { abort.abort(error) })
   const timeoutMs = box.timeoutMs ?? DEFAULT_SANDBOX_RUN_TIMEOUT_MS
+  let activeTasks = 0
+  let unconfirmed = false
 
   let start: Promise<SandboxInstance> | undefined = box.started?.catch((error: unknown) => {
     start = undefined
@@ -175,7 +177,17 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
     })
     const sandboxRun = createSandboxRunTool({
       box: () => acquire(),
-      runTask: async (...args) => { await admitted; stop.throwIfAborted(); return box.runTask(...args) },
+      runTask: async (...args) => {
+        await admitted
+        stop.throwIfAborted()
+        if (unconfirmed || activeTasks > 0) throw new SandboxRunError('sandbox_unconfirmed', 'An earlier computer step may still be running; no further task was dispatched.')
+        activeTasks++
+        try { return await box.runTask(...args) }
+        catch (error) {
+          if (!(error instanceof SandboxRunError) || error.code === 'sandbox_unconfirmed') unconfirmed = true
+          throw error
+        } finally { activeTasks-- }
+      },
       memberRequest: router.userMessage,
       timeoutMs,
       signal: stop,
@@ -206,7 +218,8 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
         speculator.onEvent(event as { type: string; toolName?: string })
         if (event.type === 'tool' && event.status === 'error' && event.toolName === sandboxRun.name && !stop.aborted) {
           const code = event.error.code
-          if (code === 'sandbox_unavailable' || code === 'sandbox_failed' || code === 'sandbox_empty') {
+          if (code === 'sandbox_unconfirmed') unconfirmed = true
+          if (code === 'sandbox_unavailable' || code === 'sandbox_failed' || code === 'sandbox_unconfirmed' || code === 'sandbox_empty') {
             warnings.set(event.callId, {
               type: 'notice', noticeKind: 'warning', id: `sandbox-warning:${event.callId}`, code,
               text: code === 'sandbox_unavailable'
@@ -239,6 +252,7 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
       try { return await fail(error) } finally { await closing }
     }
     return { ...producer, stream: events,
+      terminalObserved: () => activeTasks === 0 && !unconfirmed,
       assistantParts: () => withWarnings(producer.assistantParts?.() ?? []),
       draftParts: () => withWarnings(producer.draftParts?.() ?? []),
       get model() { return producer.model },
