@@ -221,3 +221,23 @@ it.each(['lost', 'terminal'] as const)('retains native workspace ownership on %s
     else await contender.text()
   } finally { await peer.close() }
 })
+
+it('refuses an unnamed forbidden default model before claiming or provisioning its sandbox', async () => {
+  const peer = await boundary()
+  try {
+    const restricted = peer.routes({
+      produce: { router: false },
+      modelPolicy: { catalog: [{ id: 'requested/default' }], filter: () => false },
+    })
+    const denied = await restricted.turn(peer.turn('restricted'), peer.ctx)
+    await denied.text()
+    await peer.flush()
+    // A claim is the first durable side effect of default sandbox acquisition.
+    // Checking its real SQLite table detects even a failed acquisition attempt.
+    expect(peer.db.sqlite.prepare('SELECT * FROM sandbox_prewarm_claims').all()).toEqual([])
+    expect(peer.requests).toEqual([])
+    const allowed = await peer.routes().turn(peer.turn('allowed'), peer.ctx)
+    expect(allowed.status).toBe(200)
+    expect(await allowed.text()).toContain('A default Router answer.')
+  } finally { await peer.close() }
+})

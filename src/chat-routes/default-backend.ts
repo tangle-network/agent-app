@@ -102,10 +102,12 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
       }
     },
     sandbox: async (args: ChatTurnProduceArgs<TContext, TResource>) => {
+      const model = modelFor(args)
+      if (modelPolicy) await assertPolicy({ kind: 'model', id: model, ...modelPolicy })
       // Resolve the box before the producer, but dispatch only when the route pulls
       // openEvents: producer construction failure can never leave native work running.
       const box = await acquire(args)
-      return { model: modelFor(args), modelPolicy, modelFailover: false as const, errorNotice: true,
+      return { model, modelPolicy, modelFailover: false as const, errorNotice: true,
         openEvents: ({ model, signal }: { model: string; signal: AbortSignal }) => streamSandboxPrompt(shell, box,
           normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal }),
       }
