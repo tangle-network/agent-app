@@ -515,7 +515,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'done') {
-          projectionState.terminalObserved = true
+          // SDK transport-loss cleanup emits a failed done without a backend
+          // terminal receipt. Preserve an earlier result, but never unlock on
+          // that synthetic observation ending alone.
+          if (event.data?.status !== 'failed') projectionState.terminalObserved = true
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)

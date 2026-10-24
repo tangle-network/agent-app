@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { Sandbox } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes, type ChatTurnMessageStore, type CreateChatTurnRoutesOptions } from '../../src/chat-routes/index'
 import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
@@ -18,6 +19,7 @@ async function boundary() {
   const db = sqliteD1(`${TURN_EVENTS_MIGRATION_SQL};${WARM_RECEIPT_TABLE_DDL};${PREWARM_CLAIM_TABLE_DDL};
     CREATE TABLE message(id TEXT PRIMARY KEY,thread TEXT,role TEXT,content TEXT,parts TEXT)`)
   const requests: RouterPayload[] = []
+  const nativeRequests: string[] = []
   const channels: string[] = []
   const pending: Promise<unknown>[] = []
   const held: Array<() => void> = []
@@ -27,6 +29,29 @@ async function boundary() {
     let body = ''
     request.on('data', chunk => { body += chunk })
     request.on('end', () => {
+      if (request.url === '/v1/sandboxes/observation-box') {
+        nativeRequests.push(`${request.method} ${request.url}`)
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
+          id: 'observation-box', status: 'running', filesystemIncarnationId: 'observation-incarnation',
+          filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
+          connection: { runtimeUrl: `${origin}/v1/sandboxes/observation-box/runtime` },
+        }))
+        return
+      }
+      if (request.url === '/v1/sandboxes/observation-box/runtime/agents/run/stream') {
+        nativeRequests.push(`${request.method} ${request.url}`)
+        const input = JSON.parse(body) as { sessionId: string }
+        response.writeHead(200, { 'content-type': 'text/event-stream' })
+        response.write(`id: admitted\nevent: execution.started\ndata: ${JSON.stringify({
+          executionId: request.headers['x-execution-id'], sessionId: input.sessionId,
+        })}\n\n`)
+        // The exact backend execution was admitted, but observation ends without
+        // any native result/done. The SDK, rather than this peer, synthesizes done.
+        response.end(`id: partial\nevent: message.part.updated\ndata: ${JSON.stringify({
+          part: { type: 'text', id: 'sdk-partial' }, delta: 'Native SDK partial answer.',
+        })}\n\n`)
+        return
+      }
       if (request.url?.startsWith('/native/')) {
         response.writeHead(200, { 'content-type': 'application/x-ndjson' })
         response.write(`${JSON.stringify({ type: 'message.part.updated', data: { part: { type: 'text', id: 'native-text' }, delta: 'Native partial answer.' } })}\n`)
@@ -95,7 +120,7 @@ async function boundary() {
   const turn = (threadId: string, content = 'Hello.') => post('/api/chat', { threadId, turnId: crypto.randomUUID(), content })
   const ctx = { waitUntil(work: Promise<unknown>) { pending.push(work) } }
   const flush = async () => { for (let at = 0; at < pending.length; at++) await pending[at] }
-  return { db, requests, channels, routes, post, turn, ctx, flush, origin,
+  return { db, requests, nativeRequests, channels, routes, post, turn, ctx, flush, origin,
     holdStarted: () => heldModelStarted ? Promise.resolve() : new Promise<void>(resolve => modelStarted.push(resolve)),
     release: () => { for (const send of held.splice(0)) send() },
     close: async () => {
@@ -241,3 +266,35 @@ it('refuses an unnamed forbidden default model before claiming or provisioning i
     expect(await allowed.text()).toContain('A default Router answer.')
   } finally { await peer.close() }
 })
+
+it('keeps the workspace fenced when the real Sandbox SDK synthesizes failed done after observation loss', async () => {
+  const peer = await boundary()
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+    if (!box) throw new Error('Local observation box is missing')
+    const frames: Array<{ type: string; data: unknown }> = []
+    const native = peer.routes({ produce: {
+      when: () => false,
+      router: () => { throw new Error('Native execution must not ask the Router') },
+      sandbox: args => ({ model: 'native/model', openEvents: ({ signal }) => (async function* () {
+        for await (const event of box.streamPrompt('Observe this exact native execution.', {
+          sessionId: args.identity.sessionId, executionId: args.executionId,
+          turnId: args.executionId, detach: true, timeoutMs: 500, signal,
+        })) {
+          frames.push(event)
+          yield event
+        }
+      })() }),
+    } })
+    const observation = await native.turn(peer.turn('native-sdk'), peer.ctx)
+    await observation.text()
+    await peer.flush()
+    expect(frames.some(frame => frame.type === 'execution.started')).toBe(true)
+    expect(frames.some(frame => frame.type === 'done' && (frame.data as { status?: string }).status === 'failed')).toBe(true)
+    expect(frames.some(frame => frame.type === 'result')).toBe(false)
+    expect(peer.nativeRequests.filter(request => request.startsWith('POST'))).toHaveLength(1)
+    const contender = await peer.routes().turn(peer.turn('different-thread'), peer.ctx)
+    expect(contender.status).toBe(409)
+    expect(await contender.json()).toMatchObject({ error: { code: 'workspace_turn_in_flight', threadId: 'native-sdk' } })
+  } finally { await peer.close() }
+}, 10_000)
