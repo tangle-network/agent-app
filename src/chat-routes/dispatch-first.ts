@@ -12,7 +12,7 @@ import { withProducerStream } from './producer-stream'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 
 /** Thrown into `args.admitted` when the turn was refused after its producer started. */
-export class TurnAdmissionRefusedError extends Error {
+class TurnAdmissionRefusedError extends Error {
   constructor() {
     super('The turn was refused after its producer started; its output was discarded.')
     this.name = 'TurnAdmissionRefusedError'

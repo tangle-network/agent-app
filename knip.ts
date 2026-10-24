@@ -28,6 +28,9 @@ export const UNBUILT_ENTRIES = [
   'src/stories/**/fixtures.ts',
   'tests/**/*.test.{ts,tsx}',
   'tests/**/*.integration.ts',
+  'tests/turn-stream/durable-stop.transport.ts',
+  'tests/turn-stream/durable-stop.worker.ts',
+  'tests/workers/lock-prewarm.worker.ts',
 ]
 
 export default {
