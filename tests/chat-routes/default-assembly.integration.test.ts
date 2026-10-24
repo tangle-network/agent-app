@@ -67,6 +67,11 @@ async function boundary() {
         response.end()
         return
       }
+      if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
+        response.writeHead(404, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'Unknown local protocol path.' }))
+        return
+      }
       const payload = JSON.parse(body) as RouterPayload
       requests.push(payload)
       const member = payload.messages.filter(message => message.role === 'user').at(-1)?.content
