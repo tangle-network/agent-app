@@ -11,7 +11,8 @@ import { sandboxPromptRunner } from '../../src/sandbox/sandbox-run-tool'
 import { defaultChatShell } from '../../src/chat-routes/default-backend'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
-type RouterPayload = { messages: Array<{ role: string; content: unknown }>; tools?: Array<{ function: { name: string } }> }
+type RouterPayload = { messages: Array<{ role: string; content: unknown }>; tools?: Array<{ function: { name: string } }>;
+  max_tokens?: number; max_completion_tokens?: number; reasoning_effort?: string }
 
 /** Real HTTP protocol peers, SQLite migrations/stores and the authenticated
  * TurnStreamDO core. No producer, SDK method, fetch or clock is replaced.
@@ -138,12 +139,15 @@ async function boundary() {
 it('inherits the hybrid Router backend and persists a real protocol reply without a produce option', async () => {
   const peer = await boundary()
   try {
-    const response = await peer.routes().turn(peer.turn('first'), peer.ctx)
+    const response = await peer.routes().turn(peer.turn('first'), { ...peer.ctx,
+      executionLimits: { maxOutputTokens: 321, maxReasoningTokens: 0 },
+    })
     expect(response.status).toBe(200)
     expect(await response.text()).toContain('A default Router answer.')
     await peer.flush()
     expect(peer.requests).toHaveLength(1)
     expect(peer.requests[0]?.tools?.map(tool => tool.function.name)).toContain('sandbox_run')
+    expect(peer.requests[0]).toMatchObject({ max_tokens: 321, max_completion_tokens: 321, reasoning_effort: 'none' })
     expect(peer.db.sqlite.prepare('SELECT role,content FROM message ORDER BY rowid').all()).toEqual([
       { role: 'user', content: 'Hello.' }, { role: 'assistant', content: 'A default Router answer.' },
     ])
