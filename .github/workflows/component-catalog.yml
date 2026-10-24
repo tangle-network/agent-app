@@ -1,7 +1,6 @@
 name: Component catalog
 
 on:
-  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -9,12 +8,10 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request supersedes its queued catalog check; main keeps
-# every merge's run. Without this, merged PRs left dozens of stale runs queued
-# on the shared ci-public runners (43 on 2026-10-24).
+# Every catalog deployment retains its own build and immutable artifact.
 concurrency:
-  group: component-catalog-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: component-catalog-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -24,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
@@ -41,7 +38,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: agent-app-signoff-${{ github.event.pull_request.head.sha || github.sha }}
+          name: agent-app-signoff-${{ github.sha }}
           # Never archive generated projects, local databases or .dev.vars.
           path: |
             ${{ runner.temp }}/agent-app-signoff.json
@@ -70,8 +67,7 @@ jobs:
   deploy:
     needs: build
     if: >-
-      (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      github.ref == 'refs/heads/main'
     uses: tangle-network/agent-app/.github/workflows/deploy-catalog.yml@28c882cb570fa4103fd1265eb390090bfb86fee7
     permissions:
       contents: read
