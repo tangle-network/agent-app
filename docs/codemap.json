@@ -17883,7 +17883,7 @@
         {
           "name": "peekWorkspaceSandbox",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…",
+          "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; signal?: AbortSignal | undef…",
           "doc": "Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything."
         },
         {

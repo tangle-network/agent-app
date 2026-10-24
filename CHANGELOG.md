@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.13
+
+- fix(sandbox): carry caller cancellation through shared provisioning (#1317)
+
+## 0.63.12
+
+- ci: prepare catalog through its retained deployment workflow
+
 ## 0.63.11
 
 - fix: preserve archive and release boundaries
