@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.8
+
+- fix(chat): persist canonical Router failure notices
+
 ## 0.63.7
 
 - feat: make chat turn assembly binding-aware by default
