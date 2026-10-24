@@ -193,7 +193,7 @@ async function runAdmittedTurn<TContext, TResource>({
   /** The assistant row this turn ended with. Falls back to the draft writer
    *  so a turn whose producer THREW — skipping `persistAssistantMessage`
    *  entirely — still names the partial row it left behind. */
-  const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx)
+  const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
 
   try {
     if (state.lockAcquired && JSON.stringify(await trace.measure('admission.history_recheck', 'admission', readHistory)) !== historyBeforeLock) {
@@ -547,6 +547,7 @@ function createTurnSettlement<TContext, TResource>(
   turnStreamId: `${string}-${string}-${string}-${string}-${string}`,
   log: (message: string, meta?: Record<string, unknown>) => void,
   ctx: ChatTurnRequestContext | undefined,
+  userMessageId: () => string | null | undefined,
 ) {
   const assistantRowId = (): string | null => state.assistantMessageId ?? state.draft?.rowId() ?? null
 
@@ -611,6 +612,8 @@ function createTurnSettlement<TContext, TResource>(
     // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
     const snapshot = endTrace(failed, terminalError)
     const lifecycle = options.lifecycle
+    const backend = { userMessageId: userMessageId(),
+      backendTerminal: Boolean(state.producer) && (state.producer?.terminalObserved?.() ?? true) }
     const durationMs = Date.now() - state.turnStartedAtMs
     const timing = settledTurnTiming(turnStreamId, {
       requestAt: trace.startedAt, startedAt: state.turnStartedAtMs,
@@ -622,14 +625,14 @@ function createTurnSettlement<TContext, TResource>(
         // No hooks to run; the trace still goes to its sink below.
       } else if (failed) {
         await lifecycle.onTurnError?.({
-          identity, executionId, turnStreamId, context, durationMs, ...timing,
+          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
           error: terminalError ?? state.lastFailureData ?? new Error('chat turn failed'),
         })
       } else {
         const failoverInfo = state.producer?.modelFailover?.()
         const attribution = state.producer?.modelAttribution?.()
         const completed: ChatTurnLifecycleComplete<TContext> = {
-          identity, executionId, turnStreamId, context, durationMs, ...timing,
+          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
           finalText: state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
           usage: state.producer?.usage?.() ?? {},
           assistantMessageId: assistantRowId(),
@@ -855,6 +858,8 @@ function createTurnEngine<TContext, TResource>(
             // The engine awaits this before the stream ends, so the product's completion work is a span, not a gap.
             return trace.measure('persist.on_turn_complete', 'persist', () => options.onTurnComplete!({
               identity: turnIdentity,
+              userMessageId: produceArgs.userMessageId,
+              backendTerminal: state.producer?.terminalObserved?.() ?? true,
               finalText,
               context,
               failed: state.runFailed,

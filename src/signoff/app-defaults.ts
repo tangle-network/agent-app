@@ -329,6 +329,9 @@ function firstOutputRow(kind: 'visible' | 'text', pin: string | null, sources: r
 function prewarmRow(sources: readonly SourceFile[]): DefaultRow {
   const usesBox = filesMatching(sources, /@tangle-network\/agent-app\/sandbox|\bensureWorkspaceSandbox\b/).length > 0
   if (!usesBox) return { id: 'prewarm', label: 'prewarm route', status: 'na', detail: 'the app opens no workspace box' }
+  const assembled = filesMatching(sources, /\bcreateChatTurnRoutes\s*[(<]/)[0]
+  const mounted = filesMatching(sources, /\bprewarm\s*:\s*[\w.]+\.prewarm\b|\.prewarm\s*\(\s*(?:request|c\.req\.raw)/)[0]
+  if (assembled && mounted) return { id: 'prewarm', label: 'prewarm route', status: 'ok', detail: `assembled route in ${assembled.path}; mounted in ${mounted.path}` }
   const shared = filesMatching(sources, /\bcreateWorkspacePrewarmRoute\b/)[0]
   if (shared) return { id: 'prewarm', label: 'prewarm route', status: 'ok', detail: `shared route in ${shared.path}` }
   const local = sources.find((file) => /prewarm/i.test(file.path) || /['"`/]prewarm['"`/]/.test(file.text))
@@ -462,7 +465,8 @@ export function checkAppDefaults(repoRoot: string, options: AppDefaultsOptions =
       { row: trace.row, id: 'turn-trace', optedOut: trace.optedOut },
       { row: firstOutputRow('visible', pin, sources, traceWired, calls, options.exports), id: 'first-visible', optedOut: null },
       { row: firstOutputRow('text', pin, sources, traceWired, calls, options.exports), id: 'first-text', optedOut: null },
-      { row: prewarmRow(sources), id: 'prewarm', optedOut: null },
+      { row: prewarmRow(sources), id: 'prewarm', optedOut: filesMatching(sources, /\bprewarm\s*:\s*false\b/).length
+        ? 'prewarm: false disables the inherited route' : null },
       { row: placementRow(configs), id: 'placement', optedOut: null },
       { row: toolCountRow(), id: null, optedOut: null },
       { row: limitAlarmsRow(sources), id: 'limit-alarms', optedOut: null },

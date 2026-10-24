@@ -21,16 +21,8 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import { runSandboxPrompt, type SandboxRuntimeConfig, type StreamSandboxPromptOptions } from './index'
-
-export type SandboxRunFailureCode = 'sandbox_unavailable' | 'sandbox_failed' | 'sandbox_empty' | 'invalid_arguments'
-
-/** A typed `sandbox_run` failure. `code` and `message` are what the model reads. */
-export class SandboxRunError extends Error {
-  constructor(readonly code: SandboxRunFailureCode, message: string, options?: { cause?: unknown }) {
-    super(message, options)
-    this.name = 'SandboxRunError'
-  }
-}
+import { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
+export { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
 export interface SandboxToolContext {
@@ -98,12 +90,20 @@ export const SANDBOX_RUN_DESCRIPTION =
   'runs the code and returns its answer. Takes seconds to minutes, ' +
   'so use it only when the answer needs the computer.'
 
-/** The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused). */
+/** The shell's unattended runner. A supplied execution/turn id seeds child
+ * identity with the actual tool callId: different calls stay separate and a
+ * retry of that exact call stays idempotent. Without callId, use a fresh child. */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
-  return (box, task, { signal, timeoutMs, trace, span }) => runSandboxPrompt(shell, box, task, {
-    ...prompt, signal, timeoutMs, disallowQuestions: true,
-    ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
-  })
+  return async (box, task, { callId, signal, timeoutMs, trace, span }) => {
+    const parent = prompt.executionId?.trim() || prompt.turnId?.trim()
+    const identity = parent ? new TextEncoder().encode(JSON.stringify([parent, prompt.sessionId, callId?.trim() || crypto.randomUUID()])) : undefined
+    const digest = identity ? await crypto.subtle.digest('SHA-256', identity) : undefined
+    const child = digest ? Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') : undefined
+    return runSandboxPrompt(shell, box, task, {
+      ...prompt, ...(child ? { executionId: child, turnId: child } : {}), signal, timeoutMs, disallowQuestions: true,
+      ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
+    })
+  }
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
@@ -163,8 +163,9 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {
+        if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
-        return fail('sandbox_failed', timedOut
+        return fail('sandbox_unconfirmed', timedOut
           ? `The computer step did not return an answer within ${Math.round(timeoutMs / 1000)} s. Its completion could not be confirmed.`
           : 'The computer step failed to return an answer. Its completion could not be confirmed.', error)
       }

@@ -9,6 +9,8 @@ import type { SandboxRuntimeConfig } from './configuration'
 import type { SandboxInstance, TurnDriveResult } from '@tangle-network/sandbox'
 import { streamSandboxPrompt, emitSandboxActivity } from './prompt-dispatch'
 import { type Outcome, ok, fail } from './outcome'
+import { isTerminalPromptEvent } from './prompt-events'
+import { SandboxRunError } from './sandbox-run-error'
 
 /**
  * Stable identity for a streamed text part, so deltas of one part accumulate
@@ -141,11 +143,21 @@ export async function runSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): Promise<string> {
-  return collectSandboxPromptText(
-    streamSandboxPrompt(shell, box, message, options),
-    message,
-    options?.history,
-  )
+  let terminal = false
+  let failed = false
+  async function* observed() {
+    for await (const event of streamSandboxPrompt(shell, box, message, options)) {
+      if (isTerminalPromptEvent(event)) terminal = true
+      const raw = event as { type?: string; data?: { success?: unknown; status?: unknown; error?: unknown } }
+      if (raw.type === 'error' || (raw.type === 'result' && (raw.data?.success === false
+        || raw.data?.status === 'failed' || raw.data?.status === 'error' || Boolean(raw.data?.error)))) failed = true
+      yield event
+    }
+  }
+  const answer = await collectSandboxPromptText(observed(), message, options?.history)
+  if (!terminal) throw new SandboxRunError('sandbox_unconfirmed', 'The computer stopped reporting before its completion was confirmed. Its work may still be running.')
+  if (failed) throw new SandboxRunError('sandbox_failed', 'The computer reported a failed execution.')
+  return answer
 }
 
 /** Define options to manage deterministic session resumption and turn idempotency in sandboxed drive turns */
