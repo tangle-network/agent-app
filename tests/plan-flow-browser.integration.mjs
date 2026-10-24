@@ -14,40 +14,41 @@ const root = process.cwd()
 const scratch = await mkdtemp(path.join(tmpdir(), 'agent-app-plan-browser-'))
 const db = new Database(path.join(scratch, 'plans.sqlite'))
 db.exec(`CREATE TABLE plans(id TEXT PRIMARY KEY, followup INTEGER, pending INTEGER);
-  CREATE TABLE requests(plan_id TEXT, method TEXT, target TEXT);
+  CREATE TABLE requests(plan_id TEXT, method TEXT, target TEXT, scope TEXT);
   CREATE TABLE attached(plan_id TEXT PRIMARY KEY, receipt TEXT);
-  INSERT INTO plans VALUES('retry',1,0),('terminal',0,0),('pending',0,1),('next',0,0),('stale-plan',1,0),('stale-revision',1,0),('stale-unmount',1,0),('stale-aba',1,0),('stale-error',1,0),('sticky',1,0),('inline-auto',1,0),('inline-manual',1,0);`)
+  INSERT INTO plans VALUES('retry',1,0),('terminal',0,0),('pending',0,1),('next',0,0),('stale-plan',1,0),('stale-revision',1,0),('stale-unmount',1,0),('stale-aba',1,0),('stale-error',1,0),('sticky',1,0),('inline-auto',1,0),('inline-manual',1,0),('scope-restore',1,0),('scope-error',1,0),('scope-decide',1,0),('scope-restored',1,0);`)
 const fixture = `import React, { useCallback, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createDurablePlanDecisionClient, useDurablePlanFlow } from './src/web-react/durable-plan-flow';
 const id = new URLSearchParams(location.search).get('case');
-const initial = {planId:id,revision:1,status:id==='inline-manual'?'pending':'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'};
-function Controller({selected,onUpdated}){
- const memoClient=useMemo(()=>createDurablePlanDecisionClient({url:'/plan'}),[]);
+const initial = {planId:id,revision:1,status:['inline-manual','scope-decide'].includes(id)?'pending':'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'};
+function Controller({selected,scope,onUpdated}){
+ const memoClient=useMemo(()=>createDurablePlanDecisionClient({url:'/plan?scope='+scope}),[scope]);
  // Recreated factories, URL/body functions and callbacks are valid public hook inputs.
  const client=id.startsWith('inline-')?createDurablePlanDecisionClient({url:()=>'/plan',body:()=>({source:'inline-browser-proof'})}):memoClient;
  const [attached,setAttached]=useState(false);
  const attachFollowUp=async(receipt,plan,decision)=>{
-  const response=await fetch('/attach',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({receipt,plan,decision})});
+  const response=await fetch('/attach',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({receipt,plan,decision,scope})});
   if(!response.ok)throw new Error('Attachment service unavailable');
   setAttached(true);
  };
- const flow=useDurablePlanFlow({plan:selected,client,autoRestore:true,attachFollowUp,onUpdated});
+ const flow=useDurablePlanFlow({plan:selected,client,scopeKey:String(scope),autoRestore:true,attachFollowUp,onUpdated});
  return <main><h1>Saved plan</h1><output data-error>{flow.error??flow.attachError??''}</output>
  <output data-plan>{flow.plan.planId+':'+flow.plan.revision}</output><output data-attached>{String(attached)}</output><output data-pending>{String(flow.effectPending)}</output><output data-restoring>{String(flow.restoring)}</output>
  <button onClick={flow.retryAttach}>Retry notifying the agent</button>
  <button onClick={()=>void flow.decide('approved')}>Continue plan</button></main>;
 }
 function Application(){
- const [selected,setSelected]=useState(initial),[mounted,setMounted]=useState(true),[updates,setUpdates]=useState(0);
+ const [selected,setSelected]=useState(initial),[scope,setScope]=useState(0),[mounted,setMounted]=useState(true),[updates,setUpdates]=useState(0);
  const onUpdated=()=>setUpdates(value=>value+1);
  return <><output data-updates>{updates}</output>
  <button onClick={()=>setUpdates(value=>value+1)}>Render parent</button>
  <button onClick={()=>setSelected({...initial,planId:'next',status:'pending'})}>Change plan</button>
  <button onClick={()=>setSelected({...initial,revision:2,status:'pending'})}>Change revision</button>
+  <button onClick={()=>setScope(value=>value+1)}>Change scope</button>
  <button onClick={()=>setSelected({...initial,status:'pending'})}>Return plan</button>
  <button onClick={()=>setMounted(false)}>Unmount plan</button>
- {mounted&&<Controller selected={selected} onUpdated={onUpdated}/>}</>;
+ {mounted&&<Controller selected={selected} scope={scope} onUpdated={onUpdated}/>}</>;
 }
 createRoot(document.getElementById('root')).render(<Application/>);`
 const bundle = await build({ stdin: { contents: fixture, resolveDir: root, sourcefile: 'plan-client.tsx', loader: 'tsx' }, bundle: true, write: false, format: 'esm', platform: 'browser' })
@@ -70,14 +71,16 @@ const server = createServer(async (request, response) => {
     const id = url.searchParams.get('planId') ?? input.planId ?? input.plan?.planId
     const row = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
     assert.ok(row, 'request names a persisted plan')
-    db.prepare('INSERT INTO requests VALUES(?,?,?)').run(id,request.method,url.pathname)
+    const scope=String(url.searchParams.get('scope')??input.scope??0)
+    db.prepare('INSERT INTO requests VALUES(?,?,?,?)').run(id,request.method,url.pathname,scope)
     response.setHeader('content-type','application/json')
     if (url.pathname === '/plan') {
       if (request.method === 'POST') db.prepare('UPDATE plans SET pending=0,followup=1 WHERE id=?').run(id)
       const current = db.prepare('SELECT * FROM plans WHERE id=?').get(id)
       const finish = () => response.end(JSON.stringify({plan:{planId:id,revision:Number(url.searchParams.get('revision')??1),status:'approved',body:'Integration plan',submittedAt:'2026-10-22T00:00:00Z',decidedAt:'2026-10-22T00:01:00Z'},idempotent:true,
-        ...(current.pending ? {effectPending:true}:{}), ...(current.followup ? {followUp:{receiptId:'receipt-'+id,turnId:'turn-'+id,state:'running'}}:{})}))
-      if (id.startsWith('stale-') && request.method==='GET' && url.searchParams.get('revision')==='1') {
+        ...(current.pending ? {effectPending:true}:{}), ...(current.followup ? {followUp:{receiptId:'receipt-'+id+(id.startsWith('scope-')?'-'+scope:''),turnId:'turn-'+id,state:'running'}}:{})}))
+      if ((id.startsWith('stale-') && request.method==='GET' && url.searchParams.get('revision')==='1') ||
+          (['scope-restore','scope-error','scope-decide'].includes(id) && scope==='0')) {
         const entries=held.get(id)??[]; entries.push({finish,response}); held.set(id,entries)
       } else finish()
       return
@@ -87,6 +90,7 @@ const server = createServer(async (request, response) => {
     assert.equal(input.receipt.revision,1)
     assert.equal(input.plan.status,'approved')
     assert.equal(input.decision,'approved')
+    if(id.startsWith('scope-')) assert.equal(input.receipt.receiptId,'receipt-'+id+'-'+scope,'receipt belongs to attachment context')
     const attempts = db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id=? AND target='/attach'").get(id).n
     if ((id === 'retry' && attempts <= 2) || (id === 'pending' && attempts === 1) || id === 'sticky') { response.writeHead(503); response.end(JSON.stringify({error:'Transient attachment outage'})); return }
     db.prepare('INSERT OR REPLACE INTO attached VALUES(?,?)').run(id,input.receipt.receiptId)
@@ -101,6 +105,30 @@ try {
   const page = await browser.newPage()
   const browserErrors = []
   page.on('pageerror', error => browserErrors.push(String(error)))
+  for(const id of ['scope-restore','scope-error','scope-decide']) {
+    await page.goto(base+'/?case='+id)
+    if(id==='scope-decide') await page.getByRole('button',{name:'Continue plan',exact:true}).click()
+    await waitHeld(id,1)
+    await page.getByRole('button',{name:'Change scope',exact:true}).click()
+    if(id==='scope-decide') await page.getByRole('button',{name:'Continue plan',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelector('[data-attached]')?.textContent==='true',undefined,{timeout:5000})
+    const updates=await page.locator('[data-updates]').textContent()
+    const responseSettled=page.waitForResponse(response=>new URL(response.url()).pathname==='/plan'&&new URL(response.url()).searchParams.get('scope')==='0')
+    if(id==='scope-error') { const item=held.get(id)[0]; item.response.writeHead(503); item.response.end(JSON.stringify({error:'Old scope unavailable'})) }
+    else release(id)
+    await (await responseSettled).finished()
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+    assert.equal(await page.locator('[data-updates]').textContent(),updates,id+': old scope must not update new context')
+    assert.equal(await page.locator('[data-error]').textContent(),'')
+    assert.equal(db.prepare("SELECT receipt FROM attached WHERE plan_id=?").get(id).receipt,'receipt-'+id+'-1')
+    assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id=? AND target='/attach'").get(id).n,1)
+  }
+  await page.goto(base+'/?case=scope-restored')
+  await page.waitForFunction(()=>document.querySelector('[data-attached]')?.textContent==='true'&&document.querySelector('[data-restoring]')?.textContent==='false')
+  await page.getByRole('button',{name:'Change scope',exact:true}).click()
+  await page.waitForFunction(()=>document.querySelector('[data-updates]')?.textContent==='2'&&document.querySelector('[data-restoring]')?.textContent==='false')
+  assert.equal(db.prepare("SELECT receipt FROM attached WHERE plan_id='scope-restored'").get().receipt,'receipt-scope-restored-1')
+  assert.equal(db.prepare("SELECT count(*) AS n FROM requests WHERE plan_id='scope-restored' AND target='/plan'").get().n,2,'new scope restores an already-restored plan')
   if(process.env.PLAN_BROWSER_REGRESSION!=='inline-manual'){
     await page.goto(base+'/?case=inline-auto')
     await page.waitForFunction(()=>document.querySelector('[data-attached]')?.textContent==='true'&&document.querySelector('[data-restoring]')?.textContent==='false',undefined,{timeout:5000})
@@ -180,7 +208,7 @@ try {
   }
   assert.deepEqual(errors,[])
   assert.deepEqual(browserErrors,[])
-  console.log(JSON.stringify({proof:'plan-flow-browser',cases:11,attachmentRequests:db.prepare("SELECT count(*) AS n FROM requests WHERE target='/attach'").get().n,plansAttached:db.prepare('SELECT count(*) AS n FROM attached').get().n,serverErrors:errors,browserErrors}))
+  console.log(JSON.stringify({proof:'plan-flow-browser',cases:15,attachmentRequests:db.prepare("SELECT count(*) AS n FROM requests WHERE target='/attach'").get().n,plansAttached:db.prepare('SELECT count(*) AS n FROM attached').get().n,serverErrors:errors,browserErrors}))
 } finally {
   for(const entries of held.values()) for(const item of entries) item.response.destroy()
   await browser?.close()

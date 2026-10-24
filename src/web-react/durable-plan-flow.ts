@@ -160,6 +160,10 @@ export function createDurablePlanDecisionClient(
 export interface UseDurablePlanFlowOptions {
   plan: ChatPlan
   client: DurablePlanDecisionClient
+  /** Stable, non-secret identity of the endpoint/workspace/authentication
+   * context. Change it when that context changes even if the plan does not.
+   * Incidental client object recreation does not change request lifetime. */
+  scopeKey?: string
   /** Must be idempotent by receipt.receiptId. */
   attachFollowUp?: (receipt: DurablePlanFollowUpReceipt, plan: ChatPlan, decision: DurablePlanDecision) => Promise<void> | void
   /** Restore an already-decided plan and bound failed follow-up attachment attempts. */
@@ -256,7 +260,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
       lifetime.current = null
       restoration.current = { restored: null, inFlight: null, attempts: new Map() }
     }
-  }, [options.plan.planId, options.plan.revision])
+  }, [options.plan.planId, options.plan.revision, options.scopeKey])
 
   useEffect(() => setPlan(options.plan), [options.plan])
 
@@ -335,7 +339,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
         setDeciding(null)
       }
     }
-  }, [apply, plan.planId, plan.revision])
+  }, [apply, plan.planId, plan.revision, options.scopeKey])
 
   const restore = useCallback(async () => {
     const context = lifetime.current
@@ -354,7 +358,7 @@ export function useDurablePlanFlow(options: UseDurablePlanFlowOptions): UseDurab
     } finally {
       if (lifetime.current === context) setRestoring(false)
     }
-  }, [apply, plan.planId, plan.revision])
+  }, [apply, plan.planId, plan.revision, options.scopeKey])
 
   const retryAttach = useCallback(() => {
     restoration.current.attempts.set(planDecisionKey(plan), 0)
