@@ -222,6 +222,7 @@ export async function provisionWorkspaceSandbox(
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (reuseOnly) return undefined
   await gate()
+  signal?.throwIfAborted()
   if (!replacementRequested && !forceNew && shell.resumeStopped !== false) {
     const stopped = await measure('list_stopped', () => listStopped(client, name))
     if (!stopped.succeeded) throw stopped.error
@@ -276,7 +277,8 @@ export async function provisionWorkspaceSandbox(
   }
 
   // Stage 3 — create fresh.
-  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId)
+  signal?.throwIfAborted()
+  const { payload, deferredFiles } = await measure('payload', () => prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal))
 
   let box = await measure('create', () => client.create(payload))
 
@@ -314,8 +316,11 @@ async function prepareWorkspacePayload(
   recoveryRestore: SandboxRestoreSpec | null | undefined,
   resources: NonNullable<SandboxRuntimeConfig['resources']>,
   billingOwnerId: EnsureWorkspaceSandboxOptions['billingOwnerId'],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted()
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
+  signal?.throwIfAborted()
   const buildCtx: SandboxBuildContext = {
     workspaceId,
     connectedIntegrationIds,
@@ -327,6 +332,7 @@ async function prepareWorkspacePayload(
     resolveWorkspaceRuntimeEnv(shell, scope),
     shell.files(buildCtx),
   ])
+  signal?.throwIfAborted()
   const env = { ...creationEnv, ...runtimeEnv }
   const fullProfile = shell.profile({ extraFiles: files, harness })
   // When deferring, strip inline files from the create payload and write them
@@ -346,6 +352,7 @@ async function prepareWorkspacePayload(
     : undefined
   if (model && shell.childKeyMint && model.provider === 'openai-compat') {
     const minted = await shell.childKeyMint(scope)
+    signal?.throwIfAborted()
     if (minted.succeeded) model = { ...model, apiKey: minted.value }
     else {
       console.error(
@@ -357,6 +364,7 @@ async function prepareWorkspacePayload(
 
   const storage = shell.storage?.(buildCtx)
   const restore = recoveryRestore === undefined ? await shell.restore?.(buildCtx) : recoveryRestore
+  signal?.throwIfAborted()
 
   const payload = {
     name,

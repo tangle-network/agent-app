@@ -127,9 +127,10 @@ export type PeekWorkspaceSandboxOutcome =
  */
 export async function peekWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
-  options: { workspaceId: string; userId?: string },
+  options: { workspaceId: string; userId?: string; signal?: AbortSignal },
 ): Promise<PeekWorkspaceSandboxOutcome> {
-  const { client, name } = await resolveWorkspaceSandboxClient(shell, options.workspaceId, options.userId)
+  options.signal?.throwIfAborted()
+  const { client, name } = await resolveWorkspaceSandboxClient(shell, options.workspaceId, options.userId, options.signal)
   const displayName = shell.name(options.workspaceId)
   const boxes = await client.list()
   const match = boxes.find((box) => box.name === name) ?? boxes.find((box) => box.name === displayName)

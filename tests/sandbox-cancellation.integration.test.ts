@@ -9,6 +9,8 @@ import { runForegroundSandboxSingleFlight } from '../src/sandbox/foreground-sing
 import { createD1PrewarmClaimStore, PREWARM_CLAIM_TABLE_DDL, type PrewarmClaimD1Like } from '../src/sandbox/prewarm-claim-d1'
 import { sandboxPrewarmClaimKey } from '../src/sandbox/prewarm'
 import { resolveWorkspaceSandboxClient } from '../src/sandbox/workspace-boxes'
+import { peekWorkspaceSandbox } from '../src/sandbox/workspace-boxes'
+import { provisionWorkspaceSandbox } from '../src/sandbox/workspace-provision'
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -27,7 +29,7 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
 
 /** Real SDK requests to a loopback HTTP peer. No replaced fetch, SDK method,
  * clock, lifecycle function, or production request. */
-async function boundary(mode: 'read' | 'resume' | 'create') {
+async function boundary(mode: 'read' | 'resume' | 'create' | 'connection') {
   const entered = deferred()
   const closed = deferred()
   const twoEntered = deferred()
@@ -38,7 +40,7 @@ async function boundary(mode: 'read' | 'resume' | 'create') {
     const path = new URL(request.url!, 'http://localhost').pathname
     requests.push(`${request.method} ${path}`)
     const json = (body: unknown) => response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
-    if (mode === 'read' || path.endsWith('/resume') || (mode === 'create' && request.method === 'POST')) {
+    if (mode === 'read' || path.endsWith('/resume') || (mode === 'connection' && path.endsWith('/cancel-original')) || (mode === 'create' && request.method === 'POST')) {
       pending.push(response)
       if (pending.length === 2) twoEntered.resolve()
       response.on('close', () => closed.resolve())
@@ -47,7 +49,8 @@ async function boundary(mode: 'read' | 'resume' | 'create') {
     }
     if (path === '/v1/sandboxes') {
       const stopped = new URL(request.url!, 'http://localhost').searchParams.get('status') === 'stopped'
-      return json({ sandboxes: stopped && mode === 'resume' ? [{ id: 'cancel-original', name: 'cancel-workspace', status: 'stopped', lifecycleState: 'suspended', metadata: { harness: 'opencode' } }] : [] })
+      const found = (stopped && mode === 'resume') || (!stopped && mode === 'connection')
+      return json({ sandboxes: found ? [{ id: 'cancel-original', name: 'cancel-workspace', status: stopped ? 'stopped' : 'running', lifecycleState: stopped ? 'suspended' : undefined, metadata: { harness: 'opencode' }, filesystemIncarnationId: 'cancel-incarnation', filesystemIncarnationReadiness: 'ready' }] : [] })
     }
     response.writeHead(500).end('Unexpected lifecycle request')
   })
@@ -104,7 +107,7 @@ describe('request cancellation through SDK and fenced provisioning', () => {
     } finally { await peer.close() }
   })
 
-  it.each(['read', 'resume', 'create'] as const)('aborts an in-flight %s at the actual HTTP transport without replacement', async mode => {
+  it.each(['read', 'resume', 'create', 'connection'] as const)('aborts an in-flight %s at the actual HTTP transport without replacement', async mode => {
     const peer = await boundary(mode)
     const controller = new AbortController()
     const result = peer.ensure(controller.signal)
@@ -184,5 +187,50 @@ describe('request cancellation through SDK and fenced provisioning', () => {
       expect((await store.inspect(sandboxPrewarmClaimKey(scope))).status).toBe('held')
       expect(await store.acquireLease(sandboxPrewarmClaimKey(scope), 180)).toBeNull()
     } finally { controller.abort(); await peer.close(); await result.catch(() => undefined); db.close() }
+  })
+
+  it.each(['reuse', 'peek'] as const)('cancels an actual in-flight waiter %s read and preserves another owner', async phase => {
+    const peer = await boundary('read')
+    const { db, store } = sqliteClaims()
+    const scope = { workspaceId: `cancel-read-${phase}`, harness: 'opencode' as const }
+    const key = sandboxPrewarmClaimKey(scope)
+    const lease = await store.acquireLease(key, 180)
+    const controller = new AbortController()
+    const read = (signal?: AbortSignal) => peekWorkspaceSandbox(peer.shell, { workspaceId: scope.workspaceId, signal })
+    const options = { ...scope, claim: store, signal: controller.signal, pollIntervalMs: 1,
+      ...(phase === 'reuse' ? { reuse: async (signal?: AbortSignal) => { await read(signal); return undefined } } : {}),
+      provision: async () => { throw new Error('Waiter must not provision') },
+      peek: read, adopt: () => 'unused',
+    }
+    const result = runForegroundSandboxSingleFlight(options)
+    const rejected = expect(bounded(result)).rejects.toMatchObject({ name: 'AbortError' })
+    try {
+      await bounded(peer.entered)
+      controller.abort()
+      await rejected
+      await bounded(peer.closed)
+      expect(await store.inspect(key)).toEqual({ status: 'held', expiresAt: lease!.expiresAt })
+    } finally { controller.abort(); await peer.close(); await result.catch(() => undefined); db.close() }
+  })
+
+  it('starts no payload callbacks after cancellation during the actual SQLite spend gate', async () => {
+    const peer = await boundary('create')
+    const { db } = sqliteClaims()
+    db.exec('CREATE TABLE callback_effects (event TEXT)')
+    const controller = new AbortController()
+    const shell = { ...peer.shell, resumeStopped: false, files: async () => {
+      db.exec("INSERT INTO callback_effects VALUES ('files')")
+      return []
+    } }
+    try {
+      const options = { workspaceId: 'cancel-payload', harness: 'opencode' as const, signal: controller.signal }
+      await expect(provisionWorkspaceSandbox(shell, options, async () => {
+        // A real storage boundary settles while the caller departs.
+        db.prepare('SELECT COUNT(*) AS n FROM callback_effects').get()
+        controller.abort()
+      }, false)).rejects.toMatchObject({ name: 'AbortError' })
+      expect(db.prepare('SELECT COUNT(*) AS n FROM callback_effects').get()).toMatchObject({ n: 0 })
+      expect(peer.requests.filter(line => line.startsWith('POST'))).toEqual([])
+    } finally { controller.abort(); await peer.close(); db.close() }
   })
 })
