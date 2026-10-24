@@ -67,6 +67,7 @@ export async function* detachedSandboxPromptEvents(
     throw new Error('streamSandboxPrompt detach requires stable sessionId and executionId')
   }
 
+  options.signal?.throwIfAborted()
   const lastEventId = options.lastEventId?.trim() || undefined
   const turnId = options.turnId?.trim() || executionId
   // A cursor is already proof that this execution was admitted. Re-dispatching
@@ -91,20 +92,29 @@ export async function* detachedSandboxPromptEvents(
         ...(options.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
         ...(options.trace ? { traceId: options.trace.traceId } : {}),
       } as DispatchPromptOptions)
-  const admittedExecutionId = admission?.executionId ?? executionId
-  if (!admittedExecutionId) {
-    throw new Error(`detached Sandbox dispatch for ${sessionId} returned no executionId`)
-  }
-
+  // An admission already sent must settle before observation ends. Its product
+  // owner can fence an accepted native run; an aborted read is never no-send proof.
+  options.signal?.throwIfAborted()
   // A completed-turn cache hit deliberately returns `dispatched: false` and
   // emits no new stream events. Yield its public result directly; the replay
   // buffer may already have aged out by the time a retry reaches this helper.
   if (admission?.dispatched === false) {
     const cached = await box.findCompletedTurn(turnId, { sessionId })
+    options.signal?.throwIfAborted()
     if (cached) {
-      yield* cachedSandboxPromptEvents(cached, admittedExecutionId)
+      if (cached.turnId !== turnId || cached.sessionId !== sessionId) {
+        throw new Error('sandbox.detached_completed_turn_identity_mismatch')
+      }
+      yield* cachedSandboxPromptEvents(cached, executionId)
       return
     }
+  }
+
+  // The SDK may return a different active execution with dispatched: false.
+  // That is neither admission of this run nor permission to observe its peer.
+  // Only an exact keyed completed turn above may retain a prior execution ID.
+  if (admission && (admission.sessionId !== sessionId || admission.executionId !== executionId)) {
+    throw new Error('sandbox.detached_admission_identity_mismatch')
   }
 
   // The session bus is a useful observation surface, but its message events
@@ -112,8 +122,8 @@ export async function* detachedSandboxPromptEvents(
   // execution replay instead so downstream producers receive the same event
   // vocabulary as a direct prompt stream (`data.part`, terminal `result`, etc.).
   yield* box.streamPrompt('', {
-    sessionId: admission?.sessionId ?? sessionId,
-    executionId: admittedExecutionId,
+    sessionId,
+    executionId,
     lastEventId: lastEventId || '0',
     ...(options.trace ? { traceId: options.trace.traceId } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
