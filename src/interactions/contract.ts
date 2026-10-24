@@ -310,12 +310,14 @@ export type NoticePersistedPart = {
   text: string
   /** Typed reason for an `error` notice, e.g. the sandbox or upstream error code. */
   code?: string
+  /** The failure's redacted cause chain, for operators and support. Kept with the transcript; not rendered. */
+  detail?: string
 }
 
 /** Builds the persisted/streamed `notice` part — a one-line transcript notice
  *  explaining an out-of-band event (warning, auto-declined interaction, turn error). */
-export function noticePart(noticeKind: NoticeKind, id: string, text: string, code?: string): NoticePersistedPart {
-  return { type: 'notice', id, noticeKind, text, ...(code ? { code } : {}) }
+export function noticePart(noticeKind: NoticeKind, id: string, text: string, code?: string, detail?: string): NoticePersistedPart {
+  return { type: 'notice', id, noticeKind, text, ...(code ? { code } : {}), ...(detail ? { detail } : {}) }
 }
 
 /** Reads a wire request into the client's pending `ChatInteraction`. */

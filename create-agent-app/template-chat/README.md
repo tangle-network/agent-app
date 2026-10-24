@@ -97,6 +97,18 @@ Before production, complete a real model turn, reload its saved text and usage,
 and check live disconnect/replay on the deployed origin. Those checks are not
 implied by a local build or no-model browser proof.
 
+## Release canary
+
+`pnpm deploy` ends with `pnpm canary` (`scripts/release-canary.mjs`), which runs
+two turns on the deployed origin as a canary member: a plain answer, and a
+command only the workspace computer can run. The release fails when either turn
+fails, and the log names the computer step's cause from the transcript's
+recorded notice. Set `CANARY_URL` (the deployed origin), `CANARY_EMAIL` and
+`CANARY_PASSWORD` in the shell that deploys; the first release signs that member
+up. A deploy without them fails rather than passing unchecked.
+`tests/release-canary.e2e.test.ts` runs the same script against this app's
+Worker over local protocol peers.
+
 ## Artifact index
 
 `GET /api/files` lists files under `/home/agent/artifacts` for the signed-in

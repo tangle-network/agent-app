@@ -32,6 +32,8 @@
  * run are recorded under the turn's `trace` when the route gives one.
  * A typed computer failure also emits a persisted warning; the Router keeps
  * answering without relying on the model to explain that failure faithfully.
+ * The warning's `detail` is the failure's redacted cause chain, so the cause is
+ * in the transcript, not only in a log line a Worker does not keep.
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import { redactErrorMessage } from '../redact/index'
@@ -43,7 +45,7 @@ import {
   type EscalationHint,
   type EscalationInput,
 } from '../sandbox/escalation-speculator'
-import { createSandboxRunTool, SandboxRunError, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
+import { createSandboxRunTool, SandboxRunError, sandboxRunFailureDetail, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
 import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
@@ -72,6 +74,8 @@ export interface HybridTurnBox {
   /** Wall-clock cap for one `sandbox_run` call, box start included. Default 4 minutes. */
   timeoutMs?: number
   warm?: SandboxRunToolOptions['warm']
+  /** Every computer failure with its cause. The producer already persists the redacted cause chain on the turn's
+   *  warning notice (`detail`), and logs it when this is omitted. */
   onFailure?: SandboxRunToolOptions['onFailure']
   /** The tool's name and description. Default `sandbox_run` and its shared description. */
   name?: string
@@ -171,9 +175,11 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
 
   try {
     const warnings = new Map<string, ProducerNoticeEvent>()
+    // Each failed call's redacted cause chain, by call id, recorded before the engine reports the call's error.
+    const details = new Map<string, string>()
     const withWarnings = (parts: Array<Record<string, unknown>>) => parts.flatMap(part => {
       const warning = warnings.get(String(part.callID ?? part.id ?? ''))
-      return warning ? [part, noticePart(warning.noticeKind, warning.id, warning.text, warning.code)] : [part]
+      return warning ? [part, noticePart(warning.noticeKind, warning.id, warning.text, warning.code, warning.detail)] : [part]
     })
     const sandboxRun = createSandboxRunTool({
       box: () => acquire(),
@@ -192,7 +198,12 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
       timeoutMs,
       signal: stop,
       ...(box.warm ? { warm: box.warm } : {}),
-      ...(box.onFailure ? { onFailure: box.onFailure } : {}),
+      onFailure: (error, call) => {
+        const detail = sandboxRunFailureDetail(error)
+        if (call.callId) details.set(call.callId, detail)
+        if (box.onFailure) box.onFailure(error, call)
+        else console.error(JSON.stringify({ event: 'agent_app_sandbox_run_failed', callId: call.callId ?? null, code: error.code, detail }))
+      },
       ...(box.name ? { name: box.name } : {}),
       ...(box.description ? { description: box.description } : {}),
     })
@@ -220,11 +231,13 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
           const code = event.error.code
           if (code === 'sandbox_unconfirmed') unconfirmed = true
           if (code === 'sandbox_unavailable' || code === 'sandbox_failed' || code === 'sandbox_unconfirmed' || code === 'sandbox_empty') {
+            const detail = details.get(event.callId)
             warnings.set(event.callId, {
               type: 'notice', noticeKind: 'warning', id: `sandbox-warning:${event.callId}`, code,
               text: code === 'sandbox_unavailable'
                 ? 'The workspace computer is unavailable. I can continue with work that does not need it.'
                 : 'The computer step did not return a confirmed answer. I can continue with work that does not need it.',
+              ...(detail ? { detail } : {}),
             })
           }
         }

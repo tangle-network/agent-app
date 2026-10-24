@@ -226,6 +226,8 @@ export interface ChatNoticePart {
   text: string
   /** Typed reason for an `error` notice, e.g. the sandbox or upstream error code. */
   code?: string
+  /** The failure's redacted cause chain, for operators and support. Kept with the transcript; not rendered. */
+  detail?: string
 }
 
 /**
