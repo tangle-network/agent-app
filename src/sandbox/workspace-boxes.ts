@@ -69,13 +69,15 @@ export async function resolveWorkspaceSandboxClient(
   shell: SandboxRuntimeConfig,
   workspaceId: string,
   userId: string | undefined,
+  signal?: AbortSignal,
 ): Promise<{ scope: SandboxScope; client: Sandbox; name: string }> {
   const scope: SandboxScope = { workspaceId, ...(userId ? { userId } : {}) }
   const creds = await shell.credentials(scope)
+  signal?.throwIfAborted()
   if (!creds) throw new Error('sandbox credentials are required (apiKey/baseUrl)')
   return {
     scope,
-    client: getClientFromCreds(creds),
+    client: getClientFromCreds(creds, signal),
     name: shell.boxKey ? shell.boxKey(scope) : shell.name(workspaceId),
   }
 }
@@ -125,9 +127,10 @@ export type PeekWorkspaceSandboxOutcome =
  */
 export async function peekWorkspaceSandbox(
   shell: SandboxRuntimeConfig,
-  options: { workspaceId: string; userId?: string },
+  options: { workspaceId: string; userId?: string; signal?: AbortSignal },
 ): Promise<PeekWorkspaceSandboxOutcome> {
-  const { client, name } = await resolveWorkspaceSandboxClient(shell, options.workspaceId, options.userId)
+  options.signal?.throwIfAborted()
+  const { client, name } = await resolveWorkspaceSandboxClient(shell, options.workspaceId, options.userId, options.signal)
   const displayName = shell.name(options.workspaceId)
   const boxes = await client.list()
   const match = boxes.find((box) => box.name === name) ?? boxes.find((box) => box.name === displayName)

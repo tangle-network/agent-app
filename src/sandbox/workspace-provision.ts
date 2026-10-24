@@ -94,10 +94,14 @@ export async function provisionWorkspaceSandbox(
   )) {
     throw new Error('livenessProbe.execTimeoutMs must be an integer between 100 and 600000')
   }
-  const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId } = options
-  const measure = <T>(stage: string, operation: () => Promise<T>): Promise<T> =>
-    options.measure ? options.measure(`sandbox.ensure.${stage}`, operation) : operation()
-  const resolved = await measure('credentials', () => resolveWorkspaceSandboxClient(shell, workspaceId, userId))
+  const { workspaceId, userId, harness, forceNew, onProgress, billingOwnerId, signal } = options
+  const measure = async <T>(stage: string, operation: () => Promise<T>): Promise<T> => {
+    signal?.throwIfAborted()
+    const result = await (options.measure ? options.measure(`sandbox.ensure.${stage}`, operation) : operation())
+    signal?.throwIfAborted()
+    return result
+  }
+  const resolved = await measure('credentials', () => resolveWorkspaceSandboxClient(shell, workspaceId, userId, signal))
   const { scope, client } = resolved
   let name = resolved.name
   let recoveryRestore: SandboxRestoreSpec | null | undefined
@@ -185,6 +189,7 @@ export async function provisionWorkspaceSandbox(
         )
         return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'reused', name, workspaceId, userId, harness, scope, runtimeEnv))
       } catch (cause) {
+        signal?.throwIfAborted()
         if (refusal.refused) throw refusal.error
         if (reuseOnly) return undefined
         const error = cause instanceof Error ? cause : new Error(String(cause))
@@ -217,6 +222,7 @@ export async function provisionWorkspaceSandbox(
   // Stage 2 — stopped-box resume (skipped on forceNew or resumeStopped===false).
   if (reuseOnly) return undefined
   await gate()
+  signal?.throwIfAborted()
   if (!replacementRequested && !forceNew && shell.resumeStopped !== false) {
     const stopped = await measure('list_stopped', () => listStopped(client, name))
     if (!stopped.succeeded) throw stopped.error
@@ -225,6 +231,7 @@ export async function provisionWorkspaceSandbox(
       const runtimeEnv = await measure('runtime_env', () => resolveWorkspaceRuntimeEnv(shell, scope))
       const resumed = await measure('resume', () => resumeStoppedBox(stoppedBox, resumeTimeout, runtimeEnv, onProgress))
       if (!resumed.succeeded) {
+        signal?.throwIfAborted()
         const recovery = await requestSandboxReplacement(
           shell.recoverStoppedSandbox,
           { box: stopped.value, error: resumed.error, scope, boxKey: name },
@@ -253,6 +260,7 @@ export async function provisionWorkspaceSandbox(
           )
           return rememberRunningBox(name, await finalizeExistingBox(shell, client, recovered, 'resumed', name, workspaceId, userId, harness, scope, runtimeEnv))
         } catch (cause) {
+          signal?.throwIfAborted()
           const error = cause instanceof Error ? cause : new Error(String(cause))
           const recovery = await requestMissingSandboxReplacement(shell, {
             box: stopped.value,
@@ -269,12 +277,16 @@ export async function provisionWorkspaceSandbox(
   }
 
   // Stage 3 — create fresh.
-  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId)
+  signal?.throwIfAborted()
+  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal)
 
-  let box = await measure('create', () => client.create(payload))
+  // The client signal aborts each request; the create's own signal also ends
+  // its Retry-After pacing between POSTs, so a canceled caller sends no later create.
+  let box = await measure('create', () => signal ? client.create(payload, { signal }) : client.create(payload))
 
   await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
     ...(onProgress ? { onProgress } : {}),
   }))
   box = await measure('refresh_connection', () => refreshRuntimeConnection(client, box))
@@ -306,8 +318,11 @@ async function prepareWorkspacePayload(
   recoveryRestore: SandboxRestoreSpec | null | undefined,
   resources: NonNullable<SandboxRuntimeConfig['resources']>,
   billingOwnerId: EnsureWorkspaceSandboxOptions['billingOwnerId'],
+  signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted()
   const connectedIntegrationIds = await shell.connectedIntegrationIds(workspaceId)
+  signal?.throwIfAborted()
   const buildCtx: SandboxBuildContext = {
     workspaceId,
     connectedIntegrationIds,
@@ -319,6 +334,7 @@ async function prepareWorkspacePayload(
     resolveWorkspaceRuntimeEnv(shell, scope),
     shell.files(buildCtx),
   ])
+  signal?.throwIfAborted()
   const env = { ...creationEnv, ...runtimeEnv }
   const fullProfile = shell.profile({ extraFiles: files, harness })
   // When deferring, strip inline files from the create payload and write them
@@ -338,6 +354,7 @@ async function prepareWorkspacePayload(
     : undefined
   if (model && shell.childKeyMint && model.provider === 'openai-compat') {
     const minted = await shell.childKeyMint(scope)
+    signal?.throwIfAborted()
     if (minted.succeeded) model = { ...model, apiKey: minted.value }
     else {
       console.error(
@@ -349,6 +366,7 @@ async function prepareWorkspacePayload(
 
   const storage = shell.storage?.(buildCtx)
   const restore = recoveryRestore === undefined ? await shell.restore?.(buildCtx) : recoveryRestore
+  signal?.throwIfAborted()
 
   const payload = {
     name,
