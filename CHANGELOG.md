@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.10
+
+- ci: keep local and deployment checks, remove PR CI
+
 ## 0.63.9
 
 - ci(catalog): cancel superseded pull request catalog runs (#1314)
