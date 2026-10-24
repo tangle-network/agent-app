@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.9
+
+- ci(catalog): cancel superseded pull request catalog runs (#1314)
+
 ## 0.63.8
 
 - fix(chat): persist canonical Router failure notices
