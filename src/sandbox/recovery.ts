@@ -444,6 +444,7 @@ export function createWorkspaceSandboxRecoveryManager<Snapshot extends Workspace
       if (replacementBoxKey !== undefined && current.replacementBoxKey !== replacementBoxKey) return undefined
       const policy = ACTIONS[current.action]
       if (!('completedAs' in policy)) return undefined
+      if (asNonEmptyString(current.replacementSandboxId) && current.replacementSandboxId !== replacementSandboxId) return undefined
       if (!asNonEmptyString(replacementSandboxId)) throw new Error('A replacement sandbox id is required')
       return transition(workspaceId, current, { ...current, action: policy.completedAs, replacementSandboxId })
     },

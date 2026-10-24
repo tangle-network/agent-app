@@ -33,6 +33,7 @@ function pending(detectedAt = '2026-10-24T01:34:28Z'): WorkspaceSandboxRecoveryS
 async function boundary(initial = pending()) {
   const db = new DatabaseSync(':memory:')
   db.exec('CREATE TABLE recovery (workspace TEXT PRIMARY KEY, value TEXT NOT NULL)')
+  db.exec('CREATE TABLE retained_work (sandbox_id TEXT, contents TEXT, written_at TEXT)')
   let nextReadDelivery: Promise<void> | undefined
   let deliveredRead: (() => void) | undefined
   const pauseNextRead = () => {
@@ -75,6 +76,11 @@ async function boundary(initial = pending()) {
     } as Record<string, unknown> | null,
     snapshots: { snapshots: [{ snapshotId: 'final-snapshot', sandboxId: originalId,
       createdAt: finalTime, tags: ['pre-suspend'], remoteSync: 'synced' }] } as Record<string, unknown>,
+    listing: { sandboxes: [], listingComplete: true } as Record<string, unknown>,
+    listingStatus: 200,
+    listingBody: undefined as string | undefined,
+    listingReads: 0,
+    beforeSecondListing: undefined as (() => Promise<void>) | undefined,
     snapshotStatus: 200,
     rawBody: undefined as string | undefined,
     originalReads: 0,
@@ -87,6 +93,11 @@ async function boundary(initial = pending()) {
       const json = (body: unknown, code = 200) => res.writeHead(code, { 'content-type': 'application/json' }).end(JSON.stringify(body))
       if (req.headers.authorization !== 'Bearer local-recovery-owner') return json({ error: 'unauthorized' }, 401)
       if (req.method !== 'GET') return json({ error: 'No lifecycle mutation permitted' }, 409)
+      if (req.url === '/v1/sandboxes') {
+        if (++state.listingReads === 2) await state.beforeSecondListing?.()
+        if (state.listingBody !== undefined) return res.writeHead(state.listingStatus, { 'content-type': 'application/json' }).end(state.listingBody)
+        return json(state.listing, state.listingStatus)
+      }
       if (req.url === `/v1/sandboxes/${originalId}`) {
         if (++state.originalReads === 2) await state.beforeSecondGet?.()
         return json(state.original ?? { error: 'Sandbox not found' }, state.original ? 200 : 404)
@@ -145,7 +156,7 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
       expect(preferredWorkspaceSandboxRecoveryBoxKey(await peer.manager.read(workspaceId))).toBe(originalKey)
       await expect(peer.manager.record(workspaceId, pending())).rejects.toThrow('Sandbox recovery changed')
       expect(preferredWorkspaceSandboxRecoveryBoxKey(await peer.manager.read(workspaceId))).toBe(originalKey)
-      expect(peer.requests).toEqual([`GET /v1/sandboxes/${originalId}`, `GET /v1/sandboxes/${originalId}/snapshots`, `GET /v1/sandboxes/${originalId}`])
+      expect(peer.requests).toEqual(['GET /v1/sandboxes', `GET /v1/sandboxes/${originalId}`, `GET /v1/sandboxes/${originalId}/snapshots`, `GET /v1/sandboxes/${originalId}`, 'GET /v1/sandboxes'])
     } finally { await peer.close() }
   })
 
@@ -204,6 +215,83 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
       } finally { await peer.close() }
     },
   )
+
+  it.each(['running', 'stopped', 'pending', 'failed'])('preserves an unbound physical %s replacement even when the original snapshot is newer', async status => {
+    const peer = await boundary()
+    try {
+      peer.db.prepare('INSERT INTO retained_work VALUES (?, ?, ?)').run('physical-unbound', 'newer retained work', '2026-10-24T02:59:00Z')
+      peer.state.listing.sandboxes = [{ id: 'physical-unbound', name: replacementKey, status,
+        lastActivityAt: '2026-10-24T02:59:00Z', createdAt: '2026-10-24T02:00:00Z' }]
+      expect(await peer.reconcile()).toMatchObject({ status: 'conflict', reason: 'replacement_physically_present' })
+      expect(await peer.manager.read(workspaceId)).toEqual(pending())
+      expect(peer.requests).toEqual(['GET /v1/sandboxes'])
+      expect(peer.db.prepare('SELECT contents FROM retained_work WHERE sandbox_id = ?').get('physical-unbound')).toEqual({ contents: 'newer retained work' })
+    } finally { await peer.close() }
+  })
+
+  it.each(['incomplete', 'missing-completeness', 'pagination', 'wrong-total', 'malformed', 'refused', 'too-many', 'too-large'])(
+    'fails closed on %s replacement inventory without inferring physical absence', async kind => {
+      const peer = await boundary()
+      try {
+        if (kind === 'incomplete') peer.state.listing.listingComplete = false
+        else if (kind === 'missing-completeness') delete peer.state.listing.listingComplete
+        else if (kind === 'pagination') peer.state.listing.nextCursor = 'more'
+        else if (kind === 'wrong-total') peer.state.listing.total = 1
+        else if (kind === 'malformed') peer.state.listingBody = '{"sandboxes":['
+        else if (kind === 'refused') peer.state.listingStatus = 503
+        else if (kind === 'too-many') peer.state.listing.sandboxes = Array.from({ length: 257 }, (_, i) => ({ id: `box-${i}`, name: `other-${i}` }))
+        else peer.state.listingBody = JSON.stringify({ sandboxes: [], listingComplete: true, padding: 'a'.repeat(256 * 1024) })
+        expect(await peer.reconcile()).toMatchObject({ status: 'unverified', reason: 'replacement_listing_unverified' })
+        expect(await peer.manager.read(workspaceId)).toEqual(pending())
+        expect(peer.requests).toEqual(['GET /v1/sandboxes'])
+      } finally { await peer.close() }
+    },
+  )
+
+  it('preserves a replacement that appears during original proof', async () => {
+    const peer = await boundary()
+    try {
+      peer.state.beforeSecondListing = async () => {
+        peer.state.listing.sandboxes = [{ id: 'late-physical-box', name: replacementKey, status: 'running' }]
+      }
+      expect(await peer.reconcile()).toMatchObject({ status: 'conflict', reason: 'replacement_physically_present' })
+      expect(await peer.manager.read(workspaceId)).toEqual(pending())
+      expect(peer.state.listingReads).toBe(2)
+    } finally { await peer.close() }
+  })
+
+  it('rechecks incomplete inventory after original proof rather than relying on its earlier absence observation', async () => {
+    const peer = await boundary()
+    try {
+      peer.state.beforeSecondListing = async () => { peer.state.listing.listingComplete = false }
+      expect(await peer.reconcile()).toMatchObject({ status: 'unverified', reason: 'replacement_listing_unverified' })
+      expect(await peer.manager.read(workspaceId)).toEqual(pending())
+    } finally { await peer.close() }
+  })
+
+  it('does not overwrite a pending physical binding with another ID under the same key', async () => {
+    const peer = await boundary({ ...pending(), replacementSandboxId: 'physical-a' })
+    try {
+      expect(await peer.manager.complete({ workspaceId, replacementSandboxId: 'physical-b', replacementBoxKey: replacementKey })).toBeUndefined()
+      expect(await peer.manager.read(workspaceId)).toMatchObject({ action: 'missing_replacement_started', replacementSandboxId: 'physical-a' })
+      expect(await peer.manager.complete({ workspaceId, replacementSandboxId: 'physical-a', replacementBoxKey: replacementKey })).toMatchObject({ action: 'missing_replacement_completed', replacementSandboxId: 'physical-a' })
+    } finally { await peer.close() }
+  })
+
+  it('lets only one of two physical IDs complete a simultaneous same-key race', async () => {
+    const peer = await boundary()
+    try {
+      const settled = await Promise.allSettled([
+        peer.manager.complete({ workspaceId, replacementSandboxId: 'physical-a', replacementBoxKey: replacementKey }),
+        peer.manager.complete({ workspaceId, replacementSandboxId: 'physical-b', replacementBoxKey: replacementKey }),
+      ])
+      expect(settled.filter(result => result.status === 'fulfilled' && result.value !== undefined)).toHaveLength(1)
+      expect(settled.filter(result => result.status === 'rejected')).toHaveLength(1)
+      const current = await peer.manager.read(workspaceId)
+      expect(current?.action).toBe('missing_replacement_completed')
+      expect(['physical-a', 'physical-b']).toContain(current?.replacementSandboxId)
+    } finally { await peer.close() }
+  })
 
   it('fences concurrent replacement completion without overwriting the accepted replacement', async () => {
     const peer = await boundary()

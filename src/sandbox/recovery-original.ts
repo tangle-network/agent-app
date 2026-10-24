@@ -23,8 +23,8 @@ export type WorkspaceSandboxOriginalRecoveryResult<Snapshot extends WorkspaceSan
   reason?: string
 }
 
-const MAX_SNAPSHOT_BYTES = 256 * 1024
-const MAX_SNAPSHOT_RECORDS = 256
+const MAX_RECOVERY_READ_BYTES = 256 * 1024
+const MAX_RECOVERY_READ_RECORDS = 256
 
 type CommittedOriginal = {
   boxKey: string
@@ -53,6 +53,41 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+/** A missing local binding is not proof that a prior create did not make a
+ * box. The SDK list() drops listingComplete, so preserve that public API
+ * envelope through its ordinary authenticated transport. No filters or pages:
+ * clear means only absent in this complete observation, never no remote task. */
+async function inspectReplacement(
+  client: WorkspaceSandboxOriginalRecoveryOptions['client'], boxKey: string,
+): Promise<'clear' | 'present' | 'unverified'> {
+  const response = await client.fetch('/v1/sandboxes', { method: 'GET' }, { timeoutMs: 5_000 })
+  if (!response.ok) {
+    await response.body?.cancel()
+    return 'unverified'
+  }
+  const [body, error] = await parseJsonObjectBody(response, { maxBytes: MAX_RECOVERY_READ_BYTES })
+  if (error) {
+    await response.body?.cancel().catch(() => undefined)
+    return 'unverified'
+  }
+  const entries = body.sandboxes
+  if (!Array.isArray(entries) || entries.length > MAX_RECOVERY_READ_RECORDS) return 'unverified'
+  const ids = new Set<string>()
+  for (const entry of entries) {
+    if (!record(entry) || typeof entry.id !== 'string' || !entry.id.trim()
+      || typeof entry.name !== 'string' || !entry.name.trim() || ids.has(entry.id)) return 'unverified'
+    ids.add(entry.id)
+    // A positive physical match is a conflict even if a peer also reports
+    // incompleteness. It never licenses switching or overwriting either box.
+    if (entry.name === boxKey) return 'present'
+  }
+  if (body.listingComplete !== true
+    || Object.keys(body).some(key => !['sandboxes', 'listingComplete', 'total', 'count'].includes(key))
+    || (body.total !== undefined && body.total !== entries.length)
+    || (body.count !== undefined && body.count !== entries.length)) return 'unverified'
+  return 'clear'
+}
+
 type FinalSnapshot = { snapshotId: string; createdAt: number }
 
 /** A positive same-original, remotely synced final-stop witness. The public
@@ -63,7 +98,7 @@ function finalSnapshot(
   original: CommittedOriginal, now: number,
 ): FinalSnapshot | undefined {
   const entries = body.snapshots
-  if (!Array.isArray(entries) || entries.length === 0 || entries.length > MAX_SNAPSHOT_RECORDS) return undefined
+  if (!Array.isArray(entries) || entries.length === 0 || entries.length > MAX_RECOVERY_READ_RECORDS) return undefined
   // No absence or newest-state inference from a partial page, even when a
   // tempting earlier record exists. Unknown envelope fields fail closed.
   if (Object.keys(body).some(key => !['snapshots', 'total', 'count'].includes(key))) return undefined
@@ -119,6 +154,9 @@ export async function reconcileWorkspaceSandboxOriginal<Snapshot extends Workspa
   let last: CommittedOriginal | undefined
   let snapshot: FinalSnapshot | undefined
   try {
+    const replacement = await inspectReplacement(options.client, current.replacementBoxKey)
+    if (replacement === 'present') return result('conflict', 'replacement_physically_present')
+    if (replacement !== 'clear') return result('unverified', 'replacement_listing_unverified')
     first = committedOriginal(await options.client.get(current.sandboxId), current, options, now)
     if (!first || first.boxKey === current.replacementBoxKey) return result('unverified', 'original_not_committed_or_owned')
     const response = await options.client.fetch(`/v1/sandboxes/${encodeURIComponent(current.sandboxId)}/snapshots`, { method: 'GET' }, { timeoutMs: 5_000 })
@@ -126,7 +164,7 @@ export async function reconcileWorkspaceSandboxOriginal<Snapshot extends Workspa
       await response.body?.cancel()
       return result('unverified', 'snapshot_read_refused')
     }
-    const [body, error] = await parseJsonObjectBody(response, { maxBytes: MAX_SNAPSHOT_BYTES })
+    const [body, error] = await parseJsonObjectBody(response, { maxBytes: MAX_RECOVERY_READ_BYTES })
     if (error) {
       await response.body?.cancel().catch(() => undefined)
       return result('unverified', 'snapshot_body_unreadable')
@@ -134,6 +172,9 @@ export async function reconcileWorkspaceSandboxOriginal<Snapshot extends Workspa
     snapshot = finalSnapshot(body, current, first, now)
     if (!snapshot) return result('unverified', 'final_snapshot_unverified')
     last = committedOriginal(await options.client.get(current.sandboxId), current, options, now)
+    const replacementAfter = await inspectReplacement(options.client, current.replacementBoxKey)
+    if (replacementAfter === 'present') return result('conflict', 'replacement_physically_present')
+    if (replacementAfter !== 'clear') return result('unverified', 'replacement_listing_unverified')
   } catch {
     return result('unverified', 'original_read_failed')
   }
