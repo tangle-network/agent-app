@@ -44,11 +44,15 @@ async function boundary() {
       }
       if (request.url === '/v1/sandboxes/observation-box/runtime/agents/run/stream') {
         nativeRequests.push(`${request.method} ${request.url}`)
-        const input = JSON.parse(body) as { sessionId: string }
+        const input = JSON.parse(body) as { sessionId: string; parts?: Array<{ type: string; text?: string }> }
         response.writeHead(200, { 'content-type': 'text/event-stream' })
         if (request.headers['x-execution-id']) response.write(`id: admitted\nevent: execution.started\ndata: ${JSON.stringify({
           executionId: request.headers['x-execution-id'], sessionId: input.sessionId,
         })}\n\n`)
+        if (input.parts?.some(part => part.type === 'text' && Buffer.from(part.text ?? '', 'base64').toString('utf8').includes('unconfirmed before fallback'))) {
+          response.end(`event: error\ndata: ${JSON.stringify({ code: 'upstream_unavailable', status: 503, message: 'HTTP 503 model upstream unavailable' })}\n\n`)
+          return
+        }
         // The exact backend execution was admitted, but observation ends without
         // any native result/done. The SDK, rather than this peer, synthesizes done.
         response.end(`id: partial\nevent: message.part.updated\ndata: ${JSON.stringify({
@@ -408,6 +412,42 @@ it('releases workspace admission after native preflight refuses without dispatch
     const corrected = await peer.routes().turn(peer.turn('after-refused-native'), peer.ctx)
     expect(corrected.status).toBe(200)
     expect(await corrected.text()).toContain('A default Router answer.')
+  } finally { await peer.close() }
+})
+
+it('keeps an earlier unconfirmed native attempt fenced when fallback preflight refuses', async () => {
+  const peer = await boundary()
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+    if (!box) throw new Error('Local observation box is missing')
+    const shell = defaultChatShell('default-assembly', {
+      TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin,
+    }, { model: 'openai/gpt-5' })
+    const attempts: string[] = []
+    const native = peer.routes({ produce: {
+      when: () => false,
+      router: () => { throw new Error('Native fallback must not ask the Router') },
+      sandbox: args => ({ model: 'first/model', fallbackModels: ['openai/gpt-5'],
+        openEvents: ({ model, signal }) => {
+          attempts.push(model)
+          return model === 'first/model'
+            ? box.streamPrompt('Keep the execution unconfirmed before fallback.', {
+              sessionId: args.identity.sessionId, executionId: args.executionId, signal,
+            })
+            : streamSandboxPrompt(shell, box, 'Refuse the incompatible fallback.', {
+              harness: 'kimi-code', model, sessionId: args.identity.sessionId,
+              executionId: args.executionId, turnId: args.executionId, detach: true, signal,
+            })
+        },
+      }),
+    } })
+    const failed = await native.turn(peer.turn('uncertain-fallback'), peer.ctx)
+    await failed.text()
+    await peer.flush()
+    expect(attempts).toEqual(['first/model', 'openai/gpt-5'])
+    expect(peer.nativeRequests.filter(request => request.startsWith('POST'))).toHaveLength(1)
+    const contender = await peer.routes().turn(peer.turn('after-uncertain-fallback'), peer.ctx)
+    expect(contender.status).toBe(409)
   } finally { await peer.close() }
 })
 

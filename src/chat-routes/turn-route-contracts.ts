@@ -78,7 +78,7 @@ export interface ChatTurnRouteProducer extends ChatTurnProducer {
    *  with the request's waitUntil, including when admission refuses an early
    *  Router call. Cleanup must handle and report its own failures. */
   cleanup?: Promise<void>
-  /** Actual backend result/done was observed; transport EOF/error alone is not completion. */
+  /** No unconfirmed native execution remains: a terminal was observed or local preflight prevented dispatch. */
   terminalObserved?(): boolean
   assistantParts?(): Array<Record<string, unknown>>
   /** MID-STREAM snapshot of the same projection, safe to call while the turn
