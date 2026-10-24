@@ -223,7 +223,7 @@ describe('create-agent-app --chat scaffolder', () => {
     const sandboxSource = readFileSync(join(projectDir, 'src/sandbox.ts'), 'utf8')
     expect(sandboxSource).toContain('runForegroundSandboxSingleFlight({')
     expect(sandboxSource).toContain('claim: createD1PrewarmClaimStore(env.DB)')
-    expect(sandboxSource.match(/await ensureForegroundWorkspaceSandbox\(/g) ?? []).toHaveLength(3)
+    expect(sandboxSource.match(/await ensureForegroundWorkspaceSandbox\(/g) ?? []).toHaveLength(2)
     expect(sandboxSource.match(/ensureWorkspaceSandbox\(/g) ?? []).toHaveLength(1)
   })
 

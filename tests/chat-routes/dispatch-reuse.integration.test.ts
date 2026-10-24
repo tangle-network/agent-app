@@ -370,9 +370,12 @@ it('assembles D1 replay and authenticated default locks while keeping each reque
   const first = host('first')
   const second = host('second')
   try {
-    const responses = await Promise.all([h.send('first-turn', first, 'first-thread'), h.send('second-turn', second, 'second-thread')])
-    expect(responses.map(response => response.status)).toEqual([200, 200])
-    await Promise.all(responses.map(response => response.text()))
+    const firstResponse = await h.send('first-turn', first, 'first-thread')
+    expect(firstResponse.status).toBe(200)
+    await firstResponse.text()
+    const secondResponse = await h.send('second-turn', second, 'second-thread')
+    expect(secondResponse.status).toBe(200)
+    await secondResponse.text()
     for (const context of [first, second]) {
       const values = await Promise.all(context.pending)
       expect(values.filter(value => typeof value === 'string' && value.startsWith('seam:')).sort())

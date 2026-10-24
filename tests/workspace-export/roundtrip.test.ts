@@ -23,6 +23,7 @@ import {
   type D1ExportDatabase,
   type ExportPrincipal,
 } from '../../src/workspace-export'
+import { createTarInspector } from '../../src/workspace-export/tar'
 
 const WS = 'ws-test-1'
 const OTHER = 'ws-test-2'
@@ -731,5 +732,30 @@ describe('an export an owner can read', () => {
     for (let i = 0; i < 6 && failed.status === 'running'; i += 1) failed = (await broken.advance(WS, failing.id))!
     expect(failed.status).toBe('failed')
     expect(broken.progress(failed)).toMatchObject({ unitsTotal: 2, unitsDone: 1, unitsFailed: 1 })
+  })
+})
+
+describe('archive metadata boundaries', () => {
+  it('drops AppleDouble records while preserving a valid archive and real files', async () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'wx-metadata-'))
+    const source = join(scratch, 'source')
+    mkdirSync(join(source, 'notes'), { recursive: true })
+    mkdirSync(join(source, '._node_modules'), { recursive: true })
+    mkdirSync(join(source, '._sidecar'), { recursive: true })
+    writeFileSync(join(source, 'notes', 'plan.md'), '# Plan\n')
+    writeFileSync(join(source, '._node_modules', 'ignored.js'), 'metadata')
+    writeFileSync(join(source, '._sidecar', 'state.json'), '{}')
+    const input = join(scratch, 'input.tar')
+    execFileSync('tar', ['-cf', input, '-C', source, '.'])
+    const stats = { files: 0, bytes: 0, blanked: [], excluded: 0 }
+    const stream = new Blob([readFileSync(input)]).stream().pipeThrough(createTarInspector(stats, ['node_modules', '.sidecar']))
+    const output = join(scratch, 'filtered.tar')
+    writeFileSync(output, new Uint8Array(await new Response(stream).arrayBuffer()))
+    const names = execFileSync('tar', ['-tf', output]).toString()
+    expect(names).toContain('notes/plan.md')
+    expect(names).not.toContain('._')
+    expect(stats.excluded).toBeGreaterThan(0)
+    execFileSync('tar', ['-xf', output, '-C', scratch])
+    expect(readFileSync(join(scratch, 'notes', 'plan.md'), 'utf8')).toBe('# Plan\n')
   })
 })
