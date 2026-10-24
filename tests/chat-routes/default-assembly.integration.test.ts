@@ -191,17 +191,19 @@ it('sends an unavailable default sandbox escalation back through the real Router
   } finally { await peer.close() }
 })
 
-it('prewarms only an authenticated accessible thread and derives the workspace from authorization', async () => {
+it('prewarms only a server-authorized workspace and checks access to any named thread', async () => {
   const peer = await boundary()
   try {
     const routes = peer.routes()
-    expect(await (await routes.prewarm(peer.post('/api/chat/prewarm'))).json()).toMatchObject({ outcome: 'declined', reason: 'thread_required' })
+    expect((await routes.prewarm(peer.post('/api/chat/prewarm', {}, false))).status).toBe(401)
     expect((await routes.prewarm(peer.post('/api/chat/prewarm', { threadId: 'first' }, false))).status).toBe(401)
     expect((await routes.prewarm(peer.post('/api/chat/prewarm', { threadId: 'foreign-thread' }))).status).toBe(404)
     expect(peer.channels).toEqual([])
+    const opened = await routes.prewarm(peer.post('/api/chat/prewarm'))
+    expect(await opened.json()).toMatchObject({ outcome: 'warmed', steps: [{ name: 'turn_lock', outcome: 'miss' }] })
     const warm = await routes.prewarm(peer.post('/api/chat/prewarm', { threadId: 'first', workspaceId: 'forged-workspace' }))
     expect(warm.status).toBe(200)
-    expect(await warm.json()).toMatchObject({ outcome: 'warmed', steps: [{ name: 'turn_lock', outcome: 'miss' }] })
+    expect(await warm.json()).toMatchObject({ outcome: 'warmed', steps: [{ name: 'turn_lock', outcome: 'hit' }] })
     expect(peer.channels.length).toBeGreaterThan(0)
     expect(peer.channels.every(channel => channel === 'verified-workspace')).toBe(true)
     const readsOnly = peer.routes({ authorize: async () => ({ ok: true, intent: 'replay', tenantId: 'other', userId: 'member' }) })

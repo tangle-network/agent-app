@@ -61,9 +61,10 @@ The buffer serves live reconnect; message storage serves durable history.
 ### Prewarm the same lock before send
 
 Mount `routes.prewarm(request)` at the existing POST prewarm route. It uses the
-same bindings and lock as send. The request must name a thread; the existing
-`running` authorizer verifies access and supplies the workspace identity.
-Threadless calls decline. The inherited handler never provisions paid compute.
+same bindings and lock as send. The existing `running` authorizer verifies
+access and supplies the workspace identity. It also receives page-open calls
+without a thread: the product may authorize its verified workspace or refuse.
+Any named thread still needs an access check. The inherited handler never provisions paid compute.
 `prewarm: false` disables it. The descriptor's `region` controls first placement
 of lock channels; it cannot move an existing object.
 

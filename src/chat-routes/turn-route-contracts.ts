@@ -168,7 +168,9 @@ export interface ChatTurnAuthorizeArgs {
   body?: ChatTurnRequestPayload | ChatTurnCancelRequest
   /** The buffered turn id being replayed (replay intent only). */
   turnId?: string
-  /** The thread whose running turns are being discovered (running intent only). */
+  /** The thread whose running turns are being discovered. Prewarm also uses
+   * running authorization, without a thread on page-open; the product may
+   * authorize its verified workspace or refuse that operation. */
   threadId?: string
   /** The turn's trace (turn intent only). A product records its own child spans (a billing read, a workspace check) so the
    *  admission wait is named by step; the route already records `admission.authorize` around the whole call. */
@@ -749,7 +751,7 @@ export const INTENT_LINE_MAX_CHARS = 240
 
 /** Define routes to run, replay, and list running chat turns with streaming and reconnect support */
 export interface ChatTurnRoutes {
-  /** POST — warm the authorized thread's workspace lock; never provision paid compute. */
+  /** POST — warm the server-authorized workspace lock; verify a named thread before allowing it. Never provisions paid compute. */
   prewarm(request: Request): Promise<Response>
   /** POST — run one turn, streaming NDJSON. First line is
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's

@@ -9,7 +9,6 @@ export function createChatPrewarm<TContext, TResource>(options: CreateChatTurnRo
   const route = createWorkspacePrewarmRoute({
     turnStore: bindings,
     authorize: async ({ request, threadId }) => {
-      if (!threadId) return { status: 'declined', reason: 'thread_required' }
       const auth = await options.authorize({ request, intent: 'running', threadId })
       if (!auth.ok) return { status: 'denied', response: auth.response }
       if (auth.intent !== undefined && auth.intent !== 'running') return { status: 'denied',

@@ -122,12 +122,14 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     const session = await requireUser(args.request)
     if (!session.ok) return session
     const { user } = session.value
-    // `turn` and `running` are thread-scoped and MUST verify ownership: both name
+    // `turn` and thread-scoped `running` MUST verify ownership: both name
     // a thread the caller supplies (POST body for turn, `?threadId=` for running,
     // whose response enumerates that thread's live turn ids). Inaccessible reads
     // are indistinguishable from missing ones — a cross-workspace probe must not
     // learn the thread exists.
-    if (args.intent === 'turn' || args.intent === 'running') {
+    // Page-open prewarm carries no thread yet. This single-user template may
+    // warm only the authenticated member's own workspace lock in that case.
+    if (args.intent === 'turn' || (args.intent === 'running' && args.threadId)) {
       const threadId = args.intent === 'turn' ? String(args.body?.threadId ?? '') : args.threadId
       const thread = threadId ? await store.getThread(threadId) : null
       if (!thread || thread.workspaceId !== user.id) return { ok: false, response: notFound() }
