@@ -137,6 +137,11 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return { ok: true, tenantId: user.id, userId: user.id, context: undefined }
   }
 
+  const markBackendTerminal = async (input: { userMessageId?: string | null; backendTerminal?: boolean }) => {
+    if (input.userMessageId && input.backendTerminal) await store.updateMessage(input.userMessageId, {
+      extras: { backendTerminal: true },
+    })
+  }
   const routes = createChatTurnRoutes<void>({
     env,
     // `projectId` also names the Intelligence project every turn's trace goes to (first_text_ms included). The route
@@ -156,11 +161,7 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
         extras: { turnStreamId: args.turnStreamId, backendTerminal: false },
       })
     },
-    onTurnComplete: async input => {
-      if (input.userMessageId && input.backendTerminal) await store.updateMessage(input.userMessageId, {
-        extras: { backendTerminal: true },
-      })
-    },
+    lifecycle: { onTurnComplete: markBackendTerminal, onTurnError: markBackendTerminal },
     interactions: {
       resolveConnection: async ({ request, intent, body }) => {
         const session = await requireUser(request)

@@ -611,6 +611,8 @@ function createTurnSettlement<TContext, TResource>(
     // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
     const snapshot = endTrace(failed, terminalError)
     const lifecycle = options.lifecycle
+    const backend = { userMessageId: produceArgs.userMessageId,
+      backendTerminal: Boolean(state.producer) && (state.producer?.terminalObserved?.() ?? true) }
     const durationMs = Date.now() - state.turnStartedAtMs
     const timing = settledTurnTiming(turnStreamId, {
       requestAt: trace.startedAt, startedAt: state.turnStartedAtMs,
@@ -622,14 +624,14 @@ function createTurnSettlement<TContext, TResource>(
         // No hooks to run; the trace still goes to its sink below.
       } else if (failed) {
         await lifecycle.onTurnError?.({
-          identity, executionId, turnStreamId, context, durationMs, ...timing,
+          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
           error: terminalError ?? state.lastFailureData ?? new Error('chat turn failed'),
         })
       } else {
         const failoverInfo = state.producer?.modelFailover?.()
         const attribution = state.producer?.modelAttribution?.()
         const completed: ChatTurnLifecycleComplete<TContext> = {
-          identity, executionId, turnStreamId, context, durationMs, ...timing,
+          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
           finalText: state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
           usage: state.producer?.usage?.() ?? {},
           assistantMessageId: assistantRowId(),

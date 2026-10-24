@@ -395,6 +395,9 @@ interface ChatTurnLifecycleBase<TContext> {
   executionId: string
   turnStreamId: string
   context: TContext
+  /** Member row and backend observation facts, also reported on persistence failure. */
+  userMessageId?: string | null
+  backendTerminal?: boolean
 }
 /** When the turn's first visible word streamed, measured from `onTurnStart`. Absent when no word streamed. */
 interface ChatTurnLifecycleTiming {

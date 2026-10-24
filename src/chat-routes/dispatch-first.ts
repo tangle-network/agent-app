@@ -6,7 +6,7 @@
  */
 import type { TurnTrace } from '../turn-trace/recorder'
 import type { NativeCompletionHandoffOptions } from './native-turn-timing'
-import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer, CreateChatTurnRoutesOptions } from './turn-route-contracts'
+import type { ChatRouteEvent, ChatTurnProduceArgs, ChatTurnRouteProducer } from './turn-route-contracts'
 import { routerRouteProducer, sandboxRouteProducer } from './route-producer'
 import { withProducerStream } from './producer-stream'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'

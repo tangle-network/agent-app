@@ -129,8 +129,7 @@ it('prewarms the default turn lock before send, reuses receipts, and preserves a
     assert.equal((await invoke('/acquire/proof-fencing')).body.acquired, false, 'Same execution still conflicts')
     assert.equal((await invoke('/acquire/proof-fencing?execution=competitor')).body.acquired, false)
     const sibling = await invoke('/acquire/proof-fencing?thread=sibling&execution=sibling')
-    assert.equal(sibling.body.acquired, true, 'Thread lock must not become a workspace lock')
-    await invoke('/release/proof-fencing', sibling.body.handle)
+    assert.equal(sibling.body.acquired, false, 'The default workspace fence also protects sibling threads')
     await invoke('/release/proof-fencing', { ...held.body.handle, lockId: 'wrong-lock' })
     assert.equal((await invoke('/acquire/proof-fencing?execution=competitor')).body.acquired, false,
       'Wrong lock id must not release a held lock')

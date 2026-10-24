@@ -95,7 +95,7 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
           maxTokens: args.executionLimits.maxOutputTokens, maxCompletionTokens: args.executionLimits.maxOutputTokens,
         } : {}),
         ...(base ? { baseUrl: base.endsWith('/v1') ? base : `${base}/v1` } : {}),
-        systemPrompt: { profile: shell.profile({ systemPrompt: config.systemPrompt }) },
+        systemPrompt: { profile: shell.profile({ systemPrompt: config.systemPrompt, harness }) },
         box: { acquire: () => acquire(args), runTask: sandboxPromptRunner(shell, {
           ...promptOptions(args), sessionId: `sandbox-run-${args.identity.sessionId}`,
         }) },
