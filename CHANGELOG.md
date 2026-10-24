@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.7
+
+- feat: make chat turn assembly binding-aware by default
+
 ## 0.63.6
 
 - fix(web-react): preserve plan requests for inline clients (#1288)
