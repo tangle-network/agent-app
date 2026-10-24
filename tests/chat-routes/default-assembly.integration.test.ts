@@ -413,7 +413,8 @@ it('gives detached tool calls distinct native identities and reuses only the exa
     if (request.method === 'POST' && path === '/agents/run/stream') {
       const input = JSON.parse(body) as { sessionId: string; turnId: string; runControlRef?: unknown; parts: Array<{ type: string; text?: string }> }
       const executionId = String(request.headers['x-execution-id'])
-      const task = input.parts.filter(part => part.type === 'text').map(part => part.text ?? '').join('\n')
+      // The SDK encodes every text part on the wire; the sidecar decodes it before dispatch.
+      const task = input.parts.filter(part => part.type === 'text').map(part => Buffer.from(part.text ?? '', 'base64').toString('utf8')).join('\n')
       const turn = { sessionId: input.sessionId, executionId, turnId: input.turnId, answer: `Answer:${task}` }
       admissions.push(turn)
       turns.set(`${turn.sessionId}:${turn.turnId}`, turn)
