@@ -473,6 +473,10 @@ export interface ChatTurnLifecycle<TContext> {
 /** What a settled turn reports to `onTurnComplete` — the product's
  *  post-processing seam (billing, titles, audit). */
 export interface ChatTurnCompleteInput<TContext> {
+  /** Persisted member row for this execution, when insertion was enabled. */
+  userMessageId?: string | null
+  /** False when a detached backend has not been observed to stop; its workspace stays fenced. */
+  backendTerminal?: boolean
   identity: ChatTurnIdentity
   finalText: string
   context: TContext
@@ -516,6 +520,10 @@ export interface ChatTurnTraceOptions<TContext> {
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
 export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknown> {
+  /** Deployment bindings for the template defaults. Custom producers keep their own credentials and policy. */
+  env?: import('./default-backend').ChatTurnEnvironment
+  /** Disable the inherited prewarm endpoint explicitly. It warms only authenticated thread locks. */
+  prewarm?: false
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
   projectId: string
@@ -590,7 +598,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    * when selects the Router backend (default true); false selects sandbox,
    * which always starts after admission. A function also starts after admission.
    * Reused user rows always finish admission before either backend starts. */
-  produce: ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
+  produce?: import('./default-backend').ChatTurnDefaultBackend | ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
     router(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouterBackend | Promise<ChatTurnRouterBackend>
     when?(args: ChatTurnProduceArgs<TContext, TResource>): boolean
     sandbox?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnSandboxBackend | Promise<ChatTurnSandboxBackend>
@@ -598,8 +606,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
   /** Single-flight lock acquired before durable effects and released once when
    *  the turn settles (including short-circuit/throw). `/turn-stream`'s
    *  `createDurableTurnLock` is the shared DO-backed implementation. Omit →
-   *  no lock. */
-  turnLock?: ChatTurnLock<TContext, TResource>
+   *  the binding-derived workspace lock. `false` explicitly disables it. Native
+   *  producers retain it until backend termination is observed. */
+  turnLock?: ChatTurnLock<TContext, TResource> | false
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
@@ -737,6 +746,8 @@ export const INTENT_LINE_MAX_CHARS = 240
 
 /** Define routes to run, replay, and list running chat turns with streaming and reconnect support */
 export interface ChatTurnRoutes {
+  /** POST — warm the authorized thread's workspace lock; never provision paid compute. */
+  prewarm(request: Request): Promise<Response>
   /** POST — run one turn, streaming NDJSON. First line is
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps

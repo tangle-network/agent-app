@@ -23,7 +23,6 @@
  * later: `@tangle-network/agent-app/teams` + `createChatTables({ workspaceTable })`.
  */
 
-import { createDurableTurnLock } from '@tangle-network/agent-app/turn-stream'
 import { config } from '../agent.config'
 import { createAppAuth, type AppAuth } from '@tangle-network/agent-app/app-auth'
 import {
@@ -48,7 +47,7 @@ import {
 import { drizzle } from 'drizzle-orm/d1'
 import { accounts, messages, sessions, threads, users, verifications } from './db/schema'
 import type { AppEnv } from './env'
-import { appSlug, createHybridLane, createPrewarmRoute, resolveSidecarConnection, resolveUploadSink } from './sandbox'
+import { appSlug, createSandboxShell, resolveSidecarConnection, resolveUploadSink } from './sandbox'
 
 export interface ChatAppOverrides {
   /** Test seam: an in-memory drizzle db (the e2e test runs the REAL
@@ -138,42 +137,8 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return { ok: true, tenantId: user.id, userId: user.id, context: undefined }
   }
 
-  const durableLock = env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET
-    ? createDurableTurnLock<void>({ namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET }, locationHint: env.D1_REGION, scopeOf: () => 'workspace',
-      onRefused: active => Response.json({ error: { code: 'workspace_turn_in_flight', message: `Execution ${active.executionId} in thread ${active.threadId} still owns this workspace. If observation was lost, the deployment operator must verify that exact backend execution stopped and use a fenced reconciliation adapter; elapsed time or another UUID is not recovery.`, executionId: active.executionId, threadId: active.threadId } }, { status: 409 }),
-    })
-    : null
-  interface Admission { handle: unknown; started: boolean; producer?: ChatTurnRouteProducer; userMessageId?: string }
-  const admissions = new Map<string, Admission>()
-  const lane = overrides.produce ? null : createHybridLane(env)
-  // Native Sandbox execution keeps the backend-terminal ownership check.
-  // Router option data goes directly to the shared route before its lock.
-  const nativeProduce = async (args: ChatTurnProduceArgs<void>) => {
-    const admission = admissions.get(args.executionId)
-    if (!admission) throw new Error('Turn admission is unavailable')
-    admission.started = true
-    admission.producer = await (overrides.produce ?? lane!.produce.sandbox)(args)
-    return admission.producer
-  }
   const routes = createChatTurnRoutes<void>({
-    turnLock: {
-      acquire: async args => {
-        if (!durableLock) return { acquired: false, response: Response.json({ error: 'Durable turn locking is not configured', code: 'chat.lock_not_configured' }, { status: 503 }) }
-        const acquired = await durableLock.acquire(args)
-        if (!acquired.acquired) return acquired
-        admissions.set(args.executionId, { handle: acquired.handle, started: false })
-        return { acquired: true, handle: args.executionId }
-      },
-      release: async handle => {
-        const id = String(handle)
-        const admission = admissions.get(id)
-        admissions.delete(id)
-        if (!admission) return
-        if (admission.started && !admission.producer?.terminalObserved?.()) return
-        if (admission.userMessageId) await store.updateMessage(admission.userMessageId, { extras: { backendTerminal: true } })
-        await durableLock?.release(admission.handle)
-      },
-    },
+    env,
     // `projectId` also names the Intelligence project every turn's trace goes to (first_text_ms included). The route
     // reads the Sandbox product key and warns in the Worker log when an export fails; pass `turnTrace: false` only
     // with an exemption in signoff.config.mjs.
@@ -181,16 +146,21 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     authorize,
     store,
     turnStore,
-    // The box starts the moment the caller is admitted when the ask needs a computer.
-    ...(lane ? { afterAuthorize: lane.afterAuthorize } : {}),
-    beforeTurn: async args => {
-      const admission = admissions.get(args.executionId)
-      if (args.userMessageId) {
-        if (admission) admission.userMessageId = args.userMessageId
-        await store.updateMessage(args.userMessageId, { extras: { turnStreamId: args.turnStreamId, backendTerminal: false } })
-      }
+    produce: overrides.produce ?? {
+      shell: createSandboxShell(env), model: config.model.default,
+      systemPrompt: config.systemPrompt, harness: config.harness,
+      effort: config.model.effort, interactions: config.interactions,
     },
-    produce: overrides.produce ? nativeProduce : { ...lane!.produce, sandbox: nativeProduce },
+    beforeTurn: async args => {
+      if (args.userMessageId) await store.updateMessage(args.userMessageId, {
+        extras: { turnStreamId: args.turnStreamId, backendTerminal: false },
+      })
+    },
+    onTurnComplete: async input => {
+      if (input.userMessageId && input.backendTerminal) await store.updateMessage(input.userMessageId, {
+        extras: { backendTerminal: true },
+      })
+    },
     interactions: {
       resolveConnection: async ({ request, intent, body }) => {
         const session = await requireUser(request)
@@ -262,17 +232,12 @@ export function buildChatApp(env: AppEnv, overrides: ChatAppOverrides = {}): Cha
     return Response.json({ thread, messages: await store.listMessages(params.threadId) })
   }
 
-  const prewarmRoute = createPrewarmRoute(env, async request => {
-    const session = await requireUser(request)
-    return session.ok ? session.value.user.id : null
-  })
-
   return {
     auth,
     store,
     turnStore,
     routes: { ...routes, createThread, listThreads, threadMessages },
     upload,
-    prewarm: request => prewarmRoute(request),
+    prewarm: routes.prewarm,
   }
 }

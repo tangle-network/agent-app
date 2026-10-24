@@ -1,9 +1,10 @@
 import type { AssistantDraftWriter } from './draft-persistence'
 import type { NativeCompletionHandoffOptions, NativeTimingTransfer } from './native-turn-timing'
 import type { BufferedTurnTap } from '../stream/index'
-import type { ChatTurnLock } from './turn-route-contracts'
+import type { ChatTurnLock, ChatTurnRouteProducer } from './turn-route-contracts'
 
 interface OwnershipState {
+  producer?: ChatTurnRouteProducer
   completionHandoff: boolean
   completionHandoffPromise: Promise<void> | undefined
   nativeTiming: NativeTimingTransfer | undefined
@@ -55,6 +56,12 @@ export function createChatTurnOwnership(state: OwnershipState,
   }
   const releaseLock = async (): Promise<void> => {
     if (state.completionHandoff || !state.lockAcquired || state.lockReleased) return
+    // Losing the live observation is not evidence that a detached backend stopped.
+    // The exact execution stays fenced until its durable owner reconciles it.
+    if (state.producer?.terminalObserved && !state.producer.terminalObserved()) {
+      await state.closeCancellation?.()
+      return
+    }
     state.lockReleased = true
     // Expected cooperative completion must not interpret its own release as
     // external loss of execution authority. A close failure must not skip release.

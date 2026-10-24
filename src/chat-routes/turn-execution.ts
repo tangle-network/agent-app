@@ -855,6 +855,8 @@ function createTurnEngine<TContext, TResource>(
             // The engine awaits this before the stream ends, so the product's completion work is a span, not a gap.
             return trace.measure('persist.on_turn_complete', 'persist', () => options.onTurnComplete!({
               identity: turnIdentity,
+              userMessageId: produceArgs.userMessageId,
+              backendTerminal: state.producer?.terminalObserved?.() ?? true,
               finalText,
               context,
               failed: state.runFailed,

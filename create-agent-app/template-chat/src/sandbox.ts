@@ -6,9 +6,8 @@
  * sandbox helpers. This file turns `agent.config.ts` + env into the three
  * seams the chat vertical needs:
  *
- *   - `createSandboxProduce`   — the turn producer (`createChatTurnRoutes`'s
- *     `produce` seam): resolve the workspace box, stream the prompt, bridge
- *     raw sidecar events through `createSandboxChatProducer`.
+ *   - `createSandboxShell` — product provisioning, profile and credential policy.
+ *     `createChatTurnRoutes` assembles the lane from it.
  *   - `resolveUploadSink`      — where >inline-cap uploads land (`box.fs`).
  *   - `resolveSidecarConnection` — where interaction answers go.
  *
@@ -18,30 +17,17 @@
 
 import { config } from '../agent.config'
 import {
-  createSandboxChatProducer,
-  normalizeChatPromptForSandbox,
-  startHybridBox,
-  turnCarriesFiles,
-  type ChatTurnAfterAuthorizeArgs,
-  type ChatTurnProduceArgs,
-  type ChatTurnRouteProducer,
-  type ChatTurnHybridConfiguration,
   type SandboxUploadSink,
 } from '@tangle-network/agent-app/chat-routes'
 import type { SidecarInteractionsConnection } from '@tangle-network/agent-app/interactions'
 import {
   createD1PrewarmClaimStore,
-  createSandboxPrewarmer,
-  createWorkspacePrewarmRoute,
   ensureWorkspaceSandbox,
   peekWorkspaceSandbox,
   runForegroundSandboxSingleFlight,
-  sandboxPromptRunner,
-  streamSandboxPrompt,
   type SandboxRuntimeConfig,
 } from '@tangle-network/agent-app/sandbox'
 import type { TurnTrace } from '@tangle-network/agent-app/turn-trace'
-import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { AppEnv } from './env'
 
 /** Lowercased, non-alphanumerics collapsed: box names + projectId. */
@@ -102,176 +88,6 @@ async function ensureForegroundWorkspaceSandbox(
     provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness: config.harness, ...(trace ? { trace } : {}) }),
     peek: () => peekWorkspaceSandbox(shell, scope),
     adopt: ({ box }) => box,
-  })
-}
-
-/**
- * The `produce` seam for `createChatTurnRoutes`: one call per turn. The
- * chat thread id doubles as the agent session id, so follow-up turns land in
- * the same sidecar session and keep its context.
- */
-export function createSandboxProduce(env: AppEnv) {
-  const shell = createSandboxShell(env)
-  return async ({
-    body,
-    identity,
-    prompt,
-    executionId,
-    executionLimits,
-    trace,
-  }: ChatTurnProduceArgs<void>): Promise<ChatTurnRouteProducer> => {
-    const box = await ensureForegroundWorkspaceSandbox(env, shell, {
-      workspaceId: identity.tenantId,
-      userId: identity.userId,
-    }, trace)
-    const model = body.model ?? env.MODEL_NAME ?? config.model.default
-    return createSandboxChatProducer({
-      model,
-      errorNotice: true,
-      // A detached dispatch can keep doing hidden work after transport loss.
-      // Do not turn observation failure into another model dispatch.
-      modelFailover: false,
-      openEvents: ({ model: attemptModel, signal }) => {
-        return streamSandboxPrompt(shell, box, normalizeChatPromptForSandbox(prompt), {
-          sessionId: identity.sessionId,
-          executionId,
-          turnId: executionId,
-          model: attemptModel,
-          signal,
-          ...(trace ? { trace } : {}),
-          // A zero reasoning allowance maps to the profile's supported
-          // no-reasoning control. Positive limits use token ceilings below.
-          effort: executionLimits?.maxReasoningTokens === 0
-            ? 'none'
-            : (body.effort ?? config.model.effort),
-          ...(executionLimits?.maxOutputTokens
-            ? { maxOutputTokens: executionLimits.maxOutputTokens }
-            : {}),
-          ...(executionLimits?.maxReasoningTokens
-            ? { maxReasoningTokens: executionLimits.maxReasoningTokens }
-            : {}),
-          // Gateway output is inclusive of reasoning. Keep the same total
-          // ceiling even when a separate reasoning subset was authorized.
-          ...(executionLimits?.maxOutputTokens !== undefined
-            ? { maxTotalOutputTokens: executionLimits.maxOutputTokens }
-            : {}),
-          harness: config.harness,
-          systemPrompt: config.systemPrompt,
-          // Durable by default: the run keeps executing server-side if the operator
-          // refreshes, closes the tab, or the Worker restarts mid-turn. On reopen
-          // the client re-attaches via GET /api/chat/running → /api/chat/replay, so
-          // nothing is lost. Drop this only for a run that should stop when the tab
-          // closes (e.g. a throwaway preview).
-          detach: true,
-          interactions: config.interactions,
-        })
-      },
-    })
-  }
-}
-
-/** The Router's OpenAI-compatible base URL (`…/v1`), or undefined for the platform default. */
-function routerBaseUrl(env: AppEnv): string | undefined {
-  const url = env.TANGLE_ROUTER_URL?.trim().replace(/\/+$/, '')
-  if (!url) return undefined
-  return url.endsWith('/v1') ? url : `${url}/v1`
-}
-
-/**
- * The default chat lane: the model answers first through the Tangle Router and
- * escalates to the workspace box through one `sandbox_run` call when the work
- * needs a computer (`createHybridTurnProducer`). The box starts at admission
- * when the ask needs it (`afterAuthorize`), or when the model names
- * `sandbox_run`, and that one start serves the call. A turn that carries files,
- * or a deployment with no Router key, runs on the sandbox lane, where the
- * files are.
- *
- * Pass `afterAuthorize` and `produce` to `createChatTurnRoutes`.
- */
-export function createHybridLane(env: AppEnv) {
-  const shell = createSandboxShell(env)
-  const sandboxProduce = createSandboxProduce(env)
-  // The box a turn's admission started, by thread; `produce` takes it in the same request.
-  const started = new Map<string, Promise<SandboxInstance>>()
-  const acquire = (scope: { workspaceId: string; userId: string }, trace?: TurnTrace) =>
-    ensureForegroundWorkspaceSandbox(env, shell, scope, trace)
-
-  return {
-    afterAuthorize({ body, tenantId, userId, threadId, trace }: ChatTurnAfterAuthorizeArgs<void>) {
-      if (!env.TANGLE_API_KEY?.trim()) return undefined
-      const start = startHybridBox(body, () => acquire({ workspaceId: tenantId, userId }, trace))
-      if (!start) return undefined
-      started.set(threadId, start)
-      // A turn that ends before `produce` leaves the box to idle out.
-      return () => { started.delete(threadId) }
-    },
-    produce: {
-      when: ({ prompt }: ChatTurnProduceArgs<void>) => Boolean(env.TANGLE_API_KEY?.trim()) && !turnCarriesFiles(prompt),
-      router(args: ChatTurnProduceArgs<void>): ChatTurnHybridConfiguration {
-        const { body, identity, trace } = args
-        const box = started.get(identity.sessionId)
-        started.delete(identity.sessionId)
-        const apiKey = env.TANGLE_API_KEY?.trim()
-        if (!apiKey) throw new Error('Router credentials are not configured')
-        const model = body.model ?? env.MODEL_NAME ?? config.model.default
-        const baseUrl = routerBaseUrl(env)
-        const scope = { workspaceId: identity.tenantId, userId: identity.userId }
-        return {
-          apiKey,
-          model,
-          ...(baseUrl ? { baseUrl } : {}),
-          systemPrompt: { profile: { prompt: { systemPrompt: config.systemPrompt } } },
-          box: {
-            acquire: () => acquire(scope, trace),
-            ...(box ? { started: box } : {}),
-            // The box agent keeps its own session per thread, so a sandbox-lane turn on the same thread never collides with it.
-            runTask: sandboxPromptRunner(shell, { model, harness: config.harness, sessionId: `sandbox-run-${identity.sessionId}` }),
-          },
-        }
-      },
-      sandbox(args: ChatTurnProduceArgs<void>) {
-        started.delete(args.identity.sessionId)
-        return sandboxProduce(args)
-      },
-    },
-  }
-}
-
-/**
- * Warm the open workspace's box (`POST /api/chat/prewarm`): the shared route
- * behind `AgentWorkspaceLayout`'s `prewarm`. Every configured lane wakes its
- * workspace lock. The Router lane leaves the box to its existing speculator;
- * it warms only the lock on open/focus, with no paid provisioning.
- */
-export function createPrewarmRoute(env: AppEnv, requireUserId: (request: Request) => Promise<string | null>) {
-  return createWorkspacePrewarmRoute<void>({
-    ...(env.TURN_STREAM && env.TURN_STREAM_AUTH_SECRET ? { turnStore: {
-      db: env.DB, region: env.D1_REGION,
-      lock: { namespace: env.TURN_STREAM, auth: { secret: env.TURN_STREAM_AUTH_SECRET } },
-    } } : {}),
-    authorize: async ({ request }) => {
-      const userId = await requireUserId(request)
-      if (!userId) return { status: 'denied', response: Response.json({ error: 'Unauthorized' }, { status: 401 }) }
-      if (!env.TURN_STREAM || !env.TURN_STREAM_AUTH_SECRET) return { status: 'declined', reason: 'lock_not_configured' }
-      if (env.TANGLE_API_KEY?.trim() || !env.SANDBOX_API_KEY?.trim() || !env.SANDBOX_GATEWAY_URL?.trim()) {
-        return { status: 'allowed', workspaceId: userId, steps: [] }
-      }
-      const scope = { workspaceId: userId, userId }
-      return {
-        status: 'allowed',
-        workspaceId: scope.workspaceId,
-        key: scope.workspaceId,
-        warm: async () => {
-          const prewarmer = createSandboxPrewarmer(createSandboxShell(env), {
-            claim: createD1PrewarmClaimStore(env.DB),
-            mode: 'create-or-resume',
-          })
-          const decision = await prewarmer.prewarm({ ...scope, harness: config.harness })
-          await decision.completion
-          return { outcome: decision.outcome }
-        },
-      }
-    },
   })
 }
 
