@@ -363,7 +363,7 @@ function useAgentProfileEditorViewState({ value, onChange, disabled = false, cla
           onChange={event => model({ ...value.model, [field]: event.target.value || undefined })} />}
     </Field>
   }
-  const { github, refFromCheck, addRef, addFile, nameField, githubNameValue, inlineEditor,
+  const { github, inlineEditor,
     githubEditor, rowActions, refList, addButtons } = createProfileResourceEditors({ config, skills,
     toolFiles, skillIssue, requireGitHubCommitSha, setError, resources, fileIssue, files, setFiles, id,
     githubName, requireUniqueSkillNames, editingDisabled, setGithubName, inlineDraft,

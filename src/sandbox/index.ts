@@ -177,7 +177,7 @@ export {
 
 export type { PromptInputPart, SandboxPromptTokenLimits, SandboxPromptConfig } from './prompt-profile'
 
-export type { StreamSandboxPromptOptions } from './prompt-options'
+export { sandboxPromptExecutionOptions, type SandboxPromptExecutionLimits, type StreamSandboxPromptOptions } from './prompt-options'
 
 export {
   adaptSandboxStream,

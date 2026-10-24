@@ -601,7 +601,7 @@ function postLink(item: HubApprovalItem, result: Record<string, unknown>): strin
   return resultLink(result)
 }
 
-function receiptFields(item: HubApprovalItem, presentation: HubActionPresentation, result: Record<string, unknown>): HubActionField[] {
+function receiptFields(presentation: HubActionPresentation, result: Record<string, unknown>): HubActionField[] {
   const fields: HubActionField[] = []
   const preview = presentation.preview
   switch (preview.kind) {
@@ -714,7 +714,7 @@ export function hubActionReceipt(item: HubApprovalItem): HubActionReceipt {
   if (status === 'failed') return { ...base, title: `Could not ${presentation.action.charAt(0).toLowerCase()}${presentation.action.slice(1)}`, fields: [], ...(item.error ? { error: item.error } : {}) }
   if (status !== 'done') return { ...base, title: presentation.title, fields: [] }
   const title = receiptTitle(item, presentation, result)
-  const fields = receiptFields(item, presentation, result)
+  const fields = receiptFields(presentation, result)
   const pull = hubResultRecord(result.pullRequest)
   const href = presentation.preview.kind === 'post'
     ? postLink(item, result)

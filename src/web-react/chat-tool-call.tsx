@@ -3,9 +3,9 @@ import { useState, type ReactNode } from 'react'
 import { TerminalDisplay, TerminalLine } from '@tangle-network/ui/primitives'
 import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ToolPart } from '@tangle-network/ui/types'
-import { ChevronDown, POPOVER_OPTION_FOCUS, usePending } from './controls'
+import { ChevronDown, usePending } from './controls'
 import { useArrivalStyle } from './motion'
-import type { ChatToolCallInfo, ChatUiMessage, ChatMessageSegment, ChatNoticeTone, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
+import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 
 /** Extract `{proposalId, status}` from a tool outcome when it is a proposal
  *  awaiting human approval; null otherwise. */

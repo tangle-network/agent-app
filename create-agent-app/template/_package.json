@@ -36,7 +36,7 @@
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",
-    "vitest": "^4.1.11",
-    "wrangler": "4.126.0"
+    "vitest": "^4.1.12",
+    "wrangler": "4.151.3"
   }
 }

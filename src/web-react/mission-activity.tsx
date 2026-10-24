@@ -19,7 +19,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 
 import type { StepAgentActivity } from '../missions/agent-activity'
-import type { FlowTrace } from '../trace/index'
 import { stepActivityFlowTrace } from '../trace/mission-flow'
 import { useArrivalStyle } from './motion'
 

@@ -237,8 +237,8 @@ function installAndRunScaffolder({
   if (!workspaceBeforeInstall.includes('minimumReleaseAge: 4320')) {
     throw new Error(`${variant} generated project does not hold external releases for 72 hours`)
   }
-  if (!workspaceBeforeInstall.includes('  zod: 4.4.3')) {
-    throw new Error(`${variant} generated project does not pin zod to the mature workspace version`)
+  if (!workspaceBeforeInstall.includes('  zod@4: 4.6.7')) {
+    throw new Error(`${variant} generated project does not pin zod 4 to the patched workspace version`)
   }
   const generatedPackage = JSON.parse(readFileSync(packagePath, 'utf8'))
   const expectedRange = packedVersion

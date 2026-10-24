@@ -14,7 +14,7 @@ import { TurnProgress } from './turn-progress'
 import { ReasoningRow } from './reasoning-row'
 
 import type { CatalogModel } from '../runtime/model-catalog'
-import type { ChatToolCallInfo, ChatUiMessage, ChatMessageSegment, ChatNoticeTone, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
+import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 import type { ChatMessagesProps } from './chat-message-types'
 import { ChatEmptyState } from './chat-empty-state'
 import { formatModelCost, formatTokensPerSecond } from './chat-message-metrics'

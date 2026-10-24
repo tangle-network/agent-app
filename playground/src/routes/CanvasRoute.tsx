@@ -1,5 +1,5 @@
 import { useDocumentDark as useIsDark } from '../../../src/web-react/use-document-dark'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CanvasInsertPanel, DesignCanvasEditor } from '@tangle-network/agent-app/design-canvas-react'
 import { applySceneOperations } from '@tangle-network/agent-app/design-canvas'
 import type { SceneOperation } from '@tangle-network/agent-app/design-canvas'
