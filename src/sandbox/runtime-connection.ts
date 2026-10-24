@@ -5,6 +5,7 @@ import { type Outcome, ok, fail } from './outcome'
 import { isRuntimeAuthRefreshDenied, isRuntimeExecAuthError } from './exec-failure'
 import type { AgentProfileFileMount } from '@tangle-network/agent-interface'
 import { writeProfileFilesToBox } from './profile-files'
+import { waitForSandboxPoll } from './request-cancellation'
 
 const RUNTIME_AUTH_REFRESH_SKEW_MS = 60_000
 
@@ -59,6 +60,7 @@ export async function refreshRuntimeConnection(
   client: Sandbox,
   box: SandboxInstance,
 ): Promise<SandboxInstance> {
+  client.signal?.throwIfAborted()
   let current = box
   if (sandboxRuntimeUrl(current)) return current
 
@@ -78,10 +80,11 @@ export async function refreshRuntimeConnection(
       if (latest) current = latest
       if (sandboxRuntimeUrl(current)) return current
     } catch {
+      client.signal?.throwIfAborted()
       // transient — fall through to the poll delay and retry
     }
 
-    await new Promise((resolve) => setTimeout(resolve, RUNTIME_CONNECTION_POLL_MS))
+    await waitForSandboxPoll(RUNTIME_CONNECTION_POLL_MS, client.signal)
   }
 
   return current
@@ -93,12 +96,14 @@ async function bestEffortRefreshRuntimeExecAuth(
   stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
+  client.signal?.throwIfAborted()
   let current = box
 
   try {
     await current.refresh()
     if (hasFreshRuntimeExecAuth(current)) return ok(current)
   } catch (err) {
+    client.signal?.throwIfAborted()
     if (isRuntimeAuthRefreshDenied(err)) {
       return fail(
         new SandboxRuntimeAuthRefreshError(
@@ -116,6 +121,7 @@ async function bestEffortRefreshRuntimeExecAuth(
     if (latest) current = latest
     if (hasFreshRuntimeExecAuth(current)) return ok(current)
   } catch (err) {
+    client.signal?.throwIfAborted()
     if (isRuntimeAuthRefreshDenied(err)) {
       return fail(
         new SandboxRuntimeAuthRefreshError(
@@ -137,6 +143,7 @@ async function refreshRuntimeExecAuth(
   stage: SandboxExistingBoxStage,
   name: string,
 ): Promise<Outcome<SandboxInstance>> {
+  client.signal?.throwIfAborted()
   let current = box
   let lastError: unknown
   const deadline = Date.now() + RUNTIME_CONNECTION_WAIT_MS
@@ -150,10 +157,11 @@ async function refreshRuntimeExecAuth(
       if (latest) current = latest
       if (hasFreshRuntimeExecAuth(current)) return ok(current)
     } catch (err) {
+      client.signal?.throwIfAborted()
       lastError = err
     }
 
-    await new Promise((resolve) => setTimeout(resolve, RUNTIME_CONNECTION_POLL_MS))
+    await waitForSandboxPoll(RUNTIME_CONNECTION_POLL_MS, client.signal)
   }
 
   const detail = sandboxRuntimeUrl(current)
