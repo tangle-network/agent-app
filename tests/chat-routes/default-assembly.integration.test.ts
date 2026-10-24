@@ -207,7 +207,7 @@ it('prewarms only a server-authorized workspace and checks access to any named t
     expect(await opened.json()).toMatchObject({ outcome: 'warmed', steps: [{ name: 'turn_lock', outcome: 'miss' }] })
     const warm = await routes.prewarm(peer.post('/api/chat/prewarm', { threadId: 'first', workspaceId: 'forged-workspace' }))
     expect(warm.status).toBe(200)
-    expect(await warm.json()).toMatchObject({ outcome: 'warmed', steps: [{ name: 'turn_lock', outcome: 'hit' }] })
+    expect(await warm.json()).toMatchObject({ outcome: 'recent', steps: [{ name: 'turn_lock', outcome: 'hit' }] })
     expect(peer.channels.length).toBeGreaterThan(0)
     expect(peer.channels.every(channel => channel === 'verified-workspace')).toBe(true)
     const readsOnly = peer.routes({ authorize: async () => ({ ok: true, intent: 'replay', tenantId: 'other', userId: 'member' }) })
@@ -377,3 +377,83 @@ it('releases workspace admission when the real child prompt preflight refuses an
     expect(await next.text()).toContain('A default Router answer.')
   } finally { await peer.close() }
 })
+
+it('gives detached tool calls distinct native identities and reuses only the exact call retry', async () => {
+  type NativeTurn = { sessionId: string; executionId: string; turnId: string; answer: string }
+  const turns = new Map<string, NativeTurn>()
+  const admissions: NativeTurn[] = []
+  const server = createServer(async (request, response) => {
+    let body = ''
+    for await (const chunk of request) body += String(chunk)
+    const url = new URL(request.url!, 'http://loopback.local')
+    const json = (value: unknown, status = 200) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value))
+    if (url.pathname === '/v1/sandboxes/identity-box') return json({
+      id: 'identity-box', status: 'running', filesystemIncarnationId: 'identity-incarnation',
+      filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
+      connection: { runtimeUrl: `${origin}/v1/sandboxes/identity-box/runtime` },
+    })
+    const path = url.pathname.replace('/v1/sandboxes/identity-box/runtime', '')
+    if (request.method === 'GET' && path.startsWith('/agents/sessions/')) {
+      const sessionId = decodeURIComponent(path.slice('/agents/sessions/'.length))
+      const latest = admissions.filter(turn => turn.sessionId === sessionId).at(-1)
+      return latest ? json({ id: sessionId, status: 'completed', latestExecutionId: latest.executionId }) : json({ error: 'not found' }, 404)
+    }
+    if (request.method === 'GET' && path === '/messages/turns') {
+      const turnId = url.searchParams.get('turnId')!
+      const sessionId = url.searchParams.get('sessionId')!
+      const turn = turns.get(`${sessionId}:${turnId}`)
+      return turn ? json({ turnId, sessionId, completedAt: '2026-10-24T00:00:00Z',
+        result: { executionId: turn.executionId, finalText: turn.answer } }) : response.writeHead(204).end()
+    }
+    const frame = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`
+    if (request.method === 'POST' && path === '/agents/run/stream') {
+      const input = JSON.parse(body) as { sessionId: string; turnId: string; runControlRef?: unknown; parts: Array<{ type: string; text?: string }> }
+      const executionId = String(request.headers['x-execution-id'])
+      const task = input.parts.filter(part => part.type === 'text').map(part => part.text ?? '').join('\n')
+      const turn = { sessionId: input.sessionId, executionId, turnId: input.turnId, answer: `Answer:${task}` }
+      admissions.push(turn)
+      turns.set(`${turn.sessionId}:${turn.turnId}`, turn)
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(frame('execution.started', { sessionId: turn.sessionId, executionId,
+        ...(input.runControlRef ? { runControlRef: input.runControlRef } : {}) }))
+      return
+    }
+    const replay = /^\/agents\/run\/([^/]+)\/events$/.exec(path)
+    if (request.method === 'GET' && replay) {
+      const turn = admissions.find(turn => turn.executionId === decodeURIComponent(replay[1]!))
+      if (!turn) return json({ error: 'execution not found' }, 404)
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(frame('result', { executionId: turn.executionId, sessionId: turn.sessionId, finalText: turn.answer })
+        + frame('done', { status: 'completed', executionId: turn.executionId, sessionId: turn.sessionId }))
+      return
+    }
+    return json({ error: `Unexpected protocol path ${request.method} ${url.pathname}` }, 500)
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: origin }).get('identity-box')
+    if (!box) throw new Error('Local identity box is missing')
+    const shell = defaultChatShell('identity-proof', { TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: origin }, { model: 'native/model' })
+    const run = sandboxPromptRunner(shell, { model: 'native/model', sessionId: 'same-child-session',
+      executionId: 'same-parent-execution', turnId: 'same-parent-turn', detach: true })
+    const options = (callId?: string) => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000, emit() {}, ...(callId ? { callId } : {}) })
+    expect(await run(box, 'first task', options('call-one'))).toBe('Answer:first task')
+    expect(await run(box, 'second task', options('call-two'))).toBe('Answer:second task')
+    expect(admissions).toHaveLength(2)
+    expect(new Set(admissions.map(turn => turn.executionId)).size).toBe(2)
+    expect(new Set(admissions.map(turn => turn.turnId)).size).toBe(2)
+    expect(new Set(admissions.map(turn => turn.sessionId))).toEqual(new Set(['same-child-session']))
+    expect(await run(box, 'first task', options('call-one'))).toBe('Answer:first task')
+    expect(admissions).toHaveLength(2)
+    // A caller without tool identity must never reuse its parent's cached work.
+    expect(await run(box, 'third task', options())).toBe('Answer:third task')
+    expect(await run(box, 'fourth task', options())).toBe('Answer:fourth task')
+    expect(admissions).toHaveLength(4)
+    expect(new Set(admissions.map(turn => turn.executionId)).size).toBe(4)
+    expect(new Set(admissions.map(turn => turn.turnId)).size).toBe(4)
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+}, 15_000)

@@ -90,12 +90,20 @@ export const SANDBOX_RUN_DESCRIPTION =
   'runs the code and returns its answer. Takes seconds to minutes, ' +
   'so use it only when the answer needs the computer.'
 
-/** The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused). */
+/** The shell's unattended runner. A supplied execution/turn id seeds child
+ * identity with the actual tool callId: different calls stay separate and a
+ * retry of that exact call stays idempotent. Without callId, use a fresh child. */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
-  return (box, task, { signal, timeoutMs, trace, span }) => runSandboxPrompt(shell, box, task, {
-    ...prompt, signal, timeoutMs, disallowQuestions: true,
-    ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
-  })
+  return async (box, task, { callId, signal, timeoutMs, trace, span }) => {
+    const parent = prompt.executionId?.trim() || prompt.turnId?.trim()
+    const identity = parent ? new TextEncoder().encode(JSON.stringify([parent, prompt.sessionId, callId?.trim() || crypto.randomUUID()])) : undefined
+    const digest = identity ? await crypto.subtle.digest('SHA-256', identity) : undefined
+    const child = digest ? Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') : undefined
+    return runSandboxPrompt(shell, box, task, {
+      ...prompt, ...(child ? { executionId: child, turnId: child } : {}), signal, timeoutMs, disallowQuestions: true,
+      ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
+    })
+  }
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
