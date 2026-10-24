@@ -15,54 +15,15 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [self-hosted, ci-public]
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          ref: ${{ github.sha }}
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Verify the exact source head with the maintained signoff gate
-        env:
-          VITEST_MAX_WORKERS: '2'
-          TMPDIR: ${{ runner.temp }}
-          VERIFICATION_DIR: ${{ runner.temp }}/agent-app-signoff-evidence
-        run: pnpm signoff --source head --max-parallel 1 --keep-going --json "$RUNNER_TEMP/agent-app-signoff.json"
-      - name: Retain the maintained receipt and intentional browser proof outputs
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: agent-app-signoff-${{ github.sha }}
-          # Never archive generated projects, local databases or .dev.vars.
-          path: |
-            ${{ runner.temp }}/agent-app-signoff.json
-            ${{ runner.temp }}/agent-app-signoff-evidence/*.png
-            ${{ runner.temp }}/agent-app-signoff-evidence/workspace-proof.json
-          if-no-files-found: warn
-          retention-days: 1
-      - run: pnpm build-storybook
-      - name: Read the shared catalog attestor at an immutable revision
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: tangle-network/sandbox-ui
-          ref: e57326f593b8262d873ed4e55a56d2dd5e924d94
-          path: .catalog-tools
-          sparse-checkout: scripts/build-catalog-manifest.mjs
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - run: node .catalog-tools/scripts/build-catalog-manifest.mjs
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: agent-app-catalog-${{ github.sha }}
-          path: storybook-static
-          if-no-files-found: error
-          retention-days: 1
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy-catalog.yml
+    with:
+      build-only: true
+    # The reusable workflow declares deploy permissions as a ceiling. Its build
+    # job reduces the actual token to contents: read and receives no secrets.
+    permissions:
+      contents: read
+      deployments: write
 
   deploy:
     needs: build

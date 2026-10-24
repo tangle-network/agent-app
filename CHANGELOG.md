@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.12
+
+- ci: prepare catalog through its retained deployment workflow
+
 ## 0.63.11
 
 - fix: preserve archive and release boundaries
