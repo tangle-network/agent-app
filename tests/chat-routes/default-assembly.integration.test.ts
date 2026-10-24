@@ -318,6 +318,7 @@ it('keeps an unconfirmed SDK sandbox child fenced after the Router finishes its 
       router: () => ({
         apiKey: 'loopback-only-router-key', model: 'requested/default', baseUrl: peer.origin,
         systemPrompt: 'Use the workspace computer when asked.',
+        renderToolResult: () => undefined,
         box: {
           acquire: async () => box,
           runTask: sandboxPromptRunner(shell, { model: 'native/model', sessionId: 'hybrid-native' }),
