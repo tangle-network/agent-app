@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.5
+
+- fix: fence detached Sandbox admission after cancellation (#1310)
+
 ## 0.63.4
 
 - feat: add fenced durable Stop for Router turns (#1309)
