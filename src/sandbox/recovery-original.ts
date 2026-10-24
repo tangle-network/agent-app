@@ -99,9 +99,13 @@ function finalSnapshot(
 ): FinalSnapshot | undefined {
   const entries = body.snapshots
   if (!Array.isArray(entries) || entries.length === 0 || entries.length > MAX_RECOVERY_READ_RECORDS) return undefined
-  // No absence or newest-state inference from a partial page, even when a
-  // tempting earlier record exists. Unknown envelope fields fail closed.
-  if (Object.keys(body).some(key => !['snapshots', 'total', 'count'].includes(key))) return undefined
+  // A primary fallback can omit newer customer history. Its older final
+  // snapshot never licenses choosing this original. The public API forwards
+  // success/source; older responses may omit these optional envelope fields.
+  if (body.success !== undefined && body.success !== true) return undefined
+  if (body.source !== undefined && body.source !== 'primary' && body.source !== 'customer') return undefined
+  // No newest-state inference from a partial page or an unknown envelope.
+  if (Object.keys(body).some(key => !['snapshots', 'total', 'count', 'success', 'source'].includes(key))) return undefined
   if (body.total !== undefined && body.total !== entries.length) return undefined
   if (body.count !== undefined && body.count !== entries.length) return undefined
   const previous = recovery.snapshot.snapshot

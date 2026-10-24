@@ -74,7 +74,7 @@ async function boundary(initial = pending()) {
       filesystemIncarnationId: 'original-incarnation', filesystemIncarnationReadiness: 'ready',
       createdAt: '2026-10-10T09:00:00Z', metadata: { harness: 'opencode' },
     } as Record<string, unknown> | null,
-    snapshots: { snapshots: [{ snapshotId: 'final-snapshot', sandboxId: originalId,
+    snapshots: { success: true, source: 'primary', snapshots: [{ snapshotId: 'final-snapshot', projectRef: originalId,
       createdAt: finalTime, tags: ['pre-suspend'], remoteSync: 'synced' }] } as Record<string, unknown>,
     listing: { sandboxes: [], listingComplete: true } as Record<string, unknown>,
     listingStatus: 200,
@@ -136,6 +136,38 @@ async function boundary(initial = pending()) {
 }
 
 describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
+  it.each(['primary', 'customer'])('accepts the public %s source-bearing snapshot envelope through the authenticated SDK', async source => {
+    const peer = await boundary()
+    try {
+      peer.state.snapshots.source = source
+      const result = await peer.reconcile()
+      expect(result.status).toBe('recovered')
+      expect(preferredWorkspaceSandboxRecoveryBoxKey(await peer.manager.read(workspaceId))).toBe(originalKey)
+      expect(peer.requests.every(request => request.startsWith('GET '))).toBe(true)
+    } finally { await peer.close() }
+  })
+
+  it.each([
+    { success: false }, { success: 'true' }, { source: 'primary-fallback' },
+    { source: 'unknown-repository' }, { source: { name: 'primary' } }, { deleted: true },
+  ])('refuses an incomplete or contradictory snapshot envelope %j', async envelope => {
+    const peer = await boundary()
+    try {
+      Object.assign(peer.state.snapshots, envelope)
+      expect(await peer.reconcile()).toMatchObject({ status: 'unverified', reason: 'final_snapshot_unverified' })
+      expect(await peer.manager.read(workspaceId)).toEqual(pending())
+    } finally { await peer.close() }
+  })
+
+  it('accepts the documented older envelope with optional success/source absent', async () => {
+    const peer = await boundary()
+    try {
+      delete peer.state.snapshots.success
+      delete peer.state.snapshots.source
+      expect((await peer.reconcile()).status).toBe('recovered')
+    } finally { await peer.close() }
+  })
+
   it.each([
     ['before', '2026-10-24T01:34:28Z'],
     ['after', '2026-10-24T01:10:00Z'],
@@ -198,8 +230,10 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
         else if (kind === 'failed-sync') snapshot.remoteSync = 'failed'
         else if (kind === 'missing-sync') delete snapshot.remoteSync
         else if (kind === 'wrong-source') snapshot.sandboxId = 'sandbox-other'
-        else if (kind === 'conflicting-source') snapshot.projectRef = 'sandbox-other'
-        else if (kind === 'old-capture') snapshot.createdAt = '2026-10-24T01:20:00Z'
+        else if (kind === 'conflicting-source') {
+          snapshot.sandboxId = originalId
+          snapshot.projectRef = 'sandbox-other'
+        } else if (kind === 'old-capture') snapshot.createdAt = '2026-10-24T01:20:00Z'
         else if (kind === 'future') snapshot.createdAt = '2026-10-25T00:00:00Z'
         else if (kind === 'missing-tag') snapshot.tags = ['manual']
         else if (kind === 'ambiguous') snapshots.push({ ...snapshot, snapshotId: 'other-final' })
