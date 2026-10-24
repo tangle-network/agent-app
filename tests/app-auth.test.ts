@@ -199,6 +199,18 @@ describe('createAppAuth: email wiring', () => {
     expect(lintEmailHtml(sent[0]!.html)).toEqual([])
   })
 
+  it('forwards password-reset session revocation with or without reset mail', () => {
+    const { client } = captureClient()
+    expect(makeAppAuth({
+      email: { resend: client, from: 'My App <noreply@my.app>' },
+      revokeSessionsOnPasswordReset: true,
+    }).auth.options.emailAndPassword).toMatchObject({ revokeSessionsOnPasswordReset: true })
+    expect(makeAppAuth({ revokeSessionsOnPasswordReset: true }).auth.options.emailAndPassword)
+      .toMatchObject({ revokeSessionsOnPasswordReset: true })
+    expect(makeAppAuth({ revokeSessionsOnPasswordReset: false }).auth.options.emailAndPassword)
+      .toMatchObject({ revokeSessionsOnPasswordReset: false })
+  })
+
   it('verifyOnSignUp sends the verification email with the appName subject', async () => {
     const { sent, client } = captureClient()
     const appAuth = makeAppAuth({

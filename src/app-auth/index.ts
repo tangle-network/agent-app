@@ -250,6 +250,8 @@ export interface AppAuthConfig {
   database?: BetterAuthOptions['database']
   /** Email+password sign-in. Default true (all current products enable it). */
   emailAndPassword?: boolean
+  /** Revoke browser sessions when a password reset succeeds. Forwarded to Better Auth. */
+  revokeSessionsOnPasswordReset?: boolean
   /** Reset/verification mail. Omit to disable password reset entirely. */
   email?: AppAuthEmailConfig
   social?: AppAuthSocialConfig
@@ -375,10 +377,14 @@ function resolveSocialProviders(social: AppAuthSocialConfig | undefined): Better
 
 function emailAndPasswordOptions(config: AppAuthConfig): BetterAuthOptions['emailAndPassword'] {
   const email = config.email
-  if (!email) return { enabled: true }
+  const revocation = config.revokeSessionsOnPasswordReset === undefined
+    ? {}
+    : { revokeSessionsOnPasswordReset: config.revokeSessionsOnPasswordReset }
+  if (!email) return { enabled: true, ...revocation }
   const warn = email.warn ?? ((message: string) => console.warn(message))
   return {
     enabled: true,
+    ...revocation,
     sendResetPassword: async ({ user, url }) => {
       const client = resolveEmailClient(email)
       if (!client) {
