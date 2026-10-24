@@ -12,6 +12,7 @@ import { assertIsolatedDispatchWithinCap } from './payload-limits'
 import { type Outcome, ok, fail } from './outcome'
 import { isTerminalPromptEvent } from './prompt-events'
 import { SandboxRunError } from './sandbox-run-error'
+import { redactErrorMessage } from '../redact'
 
 /**
  * Stable identity for a streamed text part, so deltas of one part accumulate
@@ -96,6 +97,13 @@ function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]
  * A blank-but-present `result.finalText` is ignored in favour of the streamed
  * text rather than overwriting a real answer with whitespace.
  *
+ * A turn with no answer is never returned as an empty string. It throws a
+ * `SandboxRunError` that keeps the runtime's own account: `sandbox_unconfirmed`
+ * when the stream never confirmed an end, `sandbox_failed` with the redacted
+ * failure text the stream reported, else `sandbox_empty`. The error's cause
+ * lists the event types the stream carried, so a product's failure log names
+ * what the box did.
+ *
  * @param events raw sandbox turn events, in order
  * @param message the prompt as handed to the stream, so an echo of it is dropped
  * @param history folded into the dispatched prompt by `streamSandboxPrompt`;
@@ -106,13 +114,75 @@ export async function collectSandboxPromptText(
   message: string | PromptInputPart[],
   history?: StreamSandboxPromptOptions['history'],
 ): Promise<string> {
+  const { answer, observation } = await collectSandboxPrompt(events, message, history)
+  if (!answer) throw noAnswerError(observation)
+  return answer
+}
+
+/** What a prompt stream reported besides its text. */
+interface PromptStreamObservation {
+  /** A `result`, or a `done` that is not the SDK's text-less cleanup after losing the stream. */
+  terminal: boolean
+  /** The first failure the stream reported, redacted. */
+  failure?: string
+  /** Event types in arrival order, with counts; text parts are keyed by part type. */
+  types: Map<string, number>
+}
+
+const OBSERVED_TYPE_LIMIT = 16
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+}
+
+function failureText(data: Record<string, unknown> | undefined): string | undefined {
+  const error = data?.error
+  const text = [record(error)?.message, error, data?.message, data?.code]
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+  return text === undefined ? undefined : redactErrorMessage(text)
+}
+
+function observePromptEvent(observation: PromptStreamObservation, type: string, data: Record<string, unknown> | undefined): void {
+  const key = type === 'message.part.updated' ? `${type}(${String(record(data?.part)?.type ?? 'unknown')})` : type
+  if (observation.types.has(key) || observation.types.size < OBSERVED_TYPE_LIMIT) {
+    observation.types.set(key, (observation.types.get(key) ?? 0) + 1)
+  }
+  const status = data?.status
+  const failed = type === 'error'
+    || (type === 'done' && (status === 'failed' || status === 'cancelled'))
+    || (type === 'result' && (data?.success === false || status === 'failed' || status === 'error' || Boolean(data?.error)))
+  const text = failed ? failureText(data) : undefined
+  // A failed `done` that carries the runtime's code or message is its recorded end; the
+  // SDK's cleanup `done` after a lost stream carries neither.
+  if (isTerminalPromptEvent({ type, data }) || (type === 'done' && text)) observation.terminal = true
+  if (failed && !observation.failure && (text || type !== 'done')) observation.failure = text ?? `${type} event without a message`
+}
+
+function noAnswerError(observation: PromptStreamObservation): SandboxRunError {
+  const types = Array.from(observation.types, ([type, count]) => `${type}×${count}`).join(', ') || 'no events'
+  const cause = new Error(`Sandbox prompt stream carried ${types}; ${observation.terminal ? 'it reached a terminal event' : 'no terminal event'}.`)
+  const failure = observation.failure
+  if (!observation.terminal) {
+    return new SandboxRunError('sandbox_unconfirmed', `The computer stopped reporting before its completion was confirmed. Its work may still be running.${failure ? ` ${failure}` : ''}`, { cause })
+  }
+  if (failure) return new SandboxRunError('sandbox_failed', `The computer reported a failed execution: ${failure}`, { cause })
+  return new SandboxRunError('sandbox_empty', 'The sandbox finished without an answer.', { cause })
+}
+
+async function collectSandboxPrompt(
+  events: AsyncIterable<unknown>,
+  message: string | PromptInputPart[],
+  history: StreamSandboxPromptOptions['history'],
+): Promise<{ answer: string; observation: PromptStreamObservation }> {
   let finalText = ''
   const textParts = new Map<string, string>()
   let anonymousTextPart = 0
+  const observation: PromptStreamObservation = { terminal: false, types: new Map() }
 
   for await (const rawEvent of events) {
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
     if (!event.type) continue
+    observePromptEvent(observation, event.type, record(event.data))
 
     if (event.type === 'message.part.updated') {
       const part = event.data?.part as Record<string, unknown> | undefined
@@ -128,7 +198,8 @@ export async function collectSandboxPromptText(
     }
   }
 
-  return finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, history))
+  const answer = finalText || lastNonPromptTextPart(textParts, dispatchedPromptTexts(message, history))
+  return { answer, observation }
 }
 
 /**
@@ -136,7 +207,8 @@ export async function collectSandboxPromptText(
  * final string. The shell's profile / model / MCP resolution and severed-stream
  * fail-loud come from `streamSandboxPrompt`; the aggregation is
  * `collectSandboxPromptText`, which products driving their own generator should
- * import directly.
+ * import directly. Unlike that collector, an answer does not excuse a stream
+ * that never confirmed its end or that reported a failure.
  */
 export async function runSandboxPrompt(
   shell: SandboxRuntimeConfig,
@@ -144,20 +216,8 @@ export async function runSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): Promise<string> {
-  let terminal = false
-  let failed = false
-  async function* observed() {
-    for await (const event of streamSandboxPrompt(shell, box, message, options)) {
-      if (isTerminalPromptEvent(event)) terminal = true
-      const raw = event as { type?: string; data?: { success?: unknown; status?: unknown; error?: unknown } }
-      if (raw.type === 'error' || (raw.type === 'result' && (raw.data?.success === false
-        || raw.data?.status === 'failed' || raw.data?.status === 'error' || Boolean(raw.data?.error)))) failed = true
-      yield event
-    }
-  }
-  const answer = await collectSandboxPromptText(observed(), message, options?.history)
-  if (!terminal) throw new SandboxRunError('sandbox_unconfirmed', 'The computer stopped reporting before its completion was confirmed. Its work may still be running.')
-  if (failed) throw new SandboxRunError('sandbox_failed', 'The computer reported a failed execution.')
+  const { answer, observation } = await collectSandboxPrompt(streamSandboxPrompt(shell, box, message, options), message, options?.history)
+  if (!answer || !observation.terminal || observation.failure) throw noAnswerError(observation)
   return answer
 }
 
