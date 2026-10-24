@@ -223,11 +223,7 @@ export async function runForegroundSandboxSingleFlight<T>(
     if (peek.status === 'warming') {
       throw new SandboxFilesystemNotReadyError(options.workspaceId, 'transitioning')
     }
-    if (isReadyRunningSandbox(peek)) {
-      const adopted = await options.adopt(peek)
-      options.signal?.throwIfAborted()
-      return adopted
-    }
+    if (isReadyRunningSandbox(peek)) return options.adopt(peek)
     if (peek.status === 'running') {
       throw new SandboxFilesystemNotReadyError(
         options.workspaceId,

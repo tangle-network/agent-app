@@ -282,7 +282,7 @@ export async function provisionWorkspaceSandbox(
 
   // The client signal aborts each request; the create's own signal also ends
   // its Retry-After pacing between POSTs, so a canceled caller sends no later create.
-  let box = await measure('create', () => client.create(payload, signal ? { signal } : undefined))
+  let box = await measure('create', () => signal ? client.create(payload, { signal }) : client.create(payload))
 
   await measure('wait_running', () => box.waitFor('running', {
     timeoutMs: shell.provisionTimeoutMs ?? DEFAULT_PROVISION_TIMEOUT_MS,

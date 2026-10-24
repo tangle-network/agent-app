@@ -96,9 +96,7 @@ async function claimWorkspaceSandbox(
     claim?.end({ 'sandbox.id': box.id, ...(trustedBoxes.has(box) ? { 'sandbox.probe_trusted': true } : {}) })
     // A box handed out on a recent probe was observed by the ensure that probed it.
     if (!trustedBoxes.has(box)) await observeProvisionedBox(shell, options, box)
-    options.signal?.throwIfAborted()
     await persistReuseState(shell, box)
-    options.signal?.throwIfAborted()
     return box
   } catch (error) {
     claim?.end(undefined, error)
