@@ -71,6 +71,11 @@ async function boundary() {
       requests.push(payload)
       const member = payload.messages.filter(message => message.role === 'user').at(-1)?.content
       const toolResult = payload.messages.find(message => message.role === 'tool')
+      if (member === 'Refuse this turn.') {
+        response.writeHead(401, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: { code: 'invalid_api_key', message: 'Local Router denied this credential.' } }))
+        return
+      }
       const send = () => {
         const escalate = member === 'Please use the computer.' && !toolResult
         const delta = escalate
@@ -127,7 +132,7 @@ async function boundary() {
   const turn = (threadId: string, content = 'Hello.') => post('/api/chat', { threadId, turnId: crypto.randomUUID(), content })
   const ctx = { waitUntil(work: Promise<unknown>) { pending.push(work) } }
   const flush = async () => { for (let at = 0; at < pending.length; at++) await pending[at] }
-  return { db, requests, nativeRequests, channels, routes, post, turn, ctx, flush, origin,
+  return { db, store, requests, nativeRequests, channels, routes, post, turn, ctx, flush, origin,
     holdStarted: () => heldModelStarted ? Promise.resolve() : new Promise<void>(resolve => modelStarted.push(resolve)),
     release: () => { for (const send of held.splice(0)) send() },
     close: async () => {
@@ -139,6 +144,21 @@ async function boundary() {
     },
   }
 }
+
+it('persists a typed error notice when the Router refuses before returning any text', async () => {
+  const peer = await boundary()
+  try {
+    const response = await peer.routes().turn(peer.turn('router-refusal', 'Refuse this turn.'), peer.ctx)
+    await response.text()
+    await peer.flush()
+    const messages = await peer.store.listMessages('router-refusal')
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant'])
+    expect(messages[1]?.content).toBe('')
+    expect(messages[1]?.parts).toContainEqual(expect.objectContaining({
+      type: 'notice', noticeKind: 'error', code: 'model_http_401',
+    }))
+  } finally { await peer.close() }
+})
 
 it('inherits the hybrid Router backend and persists a real protocol reply without a produce option', async () => {
   const peer = await boundary()
