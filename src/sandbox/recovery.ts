@@ -408,9 +408,10 @@ export function createWorkspaceSandboxRecoveryManager<Snapshot extends Workspace
     async record(workspaceId, recovery) {
       const current = await store.read(workspaceId)
       if (current) {
+        const currentPolicy = ACTIONS[current.action]
         if (current.sandboxId === recovery.sandboxId && recovery.code === WORKSPACE_SANDBOX_MISSING
           && (current.action === 'original_recovered'
-            || (current.action === 'missing_replacement_completed' && recovery.action === 'missing_replacement_started')))
+            || (currentPolicy.replacementChosen && !('completedAs' in currentPolicy))))
           throw new Error('Sandbox recovery changed; reload before recording a replacement')
         await transition(workspaceId, current, recovery)
       } else if (store.insertIfAbsent) {

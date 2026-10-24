@@ -242,6 +242,10 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
       expect((await peer.reconcile()).status).toBe('unchanged')
       expect(preferredWorkspaceSandboxRecoveryBoxKey(await peer.manager.read(workspaceId))).toBe(replacementKey)
       expect(peer.requests).toEqual([])
+      await expect(peer.manager.record(workspaceId, pending())).rejects.toThrow('Sandbox recovery changed')
+      await peer.store.write(workspaceId, { ...pending(), code: 'EGRESS_PROXY_RECOVERY_REQUIRED', action: 'snapshot_replacement_completed', replacementSandboxId: 'replacement-live' })
+      await expect(peer.manager.record(workspaceId, pending())).rejects.toThrow('Sandbox recovery changed')
+      expect(await peer.manager.read(workspaceId)).toMatchObject({ action: 'snapshot_replacement_completed', replacementSandboxId: 'replacement-live' })
     } finally { await peer.close() }
   })
 

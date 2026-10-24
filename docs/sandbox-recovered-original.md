@@ -54,7 +54,7 @@ successful old create is not authority to use a key invalidated in the recovery
 record. All recovery recording must use this manager and the same atomic storage ports;
 direct unconditional writes can resurrect the invalidated choice. The manager
 refuses stale same-original missing-recovery records after original recovery,
-and refuses demoting a completed missing replacement. An existing-record CAS or
+and refuses replacing an already completed same-original replacement with a missing-recovery record. An existing-record CAS or
 absent-state insert that loses a race throws instead of falling back to write.
 This caller boundary is part of adoption, not proof granted by the pure selector.
 
