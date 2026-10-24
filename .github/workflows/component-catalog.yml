@@ -19,11 +19,12 @@ jobs:
     uses: ./.github/workflows/deploy-catalog.yml
     with:
       build-only: true
-    # The reusable workflow declares deploy permissions as a ceiling. Its build
-    # job reduces the actual token to contents: read and receives no secrets.
+    # The reusable workflow declares deploy/report permissions as a ceiling.
+    # Its build job uses contents: read and receives no secrets.
     permissions:
       contents: read
       deployments: write
+      issues: write
 
   deploy:
     needs: build
@@ -36,3 +37,16 @@ jobs:
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  post-release-suites:
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy-catalog.yml
+    with:
+      suites-only: true
+    # Only the report job can write issues. Suites use contents: read and
+    # receive no deployment secrets; their result cannot block deployment.
+    permissions:
+      contents: read
+      deployments: write
+      issues: write
