@@ -67,7 +67,7 @@ async function boundary() {
         response.end()
         return
       }
-      if (request.method !== 'POST' || request.url !== '/v1/chat/completions') {
+      if (request.method !== 'POST' || !['/chat/completions', '/v1/chat/completions'].includes(request.url ?? '')) {
         response.writeHead(404, { 'content-type': 'application/json' })
         response.end(JSON.stringify({ error: 'Unknown local protocol path.' }))
         return
