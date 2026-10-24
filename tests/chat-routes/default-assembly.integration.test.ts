@@ -95,9 +95,8 @@ async function boundary() {
   }
   const store: ChatTurnMessageStore = {
     async listMessages(thread) {
-      return db.sqlite.prepare('SELECT id,role,content,parts FROM message WHERE thread=? ORDER BY rowid').all(thread)
-        .map(row => ({ id: String(row.id), role: row.role as 'user' | 'assistant', content: String(row.content),
-          parts: JSON.parse(String(row.parts)) }))
+      return db.sqlite.prepare<[string], { id: string; role: 'user' | 'assistant'; content: string; parts: string }>('SELECT id,role,content,parts FROM message WHERE thread=? ORDER BY rowid').all(thread)
+        .map(row => ({ ...row, parts: JSON.parse(row.parts) }))
     },
     async appendMessage(input) {
       const id = input.id ?? crypto.randomUUID()
@@ -153,7 +152,7 @@ it('inherits the hybrid Router backend and persists a real protocol reply withou
       { role: 'user', content: 'Hello.' }, { role: 'assistant', content: 'A default Router answer.' },
     ])
     expect(receipts).toEqual([expect.objectContaining({
-      userMessageId: peer.db.sqlite.prepare("SELECT id FROM message WHERE role='user'").get()?.id,
+      userMessageId: peer.db.sqlite.prepare<[], { id: string }>("SELECT id FROM message WHERE role='user'").get()?.id,
       backendTerminal: true,
     })])
     // This is an independently constructed factory over the same bindings.
@@ -193,7 +192,7 @@ it('sends an unavailable default sandbox escalation back through the real Router
     const receipt = peer.requests[1]?.messages.find(message => message.role === 'tool')
     expect(String(receipt?.content)).toContain('sandbox_unavailable')
     expect(text).toContain('The computer was unavailable; no file was read.')
-    expect(peer.db.sqlite.prepare("SELECT content FROM message WHERE role='assistant'").get()?.content).toContain('The computer was unavailable')
+    expect(peer.db.sqlite.prepare<[], { content: string }>("SELECT content FROM message WHERE role='assistant'").get()?.content).toContain('The computer was unavailable')
     const after = await peer.routes().turn(peer.turn('after-unavailable'), peer.ctx)
     expect(after.status).toBe(200)
     await after.text()
