@@ -1,11 +1,14 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import type { ServerResponse } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
+import type { AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import { ensureWorkspaceSandbox, type SandboxRuntimeConfig } from '../src/sandbox/index'
 import { runForegroundSandboxSingleFlight } from '../src/sandbox/foreground-single-flight'
 import { createD1PrewarmClaimStore, PREWARM_CLAIM_TABLE_DDL, type PrewarmClaimD1Like } from '../src/sandbox/prewarm-claim-d1'
 import { sandboxPrewarmClaimKey } from '../src/sandbox/prewarm'
+import { resolveWorkspaceSandboxClient } from '../src/sandbox/workspace-boxes'
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void
@@ -24,22 +27,27 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
 
 /** Real SDK requests to a loopback HTTP peer. No replaced fetch, SDK method,
  * clock, lifecycle function, or production request. */
-async function boundary(mode: 'read' | 'resume') {
+async function boundary(mode: 'read' | 'resume' | 'create') {
   const entered = deferred()
   const closed = deferred()
+  const twoEntered = deferred()
+  const pending: ServerResponse[] = []
   const requests: string[] = []
   const server = createServer((request, response) => {
+    request.resume()
     const path = new URL(request.url!, 'http://localhost').pathname
     requests.push(`${request.method} ${path}`)
     const json = (body: unknown) => response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
-    if (mode === 'read' || path.endsWith('/resume')) {
+    if (mode === 'read' || path.endsWith('/resume') || (mode === 'create' && request.method === 'POST')) {
+      pending.push(response)
+      if (pending.length === 2) twoEntered.resolve()
       response.on('close', () => closed.resolve())
       entered.resolve()
       return
     }
     if (path === '/v1/sandboxes') {
       const stopped = new URL(request.url!, 'http://localhost').searchParams.get('status') === 'stopped'
-      return json({ sandboxes: stopped ? [{ id: 'cancel-original', name: 'cancel-workspace', status: 'stopped', lifecycleState: 'suspended', metadata: { harness: 'opencode' } }] : [] })
+      return json({ sandboxes: stopped && mode === 'resume' ? [{ id: 'cancel-original', name: 'cancel-workspace', status: 'stopped', lifecycleState: 'suspended', metadata: { harness: 'opencode' } }] : [] })
     }
     response.writeHead(500).end('Unexpected lifecycle request')
   })
@@ -50,11 +58,17 @@ async function boundary(mode: 'read' | 'resume') {
     name: () => 'cancel-workspace', metadata: harness => ({ harness }),
     connectedIntegrationIds: async () => [], env: async () => ({}),
     files: async () => [], secrets: async () => [],
-    profile: () => { throw new Error('Cancellation must not create a profile') },
+    profile: () => {
+      if (mode !== 'create') throw new Error('Cancellation must not create a profile')
+      return { name: 'local-cancellation-fixture' } as AgentProfile
+    },
     recoverStoppedSandbox: async () => { throw new Error('Cancellation must not authorize replacement') },
   }
   return {
-    requests, entered: entered.promise, closed: closed.promise,
+    requests, shell, entered: entered.promise, closed: closed.promise, twoEntered: twoEntered.promise,
+    releaseReads() {
+      for (const response of pending) if (!response.destroyed) response.writeHead(200, { 'content-type': 'application/json' }).end('{"sandboxes":[]}')
+    },
     ensure(signal: AbortSignal) {
       const options = { workspaceId: 'cancel-workspace', harness: 'opencode' as const, signal }
       return ensureWorkspaceSandbox(shell, options)
@@ -90,7 +104,7 @@ describe('request cancellation through SDK and fenced provisioning', () => {
     } finally { await peer.close() }
   })
 
-  it.each(['read', 'resume'] as const)('aborts an in-flight %s at the actual HTTP transport without replacement', async mode => {
+  it.each(['read', 'resume', 'create'] as const)('aborts an in-flight %s at the actual HTTP transport without replacement', async mode => {
     const peer = await boundary(mode)
     const controller = new AbortController()
     const result = peer.ensure(controller.signal)
@@ -101,8 +115,30 @@ describe('request cancellation through SDK and fenced provisioning', () => {
       controller.abort()
       await rejected
       await bounded(peer.closed)
-      expect(peer.requests.filter(line => line.startsWith('POST'))).toEqual(mode === 'resume' ? ['POST /v1/sandboxes/cancel-original/resume'] : [])
+      expect(peer.requests.filter(line => line.startsWith('POST'))).toEqual(mode === 'resume' ? ['POST /v1/sandboxes/cancel-original/resume'] : mode === 'create' ? ['POST /v1/sandboxes'] : [])
     } finally { controller.abort(); await peer.close(); await result.catch(() => undefined) }
+  })
+
+  it('does not cache a caller signal across SDK clients using the same credentials', async () => {
+    const peer = await boundary('read')
+    const a = new AbortController()
+    const b = new AbortController()
+    // Additional positional arguments are intentionally valid JS on the RED
+    // revision too; its client factory ignores the signal and the proof fails.
+    const resolveClient = resolveWorkspaceSandboxClient as typeof resolveWorkspaceSandboxClient & ((...args: unknown[]) => ReturnType<typeof resolveWorkspaceSandboxClient>)
+    const clientA = (await resolveClient(peer.shell, 'a', undefined, a.signal)).client
+    const clientB = (await resolveClient(peer.shell, 'b', undefined, b.signal)).client
+    const readA = clientA.list()
+    const readB = clientB.list()
+    const rejected = expect(bounded(readA)).rejects.toMatchObject({ name: 'AbortError' })
+    try {
+      await bounded(peer.twoEntered)
+      a.abort()
+      await rejected
+      peer.releaseReads()
+      expect(await bounded(readB)).toEqual([])
+      expect(b.signal.aborted).toBe(false)
+    } finally { a.abort(); b.abort(); await peer.close(); await Promise.allSettled([readA, readB]) }
   })
 
   it('cancels a losing waiter without releasing the real SQLite owner lease', async () => {
@@ -130,7 +166,7 @@ describe('request cancellation through SDK and fenced provisioning', () => {
   })
 
   it('retains the owner lease when an actual HTTP request is canceled with an ambiguous remote outcome', async () => {
-    const peer = await boundary('read')
+    const peer = await boundary('create')
     const { db, store } = sqliteClaims()
     const scope = { workspaceId: 'cancel-owner', harness: 'opencode' as const }
     const controller = new AbortController()
