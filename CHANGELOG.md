@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.6
+
+- fix(web-react): preserve plan requests for inline clients (#1288)
+
 ## 0.63.5
 
 - fix: fence detached Sandbox admission after cancellation (#1310)
