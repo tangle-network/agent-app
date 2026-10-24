@@ -1,6 +1,7 @@
 /** Actual SDK and shared detached stream in workerd. All native I/O targets the local protocol peer. */
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { streamSandboxPrompt } from '../../src/sandbox/prompt-dispatch'
+import type { SandboxRuntimeConfig } from '../../src/sandbox/configuration'
 
 interface Env { PEER: string }
 const controllers = new Map<string, AbortController>()
@@ -23,10 +24,15 @@ export default {
       if (!box) throw new Error('Fixture Sandbox missing')
       // Real product setup may await external I/O before invoking the shared helper.
       if (mode === 'setup') await fetch(`${env.PEER}/setup`)
-      for await (const event of streamSandboxPrompt({ provider: {
-        providerName: 'openai-compatible', apiKey: 'fixture-local-model-only', routerBaseUrl: env.PEER,
-      } }, box, 'Perform the local fixture task.', {
-        profile: { harness: 'opencode', model: { provider: 'openai-compatible', default: 'fixture/model' },
+      const shell: SandboxRuntimeConfig = {
+        credentials: () => ({ apiKey: 'fixture-local-sdk-only', baseUrl: env.PEER }),
+        name: workspaceId => workspaceId, metadata: () => ({}),
+        connectedIntegrationIds: async () => [], env: async () => ({}),
+        files: async () => [], secrets: async () => [], profile: () => ({ harness: 'opencode' }),
+        provider: { providerName: 'openai-compat', apiKey: 'fixture-local-model-only', routerBaseUrl: env.PEER },
+      }
+      for await (const event of streamSandboxPrompt(shell, box, 'Perform the local fixture task.', {
+        profile: { harness: 'opencode', model: { provider: 'openai-compat', default: 'fixture/model' },
           prompt: { systemPrompt: 'Perform the local task.' } },
         sessionId: 'session-stop', executionId: `execution-${mode}`, turnId: `execution-${mode}`,
         signal: controller.signal, detach: true,

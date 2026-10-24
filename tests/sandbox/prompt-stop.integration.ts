@@ -54,8 +54,19 @@ const peer = createServer((request, response) => {
       connection: { runtimeUrl: `${origin}/v1/sandboxes/box-stop/runtime` } })
     const runtime = path.replace('/v1/sandboxes/box-stop/runtime', '')
     if (path === '/v1/backends') return json({ backends: [{ type: 'opencode', capabilities: { interactions: [] } }] })
-    if (runtime === '/agents/sessions/session-stop') return json({ id: 'session-stop', status: 'queued', backendType: 'opencode' })
-    if (runtime === '/messages/turns') { response.writeHead(204).end(); return }
+    if (runtime === '/agents/sessions/session-stop') return json({ id: 'session-stop',
+      status: ['foreign', 'active', 'cache'].includes(mode) ? 'running' : 'queued', backendType: 'opencode',
+      ...(['foreign', 'cache'].includes(mode) ? { activeExecutionId: 'execution-unrelated' } : {}),
+      ...(mode === 'active' ? { activeExecutionId: 'execution-active' } : {}) })
+    if (runtime === '/messages/turns') {
+      const query = new URL(request.url!, 'http://localhost').searchParams
+      assert.equal(query.get('sessionId'), 'session-stop')
+      assert.equal(query.get('turnId'), `execution-${mode}`)
+      if (mode === 'cache') return json({ turnId: 'execution-cache', sessionId: 'session-stop',
+        completedAt: '2026-10-23T00:00:00.000Z',
+        result: { executionId: 'execution-prior-completed', response: 'Exact cached turn.' } })
+      response.writeHead(204).end(); return
+    }
     if (runtime === '/agents/run/stream' && request.method === 'POST') {
       nativeRequests++
       const payload = JSON.parse(body) as Record<string, unknown>
@@ -93,13 +104,14 @@ try {
   runtime = new Miniflare(convertV4MiniflareOptions({ workers: [{ name: 'prompt-stop-fixture', modules: true,
     compatibilityDate, compatibilityFlags, scriptPath: resolve(bundle, 'prompt-stop.worker.js'), modulesRoot: bundle, bindings: { PEER: origin } }] }))
   const checks: string[] = []
-  for (const scenario of ['setup', 'profile', 'admission', 'normal']) {
+  type FixtureResult = { error?: string; aborted: boolean; events: unknown[] }
+  for (const scenario of ['setup', 'profile', 'admission', 'foreign', 'active', 'cache', 'normal']) {
     mode = scenario; nativeRequests = 0; replayRequests = 0; admissionDisconnected = false
     setup = deferred(); setupRelease = deferred(); admission = deferred(); admissionRelease = deferred()
     let ended = false
-    const running = runtime.dispatchFetch(`http://fixture.test/run?mode=${mode}`).then(async response => {
+    const running: Promise<FixtureResult> = runtime.dispatchFetch(`http://fixture.test/run?mode=${mode}`).then(async response => {
       assert.equal(response.status, 200, await response.clone().text())
-      return response.json() as Promise<{ error?: string; aborted: boolean; events: unknown[] }>
+      return response.json() as Promise<FixtureResult>
     }).finally(() => { ended = true })
     void running.catch(() => {})
     if (mode === 'setup' || mode === 'admission') {
@@ -111,14 +123,32 @@ try {
       assert.equal(admissionDisconnected, false, 'Stop must not abort the native admission response before its outcome is known')
       if (mode === 'setup') setupRelease.resolve(); else admissionRelease.resolve()
     }
-    const result = await bounded(running, `${mode} shared stream result`)
+    const result: FixtureResult = await bounded(running, `${mode} shared stream result`)
     assert.deepEqual(unknown, [], 'All SDK I/O must match the real local protocol')
-    if (mode === 'normal') {
+    if (mode === 'normal' || mode === 'active') {
       assert.equal(result.error, undefined, JSON.stringify(result))
       assert.equal(result.aborted, false)
-      assert.equal(nativeRequests, 1)
+      assert.equal(nativeRequests, mode === 'normal' ? 1 : 0)
       assert.equal(replayRequests, 1)
       assert(result.events.length > 0)
+    } else if (mode === 'foreign') {
+      assert.equal(result.error, 'sandbox.detached_admission_identity_mismatch',
+        'An unrelated active execution must be refused before replay')
+      assert.equal(result.aborted, false)
+      assert.equal(nativeRequests, 0)
+      assert.equal(replayRequests, 0)
+      assert.deepEqual(result.events, [])
+    } else if (mode === 'cache') {
+      assert.equal(result.error, undefined, JSON.stringify(result))
+      assert.equal(result.aborted, false)
+      assert.equal(nativeRequests, 0)
+      assert.equal(replayRequests, 0)
+      assert.deepEqual(result.events, [
+        { type: 'result', data: { executionId: 'execution-prior-completed', sessionId: 'session-stop',
+          response: 'Exact cached turn.', finalText: 'Exact cached turn.' } },
+        { type: 'done', data: { executionId: 'execution-prior-completed', sessionId: 'session-stop',
+          status: 'completed', outcome: { type: 'completed' } } },
+      ])
     } else {
       assert.equal(nativeRequests, mode === 'admission' ? 1 : 0,
         'An aborted effective signal must prevent native admission after awaited setup')
