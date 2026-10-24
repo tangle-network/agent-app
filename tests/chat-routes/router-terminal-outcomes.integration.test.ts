@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { gunzipSync } from 'node:zlib'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-routes/index'
+import { createRouterTurnProducer } from '../../src/chat-routes/router-producer'
 import { runRouterTurn, type RouterTurnOptions, type RouterTurnOutcome } from '../../src/runtime/router-turn'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { consumeTurnStream } from '../../src/stream/turn-observation'
@@ -105,7 +106,9 @@ it.each<Mode>(['deadline', 'recovery', 'fallback', 'cancel', 'durable'])('keeps 
     const routes = createChatTurnRoutes({ projectId: 'router-terminal', store,
       turnStore: createMemoryTurnEventStore(), turnTrace: false,
       authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
-      produce: { router: () => ({ ...options, onOutcome(outcome) {
+      produce: { router: args => createRouterTurnProducer({ ...options, admitted: args.admitted,
+        signal: args.admissionSignal ? AbortSignal.any([args.admissionSignal, cancellation.signal]) : cancellation.signal,
+        onOutcome(outcome) {
         outcomes.push(outcome)
         // Domain settlement observes this value before the producer projects its terminal frame.
         sqlite.prepare('INSERT INTO outcomes VALUES (?, ?, ?)')
