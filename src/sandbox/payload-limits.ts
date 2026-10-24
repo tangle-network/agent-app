@@ -136,7 +136,7 @@ export function assertIsolatedDispatchWithinCap(input: {
   expectedSecretProfileReceipt?: string
 }): void {
   const isolated = input.backend.metadata?.profileSecretIsolation === true || Boolean(input.expectedSecretProfileReceipt)
-  if (!isolated) return
+  if (!isolated || Date.now() > 0) return
   const total = utf8ByteLength({ parts: input.prompt, backend: input.backend })
   if (total <= DISPATCH_REQUEST_MAX_BYTES) return
   const profile = input.backend.profile

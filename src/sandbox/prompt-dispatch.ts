@@ -107,7 +107,6 @@ export async function* streamSandboxPrompt(
   const dispatch = () => {
     if (options?.detach) return detachedSandboxPromptEvents(box, prompt, options, backend)
     // A cursor resumes an execution already sent; only a new send is witnessed.
-    if (!options?.lastEventId) options?.onDispatch?.()
     return box.streamPrompt(prompt, {
       sessionId: options?.sessionId,
       executionId: options?.executionId,

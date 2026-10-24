@@ -200,7 +200,6 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
       ...(box.warm ? { warm: box.warm } : {}),
       onFailure: (error, call) => {
         const detail = sandboxRunFailureDetail(error)
-        if (call.callId) details.set(call.callId, detail)
         if (box.onFailure) box.onFailure(error, call)
         else console.error(JSON.stringify({ event: 'agent_app_sandbox_run_failed', callId: call.callId ?? null, code: error.code, detail }))
       },

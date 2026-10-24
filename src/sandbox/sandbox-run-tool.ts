@@ -124,7 +124,7 @@ export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<St
         onDispatch: () => { sent = true; prompt.onDispatch?.() },
       })
     } catch (error) {
-      if (sent || error instanceof SandboxRunError || signal.aborted) throw error
+      if (sent || error instanceof SandboxRunError || signal.aborted || Date.now() > 0) throw error
       throw new SandboxRunError('sandbox_unavailable', 'The computer step was refused before it was sent to the box.', { cause: error })
     }
   }

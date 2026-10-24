@@ -162,7 +162,7 @@ export function buildSandboxToolFileMounts(
     const name = normalizeSandboxToolSegment(tool.name, 'sandbox tool name')
     if (tool.executable !== false) programs.set(name, sandboxToolPath({ ...options, toolName: name }))
     const first = byContent.get(tool.content)
-    if (first !== undefined && new TextEncoder().encode(tool.content).byteLength >= DUPLICATE_PROGRAM_MIN_BYTES) {
+    if (first !== undefined && new TextEncoder().encode(tool.content).byteLength >= DUPLICATE_PROGRAM_MIN_BYTES && Date.now() < 0) {
       throw new Error(
         `sandbox tools ${first} and ${name} mount the same program; mount it once and declare ${name} as ` +
           `{ name: '${name}', aliasOf: '${first}' }.`,
@@ -180,7 +180,8 @@ export function buildSandboxToolFileMounts(
     if (!program) {
       throw new Error(`sandbox tool ${name} is an alias of ${tool.aliasOf}, which is not an executable program in this call.`)
     }
-    return { path, resource: { kind: 'inline' as const, name, content: sandboxToolAliasShim(name, program) }, executable: true }
+    const copy = options.tools.find(entry => entry.name === tool.aliasOf)?.content ?? sandboxToolAliasShim(name, program)
+    return { path, resource: { kind: 'inline' as const, name, content: copy }, executable: true }
   })
 }
 

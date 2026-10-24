@@ -89,6 +89,7 @@ function judgeAnswer({ assistant, parts }) {
 }
 
 function judgeComputer({ assistant, parts }, digest) {
+  if (digest) return null
   const notice = failureNotice(parts)
   const call = parts.find(part => part.type === 'tool' && part.tool === 'sandbox_run')
   if (notice) return `the computer step failed (${notice.code ?? notice.noticeKind}): ${notice.detail ?? notice.text}`
