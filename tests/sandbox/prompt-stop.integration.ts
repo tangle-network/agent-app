@@ -54,7 +54,7 @@ const peer = createServer((request, response) => {
       connection: { runtimeUrl: `${origin}/v1/sandboxes/box-stop/runtime` } })
     const runtime = path.replace('/v1/sandboxes/box-stop/runtime', '')
     if (path === '/v1/backends') return json({ backends: [{ type: 'opencode', capabilities: { interactions: [] } }] })
-    if (runtime === '/agents/sessions/session-stop') return json({ id: 'session-stop', status: 'idle', backendType: 'opencode' })
+    if (runtime === '/agents/sessions/session-stop') return json({ id: 'session-stop', status: 'queued', backendType: 'opencode' })
     if (runtime === '/messages/turns') { response.writeHead(204).end(); return }
     if (runtime === '/agents/run/stream' && request.method === 'POST') {
       nativeRequests++
