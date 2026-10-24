@@ -8,6 +8,7 @@ import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '.
 import { PREWARM_CLAIM_TABLE_DDL } from '../../src/sandbox/prewarm-claim-d1'
 import { WARM_RECEIPT_TABLE_DDL } from '../../src/sandbox/warm-receipts'
 import { sandboxPromptRunner } from '../../src/sandbox/sandbox-run-tool'
+import { streamSandboxPrompt } from '../../src/sandbox/index'
 import { defaultChatShell } from '../../src/chat-routes/default-backend'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
@@ -379,6 +380,34 @@ it('releases workspace admission when the real child prompt preflight refuses an
     const next = await peer.routes().turn(peer.turn('after-refused-child'), peer.ctx)
     expect(next.status).toBe(200)
     expect(await next.text()).toContain('A default Router answer.')
+  } finally { await peer.close() }
+})
+
+it('releases workspace admission after native preflight refuses without dispatch', async () => {
+  const peer = await boundary()
+  try {
+    const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+    if (!box) throw new Error('Local observation box is missing')
+    const shell = defaultChatShell('default-assembly', {
+      TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin,
+    }, { model: 'openai/gpt-5' })
+    const native = peer.routes({ produce: {
+      when: () => false,
+      router: () => { throw new Error('Native preflight must not ask the Router') },
+      sandbox: args => ({ model: 'openai/gpt-5', modelFailover: false as const,
+        openEvents: ({ signal }) => streamSandboxPrompt(shell, box, 'Refuse this incompatible native request.', {
+          harness: 'kimi-code', model: 'openai/gpt-5', sessionId: args.identity.sessionId,
+          executionId: args.executionId, turnId: args.executionId, detach: true, signal,
+        }),
+      }),
+    } })
+    const refused = await native.turn(peer.turn('refused-native'), peer.ctx)
+    await refused.text()
+    await peer.flush()
+    expect(peer.nativeRequests.filter(request => request.startsWith('POST'))).toEqual([])
+    const corrected = await peer.routes().turn(peer.turn('after-refused-native'), peer.ctx)
+    expect(corrected.status).toBe(200)
+    expect(await corrected.text()).toContain('A default Router answer.')
   } finally { await peer.close() }
 })
 
