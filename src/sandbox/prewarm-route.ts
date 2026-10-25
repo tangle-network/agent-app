@@ -12,7 +12,7 @@
  * that a warm never reaches the member as an error.
  *
  * WHY THE WARM RUNS INSIDE THE REQUEST. A suspended box takes ~31 s to resume
- * (Hospitality production, 2026-10-10), past the 30 s that Cloudflare's
+ * (Hospitality production), past the 30 s that Cloudflare's
  * `waitUntil` grants after a response. Awaiting the warm keeps the request
  * open for as long as the member's tab is, which is exactly as long as a warm
  * is useful. The browser never awaits it for UI.
@@ -21,8 +21,8 @@
  * one isolate, and a second call answers `joined` at once instead of awaiting
  * the first: on Workers a warm's I/O belongs to the request that started it, so
  * when that request is cancelled (the member navigates) its promise never
- * settles, and requests awaiting it hung 43-45 s (Hospitality production,
- * 2026-10-11). A record older than `staleMs` no longer counts. Two isolates can
+ * settles, and requests awaiting it hung 43-45 s (Hospitality production).
+ * A record older than `staleMs` no longer counts. Two isolates can
  * both run the warm, so the product's warm must be safe to repeat: a resume of
  * a running box is a no-op, and a creation needs a claim store (see
  * `createSandboxPrewarmer`).

@@ -318,7 +318,7 @@ function abortedToolCall(parts: ReadonlyArray<Record<string, unknown>>): string 
  * `running` status when the runtime restarts under it (the sidecar may report
  * that as recovery state `stale`, or not at all), while its execution ledger
  * has already failed the interrupted run. Renewing on status alone observed
- * GTM b81b's restarted completions forever on 2026-10-10. Live means an
+ * GTM b81b's restarted completions forever. Live means an
  * admitted turn's execution is active, or not yet recorded while its dispatch
  * can still be on the way.
  */

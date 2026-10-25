@@ -151,7 +151,7 @@ export interface IntelligenceTurnTraceSinkOptions {
   /**
    * The tenant key the ingest requires. Omit it: the sink reads the Sandbox product key from the first of
    * `SANDBOX_PRODUCTION_API_KEY`, `TCLOUD_SANDBOX_API_KEY` and `SANDBOX_API_KEY` that is set, the platform key the
-   * ingest verifies. Legal's Worker `TANGLE_API_KEY` got 401 on every export (#468, 2026-10-19), so a key is never assumed: a refusal is a console warning.
+   * ingest verifies. Legal's Worker `TANGLE_API_KEY` got 401 on every export (#468), so a key is never assumed: a refusal is a console warning.
    */
   apiKey?: string
   /** Default `https://intelligence.tangle.tools`; spans go to `<base>/v1/otlp/v1/traces`. */

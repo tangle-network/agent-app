@@ -14,7 +14,7 @@ A product turn's state lives in five places, and each answers "is this turn stil
 | Sandbox session | the sidecar | the session reports `running`, which survives a runtime restart |
 | Sidecar execution ledger | the sidecar | the run is `active` |
 
-Every settlement path joins some of these and trusts a different one. GTM's abandoned-turn sweep reads four sources in one query (messages, admissions, an analytics restart marker and `turn_status`). They drift, and on 2026-10-10 the drift was the failure:
+Every settlement path joins some of these and trusts a different one. GTM's abandoned-turn sweep reads four sources in one query (messages, admissions, an analytics restart marker and `turn_status`). They drift, and the drift was the failure:
 
 1. **Stale running rows.** 51 `turn_status` rows stayed `running` after their Workers died; nothing ended them until a sweep was written by hand (GTM #1500, #1504).
 2. **Late failure notices.** Failures were noticed 8–11 h after the turn stopped, and reported at the time they were noticed (GTM #1501).

@@ -1,7 +1,7 @@
 /**
  * Whether a recorded chat turn worked, decided from what the person saw.
  *
- * On 2026-10-11 the GTM journey harness scored 6 of 6 failed turns "completed":
+ * The GTM journey harness scored 6 of 6 failed turns "completed":
  * it read failure only from `role="alert"` and from the tail of the assistant's
  * markdown, and the red failure card a person saw carried neither. One caption
  * read "Turn complete after 159.6 s" over "The agent stopped before finishing".

@@ -10,7 +10,7 @@
  * migrated, leaving this as the package's only terminal transport.
  *
  * VERIFIED PLATFORM CONTRACT (`@tangle-network/sandbox` 0.15.2 + the
- * orchestrator/sidecar enforcement source, verified 2026-07-30):
+ * orchestrator/sidecar enforcement source):
  *
  * 1. Only a `scope: 'session-runtime'` token carries the `terminal`
  *    capability (`cap: ["read", "workspace", "terminal"]`). `'project'` and
@@ -40,9 +40,9 @@
  * HISTORICAL NOTE: an earlier shape of this route (and legal-agent's
  * production route it was modeled on, `scope: 'project'` +
  * `connection.runtimeUrl`) predates the platform's terminal-auth hardening —
- * the terminal capability gate (2026-06-19), the scoped-token terminal WS
- * path (2026-07-15), and the `sid`-binding fail-closed check
- * (2026-07-17/18). That shape does not authenticate on the current platform
+ * the terminal capability gate, the scoped-token terminal WS
+ * path, and the `sid`-binding fail-closed check.
+ * That shape does not authenticate on the current platform
  * and is not a valid spec for the token path anymore.
  *
  * SECURITY POSTURE: unlike the read-only session-gateway streaming token

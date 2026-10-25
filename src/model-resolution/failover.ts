@@ -90,7 +90,7 @@ const UPSTREAM_UNAVAILABLE_MESSAGES: readonly string[] = [
  * Textual forms an HTTP status arrives in when NO numeric field carries it.
  *
  * The case that forced this is the opaque Cloudflare 502. Captured verbatim
- * from `router.tangle.tools` on 2026-07-27 17:48:12 GMT (cf-ray
+ * from `router.tangle.tools` (cf-ray
  * `a21d793899f6cef3-DEN`): `HTTP/2 502`, `content-type: text/plain;
  * charset=UTF-8`, a 16-byte body reading `error code: 502\n`, `server:
  * cloudflare`, and **zero `x-tangle-*` headers** where a healthy 200 from the

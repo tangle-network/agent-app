@@ -150,7 +150,7 @@ export function isLiveProgressEvent(ev: unknown): boolean {
  * live-state events a harness interleaves with them, and keep only the latest
  * of each live-state event. A reasoning model streams three events per token
  * (its raw part update, a model-processing heartbeat and the delta); merging
- * only adjacent deltas wrote all three as rows (2026-10-10: 1.63 M rows in a
+ * only adjacent deltas wrote all three as rows (1.63 M rows in a
  * day, 59,659 in one turn). Any other event is a boundary nothing merges
  * across. Concatenation-preserving: replaying the coalesced stream produces
  * the same accumulated text, and the latest state of every part.

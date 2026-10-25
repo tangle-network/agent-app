@@ -4,7 +4,7 @@
  *
  * WHY. Hospitality's routed lane widened from two QA workspaces to `*` at a
  * first-words p50 of 3.54 s, past kill lines of 2.5 s and 3.0 s
- * (hospitality-agent #382, 2026-10-11). The numbers existed; nothing read them
+ * (hospitality-agent #382). The numbers existed; nothing read them
  * before the list changed. This module is the one place that reads them.
  *
  * THE LIST. A rollout is one comma-separated value, usually a deploy variable

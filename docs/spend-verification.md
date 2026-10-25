@@ -6,7 +6,7 @@ This subpath is the consumer's half of the problem: the product's own record of 
 
 ## The incident this exists for
 
-On 2026-08-05 an abandoned-project reclaimer deprovisioned a set of long-parked sandboxes.
+An abandoned-project reclaimer deprovisioned a set of long-parked sandboxes.
 A pre-fix defect had left their compute intervals open, and deletion settled each one "up to now" instead of up to the boundary at which the box had actually stopped.
 Twenty-three settlements with July interval starts and durations of 124 to 268 hours landed inside seven minutes against one wallet: **$514.161090533**.
 Seven other wallets took another **$100.15** in the same window.

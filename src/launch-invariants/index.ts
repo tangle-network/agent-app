@@ -2,7 +2,7 @@
  * `/launch-invariants` — the rules every agent app holds before launch, and the
  * runtime pieces that hold them.
  *
- * Each invariant is a failure GTM shipped on 2026-10-10 and fixed by hand
+ * Each invariant is a failure GTM shipped and fixed by hand
  * (see {@link LAUNCH_INVARIANTS}). This subpath carries what runs in the
  * Worker: sized reads, the scheduled dispatcher that gives each job its own
  * invocation, the auth lookup cache that survives a D1 stall, and the 80%

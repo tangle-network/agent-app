@@ -16,7 +16,7 @@
  * is split out).
  *
  * WHAT IT IS NOT. It does not make cold starts fast — they already are.
- * Measured on the real platform (staging-sandbox, n=5, 2026-07-28): a box goes
+ * Measured on the real platform (staging-sandbox, n=5): a box goes
  * from nothing to terminal-ready in 2.34–3.19 s (median 2.73 s), and an
  * already-running box answers in 1.16–2.29 s (median 1.35 s). Prewarming buys
  * ~1.4 s. The reason it matters is not latency: it is that a product which
@@ -52,7 +52,7 @@
  * ── SINGLE-FLIGHT (measured, not assumed) ──────────────────────────────────
  * The sandbox platform does NOT dedupe by box name. Two concurrent
  * `POST /v1/sandboxes` with an identical name both returned HTTP 201 and left
- * two running boxes (verified against staging-sandbox, 2026-07-28). So two
+ * two running boxes (verified against staging-sandbox). So two
  * tabs, or two isolates, racing a warm genuinely leak a box — a prewarm that
  * races is worse than no prewarm. Hence two layers:
  *   1. an in-process map, which is free and catches same-isolate races

@@ -17,7 +17,7 @@ import type {
  * store is the same code in all of them: it is mechanism, not domain, and it
  * belongs beside the prewarmer.
  *
- * The measured stake (staging-sandbox, 2026-07-28): two concurrent
+ * The measured stake (staging-sandbox): two concurrent
  * `POST /v1/sandboxes` with an identical name BOTH returned HTTP 201 and left
  * two running boxes. The platform does not dedupe by name, so nothing below
  * this line is defensive programming — an unclaimed race genuinely doubles

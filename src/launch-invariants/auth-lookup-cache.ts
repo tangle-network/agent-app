@@ -5,7 +5,7 @@
  * Every lookup reads the store first, so a revoked or expired credential is
  * refused as soon as the store says so, and that answer drops its entry. When
  * the store errors or stalls past the deadline, a valid result verified less
- * than the TTL ago is served instead: on 2026-10-10 an overloaded D1 failed
+ * than the TTL ago is served instead: an overloaded D1 failed
  * API-key checks and session reads for requests whose credentials were valid
  * moments before (GTM #1488). The TTL counts from the last successful store
  * read and a served entry never renews it, so a credential revoked during an
