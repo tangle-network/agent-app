@@ -71,7 +71,7 @@ async function boundary(initial = pending()) {
   const state = {
     original: {
       id: originalId, name: originalKey, status: 'stopped', lifecycleState: 'suspended', suspendedAt: stop,
-      filesystemIncarnationId: 'original-incarnation', filesystemIncarnationReadiness: 'ready',
+      filesystemIncarnationId: 'original-incarnation', filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
       createdAt: '2026-10-10T09:00:00Z', metadata: { harness: 'opencode' },
     } as Record<string, unknown> | null,
     snapshots: { success: true, source: 'primary', snapshots: [{ snapshotId: 'final-snapshot', projectRef: originalId,
@@ -196,6 +196,7 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
     const peer = await boundary()
     try {
       delete peer.state.original!.filesystemIncarnationId
+      delete peer.state.original!.filesystemIncarnationProvenance
       delete peer.state.original!.filesystemIncarnationReadiness
       expect((await peer.reconcile()).status).toBe('recovered')
     } finally { await peer.close() }
