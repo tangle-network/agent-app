@@ -379,7 +379,7 @@ try {
       const thread = `route-${mode}`
       const clientTurnId = `client-${thread}`
       const response = await bounded(request('/turn', { threadId: thread, turnId: clientTurnId, content: 'Read my request.' }), 'route response')
-      assert.equal(response.status, 200, response.status === 200 ? undefined
+      assert.equal(response.status, 200, response.status === 200 ? 'Product turn should succeed'
         : `Product turn ${mode} refused (HTTP ${response.status}): ${await bounded(response.text(), 'failed product response body')}`)
       const wire = response.text()
       // Observe rejection at creation even while the scenario is waiting for
