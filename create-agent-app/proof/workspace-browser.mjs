@@ -263,7 +263,7 @@ try {
   const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true })
   await drawer.getByRole('link', { name: 'New thread', exact: true }).waitFor()
   await drawer.evaluate(async (element) => {
-    await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished))
+    await Promise.allSettled(element.getAnimations({ subtree: true }).map((animation) => animation.finished))
   })
   await page.screenshot({ path: join(evidence, 'workspace-mobile-navigation.png'), fullPage: true })
   await drawer.getByRole('link', { name: 'History', exact: true }).click()
