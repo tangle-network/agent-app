@@ -40,7 +40,7 @@
  */
 
 import { sql } from 'drizzle-orm'
-import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import type {
   AnySQLiteColumn,
   AnySQLiteTable,
@@ -169,6 +169,56 @@ export function createChatTables<
   ])
 
   return { threads, messages }
+}
+
+/**
+ * Build the `thread_artifact_link` table: artifacts a thread mentioned or
+ * touched beyond its own scope, inserted once on first reference. It powers a
+ * thread's "also discussed" chips and the reverse "which threads touched this
+ * file" lookup. `kinds` is the product's artifact-kind enum.
+ */
+export function createThreadArtifactLinksTable<const Kind extends string>(
+  threadTable: ChatParentTable,
+  kinds: readonly [Kind, ...Kind[]],
+) {
+  return sqliteTable('thread_artifact_link', {
+    id: hexId(),
+    threadId: text('thread_id').notNull().references(() => threadTable.id, { onDelete: 'cascade' }),
+    artifactKind: text('artifact_kind', { enum: kinds }).notNull(),
+    artifactKey: text('artifact_key').notNull(),
+    firstReferencedAt: integer('first_referenced_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+  }, (table) => [
+    index('idx_thread_artifact_link_thread').on(table.threadId),
+    uniqueIndex('idx_thread_artifact_link_unique').on(table.threadId, table.artifactKind, table.artifactKey),
+    index('idx_thread_artifact_link_reverse').on(table.artifactKind, table.artifactKey),
+  ])
+}
+
+/**
+ * Build the `agent_run` table: one row per agent run in a workspace, with the
+ * product's run telemetry as JSON `metadata`. `idx_agent_run_workspace` covers
+ * `(workspace_id, agent_id)`, or `workspace_id` alone with `indexAgentId: false`
+ * for products whose migration created it that way.
+ */
+export function createAgentRunsTable<Metadata = Record<string, unknown>>(
+  workspaceTable: ChatParentTable,
+  options: { indexAgentId?: boolean } = {},
+) {
+  return sqliteTable('agent_run', {
+    id: hexId(),
+    workspaceId: text('workspace_id').notNull().references(() => workspaceTable.id, { onDelete: 'cascade' }),
+    agentId: text('agent_id').notNull(),
+    status: text('status', { enum: ['running', 'completed', 'failed'] }).notNull().default('running'),
+    success: integer('success', { mode: 'boolean' }).notNull().default(true),
+    resultSummary: text('result_summary'),
+    metadata: text('metadata', { mode: 'json' }).$type<Metadata>(),
+    startedAt: integer('started_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    completedAt: integer('completed_at', { mode: 'timestamp' }),
+  }, (table) => [
+    options.indexAgentId === false
+      ? index('idx_agent_run_workspace').on(table.workspaceId)
+      : index('idx_agent_run_workspace').on(table.workspaceId, table.agentId),
+  ])
 }
 
 /**

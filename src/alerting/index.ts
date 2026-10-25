@@ -13,3 +13,9 @@ export {
   type SlackAlertOutcome,
   type SlackFailureReason,
 } from './slack'
+
+export {
+  createGithubIssueAlertChannel,
+  type GithubIssueAlertChannel,
+  type GithubIssueAlertOptions,
+} from './github'

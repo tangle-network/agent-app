@@ -21,3 +21,4 @@
 export * from './roles'
 export * from './invite'
 export * from './invitations'
+export * from './thread-access'

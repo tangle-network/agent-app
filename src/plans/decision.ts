@@ -113,3 +113,67 @@ const TERMINAL_PLAN_STATUSES: readonly ChatPlanStatus[] = ['approved', 'rejected
 export function isTerminalPlanStatus(status: ChatPlanStatus): boolean {
   return TERMINAL_PLAN_STATUSES.includes(status)
 }
+
+export type PlanLookupQuery =
+  | { ok: true; workspaceId: string; threadId: string; planId: string; revision: number | null }
+  | { ok: false; error: string }
+
+/**
+ * Validate a current-plan lookup (`?workspaceId&threadId[&planId&revision]`).
+ * `planId` is empty when the caller asks for the thread's current plan; a
+ * named plan needs its positive integer revision.
+ */
+export function parsePlanLookupQuery(url: URL): PlanLookupQuery {
+  const workspaceId = url.searchParams.get('workspaceId')?.trim() ?? ''
+  const threadId = url.searchParams.get('threadId')?.trim() ?? ''
+  const planId = url.searchParams.get('planId')?.trim() ?? ''
+  const revisionParam = url.searchParams.get('revision')
+  const revision = revisionParam ? Number(revisionParam) : null
+  if (!workspaceId) return { ok: false, error: 'Missing workspaceId' }
+  if (!threadId) return { ok: false, error: 'Missing threadId' }
+  if (planId && (!Number.isInteger(revision) || Number(revision) < 1)) {
+    return { ok: false, error: 'Invalid revision: expected a positive integer' }
+  }
+  return { ok: true, workspaceId, threadId, planId, revision }
+}
+
+/**
+ * The response for a sandbox refusal of a plan decision, or null when the
+ * refusal is not one the decision flow answers. A 409 means someone decided
+ * first: converge on the recorded outcome (`reconcile`), running `onApproved`
+ * when it was an approval. A plan the platform no longer knows can never be
+ * decided, so it is reported gone rather than retried.
+ */
+export async function planDecisionRefusalResponse(
+  error: { status?: number; code?: string; message: string },
+  options: {
+    reconcile: () => Promise<ChatPlan | null>
+    onApproved: () => Promise<void>
+  },
+): Promise<Response | null> {
+  const code = durablePlanConflictCode(error)
+  if (code) {
+    const plan = await options.reconcile()
+    if (!plan || plan.status === 'preparing' || plan.status === 'pending') {
+      return Response.json(
+        {
+          code: 'plan_reconciliation_pending',
+          error: 'The plan decision status is still being checked. Retry in a moment.',
+        },
+        { status: 503 },
+      )
+    }
+    if (plan.status === 'approved') await options.onApproved()
+    return Response.json({ code, plan }, { status: 409 })
+  }
+  if (error.code === 'PLAN_NOT_FOUND') {
+    return Response.json(
+      {
+        code: 'plan_missing',
+        error: 'This plan no longer exists on the agent platform. Ask the agent to submit a fresh plan.',
+      },
+      { status: 410 },
+    )
+  }
+  return null
+}
