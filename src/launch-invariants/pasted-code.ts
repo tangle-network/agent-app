@@ -2,7 +2,7 @@
  * Pasted code reaches the chat.
  *
  * People paste commands, SQL and markup into a chat with an agent that runs
- * code; that is the product. On 2026-10-11 a chat message containing
+ * code; that is the product. A chat message containing
  * `cat /etc/passwd` sent to gtm.tangle.tools got Cloudflare's 403 "Attention
  * Required" page instead of the app's own answer: a managed WAF rule matched
  * the text before the request reached the Worker. These samples are what a

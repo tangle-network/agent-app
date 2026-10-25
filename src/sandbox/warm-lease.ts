@@ -5,9 +5,9 @@
  * focus, an inbound line message and a learned weekly pattern share one
  * dedupe, one budget and one event stream.
  *
- * WHY A LEASE. Drew cancelled always-on keep-warm (2026-10-11): a warm box must
+ * WHY A LEASE. Always-on keep-warm is off: a warm box must
  * be earned by a signal and must cost a bounded amount when the signal was
- * wrong. Measured on Hospitality (2026-10-04..10-11, timestamps only): every
+ * wrong. Measured on Hospitality (timestamps only): every
  * human first message after 30 min of quiet landed on a suspended box, and the
  * cold first reply took 68 s on the web and 76 s on a line.
  *

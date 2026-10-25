@@ -1,7 +1,7 @@
 /**
  * Scheduled jobs that cannot take each other down.
  *
- * On 2026-10-10 at 21:00Z GTM's turn health ran out of memory while the hourly
+ * GTM's turn health ran out of memory while the hourly
  * sweeps shared one scheduled run, and none of the eight queued after it ran.
  * Here each scheduled invocation runs exactly one job. A cron can carry a
  * minute list (`0,1,2 * * * *`) with one job per minute, so a Worker keeps a

@@ -424,7 +424,7 @@ readonly SettlementScenario[]
 
 ### `SettlementScenario`
 
-`interface` — The failure shapes GTM shipped on 2026-10-10, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s.
+`interface` — The failure shapes GTM shipped, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s.
 
 ```ts
 interface SettlementScenario

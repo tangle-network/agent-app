@@ -68,7 +68,7 @@ this scoped optional UI change. No PR CI or hosted Codex review was awaited.
 ## Boundaries and handoff
 
 The [current OpenAI guide](https://developers.openai.com/plugins/deploy/connect-chatgpt)
-was checked on 2026-10-02: Security and login → Developer mode; ChatGPT Plugins →
+was checked: Security and login → Developer mode; ChatGPT Plugins →
 plus; name/description/public MCP URL; sign-in/tool review; new chat/tools menu.
 Account/workspace policy can restrict this flow. A verified registered URL is
 used exactly when supplied; the component never constructs an app ID/install

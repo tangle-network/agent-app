@@ -99,8 +99,7 @@ function memoizedSession(scope: string, ttlMs: number, request: Request,
   // Only a resolved session is shared across requests, never a read in flight.
   // Workers ties a read's I/O to the request that started it: when that request
   // is cancelled (a navigation), the read never settles, and every other request
-  // awaiting it hung until its client gave up (Hospitality production, 20.4-21.0 s,
-  // 2026-10-11).
+  // awaiting it hung until its client gave up (Hospitality production, 20.4-21.0 s).
   const generation = scopeGenerations.get(scope) ?? 0
   const session = read(request).then((value) => {
     const expiresAt = value ? new Date(value.session.expiresAt).getTime() : 0

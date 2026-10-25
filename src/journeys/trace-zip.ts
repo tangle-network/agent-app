@@ -4,7 +4,7 @@
  *
  * Why not `documents/zip`: that reader holds the archive in memory and refuses
  * zip64, and a recorded hour-long journey's trace is 6.6 GB with 49,117
- * entries (measured on 2026-10-11), so offsets pass 4 GiB. This reader keeps
+ * entries, so offsets pass 4 GiB. This reader keeps
  * one entry in memory at a time and reads the zip64 records; the writer emits
  * zip64 fields only when a size, an offset or the entry count needs them.
  */

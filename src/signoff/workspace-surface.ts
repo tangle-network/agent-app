@@ -3,7 +3,7 @@
  * floating panel (sandbox-ui `WorkspaceSurface`, or `WorkspaceLayout` with
  * `surface="inset"`), and that panel's first row is an inset `ShellHeader`.
  *
- * Drew's review of Creative asked for "ONE skeleton": the chat's rounded panel
+ * Every workspace page uses one skeleton: the chat's rounded panel
  * as the layout of Studio, Assets, Tasks, Activity, Vault, the terminal and
  * Integrations. A page with its own skeleton has no `[data-workspace-surface]`,
  * or a header that is not the shell row, and this check names it. It measures

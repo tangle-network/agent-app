@@ -36,7 +36,7 @@ export const DEFAULT_SANDBOX_EXCLUDE: readonly string[] = ['node_modules', '.sid
 
 /**
  * A resume the platform failed on its side (HTTP 5xx). The box stays suspended
- * and a later resume usually works: on 2026-10-12 one Hospitality export failed
+ * and a later resume usually works: one Hospitality export failed
  * on "Project sidecar could not be reprovisioned for resume" and the next export,
  * six minutes later, resumed the same box.
  */
