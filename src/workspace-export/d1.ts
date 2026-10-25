@@ -9,6 +9,7 @@
  * `unscoped`, so a reviewer sees exactly what the export leaves out.
  */
 
+import { DEFAULT_COMPUTER_STEP_RECEIPT_TABLE } from '../sandbox/computer-receipts'
 import type { ExportDataClass, ExportRow, ExportRowsSource } from './types'
 
 /** The slice of Cloudflare's `D1Database` used here. */
@@ -38,7 +39,7 @@ export interface D1WorkspaceTablesOptions {
    * the workspace id. Example: `{ message: 'thread_id IN (SELECT id FROM thread WHERE workspace_id = ?)' }`.
    */
   scoped?: Readonly<Record<string, string>>
-  /** Tables left out on purpose, with the reason recorded in coverage. */
+  /** Tables left out on purpose, with the reason recorded in coverage. agent-app's own operational tables are excluded by default. */
   exclude?: Readonly<Record<string, string>>
   /** Per-table columns to drop beyond the automatic credential policy. */
   omitColumns?: Readonly<Record<string, readonly string[]>>
@@ -48,6 +49,14 @@ export interface D1WorkspaceTablesOptions {
   classify?: (table: string) => ExportDataClass
   /** Rows per query. Default 500. */
   pageSize?: number
+}
+
+/**
+ * Tables agent-app itself creates for runtime bookkeeping, excluded with their reason so a product
+ * that adopts the shared lane does not have to classify them. A product's own `exclude` entry wins.
+ */
+const AGENT_APP_EXPORT_EXCLUSIONS: Readonly<Record<string, string>> = {
+  [DEFAULT_COMPUTER_STEP_RECEIPT_TABLE]: 'agent-app computer-step idempotency receipts (a step id, its vault listing and answer), operational only',
 }
 
 // Bookkeeping tables of SQLite, D1 and migration runners (drizzle, custom _migrations*).
@@ -66,6 +75,7 @@ export async function d1WorkspaceTables(
   options: D1WorkspaceTablesOptions,
 ): Promise<{ sources: ExportRowsSource[]; coverage: D1TableCoverage[] }> {
   const { db, workspaceId } = options
+  const exclude = { ...AGENT_APP_EXPORT_EXCLUSIONS, ...options.exclude }
   const pageSize = options.pageSize ?? 500
   const tables = (
     await db.prepare(`SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name`).all<{ name: string; sql: string | null }>()
@@ -75,7 +85,7 @@ export async function d1WorkspaceTables(
   const columnsOf = new Map(
     await Promise.all(
       tables
-        .filter((t) => options.exclude?.[t.name] === undefined && !options.scoped?.[t.name])
+        .filter((t) => exclude[t.name] === undefined && !options.scoped?.[t.name])
         .map(async (t) => [t.name, (await db.prepare(`PRAGMA table_info(${quote(t.name)})`).all<{ name: string }>()).results.map((c) => c.name)] as const),
     ),
   )
@@ -83,7 +93,7 @@ export async function d1WorkspaceTables(
   const sources: ExportRowsSource[] = []
   const coverage: D1TableCoverage[] = []
   for (const { name: table, sql } of tables) {
-    const excluded = options.exclude?.[table]
+    const excluded = exclude[table]
     if (excluded !== undefined) {
       coverage.push({ table, status: 'excluded', detail: excluded })
       continue
