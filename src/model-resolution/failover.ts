@@ -38,6 +38,10 @@ import {
 export const UPSTREAM_UNAVAILABLE_CODES: readonly string[] = [
   'provider_inference_unavailable',
   'provider_quota_exhausted',
+  // The Router has no enabled credential for this model's provider (`403 provider_disabled`, tangle-router
+  // `lib/native-credential-guard.ts`): gpt-6-luna with the OpenAI company credential off, Tax 2026-10-25 (#649).
+  // Model-scoped, so the next model in the chain may serve.
+  'provider_disabled',
   'upstream_unavailable',
   'insufficient_quota',
   'model_not_available',
@@ -165,10 +169,17 @@ export function readUpstreamUnavailableCode(signal: unknown): string | undefined
     readString(record, 'message') ??
     readString(record, 'error') ??
     (nestedRecord ? readString(nestedRecord, 'message') : undefined)
-  return message && /\(\s*provider_quota_exhausted\s*\)/i.test(message)
-    ? 'provider_quota_exhausted'
-    : undefined
+  return message?.match(/\b(provider_quota_exhausted|provider_disabled)\b/i)?.[1]?.toLowerCase()
 }
+
+/**
+ * A model-scoped refusal whose text is decisive even beside a 4xx status: the Router answers a disabled provider
+ * with 403, and the box agent relays it as `opencode execution failed: Tangle-funded openai inference is unavailable
+ * for "gpt-6-luna": …` (Tax 2026-10-25). Another model may still serve, so the chain moves on.
+ */
+const MODEL_SCOPED_REFUSALS: readonly string[] = [
+  'inference is unavailable for',
+]
 
 /**
  * True when `signal` — a thrown error OR a resolved result payload — indicates
@@ -207,6 +218,8 @@ export function isUpstreamUnavailable(signal: unknown): boolean {
   // `error code: 502` as a non-outage and handed the customer a Bad Gateway
   // instead of trying the next model — the exact failure the router cannot
   // rescue from inside its own origin.
+  const lowered = message.toLowerCase()
+  if (MODEL_SCOPED_REFUSALS.some((fragment) => lowered.includes(fragment))) return true
   const hinted = readHttpStatusHint(message)
   if (hinted !== undefined) {
     if (UPSTREAM_UNAVAILABLE_STATUSES.includes(hinted)) return true
@@ -218,7 +231,6 @@ export function isUpstreamUnavailable(signal: unknown): boolean {
     if (REQUEST_ERROR_STATUSES.includes(hinted)) return false
   }
 
-  const lowered = message.toLowerCase()
   return UPSTREAM_UNAVAILABLE_MESSAGES.some((fragment) => lowered.includes(fragment))
 }
 
