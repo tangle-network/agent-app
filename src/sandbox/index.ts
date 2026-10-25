@@ -67,6 +67,13 @@ export * from './prewarm'
 
 export * from './sandbox-run-tool'
 
+// One computer step for every app: the box key's model allow-list, one session value, stable step ids,
+// durable receipts and the copy of the step's files into the app's Vault.
+export * from './computer-step'
+export * from './computer-files'
+export * from './computer-receipts'
+export * from './router-models'
+
 export * from './sandbox-exec-tool'
 
 export * from './prewarm-claim-d1'

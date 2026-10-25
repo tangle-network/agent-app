@@ -4,7 +4,6 @@ import type { Harness } from '../harness/index'
 import { createD1PrewarmClaimStore } from '../sandbox/prewarm-claim-d1'
 import { runForegroundSandboxSingleFlight } from '../sandbox/foreground-single-flight'
 import { ensureWorkspaceSandbox, peekWorkspaceSandbox, streamSandboxPrompt } from '../sandbox/index'
-import { sandboxPromptRunner } from '../sandbox/sandbox-run-tool'
 import type { SandboxRuntimeConfig } from '../sandbox/configuration'
 import { sandboxPromptExecutionOptions, type StreamSandboxPromptOptions } from '../sandbox/prompt-options'
 import type { ChatTurnStoreBindings } from './route-storage'
@@ -12,6 +11,11 @@ import { turnCarriesFiles } from './hybrid-producer'
 import { normalizeChatPromptForSandbox } from './dispatch-parts'
 import { assertPolicy, type ModelPolicy } from '../policy-filters/index'
 import type { ChatTurnProduceArgs, ChatTurnHybridConfiguration } from './turn-route-contracts'
+import type { RouterTurnTool } from '../runtime/router-turn'
+import type { RouterTurnKey } from './router-producer'
+import type { ComputerVault } from '../sandbox/computer-files'
+import type { ComputerStepReceipts } from '../sandbox/computer-receipts'
+import type { Outcome } from '../sandbox/outcome'
 
 /** Worker bindings are explicit; no ambient deployment credentials replace product policy. */
 export interface ChatTurnEnvironment {
@@ -28,7 +32,7 @@ export interface ChatTurnEnvironment {
 }
 
 /** Domain data for the default lane, instead of constructing producers or admission hooks. */
-export interface ChatTurnDefaultBackend {
+export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown> {
   model?: string
   systemPrompt?: string
   harness?: Harness
@@ -38,6 +42,18 @@ export interface ChatTurnDefaultBackend {
   shell?: SandboxRuntimeConfig
   /** Explicitly keep every turn on the sandbox lane. */
   router?: false
+  /** Who pays for the Router model call: the turn's key, or a per-turn lease (`createDelegatedTurnKeys`) the
+   *  producer revokes when the turn settles. Default `TANGLE_API_KEY`. Started before the turn lock, like the call. */
+  funding?(args: ChatTurnProduceArgs<TContext, TResource>): RouterTurnKey | Promise<RouterTurnKey>
+  /** The product's in-process tools for the Router model; `sandbox_run` is added after them. */
+  tools?(args: ChatTurnProduceArgs<TContext, TResource>): RouterTurnTool[] | Promise<RouterTurnTool[]>
+  /** What the computer step does beyond running the task: copy its files into the product's Vault, keep durable
+   *  receipts, and run a model the box key allows (`readSandboxRouterModels` with the payer's key). */
+  computer?: {
+    files?(args: ChatTurnProduceArgs<TContext, TResource>): ComputerVault | undefined
+    receipts?: ComputerStepReceipts
+    allowedModels?(args: ChatTurnProduceArgs<TContext, TResource>, signal: AbortSignal): Promise<Outcome<readonly string[] | null>>
+  }
 }
 
 export function defaultChatShell(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend): SandboxRuntimeConfig {
@@ -56,7 +72,7 @@ export function defaultChatShell(projectId: string, env: ChatTurnEnvironment, co
   }
 }
 
-export function createDefaultChatBackend<TContext, TResource>(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend, bindings?: ChatTurnStoreBindings, modelPolicy?: ModelPolicy) {
+export function createDefaultChatBackend<TContext, TResource>(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend<TContext, TResource>, bindings?: ChatTurnStoreBindings, modelPolicy?: ModelPolicy) {
   const shell = defaultChatShell(projectId, env, config)
   const harness = config.harness ?? 'opencode'
   const acquire = (args: ChatTurnProduceArgs<TContext, TResource>): Promise<SandboxInstance> => {
@@ -71,30 +87,43 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     if (!model?.trim()) throw new Error('Default chat requires MODEL_NAME or produce.model')
     return model
   }
-  const promptOptions = (args: ChatTurnProduceArgs<TContext, TResource>): StreamSandboxPromptOptions => ({
-    model: modelFor(args), harness, sessionId: args.identity.sessionId, executionId: args.executionId,
-    turnId: args.executionId, trace: args.trace, signal: args.admissionSignal, detach: true,
+  const runOptions = (args: ChatTurnProduceArgs<TContext, TResource>) => ({
+    model: modelFor(args), harness, detach: true as const,
     systemPrompt: config.systemPrompt, interactions: config.interactions,
     ...sandboxPromptExecutionOptions(args.executionLimits, args.body.effort ?? config.effort),
   })
+  const promptOptions = (args: ChatTurnProduceArgs<TContext, TResource>): StreamSandboxPromptOptions => ({
+    ...runOptions(args), sessionId: args.identity.sessionId, executionId: args.executionId,
+    turnId: args.executionId, trace: args.trace, signal: args.admissionSignal,
+  })
   return {
-    when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false && Boolean(env.TANGLE_API_KEY?.trim()) && !turnCarriesFiles(args.prompt)
+    when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false
+      && (Boolean(config.funding) || Boolean(env.TANGLE_API_KEY?.trim())) && !turnCarriesFiles(args.prompt)
       // The Router can cap total output but not a separate reasoning subset.
       && !(args.executionLimits?.maxReasoningTokens),
     async router(args: ChatTurnProduceArgs<TContext, TResource>): Promise<ChatTurnHybridConfiguration> {
       const model = modelFor(args)
       if (modelPolicy) await assertPolicy({ kind: 'model', id: model, ...modelPolicy })
       const base = env.TANGLE_ROUTER_URL?.trim().replace(/\/+$/, '')
-      return { apiKey: env.TANGLE_API_KEY!.trim(), model,
+      const funding = config.funding
+      const tools = config.tools ? await config.tools(args) : undefined
+      const files = config.computer?.files?.(args)
+      const allowedModels = config.computer?.allowedModels
+      return { apiKey: funding ? Promise.resolve().then(() => funding(args)) : env.TANGLE_API_KEY!.trim(), model,
+        ...(tools?.length ? { tools } : {}),
         reasoningEffort: args.executionLimits?.maxReasoningTokens === 0 ? 'none' : args.body.effort ?? config.effort,
         ...(args.executionLimits?.maxOutputTokens !== undefined ? {
           maxTokens: args.executionLimits.maxOutputTokens, maxCompletionTokens: args.executionLimits.maxOutputTokens,
         } : {}),
         ...(base ? { baseUrl: base.endsWith('/v1') ? base : `${base}/v1` } : {}),
         systemPrompt: { profile: shell.profile({ systemPrompt: config.systemPrompt, harness }) },
-        box: { acquire: () => acquire(args), runTask: sandboxPromptRunner(shell, {
-          ...promptOptions(args), sessionId: `sandbox-run-${args.identity.sessionId}`,
-        }) },
+        box: { acquire: () => acquire(args), computer: {
+          shell, prompt: runOptions(args), parentExecutionId: args.executionId,
+          session: { id: `sandbox-run-${args.identity.sessionId}` },
+          ...(allowedModels ? { models: { preferred: [model], allowed: (signal: AbortSignal) => allowedModels(args, signal) } } : {}),
+          ...(files ? { files } : {}),
+          ...(config.computer?.receipts ? { receipts: config.computer.receipts } : {}),
+        } },
       }
     },
     sandbox: async (args: ChatTurnProduceArgs<TContext, TResource>) => {

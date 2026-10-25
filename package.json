@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.63.27",
+  "version": "0.63.30",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -45,7 +45,8 @@
     "tangle-agent": "bin/tangle-agent.mjs",
     "agent-app-invariants": "./dist/launch-invariants/cli.js",
     "agent-app-rollout-check": "./dist/rollout/cli.js",
-    "agent-app-journeys": "./dist/journeys/cli.js"
+    "agent-app-journeys": "./dist/journeys/cli.js",
+    "agent-app-conformance": "./dist/conformance/cli.js"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -303,6 +304,11 @@
       "types": "./dist/journeys/index.d.ts",
       "import": "./dist/journeys/index.js",
       "default": "./dist/journeys/index.js"
+    },
+    "./conformance": {
+      "types": "./dist/conformance/index.d.ts",
+      "import": "./dist/conformance/index.js",
+      "default": "./dist/conformance/index.js"
     },
     "./integrations": {
       "types": "./dist/integrations/index.d.ts",

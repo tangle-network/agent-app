@@ -21,7 +21,10 @@ export function routerRouteProducer<TContext, TResource>(value: ChatTurnRouterBa
     // They can only add a requirement; they never replace route admission.
     admitted: Promise.all([args.admitted, value.admitted]),
   }
-  return 'box' in value ? createHybridTurnProducer({ ...options, box: value.box }) : createRouterTurnProducer(options)
+  if (!('box' in value)) return createRouterTurnProducer(options)
+  // A repeated call of the same turn's tool call is the same computer step, whatever the trace.
+  const computer = value.box.computer && { parentExecutionId: args.executionId, ...value.box.computer }
+  return createHybridTurnProducer({ ...options, box: { ...value.box, ...(computer ? { computer } : {}) } })
 }
 
 export function sandboxRouteProducer<TContext, TResource>(value: ChatTurnSandboxBackend, args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouteProducer {

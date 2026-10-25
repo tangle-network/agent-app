@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-309 exports.
+310 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -2012,6 +2012,14 @@ type ResolveChatAttachmentsResult
 
 ```ts
 (priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+```
+
+### `RouterTurnKey`
+
+`type` — The turn's model key: a plain key, or a per-turn lease whose fetch and revocation belong to the producer.
+
+```ts
+type RouterTurnKey
 ```
 
 ### `RouterTurnProducerOptions`

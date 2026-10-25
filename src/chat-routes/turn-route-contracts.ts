@@ -602,7 +602,7 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    * when selects the Router backend (default true); false selects sandbox,
    * which always starts after admission. A function also starts after admission.
    * Reused user rows always finish admission before either backend starts. */
-  produce?: import('./default-backend').ChatTurnDefaultBackend | ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
+  produce?: import('./default-backend').ChatTurnDefaultBackend<TContext, TResource> | ((args: ChatTurnProduceArgs<TContext, TResource>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>) | {
     router(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnRouterBackend | Promise<ChatTurnRouterBackend>
     when?(args: ChatTurnProduceArgs<TContext, TResource>): boolean
     sandbox?(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnSandboxBackend | Promise<ChatTurnSandboxBackend>
