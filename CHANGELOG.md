@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.26
+
+- feat(sandbox): own computer-step safety for every app (#1320)
+
 ## 0.63.25
 
 - fix: settle canceled navigation animations in browser proof (#1329)
