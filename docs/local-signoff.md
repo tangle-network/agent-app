@@ -97,7 +97,11 @@ workspace survives its own run for inspection, but a later run may retire it.
 Cache paths are canonicalized before locking, so symlinked paths share leases.
 A detached install or check keeps its lease after its coordinator exits; unreadable
 process state and malformed lease markers preserve the cache conservatively.
-The CLI reports any bytes it could not reclaim because a run still holds them.
+Linked trees whose private or common Git metadata has disappeared keep their
+content for the owning lane; their allocated bytes remain in the cache total.
+The CLI reports these orphaned trees separately from reclaimed entries and
+reports any bytes still above the idle cap. Other Git retirement failures
+remain errors rather than being counted as reclaimed space.
 Four generations are kept, so moving between a branch and `main` finds both warm.
 
 Measured, install wall clock, same commit either side:

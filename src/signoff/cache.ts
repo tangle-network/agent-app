@@ -25,6 +25,10 @@ export interface CachePruneResult {
   readonly beforeBytes: number
   readonly afterBytes: number
   readonly removed: readonly string[]
+  /** Linked trees whose Git metadata disappeared. Content is retained for its owner. */
+  readonly orphaned: readonly string[]
+  /** Allocated bytes in those trees, counting shared inodes once. Included in afterBytes. */
+  readonly orphanedBytes: number
   /** Active or explicitly kept entries can temporarily hold the cache above its idle cap. */
   readonly overBudgetBytes: number
 }
@@ -41,6 +45,7 @@ interface CacheEntry {
   readonly kind: 'tree' | 'store'
   readonly mtimeMs: number
   readonly protected: boolean
+  orphaned: boolean
   readonly inodes: Set<string>
 }
 
@@ -226,33 +231,72 @@ function collectInodes(path: string, keys: Set<string>, sizes: Map<string, numbe
   for (const child of children) collectInodes(join(path, child), keys, sizes)
 }
 
+/** Only ENOENT proves vanished metadata; permission and I/O failures still refuse pruning. */
+function missingGitMetadata(tree: string): boolean {
+  try {
+    const marker = join(tree, '.git')
+    if (!lstatSync(marker).isFile()) return false
+    const pointer = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(readFileSync(marker, 'utf8'))
+    if (!pointer) return false
+    const gitDir = resolve(tree, pointer[1]!)
+    statSync(gitDir)
+    // A linked tree names its common repository relative to its private Git directory.
+    const common = readFileSync(join(gitDir, 'commondir'), 'utf8').trim()
+    if (!common) return false
+    statSync(resolve(gitDir, common))
+    return false
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw error
+  }
+}
+
 function entries(cacheDir: string, protectedSet: Set<string>, unknown: boolean): CacheEntry[] {
   const found: CacheEntry[] = []
   for (const [kind, child] of [['tree', 'trees'], ['store', 'stores']] as const) {
     const root = join(cacheDir, child)
-    if (!existsSync(root)) continue
+    if (!existsSync(root) || !lstatSync(root).isDirectory()) continue
     for (const entry of readdirSync(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue // never follow a symlink out of this cache
       const path = join(root, entry.name)
       const recognized = kind === 'store' ? /^[a-f0-9]{64}$/.test(entry.name)
         : existsSync(join(path, '.git'))
+      const orphaned = kind === 'tree' && recognized && missingGitMetadata(path)
       let mtimeMs: number
       try { mtimeMs = statSync(path).mtimeMs } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
         throw error
       }
-      found.push({ path, kind, mtimeMs,
-        protected: unknown || protectedSet.has(path) || !recognized, inodes: new Set() })
+      found.push({ path, kind, mtimeMs, orphaned,
+        protected: unknown || protectedSet.has(path) || !recognized || orphaned, inodes: new Set() })
     }
   }
   return found
 }
 
-function removeEntry(entry: CacheEntry): void {
-  if (entry.kind === 'store') { rmSync(entry.path, { recursive: true, force: true }); return }
+function removeEntry(entry: CacheEntry): boolean {
+  if (entry.kind === 'store') { rmSync(entry.path, { recursive: true, force: true }); return true }
+  try {
+    const current = lstatSync(entry.path)
+    if (!current.isDirectory() || !entry.inodes.has(`${current.dev}:${current.ino}`)) {
+      throw new Error(`signoff: cached worktree changed before retirement: ${entry.path}`)
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw error
+  }
   // Trees are registered Git worktrees, not ordinary scratch directories.
   const git = spawnSync('git', ['-C', entry.path, 'worktree', 'remove', '--force', entry.path], { encoding: 'utf8' })
-  if (git.status !== 0) throw new Error(`signoff: cannot retire cached worktree ${entry.path}: ${git.stderr.trim()}`)
+  if (git.error) throw new Error(`signoff: cannot start Git to retire cached worktree ${entry.path}`, { cause: git.error })
+  if (git.status === 0) return true
+  // Another owner may retire the source checkout between selection and Git's removal.
+  // Preserve any remaining content, but never turn an unrelated Git failure into success.
+  try { lstatSync(entry.path) } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
+    throw error
+  }
+  if (missingGitMetadata(entry.path)) { entry.orphaned = true; return false }
+  throw new Error(`signoff: cannot retire cached worktree ${entry.path}: ${git.stderr.trim()}`)
 }
 
 /** Bound idle trees and stores by age first, then allocated physical bytes. */
@@ -294,8 +338,25 @@ export async function pruneSignoffCache(cacheDir: string, options: CachePruneOpt
       if (bytes <= maxBytes) break
       if (!selected.includes(entry)) select(entry)
     }
-    for (const entry of selected) removeEntry(entry)
-    return { beforeBytes, afterBytes: bytes, removed: selected.map((entry) => entry.path),
+    const removed = selected.filter(removeEntry).map((entry) => entry.path)
+    // A metadata-loss race invalidates the predicted reclamation. Recount it;
+    // ordinary pruning keeps its single inode scan, including protected trees.
+    let retained = sizes
+    if (removed.length !== selected.length) {
+      retained = new Map()
+      for (const entry of candidates) {
+        entry.inodes.clear()
+        collectInodes(entry.path, entry.inodes, retained)
+      }
+      bytes = [...retained.values()].reduce((sum, size) => sum + size, 0)
+    }
+    const orphanedInodes = new Set<string>()
+    for (const entry of candidates) if (entry.orphaned) {
+      for (const key of entry.inodes) orphanedInodes.add(key)
+    }
+    return { beforeBytes, afterBytes: bytes, removed,
+      orphaned: candidates.filter((entry) => entry.orphaned).map((entry) => entry.path),
+      orphanedBytes: [...orphanedInodes].reduce((sum, key) => sum + (retained.get(key) ?? 0), 0),
       overBudgetBytes: Math.max(0, bytes - maxBytes) }
   })
 }
