@@ -32,7 +32,7 @@ import {
   isAssignableWorkspaceRole,
   organizationRoleGrantsWorkspaceOwner,
 } from './roles'
-import { generateInviteToken } from './invite'
+import { generateInviteToken, validateInviteToken } from './invite'
 import type { TeamDatabase, WorkspaceAccessReader } from './drizzle/access'
 import type { TeamParentTable, TeamTables } from './drizzle/schema'
 
@@ -60,6 +60,8 @@ export interface UserLookupTable {
 export interface WorkspaceLookupTable {
   id: any
   organizationId: any
+  /** Display name, read by `getInviteDetails` when present. */
+  name?: any
 }
 
 /**
@@ -126,8 +128,18 @@ export interface MemberListEntry {
   inherited: boolean
 }
 
+/** A pending-member invite as the invite page shows it. */
+export interface InviteDetails {
+  status: 'pending' | 'invalid' | 'already-accepted'
+  workspaceName: string | null
+  inviterName: string | null
+  role: WorkspaceRole | null
+  inviteEmail: string | null
+  currentUserEmail: string | null
+}
+
 /**
- * Build the members API bound to one product's db/tables/access. Returns five
+ * Build the members API bound to one product's db/tables/access. Returns six
  * handlers; an app maps its route methods onto them (GET→list, POST→invite,
  * PATCH→updateRole, DELETE→remove; accept on its own route).
  */
@@ -277,6 +289,45 @@ export function createMembersApi(opts: MembersApiOptions) {
     return Response.json({ success: true })
   }
 
+  /**
+   * What the `/invite/:token` page shows before acceptance: the invite's
+   * workspace, inviter, role and addressee, judged against the signed-in
+   * email. Shaped for `InviteAcceptPage`'s `details`.
+   */
+  async function getInviteDetails(input: { token: string; currentUserEmail: string | null }): Promise<InviteDetails> {
+    const { currentUserEmail } = input
+    const none = { workspaceName: null, inviterName: null, role: null, inviteEmail: null, currentUserEmail }
+    const [invite] = await db
+      .select()
+      .from(workspaceMembers)
+      .where(eq(workspaceMembers.inviteToken, input.token))
+      .limit(1)
+    if (!invite) return { status: 'invalid', ...none }
+
+    const validation = validateInviteToken(invite, { acceptingEmail: currentUserEmail })
+    if (!validation.ok && validation.reason === 'already-accepted') return { status: 'already-accepted', ...none }
+
+    const [workspace] = workspaces.name === undefined
+      ? []
+      : await db
+        .select({ name: workspaces.name })
+        .from(workspaces)
+        .where(eq(workspaces.id, invite.workspaceId))
+        .limit(1)
+    const [inviter] = invite.invitedBy
+      ? await db.select({ name: users.name }).from(users).where(eq(users.id, invite.invitedBy)).limit(1)
+      : []
+
+    return {
+      status: 'pending',
+      workspaceName: (workspace as { name?: string | null } | undefined)?.name ?? null,
+      inviterName: (inviter as { name?: string | null } | undefined)?.name ?? null,
+      role: invite.role as WorkspaceRole,
+      inviteEmail: invite.inviteEmail ?? null,
+      currentUserEmail,
+    }
+  }
+
   async function acceptInvite(input: { token?: string; actor: MembersApiActor }): Promise<Response> {
     if (!input.token || typeof input.token !== 'string') {
       return Response.json({ error: 'Missing invite token' }, { status: 400 })
@@ -356,7 +407,7 @@ export function createMembersApi(opts: MembersApiOptions) {
 
   const { listMembers, getUserByEmail, getOrganizationMember, findExistingProjectInvite, hasPendingOrgInvite } = createMemberQueries(db, users, organizationMembers, workspaceMembers, workspaces, access)
 
-  return { listMembers, inviteMember, updateMemberRole, removeMember, acceptInvite }
+  return { listMembers, inviteMember, updateMemberRole, removeMember, getInviteDetails, acceptInvite }
 }
 
 function createMemberQueries(

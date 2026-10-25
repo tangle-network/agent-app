@@ -68,6 +68,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
 - For scheduled jobs, report routes, auth lookups, turn settlement or platform-limit alarms, read [launch-invariants.md](docs/launch-invariants.md); every agent app proves them with `agent-app-invariants`.
   For where a turn's lifecycle is decided, read [turn-lifecycle-owner.md](docs/turn-lifecycle-owner.md).
 - To prove an app's product flows as a person uses them (recorded journeys, scored chat turns, a reviewer's INDEX.md), read [journeys.md](docs/journeys.md); every agent app records them with `agent-app-journeys`.
+- To check that a deployed app still signs in, serves its revision and answers a plain and a computer turn, read [conformance.md](docs/conformance.md); every agent app is checked every few hours with `agent-app-conformance`.
 - For billing verification, read [spend-verification.md](docs/spend-verification.md).
   Preserve declared ownership, observation coverage, and uncertainty; missing observations cannot certify a clean bill.
 - For dependency provenance or peer checks, read [dependency-source-gate.md](docs/dependency-source-gate.md).
