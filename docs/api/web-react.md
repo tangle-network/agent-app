@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-517 exports.
+524 exports.
 
 ### `acceptRejectionReason`
 
@@ -1236,6 +1236,22 @@ interface DurablePlanDecisionInput
 
 ```ts
 interface DurablePlanDecisionResult
+```
+
+### `DurablePlanFlowCard`
+
+`function` — The durable plan card as a product mounts it: `DurablePlanCard` on `useDurablePlanFlow` with automatic restore, so a plan decided in another tab (or before a reconnect) still attaches its follow-up.
+
+```ts
+({ plan, client, canWrite, onUpdated, attachFollowUp, renderMarkdown, className, }: DurablePlanFlowCardProps) => Element
+```
+
+### `DurablePlanFlowCardProps`
+
+`interface` — Props for a plan card wired to the durable decision flow.
+
+```ts
+interface DurablePlanFlowCardProps
 ```
 
 ### `DurablePlanFollowUpReceipt`
@@ -3854,12 +3870,52 @@ interface UseFileMentionsResult
 interface UseInfiniteScrollOptions
 ```
 
+### `useModels`
+
+`function` — Load the model catalog (`{ data, catalog }`) from the product's models route.
+
+```ts
+(options?: UseModelsOptions) => UseModelsResult
+```
+
+### `UseModelsOptions`
+
+`interface` — Options for the model-catalog hook.
+
+```ts
+interface UseModelsOptions
+```
+
+### `UseModelsResult`
+
+`interface` — The model catalog for a product's pickers.
+
+```ts
+interface UseModelsResult
+```
+
 ### `usePending`
 
 `function` — Guard an async action against double-submit.
 
 ```ts
 () => { pending: boolean; run: (action: () => void | Promise<void>) => void; }
+```
+
+### `usePlanModeSelection`
+
+`function` — Per-THREAD plan-mode toggle for `ComposerModeControls`.
+
+```ts
+(threadId: string | undefined, initialPlanMode: boolean, options?: UsePlanModeSelectionOptions) => Required<ComposerPla…
+```
+
+### `UsePlanModeSelectionOptions`
+
+`interface` — Options for the per-thread plan-mode toggle.
+
+```ts
+interface UsePlanModeSelectionOptions
 ```
 
 ### `usePopover`

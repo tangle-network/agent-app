@@ -4,7 +4,7 @@
 
 Source: `src/web-react/terminal.ts`
 
-6 exports.
+8 exports.
 
 ### `SandboxTerminalConnection`
 
@@ -20,6 +20,22 @@ interface SandboxTerminalConnection
 
 ```ts
 interface SandboxTerminalConnectionResponse
+```
+
+### `SandboxTerminalPanel`
+
+`function` — Sandbox terminal panel.
+
+```ts
+({ workspaceId, isActive, connectionKey, autoConnect, sessionTitle, description, heading: Heading, surfaceTitle, }: San…
+```
+
+### `SandboxTerminalPanelProps`
+
+`interface` — Props for the shared sandbox terminal panel.
+
+```ts
+interface SandboxTerminalPanelProps
 ```
 
 ### `tabTerminalConnectionId`

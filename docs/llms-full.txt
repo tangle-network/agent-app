@@ -31295,6 +31295,22 @@ interface InviteAcceptPageProps
 type InviteAcceptStatus
 ```
 
+### `InviteTokenPage`
+
+`function`
+
+```ts
+({ details, token, navigate, acceptUrl, signInPath, signUpPath, signOutUrl, appPath, }: InviteTokenPageProps) => Element
+```
+
+### `InviteTokenPageProps`
+
+`interface` — Props for the invite-token route page.
+
+```ts
+interface InviteTokenPageProps
+```
+
 ### `MembersPanel`
 
 `function`
@@ -31668,6 +31684,14 @@ Source: `src/teams/members-api.ts`
 
 ```ts
 interface EnforceSeatSeam
+```
+
+### `InviteDetails`
+
+`interface` — A pending-member invite as the invite page shows it.
+
+```ts
+interface InviteDetails
 ```
 
 ### `MemberListEntry`
@@ -34948,6 +34972,30 @@ interface ApiKeyFetchOptions
 (url: string, what?: string) => void
 ```
 
+### `buildHttpChatStreamError`
+
+`function` — Read status / code / Retry-After / checkout and connect routes / recommended actions from a non-ok chat response body, which may nest them under `error` or carry them top-level.
+
+```ts
+(status: number, retryAfterSeconds: number | undefined, body: unknown, fallbackMessage: string, options?: ChatStreamErr…
+```
+
+### `ChatStreamError`
+
+`interface` — A chat failure the UI can render as a structured error.
+
+```ts
+interface ChatStreamError
+```
+
+### `ChatStreamErrorOptions`
+
+`interface` — Product vocabulary for chat failures.
+
+```ts
+interface ChatStreamErrorOptions
+```
+
 ### `checkFreeRouteLimit`
 
 `function` — Decide whether one authenticated, unmetered call may run.
@@ -35172,12 +35220,44 @@ type JsonObject
 interface KvLike
 ```
 
+### `parseChatHttpErrorResponse`
+
+`function` — Turn a non-ok chat submit response into a structured error.
+
+```ts
+(res: Response, options?: ChatStreamErrorOptions) => Promise<ChatStreamError>
+```
+
+### `parseChatStreamError`
+
+`function` — Parse the data of a stream `error` event.
+
+```ts
+(data: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError
+```
+
+### `parseChatStreamErrorEvent`
+
+`function` — Normalize the error-event shapes a stream can carry: `{type:'error', data:{message}}`, `{type:'error',data:{error:'...'}}` and `{type:'error',error:'...'}`, so a failed turn surfaces the real failure…
+
+```ts
+(event: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError
+```
+
 ### `parseJsonObjectBody`
 
 `function` — Parse + object-narrow a Request or Response body.
 
 ```ts
 (request: Pick<Request, "json" | "body" | "headers">, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObj…
+```
+
+### `parseRetryAfterSeconds`
+
+`function` — Parse a Retry-After header in either delta-seconds or HTTP-date form.
+
+```ts
+(value: string | null) => number | undefined
 ```
 
 ### `RateLimitBudget`
@@ -35327,7 +35407,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -36559,6 +36639,22 @@ interface DurablePlanDecisionInput
 
 ```ts
 interface DurablePlanDecisionResult
+```
+
+### `DurablePlanFlowCard`
+
+`function` — The durable plan card as a product mounts it: `DurablePlanCard` on `useDurablePlanFlow` with automatic restore, so a plan decided in another tab (or before a reconnect) still attaches its follow-up.
+
+```ts
+({ plan, client, canWrite, onUpdated, attachFollowUp, renderMarkdown, className, }: DurablePlanFlowCardProps) => Element
+```
+
+### `DurablePlanFlowCardProps`
+
+`interface` — Props for a plan card wired to the durable decision flow.
+
+```ts
+interface DurablePlanFlowCardProps
 ```
 
 ### `DurablePlanFollowUpReceipt`
@@ -39177,12 +39273,52 @@ interface UseFileMentionsResult
 interface UseInfiniteScrollOptions
 ```
 
+### `useModels`
+
+`function` — Load the model catalog (`{ data, catalog }`) from the product's models route.
+
+```ts
+(options?: UseModelsOptions) => UseModelsResult
+```
+
+### `UseModelsOptions`
+
+`interface` — Options for the model-catalog hook.
+
+```ts
+interface UseModelsOptions
+```
+
+### `UseModelsResult`
+
+`interface` — The model catalog for a product's pickers.
+
+```ts
+interface UseModelsResult
+```
+
 ### `usePending`
 
 `function` — Guard an async action against double-submit.
 
 ```ts
 () => { pending: boolean; run: (action: () => void | Promise<void>) => void; }
+```
+
+### `usePlanModeSelection`
+
+`function` — Per-THREAD plan-mode toggle for `ComposerModeControls`.
+
+```ts
+(threadId: string | undefined, initialPlanMode: boolean, options?: UsePlanModeSelectionOptions) => Required<ComposerPla…
+```
+
+### `UsePlanModeSelectionOptions`
+
+`interface` — Options for the per-thread plan-mode toggle.
+
+```ts
+interface UsePlanModeSelectionOptions
 ```
 
 ### `usePopover`
@@ -39468,7 +39604,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -39822,7 +39958,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/document`
 
-Source: `src/web-react/document.tsx` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `AppDocument`
 
@@ -39883,7 +40019,7 @@ interface AppDocumentProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `SandboxTerminalConnection`
 
@@ -39899,6 +40035,22 @@ interface SandboxTerminalConnection
 
 ```ts
 interface SandboxTerminalConnectionResponse
+```
+
+### `SandboxTerminalPanel`
+
+`function` — Sandbox terminal panel.
+
+```ts
+({ workspaceId, isActive, connectionKey, autoConnect, sessionTitle, description, heading: Heading, surfaceTitle, }: San…
+```
+
+### `SandboxTerminalPanelProps`
+
+`interface` — Props for the shared sandbox terminal panel.
+
+```ts
+interface SandboxTerminalPanelProps
 ```
 
 ### `tabTerminalConnectionId`

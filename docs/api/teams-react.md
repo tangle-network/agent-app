@@ -4,7 +4,7 @@
 
 Source: `src/teams-react/index.ts`
 
-10 exports.
+12 exports.
 
 ### `InvitationsPanel`
 
@@ -60,6 +60,22 @@ interface InviteAcceptPageProps
 
 ```ts
 type InviteAcceptStatus
+```
+
+### `InviteTokenPage`
+
+`function`
+
+```ts
+({ details, token, navigate, acceptUrl, signInPath, signUpPath, signOutUrl, appPath, }: InviteTokenPageProps) => Element
+```
+
+### `InviteTokenPageProps`
+
+`interface` — Props for the invite-token route page.
+
+```ts
+interface InviteTokenPageProps
 ```
 
 ### `MembersPanel`

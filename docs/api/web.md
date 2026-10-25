@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-52 exports.
+59 exports.
 
 ### `acquisitionFromRequest`
 
@@ -44,6 +44,30 @@ interface ApiKeyFetchOptions
 
 ```ts
 (url: string, what?: string) => void
+```
+
+### `buildHttpChatStreamError`
+
+`function` — Read status / code / Retry-After / checkout and connect routes / recommended actions from a non-ok chat response body, which may nest them under `error` or carry them top-level.
+
+```ts
+(status: number, retryAfterSeconds: number | undefined, body: unknown, fallbackMessage: string, options?: ChatStreamErr…
+```
+
+### `ChatStreamError`
+
+`interface` — A chat failure the UI can render as a structured error.
+
+```ts
+interface ChatStreamError
+```
+
+### `ChatStreamErrorOptions`
+
+`interface` — Product vocabulary for chat failures.
+
+```ts
+interface ChatStreamErrorOptions
 ```
 
 ### `checkFreeRouteLimit`
@@ -270,12 +294,44 @@ type JsonObject
 interface KvLike
 ```
 
+### `parseChatHttpErrorResponse`
+
+`function` — Turn a non-ok chat submit response into a structured error.
+
+```ts
+(res: Response, options?: ChatStreamErrorOptions) => Promise<ChatStreamError>
+```
+
+### `parseChatStreamError`
+
+`function` — Parse the data of a stream `error` event.
+
+```ts
+(data: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError
+```
+
+### `parseChatStreamErrorEvent`
+
+`function` — Normalize the error-event shapes a stream can carry: `{type:'error', data:{message}}`, `{type:'error',data:{error:'...'}}` and `{type:'error',error:'...'}`, so a failed turn surfaces the real failure…
+
+```ts
+(event: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError
+```
+
 ### `parseJsonObjectBody`
 
 `function` — Parse + object-narrow a Request or Response body.
 
 ```ts
 (request: Pick<Request, "json" | "body" | "headers">, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObj…
+```
+
+### `parseRetryAfterSeconds`
+
+`function` — Parse a Retry-After header in either delta-seconds or HTTP-date form.
+
+```ts
+(value: string | null) => number | undefined
 ```
 
 ### `RateLimitBudget`
