@@ -89,3 +89,9 @@ Before removing an app's old workflow, prove the adapter through its existing ad
 6. Private checkout, environment secrets, explicit credential maps, runner-group admission, diagnostics retention and existing dry-run behavior are accounted for.
 
 A static YAML check does not prove any of these runtime outcomes. Deploy, served and suite proof remain separate from source review.
+
+## Component catalog placement
+
+[component-catalog.yml](../.github/workflows/component-catalog.yml) retains the catalog's main-branch input path filter and manual dispatch. Storybook configuration, package source, generated templates, build/toolchain configuration and the two catalog workflow files trigger publication; unrelated documentation and test-only pushes do not.
+
+The credential-free build, full post-release signoff and suite-failure reporter in [deploy-catalog.yml](../.github/workflows/deploy-catalog.yml) run on GitHub-hosted Ubuntu for this public repository. Build and suites retain content reads; only the reporter receives issue writes. The caller's pinned deployment workflow keeps the existing production runner, Cloudflare credential boundary and immutable artifact verification. Build, immutable Pages deployment and post-release suites remain ordered; a red later suite reports an issue without blocking the completed deployment.
