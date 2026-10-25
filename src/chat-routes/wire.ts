@@ -100,6 +100,8 @@ export interface ProducerNoticeEvent {
   text: string
   /** Typed reason, on an `error` notice. */
   code?: string
+  /** The failure's redacted cause chain, persisted with the notice and not rendered. */
+  detail?: string
 }
 
 /** Represent an error event emitted by a producer containing message, code, and optional details */

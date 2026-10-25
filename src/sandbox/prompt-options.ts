@@ -43,6 +43,11 @@ export interface StreamSandboxPromptOptions {
   expectedPublicProfileRequestDigest?: `sha256:${string}`
   /** SDK-issued receipt for the prepared secret native profile revision. */
   expectedSecretProfileReceipt?: `hmac-sha256:${string}`
+  /** The send witness: called synchronously just before this execution is handed to the SDK, once per send
+   * attempt and never for a `lastEventId` resume. It is the same in a shared and a secret-isolated session, so
+   * never pass it only for one mode. A failure before its first call was never sent and holds no run on the box;
+   * after it, the run may exist and is reconciled, not retried. */
+  onDispatch?: () => void
   signal?: AbortSignal
   timeoutMs?: number
   /**

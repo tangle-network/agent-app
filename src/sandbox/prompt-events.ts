@@ -72,6 +72,8 @@ export async function* detachedSandboxPromptEvents(
   const turnId = options.turnId?.trim() || executionId
   // A cursor is already proof that this execution was admitted. Re-dispatching
   // before replay would turn a failed terminal session into a new prompt.
+  // Only a new send is witnessed, and nothing awaited separates the witness from it.
+  if (!lastEventId) options.onDispatch?.()
   const admission = lastEventId
     ? null
     : await box.dispatchPrompt(prompt, {

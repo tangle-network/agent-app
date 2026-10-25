@@ -53,12 +53,22 @@ export function buildAppToolMcpServers(
   return entries
 }
 
-/** Define the specification for a sandbox tool including its name, content, and optional executability */
-export interface SandboxToolSpec {
-  name: string
-  content: string
-  executable?: boolean
-}
+/**
+ * One tool name on a sandbox PATH: a program mounted from its own bytes, or a second name for a program another
+ * entry in the same call mounts. An alias mounts a small shell shim instead of a copy, so a program that answers to
+ * several names (one that dispatches on its invoked name) is sent once.
+ */
+export type SandboxToolSpec =
+  | { name: string; content: string; executable?: boolean; aliasOf?: undefined }
+  | {
+      name: string
+      /** The entry in this call whose program this name runs. The shim runs it through a link that carries this
+       *  name, so the program reads it as `basename "$0"` (`os.path.basename(sys.argv[0])` in Python) and finds
+       *  its own file and siblings through `realpath`. */
+      aliasOf: string
+      content?: undefined
+      executable?: undefined
+    }
 
 /** Define options for resolving sandbox tool paths including appName, baseDir, and binDir */
 export interface SandboxToolPathOptions {
@@ -115,17 +125,62 @@ export function sandboxToolPath(options: SandboxToolPathOptions & { toolName: st
   return `${sandboxToolBinDir(options)}/${toolName}`
 }
 
-/** Build file mounts for sandbox tools based on provided options and tool configurations */
+/** One program's bytes under two names are always avoidable with `aliasOf`; below this size a copy is a shim. */
+const DUPLICATE_PROGRAM_MIN_BYTES = 4_096
+
+/** The shim an alias mounts: a link named for the alias, then `exec` through it, so the program sees that name. */
+function sandboxToolAliasShim(alias: string, program: string): string {
+  return [
+    '#!/bin/sh',
+    `# ${alias} runs ${program} under its own name. Mounted by buildSandboxToolFileMounts (aliasOf).`,
+    `program=${shellSingleQuote(program)}`,
+    `link="\${TMPDIR:-/tmp}/sandbox-tool-aliases\${program}.d/${alias}"`,
+    '[ -L "$link" ] || { mkdir -p "${link%/*}" && { ln -s "$program" "$link" 2>/dev/null || [ -L "$link" ]; }; } || {',
+    `  echo "${alias}: cannot create its alias link under \${TMPDIR:-/tmp}" >&2`,
+    '  exit 126',
+    '}',
+    'exec "$link" "$@"',
+    '',
+  ].join('\n')
+}
+
+/**
+ * Build file mounts for sandbox tools based on provided options and tool configurations.
+ *
+ * An `aliasOf` entry mounts a shim that runs the named entry's program under its own name, so the program's bytes
+ * are mounted once. Two entries carrying the same program of 4 KB or more are refused: a secret-isolated session
+ * sends every mount inline in one request capped at 1 MiB, and GTM's five copies of one 342 KB program made
+ * every computer step fail there (2026-10-24).
+ */
 export function buildSandboxToolFileMounts(
   options: BuildSandboxToolFileMountsOptions,
 ): AgentProfileFileMount[] {
+  const programs = new Map<string, string>()
+  const byContent = new Map<string, string>()
+  for (const tool of options.tools) {
+    if (tool.aliasOf !== undefined) continue
+    const name = normalizeSandboxToolSegment(tool.name, 'sandbox tool name')
+    if (tool.executable !== false) programs.set(name, sandboxToolPath({ ...options, toolName: name }))
+    const first = byContent.get(tool.content)
+    if (first !== undefined && new TextEncoder().encode(tool.content).byteLength >= DUPLICATE_PROGRAM_MIN_BYTES) {
+      throw new Error(
+        `sandbox tools ${first} and ${name} mount the same program; mount it once and declare ${name} as ` +
+          `{ name: '${name}', aliasOf: '${first}' }.`,
+      )
+    }
+    if (first === undefined) byContent.set(tool.content, name)
+  }
   return options.tools.map((tool) => {
     const name = normalizeSandboxToolSegment(tool.name, 'sandbox tool name')
-    return {
-      path: sandboxToolPath({ ...options, toolName: name }),
-      resource: { kind: 'inline' as const, name, content: tool.content },
-      executable: tool.executable ?? true,
+    const path = sandboxToolPath({ ...options, toolName: name })
+    if (tool.aliasOf === undefined) {
+      return { path, resource: { kind: 'inline' as const, name, content: tool.content }, executable: tool.executable ?? true }
     }
+    const program = programs.get(normalizeSandboxToolSegment(tool.aliasOf, 'sandbox tool aliasOf'))
+    if (!program) {
+      throw new Error(`sandbox tool ${name} is an alias of ${tool.aliasOf}, which is not an executable program in this call.`)
+    }
+    return { path, resource: { kind: 'inline' as const, name, content: sandboxToolAliasShim(name, program) }, executable: true }
   })
 }
 

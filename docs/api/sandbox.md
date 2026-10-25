@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-286 exports.
+287 exports.
 
 ### `adaptSandboxStream`
 
@@ -120,7 +120,7 @@ interface BuildAppToolMcpServersOptions
 
 ### `buildSandboxToolFileMounts`
 
-`function` — Build file mounts for sandbox tools based on provided options and tool configurations
+`function` — Build file mounts for sandbox tools based on provided options and tool configurations.
 
 ```ts
 (options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]
@@ -1422,6 +1422,14 @@ class SandboxRunError
 type SandboxRunFailureCode
 ```
 
+### `sandboxRunFailureDetail`
+
+`function` — The redacted cause chain of a computer-step failure, one line, for a durable record: each cause's name, code, status and message, outermost first, credentials and signed URLs removed.
+
+```ts
+(error: unknown) => string
+```
+
 ### `SandboxRuntimeAuthRefreshError`
 
 `class` — Represent an error thrown when sandbox runtime authentication refresh fails for a specific stage and name
@@ -1544,10 +1552,10 @@ interface SandboxToolPathOptions
 
 ### `SandboxToolSpec`
 
-`interface` — Define the specification for a sandbox tool including its name, content, and optional executability
+`type` — One tool name on a sandbox PATH: a program mounted from its own bytes, or a second name for a program another entry in the same call mounts.
 
 ```ts
-interface SandboxToolSpec
+type SandboxToolSpec
 ```
 
 ### `sandboxTransientBackoffMs`
