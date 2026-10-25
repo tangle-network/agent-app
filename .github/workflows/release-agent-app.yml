@@ -90,6 +90,10 @@ jobs:
           echo "validated=true" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         if: ${{ hashFiles('pnpm-lock.yaml') != '' }}
+        # Keep the action self-install separate from the caller's canonical project store.
+        env:
+          pnpm_config_store_dir: ${{ runner.temp }}/pnpm-bootstrap-store
+          PNPM_CONFIG_STORE_DIR: ${{ runner.temp }}/pnpm-bootstrap-store
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: ${{ inputs.node-version-file }}
@@ -277,6 +281,10 @@ jobs:
           persist-credentials: false
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         if: ${{ hashFiles('pnpm-lock.yaml') != '' }}
+        # Keep the action self-install separate from the caller's canonical project store.
+        env:
+          pnpm_config_store_dir: ${{ runner.temp }}/pnpm-bootstrap-store
+          PNPM_CONFIG_STORE_DIR: ${{ runner.temp }}/pnpm-bootstrap-store
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version-file: ${{ inputs.node-version-file }}
