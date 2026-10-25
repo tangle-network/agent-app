@@ -163,7 +163,7 @@ describe('signoff cache retention', () => {
     const content = Buffer.alloc(32 * 1024, 19)
     writeFileSync(join(tree, 'only-copy'), content)
     const privateGit = readFileSync(join(tree, '.git'), 'utf8').trim().slice('gitdir: '.length)
-    renameSync(missing === 'private' ? privateGit : join(repo, '.git'), join(root(), 'retained-metadata'))
+    renameSync(missing === 'private' ? privateGit : join(privateGit, 'commondir'), join(root(), 'retained-metadata'))
     const idleStore = store(cacheDir, 'e'.repeat(64), 32 * 1024)
 
     const result = await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })
