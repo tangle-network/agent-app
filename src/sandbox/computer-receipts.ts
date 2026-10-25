@@ -61,10 +61,11 @@ export function createD1ComputerStepReceipts(db: ComputerStepReceiptD1Like, opti
   const table = options.table ?? DEFAULT_COMPUTER_STEP_RECEIPT_TABLE
   if (!SAFE_IDENTIFIER.test(table)) throw new Error(`Invalid computer step receipt table name: ${JSON.stringify(table)}`)
   const now = options.now ?? (() => Date.now())
-  const readSql = `SELECT receipt FROM ${table} WHERE step_id = ?1`
-  const writeSql = `INSERT INTO ${table} (step_id, state, receipt, updated_at) VALUES (?1, ?2, ?3, ?4)
-ON CONFLICT(step_id) DO UPDATE SET state = ?2, receipt = ?3, updated_at = ?4 WHERE ${table}.state <> 'settled'`
-  const pruneSql = `DELETE FROM ${table} WHERE updated_at < ?1`
+  const readSql = `SELECT receipt FROM ${table} WHERE step_id = ?`
+  const writeSql = `INSERT INTO ${table} (step_id, state, receipt, updated_at) VALUES (?, ?, ?, ?)
+ON CONFLICT(step_id) DO UPDATE SET state = excluded.state, receipt = excluded.receipt, updated_at = excluded.updated_at
+WHERE ${table}.state <> 'settled'`
+  const pruneSql = `DELETE FROM ${table} WHERE updated_at < ?`
   let writes = 0
   return {
     async read(stepId) {

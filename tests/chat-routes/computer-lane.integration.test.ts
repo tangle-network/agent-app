@@ -287,7 +287,7 @@ it('runs the default backend on the product funding lease and tools', async () =
   try {
     const routes = createChatTurnRoutes({
       projectId: 'computer-lane', env: { TANGLE_ROUTER_URL: peer.origin }, store, turnStore: createD1TurnEventStore(events.d1),
-      turnTrace: false, log: () => {},
+      turnTrace: false, turnLock: false, log: () => {},
       authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
       produce: {
         model: 'turn/model', systemPrompt: 'Answer the member.',
