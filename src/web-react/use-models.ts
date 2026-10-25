@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ModelInfo } from '@tangle-network/sandbox-ui/dashboard'
 import type { CatalogModel } from '../catalog/index'
 
@@ -38,6 +38,8 @@ export function useModels(options: UseModelsOptions = {}): UseModelsResult {
   const [loading, setLoading] = useState(enabled && !cached)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  // A reload bypasses the cache once; later url or enabled changes read it again.
+  const forceFetch = useRef(false)
 
   useEffect(() => {
     if (!enabled) {
@@ -45,15 +47,25 @@ export function useModels(options: UseModelsOptions = {}): UseModelsResult {
       return
     }
     const entry = modelCache.get(url)
-    if (entry && Date.now() - entry.fetchedAt < STALE_AFTER_MS && reloadKey === 0) {
+    const force = forceFetch.current
+    forceFetch.current = false
+    if (entry && Date.now() - entry.fetchedAt < STALE_AFTER_MS && !force) {
       setModels(entry.data)
       setCatalog(entry.catalog)
+      setError(null)
+      // A switch from a URL still fetching cancels that fetch, so this branch ends the load.
+      setLoading(false)
       return
     }
 
     let cancelled = false
     setLoading(true)
     setError(null)
+    // Never show another URL's catalog while this one loads; a reload keeps the current list.
+    if (!entry) {
+      setModels([])
+      setCatalog([])
+    }
 
     fetch(url, { credentials: 'include' })
       .then(async (res) => {
@@ -86,6 +98,9 @@ export function useModels(options: UseModelsOptions = {}): UseModelsResult {
     catalog,
     loading,
     error,
-    reload: () => setReloadKey((key) => key + 1),
+    reload: () => {
+      forceFetch.current = true
+      setReloadKey((key) => key + 1)
+    },
   }
 }
