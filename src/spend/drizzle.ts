@@ -4,9 +4,10 @@
  * sweep needs, and the per-workspace budget opt-in. This optional subpath keeps
  * the core `./spend` entry free of Drizzle.
  *
- * The product owns the tables and their migration. The ledger table needs the
- * columns of {@link SpendBoxLedgerTable}; every timestamp is epoch
- * MILLISECONDS, matching `SpendBoxRecord`, so declare them as plain `integer`
+ * The product owns its migration. {@link createSpendBoxLedgerTable} builds the
+ * standard `spend_box_ledger` table; a product with its own table needs the
+ * columns of {@link SpendBoxLedgerTable}. Every timestamp is epoch
+ * MILLISECONDS, matching `SpendBoxRecord`, so they are plain `integer` columns
  * (a drizzle `{ mode: 'timestamp' }` column would silently divide by 1000).
  * `openDetachedRunIds` is a JSON-mode text column defaulting to `[]`; `extras`
  * is a nullable JSON-mode text column carrying `{ billingOwnerId }`.
@@ -21,6 +22,7 @@
  * missed charge.
  */
 import { and, eq, gte, isNull, lte, or, sql, type SQL } from 'drizzle-orm'
+import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import type { AnySQLiteColumn, AnySQLiteTable, BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core'
 import { DEFAULT_WORKSPACE_SPEND_BUDGET_NANO_USD } from './budget'
 import type { SpendLedgerStorePort } from './store'
@@ -43,6 +45,35 @@ export type SpendBoxLedgerTable = AnySQLiteTable & {
   stoppedAt: AnySQLiteColumn
   deletedAt: AnySQLiteColumn
   extras: AnySQLiteColumn
+}
+
+/**
+ * Build the standard `spend_box_ledger` table. With `workspaceTable`, a box row
+ * cascades with its workspace; without it, `workspace_id` is a plain column so
+ * the ledger outlives a deleted workspace whose boxes may still be on the
+ * platform's books.
+ */
+export function createSpendBoxLedgerTable(options: { workspaceTable?: AnySQLiteTable & { id: AnySQLiteColumn } } = {}) {
+  const { workspaceTable } = options
+  return sqliteTable('spend_box_ledger', {
+    sandboxId: text('sandbox_id').primaryKey(),
+    workspaceId: workspaceTable
+      ? text('workspace_id').notNull().references(() => workspaceTable.id, { onDelete: 'cascade' })
+      : text('workspace_id').notNull(),
+    createdAt: integer('created_at').notNull(),
+    idleTimeoutSeconds: integer('idle_timeout_seconds').notNull(),
+    maxLifetimeSeconds: integer('max_lifetime_seconds'),
+    lastActivityAt: integer('last_activity_at').notNull(),
+    openDetachedRunIds: text('open_detached_run_ids', { mode: 'json' }).$type<string[]>().notNull().default([]),
+    stoppedAt: integer('stopped_at'),
+    deletedAt: integer('deleted_at'),
+    // Opaque product columns written verbatim on insert: `billingOwnerId`, the
+    // platform user whose wallet the box bills, which the platform's own
+    // settlement row does not name.
+    extras: text('extras', { mode: 'json' }).$type<Record<string, unknown>>(),
+  }, (table) => [
+    index('idx_spend_box_ledger_workspace').on(table.workspaceId),
+  ])
 }
 
 /** The ledger a store or query reads: a database and the product's table. */

@@ -37,6 +37,8 @@
  * child key.
  */
 
+import { platformBaseUrlFromEnv } from './deployment'
+
 const REQUEST_TIMEOUT_MS = 10_000
 // Backoff while Platform cannot answer a delegation: 250 ms doubling to 5 s, with jitter.
 const UNAVAILABLE_BASE_DELAY_MS = 250
@@ -262,8 +264,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
   const fetchImpl = options.fetch ?? fetch
   const now = options.now ?? Date.now
   const env = () => (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
-  const origin = options.platformUrl ?? env()?.TANGLE_PLATFORM_URL ?? env()?.TANGLE_SSO_URL
-  if (!origin) throw new Error('TANGLE_PLATFORM_URL is required for delegated product keys')
+  const origin = options.platformUrl ?? platformBaseUrlFromEnv()
   const base = options.platformUrl ? origin.replace(/\/+$/, '') : new URL(origin).origin
   const serviceToken = () => {
     if (options.serviceToken !== undefined) return typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken

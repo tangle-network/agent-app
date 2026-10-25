@@ -5,7 +5,8 @@
  * product, which passes its defaults in and extends the body type.
  */
 import { isBlockedFetchHostname } from '../web/fetch-guard'
-import type { GenerationType } from '../studio/generation'
+import { isGenerationType, type GenerationType } from '../studio/generation'
+import { normalizeGeneratedOutputPath } from '../studio/generated-media/output'
 
 /** The request body every media product accepts; a product extends it with its own fields. */
 export interface GenerateRequestBody {
@@ -145,6 +146,72 @@ export function modelForRequest(
   defaults: Record<GenerationType, string>,
 ): string {
   return body.model?.trim() || defaults[type]
+}
+
+/** A direct generation request after every check that runs before access, billing and provider calls. */
+export interface CheckedGenerateRequest {
+  workspaceId: string
+  type: GenerationType
+  /** The trimmed prompt; empty for transcription and avatar requests that carry none. */
+  prompt: string
+  negativePrompt?: string
+  /** The prompt a provider receives: the prompt plus its negative prompt as an `Avoid:` line. */
+  effectivePrompt: string
+  /** The checked inputs recorded on the generation row. */
+  inputs: GenerateInputs
+  /** `inputs` with the image count an image request resolved to. */
+  requestInputs: GenerateInputs
+  /** The images requested; 1 for every other type. */
+  imageCount: number
+  model: string
+  clientRequestId?: string
+  /** The Vault folder or file the result is written to. */
+  outputPath: string
+}
+
+/**
+ * Check a direct generation request body: its workspace, type, inputs, image
+ * count, model and output path. A refusal carries the message the route
+ * returns with status 400.
+ */
+export function checkGenerateRequest(
+  body: GenerateRequestBody,
+  defaults: Record<GenerationType, string>,
+): Checked<CheckedGenerateRequest> {
+  const workspaceId = requiredText(body.workspaceId)
+  const type = body.type
+  const prompt = body.prompt?.trim() ?? ''
+  if (!workspaceId || !type) return { succeeded: false, error: 'Missing workspaceId or type' }
+  if (!isGenerationType(type)) {
+    return { succeeded: false, error: 'Invalid type. Must be one of: image, video, speech, avatar, transcription' }
+  }
+  const inputs = validateGenerateRequest(type, body, prompt)
+  if (!inputs.succeeded) return inputs
+  const imageCount = type === 'image' ? imageCountForRequest(body.n) : { succeeded: true as const, value: 1 }
+  if (!imageCount.succeeded) return imageCount
+  let outputPath: string
+  try {
+    outputPath = normalizeGeneratedOutputPath(type, body.outputPath?.trim() || null)
+  } catch (err) {
+    return { succeeded: false, error: err instanceof Error ? err.message : `Invalid ${type} output path` }
+  }
+  const negativePrompt = body.negativePrompt?.trim() || undefined
+  return {
+    succeeded: true,
+    value: {
+      workspaceId,
+      type,
+      prompt,
+      negativePrompt,
+      effectivePrompt: negativePrompt ? `${prompt}\n\nAvoid: ${negativePrompt}` : prompt,
+      inputs: inputs.value,
+      requestInputs: type === 'image' ? { ...inputs.value, n: imageCount.value } : inputs.value,
+      imageCount: imageCount.value,
+      model: modelForRequest(type, body, defaults),
+      clientRequestId: requiredText(body.clientRequestId) ?? undefined,
+      outputPath,
+    },
+  }
 }
 
 /** A required https URL that does not point at this machine or a private network. */
