@@ -136,7 +136,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     ...input, ...resolveTurnStorage(input),
     produce: typeof produce === 'function' || (produce && 'router' in produce && typeof produce.router === 'function')
       ? produce as ResolvedChatTurnRoutesOptions<TContext, TResource>['produce']
-      : createDefaultChatBackend<TContext, TResource>(input.projectId, input.env ?? {}, produce as ChatTurnDefaultBackend | undefined ?? {}, turnStorageBindings(input), input.modelPolicy),
+      : createDefaultChatBackend<TContext, TResource>(input.projectId, input.env ?? {}, produce as ChatTurnDefaultBackend<TContext, TResource> | undefined ?? {}, turnStorageBindings(input), input.modelPolicy),
   }
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
