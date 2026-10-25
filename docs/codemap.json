@@ -4900,6 +4900,63 @@
       ]
     },
     {
+      "id": "./conformance",
+      "source": "src/conformance/index.ts",
+      "dependsOn": [
+        "operator",
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "checkDeployedApp",
+          "kind": "function",
+          "signature": "(options: ConformanceOptions) => Promise<CheckResult[]>",
+          "doc": "Runs the checks against one deployed app and returns every result, in the order they ran."
+        },
+        {
+          "name": "CheckName",
+          "kind": "type",
+          "signature": "type CheckName",
+          "doc": null
+        },
+        {
+          "name": "CheckResult",
+          "kind": "interface",
+          "signature": "interface CheckResult",
+          "doc": "One check's verdict."
+        },
+        {
+          "name": "ComputerProof",
+          "kind": "type",
+          "signature": "type ComputerProof",
+          "doc": null
+        },
+        {
+          "name": "ConformanceOptions",
+          "kind": "interface",
+          "signature": "interface ConformanceOptions",
+          "doc": null
+        },
+        {
+          "name": "SignInMode",
+          "kind": "type",
+          "signature": "type SignInMode",
+          "doc": "Sign-in for the conformance runner: the two ways a member reaches an agent app, and one question both answer, \"does the app accept this session?\"."
+        }
+      ]
+    },
+    {
+      "id": "./conformance/cli",
+      "source": "src/conformance/cli.ts",
+      "dependsOn": [
+        "operator",
+        "signoff"
+      ],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./copy-quality",
       "source": "src/copy-quality/index.ts",
       "dependsOn": [
@@ -24238,6 +24295,18 @@
           "doc": "Define possible statuses for the acceptance state of an invitation"
         },
         {
+          "name": "InviteTokenPage",
+          "kind": "function",
+          "signature": "({ details, token, navigate, acceptUrl, signInPath, signUpPath, signOutUrl, appPath, }: InviteTokenPageProps) => Element",
+          "doc": null
+        },
+        {
+          "name": "InviteTokenPageProps",
+          "kind": "interface",
+          "signature": "interface InviteTokenPageProps",
+          "doc": "Props for the invite-token route page."
+        },
+        {
           "name": "MembersPanel",
           "kind": "function",
           "signature": "({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…",
@@ -24530,6 +24599,12 @@
           "kind": "interface",
           "signature": "interface EnforceSeatSeam",
           "doc": "Optional billing seat gate."
+        },
+        {
+          "name": "InviteDetails",
+          "kind": "interface",
+          "signature": "interface InviteDetails",
+          "doc": "A pending-member invite as the invite page shows it."
         },
         {
           "name": "MemberListEntry",
@@ -27110,6 +27185,24 @@
           "doc": "Canonical media-reference boundary shared by every surface that persists a media url (sequences clips, design-canvas image/video src)."
         },
         {
+          "name": "buildHttpChatStreamError",
+          "kind": "function",
+          "signature": "(status: number, retryAfterSeconds: number | undefined, body: unknown, fallbackMessage: string, options?: ChatStreamErr…",
+          "doc": "Read status / code / Retry-After / checkout and connect routes / recommended actions from a non-ok chat response body, which may nest them under `error` or carry them top-level."
+        },
+        {
+          "name": "ChatStreamError",
+          "kind": "interface",
+          "signature": "interface ChatStreamError",
+          "doc": "A chat failure the UI can render as a structured error."
+        },
+        {
+          "name": "ChatStreamErrorOptions",
+          "kind": "interface",
+          "signature": "interface ChatStreamErrorOptions",
+          "doc": "Product vocabulary for chat failures."
+        },
+        {
           "name": "checkFreeRouteLimit",
           "kind": "function",
           "signature": "(input: FreeRouteLimitInput) => Promise<FreeRouteLimitOutcome>",
@@ -27278,10 +27371,34 @@
           "doc": "Minimal KV contract (Cloudflare `KVNamespace` satisfies it structurally)."
         },
         {
+          "name": "parseChatHttpErrorResponse",
+          "kind": "function",
+          "signature": "(res: Response, options?: ChatStreamErrorOptions) => Promise<ChatStreamError>",
+          "doc": "Turn a non-ok chat submit response into a structured error."
+        },
+        {
+          "name": "parseChatStreamError",
+          "kind": "function",
+          "signature": "(data: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError",
+          "doc": "Parse the data of a stream `error` event."
+        },
+        {
+          "name": "parseChatStreamErrorEvent",
+          "kind": "function",
+          "signature": "(event: Record<string, unknown>, options?: ChatStreamErrorOptions) => ChatStreamError",
+          "doc": "Normalize the error-event shapes a stream can carry: `{type:'error', data:{message}}`, `{type:'error',data:{error:'...'}}` and `{type:'error',error:'...'}`, so a failed turn surfaces the real failure…"
+        },
+        {
           "name": "parseJsonObjectBody",
           "kind": "function",
           "signature": "(request: Pick<Request, \"json\" | \"body\" | \"headers\">, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObj…",
           "doc": "Parse + object-narrow a Request or Response body."
+        },
+        {
+          "name": "parseRetryAfterSeconds",
+          "kind": "function",
+          "signature": "(value: string | null) => number | undefined",
+          "doc": "Parse a Retry-After header in either delta-seconds or HTTP-date form."
         },
         {
           "name": "RateLimitBudget",
@@ -27398,6 +27515,7 @@
       "source": "src/web-react/index.tsx",
       "dependsOn": [
         "brand",
+        "catalog",
         "chat-routes",
         "chat-store",
         "harness",
@@ -28339,6 +28457,18 @@
           "kind": "interface",
           "signature": "interface DurablePlanDecisionResult",
           "doc": "Describe the result of a durable plan decision including plan details and pending statuses"
+        },
+        {
+          "name": "DurablePlanFlowCard",
+          "kind": "function",
+          "signature": "({ plan, client, canWrite, onUpdated, attachFollowUp, renderMarkdown, className, }: DurablePlanFlowCardProps) => Element",
+          "doc": "The durable plan card as a product mounts it: `DurablePlanCard` on `useDurablePlanFlow` with automatic restore, so a plan decided in another tab (or before a reconnect) still attaches its follow-up."
+        },
+        {
+          "name": "DurablePlanFlowCardProps",
+          "kind": "interface",
+          "signature": "interface DurablePlanFlowCardProps",
+          "doc": "Props for a plan card wired to the durable decision flow."
         },
         {
           "name": "DurablePlanFollowUpReceipt",
@@ -30303,10 +30433,40 @@
           "doc": null
         },
         {
+          "name": "useModels",
+          "kind": "function",
+          "signature": "(options?: UseModelsOptions) => UseModelsResult",
+          "doc": "Load the model catalog (`{ data, catalog }`) from the product's models route."
+        },
+        {
+          "name": "UseModelsOptions",
+          "kind": "interface",
+          "signature": "interface UseModelsOptions",
+          "doc": "Options for the model-catalog hook."
+        },
+        {
+          "name": "UseModelsResult",
+          "kind": "interface",
+          "signature": "interface UseModelsResult",
+          "doc": "The model catalog for a product's pickers."
+        },
+        {
           "name": "usePending",
           "kind": "function",
           "signature": "() => { pending: boolean; run: (action: () => void | Promise<void>) => void; }",
           "doc": "Guard an async action against double-submit."
+        },
+        {
+          "name": "usePlanModeSelection",
+          "kind": "function",
+          "signature": "(threadId: string | undefined, initialPlanMode: boolean, options?: UsePlanModeSelectionOptions) => Required<ComposerPla…",
+          "doc": "Per-THREAD plan-mode toggle for `ComposerModeControls`."
+        },
+        {
+          "name": "UsePlanModeSelectionOptions",
+          "kind": "interface",
+          "signature": "interface UsePlanModeSelectionOptions",
+          "doc": "Options for the per-thread plan-mode toggle."
         },
         {
           "name": "usePopover",
@@ -30525,6 +30685,7 @@
       "source": "src/web-react/agent-profile-editor.tsx",
       "dependsOn": [
         "brand",
+        "catalog",
         "chat-routes",
         "chat-store",
         "harness",
@@ -30816,6 +30977,7 @@
       "source": "src/web-react/document.tsx",
       "dependsOn": [
         "brand",
+        "catalog",
         "chat-routes",
         "chat-store",
         "harness",
@@ -30883,6 +31045,7 @@
       "source": "src/web-react/terminal.ts",
       "dependsOn": [
         "brand",
+        "catalog",
         "chat-routes",
         "chat-store",
         "harness",
@@ -30912,6 +31075,18 @@
           "kind": "interface",
           "signature": "interface SandboxTerminalConnectionResponse",
           "doc": "Define the response structure for a sandbox terminal connection including URLs, token, status, and errors The browser-direct scoped-token route (`createSandboxTerminalConnectionRoute`, `src/sandbox/t…"
+        },
+        {
+          "name": "SandboxTerminalPanel",
+          "kind": "function",
+          "signature": "({ workspaceId, isActive, connectionKey, autoConnect, sessionTitle, description, heading: Heading, surfaceTitle, }: San…",
+          "doc": "Sandbox terminal panel."
+        },
+        {
+          "name": "SandboxTerminalPanelProps",
+          "kind": "interface",
+          "signature": "interface SandboxTerminalPanelProps",
+          "doc": "Props for the shared sandbox terminal panel."
         },
         {
           "name": "tabTerminalConnectionId",
