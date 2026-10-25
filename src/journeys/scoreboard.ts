@@ -15,8 +15,7 @@
  * and a field the run no longer has (an old blocker on a flow that now passes)
  * is deleted. A document with no known version is created with `set`; the
  * store refuses a `set` without a version on a document that already exists
- * (version_mismatch, nothing written; checked against the board's store on
- * 2026-10-12), so a row a person wrote is never replaced.
+ * (version_mismatch, nothing written; checked against the board's store), so a row a person wrote is never replaced.
  *
  * Pure: the same summary and options give the same writes, in the same order.
  */

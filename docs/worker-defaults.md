@@ -51,7 +51,7 @@ After a build, `build/server` holds `.map` files and `build/client` holds none.
 
 Smart placement moves a Worker toward the back end it calls most when that is measurably faster.
 Whether it pays depends on each app's D1 region and where its callers are, which a shared default cannot know.
-Measured on 2026-10-10 over 7 days: gtm-agent's D1 primary is in WNAM and 52% of its requests already run at LAX (median wall time 312 ms); its European colos serve a different route mix, so their 138–902 ms medians do not isolate placement.
+Measured over 7 days: gtm-agent's D1 primary is in WNAM and 52% of its requests already run at LAX (median wall time 312 ms); its European colos serve a different route mix, so their 138–902 ms medians do not isolate placement.
 Enable `[placement] mode = "smart"` per app only after comparing request duration against the 1% of requests Cloudflare keeps unplaced as a baseline.
 
 ## Pin the Worker beside its D1 primary
@@ -66,7 +66,7 @@ mode = "targeted"
 region = "aws:us-east-1"   # beside an ENAM primary
 ```
 
-Measured on Legal (2026-10-19, `agent-ask` turns, one trace each): over 6 turns before and 5 after, `admission.lock` went from 2.1 to 1.6 s, `admission.before_turn` from 1.19 to 0.71 s and the lane's setup from 1.04 to 0.75 s, and the first model byte from 10.3 to 9.3 s, while the Worker-to-Router leg grew from 0.26 to 0.66 s.
+Measured on Legal (`agent-ask` turns, one trace each): over 6 turns before and 5 after, `admission.lock` went from 2.1 to 1.6 s, `admission.before_turn` from 1.19 to 0.71 s and the lane's setup from 1.04 to 0.75 s, and the first model byte from 10.3 to 9.3 s, while the Worker-to-Router leg grew from 0.26 to 0.66 s.
 Keep that trade in view: a Worker whose time goes to a far service gains less.
 
 Two hazards of a targeted placement on wrangler 4.127:

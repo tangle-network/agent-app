@@ -485,7 +485,7 @@ Three rules follow from it, and each one kills a shipped shape:
 **Rejected.**
 The audit's case: the tax Overview's first screen was **four em-dashes and "Computed from 0 accepted facts, 1 missing"**.
 That line reports the internals of a pipeline the reader has not started, in a vocabulary they have never seen, and offers nothing to do about it.
-The same shape is still live in cousins measured 2026-08-04 — `tax-agent apps/web/src/components/vault-ui/completeness-tracker.tsx:77` and `:95` render `'—'` for every score while `scores` is absent; `tax-agent apps/web/src/routes/app.planning.tsx:224` renders `'—'` for the AMT crossover threshold; `tax-agent apps/web/src/components/vault-ui/filing-runtime-panel.tsx:25` ships a hardcoded first row of `{ time: "—", tag: "SECURE", message: "Waiting for session initialization..." }`.
+The same shape is still live in cousins — `tax-agent apps/web/src/components/vault-ui/completeness-tracker.tsx:77` and `:95` render `'—'` for every score while `scores` is absent; `tax-agent apps/web/src/routes/app.planning.tsx:224` renders `'—'` for the AMT crossover threshold; `tax-agent apps/web/src/components/vault-ui/filing-runtime-panel.tsx:25` ships a hardcoded first row of `{ time: "—", tag: "SECURE", message: "Waiting for session initialization..." }`.
 Each is a loaded layout with the values taken out, which is exactly what a declared first run prevents.
 
 ---
@@ -533,13 +533,13 @@ Required on: every computed figure on an overview or summary, every line of a wo
 Pattern 3 answers *where did this number come from*.
 A screen can pass one and fail the other, and shipping the first while claiming the second is the nearest-miss to watch for in review.
 
-**Rejected** (measured 2026-08-04).
+**Rejected**.
 Before the shared primitive above, the affordance existed in exactly one place in the fleet: `agent-app-uplift src/web-react/record-grid.tsx` (`SourceMarker` — quote, label, locator, `href`, basis, with the keyboard and ARIA contract), reachable only by a caller who already had their data in that grid.
 Every figure on the tax Overview renders bare, and `tax-agent apps/web/src/routes/app.planning.tsx:224` renders an AMT crossover threshold — precisely the kind of number a CPA is asked to defend — with nothing to click.
 A grid-only provenance affordance puts the product's trust move exactly where the data is already in a table, and nowhere the numbers are summarized — which is where a professional actually reads them.
 That is why Pattern 3 is specified as an interaction over a value rather than a feature of a grid: a rule a component owns can only be obeyed by callers of that component.
 
-**Rejected — the second one, and it is the reference implementation** (measured 2026-08-04, unified 2026-08-05).
+**Rejected — the second one, and it is the reference implementation**.
 `src/web-react/record-grid.tsx:929` read `const basis = source.basis ?? 'source'`, over a `RecordGridSourceBasis` of its own — `source | confirmed | derived` — whose `source` renders the tooltip "Extracted from a source document" (`:192`).
 So a cell whose caller did not state a basis — the default path, the one every first integration takes — told a CPA the figure was read out of a document, with no fourth value the caller could pass to say the agent simply asserted it.
 Three lanes reached for this concept in the same week and produced three vocabularies — `source|confirmed|derived` in the grid, `extracted|entered|computed|asserted` in `src/web-react/provenance-model.ts`, and an invented `source|confirmed|derived` in the first draft of this very document.
@@ -581,7 +581,7 @@ A trigger with no row here does not animate until someone adds the row and says 
 - **Anything triggered by scroll** on a dense surface.
 - **Skeletons for waits under ~200ms** — a shimmer that outlives its wait invents a delay that did not happen.
 
-Reduced motion is a **token-layer** concern: all four durations collapse at `:root` under `prefers-reduced-motion` (`agent-app-tokens src/theme/tokens.css:206-213`, verified 2026-08-04), so no component carries a per-component opt-out to forget.
+Reduced motion is a **token-layer** concern: all four durations collapse at `:root` under `prefers-reduced-motion` (`agent-app-tokens src/theme/tokens.css:206-213`), so no component carries a per-component opt-out to forget.
 They collapse to 1ms rather than 0, because a zero-duration transition fires no `transitionend` and anything sequencing on it hangs.
 The corollary is the enforceable half: a component that hardcodes its own duration is invisible to that collapse, so **"it writes its own timing" and "it ignores reduced motion" are the same defect**, and one grep finds both.
 
@@ -590,7 +590,7 @@ The exemption is from the blanket rule, never from the request: an element that 
 The waiting label is the one such case shipped here — under `prefers-reduced-motion` its sweep stops and a dotted rule stays under the word, which its settled siblings do not carry, so "in flight" still reads from a still frame.
 That rule is the whole difference, and colour is not part of it: measured in Chromium under `prefers-reduced-motion: reduce`, a live label and the settled label beside it compute the same `color` and the same weight in both themes, because `.agent-shimmer` restores `color: inherit` and the settled label shares that context.
 
-**Rejected** (measured in this package's `src/**`, 2026-08-04):
+**Rejected** (measured in this package's `src/**`):
 
 - **One animation, two meanings.** `animate-pulse` appears **14 times** in this package's shipped source — eleven of them real usages, three of them comments naming the class a surface deliberately moved off — and those eleven still carry two unrelated signals: a loading skeleton (`src/vault/VaultPane.tsx`, `src/web-react/session-history.tsx`, `src/web-react/message-attachments.tsx`, `src/web-react/record-grid.tsx`) and a live-running status dot (the dictation capture indicator in `src/web-react/chat-composer.tsx`). A reader cannot learn what pulsing means when it means both "no data yet" and "work in progress" — a 2s ease fade is the cue a placeholder uses, and a placeholder is the one thing a running agent is not. Every surface under `/web-react` is now off the ambiguous side of that: the streaming caret blinks on a hard step (`agent-caret`), and a label that is WAITING sweeps through its own glyphs (`agent-shimmer`) — the chat thinking row, and a delegated run still in flight in `src/web-react/mission-activity.tsx`, whose tone dot keeps the hue and drops the pulse. Inside `/web-react`, pulsing now means "no data yet" and nothing else.
 - **A component inventing its own timing.** The old studio composer hero hardcoded `duration-300` — a fourth number in a three-number scale, and one that did not move under `prefers-reduced-motion`. The composer rework (#449) deleted that component, and its replacement puts its one entrance (the option pills rising when the media type changes) in `src/studio-react/studio.css`, where the stylesheet's own `prefers-reduced-motion` block collapses it with every other studio animation. No file under `src/studio-react/` carries a Tailwind `duration-*` utility any more.
@@ -659,7 +659,7 @@ Mechanically: take the capability's own route files, ignore every link between t
 A set of screens that only reference each other is an island, and an island's internal link count can be arbitrarily large while its reachability stays zero.
 
 **Rejected.**
-Two engines, built correct, unreachable in two different ways (`legal-agent`, measured 2026-08-04):
+Two engines, built correct, unreachable in two different ways (`legal-agent`):
 
 | Engine | Built | Human path |
 |---|---|---|

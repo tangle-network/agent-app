@@ -11,7 +11,7 @@
  *
  * The receipt store is shared across isolates (D1), because Workers spread one
  * member's requests over many isolates: an in-isolate cache missed on 2 of 3
- * warm turns in Creative staging (2026-10-21, connected-tool catalog 928-2,742
+ * warm turns in Creative staging (connected-tool catalog 928-2,742
  * ms). The route still keeps an in-isolate copy, so a repeat in the same
  * isolate costs no read at all.
  *

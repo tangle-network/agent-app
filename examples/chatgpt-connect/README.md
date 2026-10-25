@@ -51,7 +51,7 @@ configuration and inherits light/dark/named Brand tokens.
 ## Supported destination
 
 The [official OpenAI connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt)
-(as checked 2026-10-02) directs users to developer mode and
+(as checked) directs users to developer mode and
 [ChatGPT Plugins](https://chatgpt.com/plugins) to add an MCP endpoint. Account and
 workspace policy can limit availability. The UI follows that supported guide
 when no registered link exists. Plugin packaging is a separate step described in

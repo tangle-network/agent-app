@@ -490,12 +490,12 @@ agent-app-signoff shell-alignment --base-url http://127.0.0.1:8787 \
 
 The `--theme-script` file runs before the app loads with `theme` in scope, so it can use the app's own switch, for example `localStorage.setItem('theme', theme)`. Add the check as a sign-off step after the app's local server step, or run it against a preview. The judge (`judgeShellAlignment`) is a pure function. The geometry reader (`collectShellDividers`) skips inputs, cards and full-box surfaces, which draw a top border, and it skips dialogs and menus.
 
-Calibration, on 2026-10-10, against Hospitality `aed07b5` with ReCenter fixture data: see the PR that added this section for the before/after table.
+Calibration, against Hospitality `aed07b5` with ReCenter fixture data: see the PR that added this section for the before/after table.
 
 
 ## Surface ladder
 
-`agent-app-signoff surface-ladder` is the browser check for surface hierarchy. A card or field must step off the surface it sits on, a field border must be visible, and a card's body copy must fit on one short line. Hospitality shipped cards painted the color of their parent card, a search field the color of the page, and cards with 20 to 40 words of copy. Drew rated it 0/10 for exactly that. The check takes the same options as `shell-alignment`.
+`agent-app-signoff surface-ladder` is the browser check for surface hierarchy. A card or field must step off the surface it sits on, a field border must be visible, and a card's body copy must fit on one short line. Hospitality shipped cards painted the color of their parent card, a search field the color of the page, and cards with 20 to 40 words of copy, and rated 0/10 for exactly that. The check takes the same options as `shell-alignment`.
 
 ```bash
 agent-app-signoff surface-ladder --base-url http://127.0.0.1:8787 \
@@ -516,7 +516,7 @@ Only `main` (or `[role=main]`) is measured. Dialogs, menus and popovers are skip
 
 `--inject-css <file>` is for calibration only. It adds a stylesheet to each page before the measurement, so you can test a proposed override before it lands.
 
-Calibration on 2026-10-11, against the local Hospitality harness (`3516232`, ReCenter fixture data). Routes: connections, overview and chat-conversation, at 1440 and 390, light and dark. Each cell lists failures as card-step / field-step / field-border / card-copy.
+Calibration, against the local Hospitality harness (`3516232`, ReCenter fixture data). Routes: connections, overview and chat-conversation, at 1440 and 390, light and dark. Each cell lists failures as card-step / field-step / field-border / card-copy.
 
 | route | width | theme | today | with `final.css` | `final.css` + composer `focusFieldWithin` |
 | --- | --- | --- | --- | --- | --- |

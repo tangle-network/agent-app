@@ -44,7 +44,7 @@ let activeReuseStore: ReuseStateStore | null = null
 
 /**
  * What tells one run of a box from the next. The Sandbox API reports no
- * `startedAt` on 2026-10-20 (neither a list row nor a get carries it), so the
+ * `startedAt` (neither a list row nor a get carries it), so the
  * filesystem incarnation stands in for a restored or replaced filesystem and the
  * start time joins it whenever the platform reports one. A box that is stopped
  * and resumed passes through a status the reuse reads, and resume, delete and a

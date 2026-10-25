@@ -8,7 +8,7 @@
  * is dropped. An `authorize` that never calls `identified` still gets the prefetch, started once it allows the turn.
  *
  * Why: Legal's turns ran `authorize` (~716 ms) and then the prompt reads (~597 ms) in series before the model call
- * (dispatchMs median 1,567 ms, 2026-10-22); Creative overlaps the same reads by hand (creative-agent
+ * (dispatchMs median 1,567 ms); Creative overlaps the same reads by hand (creative-agent
  * chat-vertical.ts:289). The contract: the prefetch only reads. It writes nothing and calls nothing paid or external
  * as the member beyond what the verified identity already allows.
  */

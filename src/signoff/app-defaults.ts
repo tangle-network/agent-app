@@ -13,7 +13,7 @@ import { trackedFiles, trackedWorkerConfigs } from './worker-defaults'
  * It is a report: it fails only on an explicit opt-out that gives no reason, so a gap stays visible without
  * blocking a merge, and an exemption is a line in the app's `signoff.config.mjs` with the reason beside it.
  *
- * The rows are the outcomes Drew named on 2026-10-19: the turn trace on every turn with first-visible and answer-text timing (a turn handed
+ * The rows are the required outcomes: the turn trace on every turn with first-visible and answer-text timing (a turn handed
  * to a completion owner included), the shared
  * prewarm route, Worker placement beside the D1 primary, limit alarms wired in the server entry, and the Worker
  * upload size against Cloudflare's limit. A row is read from the source, the Wrangler config and the lockfile; it

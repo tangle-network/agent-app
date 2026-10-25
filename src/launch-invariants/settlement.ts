@@ -8,7 +8,7 @@
  * noticed is measured. A run that completed with a tool call the Sandbox
  * aborted stopped mid-work, so it is a failure.
  *
- * On 2026-10-10 GTM held turns in five places (turn status, admissions,
+ * GTM held turns in five places (turn status, admissions,
  * Workflows, Sandbox sessions and the sidecar tracker) and they disagreed:
  * 51 stream rows stayed `running` after their producers died, failure notices
  * arrived 8–11 hours late, and completions with aborted tools counted as
@@ -114,7 +114,7 @@ function minutes(ms: number): number {
 }
 
 /**
- * The failure shapes GTM shipped on 2026-10-10, as scenarios a product seeds
+ * The failure shapes GTM shipped, as scenarios a product seeds
  * into its own storage, settles with its own scheduled jobs, and reads back as
  * {@link SettledTurnRecord}s. `expect` is the one honest terminal state.
  */

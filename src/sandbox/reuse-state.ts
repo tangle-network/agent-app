@@ -3,7 +3,7 @@
  * trust (see `ReuseChecks` in `./index`).
  *
  * A Worker request is not promised the isolate that served the last one. Legal's
- * sandbox lane, 8 consecutive turns on 2026-10-20, found no check from the turn
+ * sandbox lane, 8 consecutive turns, found no check from the turn
  * before in any of them, so a trust held only in isolate memory never opened. The
  * state is small and best effort, so it rides the Workers Cache API (one read at
  * the start of a reuse, a write only when a check changed); a miss costs the full

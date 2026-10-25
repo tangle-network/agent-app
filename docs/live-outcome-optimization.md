@@ -4,7 +4,7 @@ Every agent product should get better at the jobs customers actually ask of it, 
 
 ## Problem
 
-Offline evaluation (agent-eval `selfImprove`, persona campaigns) tells us whether a profile does well on scenarios we wrote. It does not tell us whether the agent did the job a customer asked for. On 2026-10-07 the GTM agent produced eight ads that passed its own review and every scripted check we had, and the founder rejected all of them: the image model had painted invented logos. An unassisted run on the same day fetched the real logo and rendered HTML with the real fonts, and got it right. Nothing recorded the difference, nothing attributed it to the profile or to a missing tool, and nothing changed the agent's next run.
+Offline evaluation (agent-eval `selfImprove`, persona campaigns) tells us whether a profile does well on scenarios we wrote. It does not tell us whether the agent did the job a customer asked for. The GTM agent produced eight ads that passed its own review and every scripted check we had, and the founder rejected all of them: the image model had painted invented logos. An unassisted run on the same day fetched the real logo and rendered HTML with the real fonts, and got it right. Nothing recorded the difference, nothing attributed it to the profile or to a missing tool, and nothing changed the agent's next run.
 
 ## Change
 

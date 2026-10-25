@@ -4,8 +4,8 @@
  * copy must stay one short line.
  *
  * Hospitality shipped cards painted the color of their parent, a search field
- * the color of the page, and cards carrying 20–40 words of body copy. Drew
- * rated it 0/10 for exactly that. This check measures the rendered page, so it
+ * the color of the page, and cards carrying 20–40 words of body copy, and
+ * rated 0/10 for exactly that. This check measures the rendered page, so it
  * catches the flat step whatever token, class or override produced it.
  *
  * Rules (OKLCH lightness ×100, the same unit the brand ladder is specified in):
