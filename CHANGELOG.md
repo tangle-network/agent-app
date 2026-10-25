@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.19
+
+- docs: state rules without who, when or quotes (#1324)
+
 ## 0.63.18
 
 - test(peer-floors): consolidate repository source audit
