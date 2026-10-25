@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-284 exports.
+286 exports.
 
 ### `adaptSandboxStream`
 
@@ -2116,6 +2116,22 @@ interface WorkspaceSandboxManager
 
 ```ts
 interface WorkspaceSandboxManagerOptions
+```
+
+### `WorkspaceSandboxOriginalRecoveryOptions`
+
+`interface`
+
+```ts
+interface WorkspaceSandboxOriginalRecoveryOptions
+```
+
+### `WorkspaceSandboxOriginalRecoveryResult`
+
+`type`
+
+```ts
+type WorkspaceSandboxOriginalRecoveryResult
 ```
 
 ### `WorkspaceSandboxRecoveryAction`

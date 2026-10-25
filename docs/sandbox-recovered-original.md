@@ -93,6 +93,13 @@ able to return/use a late replacement. Keep the incident workspace held while
 that condition is unproven. This is a delivery precondition, not a browser flag,
 a caller-supplied boolean or an absence guarantee produced by this helper.
 
+A newer synced snapshot does not prove that every final write was captured.
+Legacy recovery can capture before stopping a still-running container, leaving
+later writes outside that snapshot. This helper neither quiesces writes nor
+resumes or restores the sandbox. The consumer/operator must resolve any named
+capture-versus-stop finding before activating an incident workspace; source
+qualification and package publication do not satisfy that condition.
+
 The existing public workspace-operation lookup serves checkpoint/fork and the
 SDK snapshot lookup serves snapshot operations; neither supplies a create-task
 absence proof for the pending replacement. Unknown creates stay unknown. A late
