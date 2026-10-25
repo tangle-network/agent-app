@@ -15,7 +15,8 @@ import { noticePart } from '../interactions/contract'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
-type RouterTurnKey = string | { key: string; fetchImpl?: typeof fetch; revoke(): Promise<void> }
+/** The turn's model key: a plain key, or a per-turn lease whose fetch and revocation belong to the producer. */
+export type RouterTurnKey = string | { key: string; fetchImpl?: typeof fetch; revoke(): Promise<void> }
 type RouterTurnPrompt = string | (RouterTurnPromptOptions & { profile: Parameters<typeof composeRouterTurnPromptSections>[0] })
 
 export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent' | 'systemPrompt' | 'apiKey'> & {

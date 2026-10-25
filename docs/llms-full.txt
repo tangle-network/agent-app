@@ -5183,6 +5183,14 @@ type ResolveChatAttachmentsResult
 (priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
 ```
 
+### `RouterTurnKey`
+
+`type` — The turn's model key: a plain key, or a per-turn lease whose fetch and revocation belong to the producer.
+
+```ts
+type RouterTurnKey
+```
+
 ### `RouterTurnProducerOptions`
 
 `type`
@@ -22415,12 +22423,140 @@ interface BuildSandboxToolFileMountsOptions
 (events: AsyncIterable<unknown>, message: string | PromptInputPart[], history?: { role: "user" | "assistant"; content:…
 ```
 
+### `COMPUTER_FILES_GUIDANCE`
+
+`const` — Appended to the Router model's prompt whenever a computer step copies files into the Vault.
+
+```ts
+string
+```
+
+### `COMPUTER_STEP_RECEIPT_TABLE_DDL`
+
+`const` — Paste into a product migration; the store never runs DDL.
+
+```ts
+"CREATE TABLE IF NOT EXISTS computer_step_receipts (\n step_id TEXT PRIMARY KEY,\n state TEXT NOT NULL,\n receipt TEXT…
+```
+
+### `computerFileContract`
+
+`function` — Appended to the task the box agent receives, so a member's relative path lands under the Vault root.
+
+```ts
+(root: string, task: string) => string
+```
+
+### `ComputerFileListing`
+
+`type` — Path relative to the root, mapped to the file's size and modification time.
+
+```ts
+type ComputerFileListing
+```
+
+### `ComputerFileReceipt`
+
+`interface` — What one step saved, and what it left on the computer only (with the reason).
+
+```ts
+interface ComputerFileReceipt
+```
+
+### `ComputerStep`
+
+`interface`
+
+```ts
+interface ComputerStep
+```
+
+### `ComputerStepOptions`
+
+`interface`
+
+```ts
+interface ComputerStepOptions
+```
+
+### `ComputerStepReceipt`
+
+`interface`
+
+```ts
+interface ComputerStepReceipt
+```
+
+### `ComputerStepReceiptD1Like`
+
+`interface` — The D1 surface the store uses.
+
+```ts
+interface ComputerStepReceiptD1Like
+```
+
+### `ComputerStepReceipts`
+
+`interface`
+
+```ts
+interface ComputerStepReceipts
+```
+
+### `ComputerStepRun`
+
+`interface` — What a product's own prompt path receives for one step.
+
+```ts
+interface ComputerStepRun
+```
+
+### `ComputerStepSession`
+
+`interface` — The box session one computer step runs in.
+
+```ts
+interface ComputerStepSession
+```
+
+### `ComputerVault`
+
+`interface` — The app's Vault, as a computer step sees it.
+
+```ts
+interface ComputerVault
+```
+
+### `ComputerVaultFile`
+
+`interface` — One file the step wrote, at its path relative to the Vault root.
+
+```ts
+interface ComputerVaultFile
+```
+
 ### `createCacheReuseStore`
 
 `function` — A store over a Workers-style cache.
 
 ```ts
 (open: () => Promise<ReuseCacheLike>) => ReuseStateStore
+```
+
+### `createComputerStep`
+
+`function`
+
+```ts
+(options: ComputerStepOptions) => ComputerStep
+```
+
+### `createD1ComputerStepReceipts`
+
+`function` — Receipts in one D1 table, shared by every isolate.
+
+```ts
+(db: ComputerStepReceiptD1Like, options?: { table?: string | undefined; retentionMs?: number | undefined; now?: (() =>…
 ```
 
 ### `createD1PrewarmClaimStore`
@@ -22557,6 +22693,14 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 (slots: readonly number[], from: number, at: number) => number[]
+```
+
+### `DEFAULT_COMPUTER_STEP_RECEIPT_TABLE`
+
+`const`
+
+```ts
+"computer_step_receipts"
 ```
 
 ### `DEFAULT_ESCALATION_TOOLS`
@@ -22927,6 +23071,14 @@ interface InspectablePrewarmClaimStore
 (error: unknown) => boolean
 ```
 
+### `listComputerFiles`
+
+`function` — The box's tree under `root`.
+
+```ts
+(box: SandboxInstance, root: string) => Promise<ComputerFileListing>
+```
+
 ### `LivenessProbeConfig`
 
 `interface` — Configure runtime exec verification before reusing a sandbox.
@@ -23005,6 +23157,14 @@ type ModelSelectionFailure
 
 ```ts
 type ModelSelectionSource
+```
+
+### `modelWithinAllowList`
+
+`function` — The first preferred model the policy allows, else the policy's own first model; `null` allows the first preference.
+
+```ts
+(preferred: readonly string[], allowedModels: readonly string[] | null) => string | undefined
 ```
 
 ### `Outcome`
@@ -23197,6 +23357,22 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ```ts
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
+```
+
+### `readSandboxRouterModels`
+
+`function` — Platform's model policy for a box minted under the payer of `apiKey`: the allowed models, or `null` for any.
+
+```ts
+(options: ReadSandboxRouterModelsOptions) => Promise<Outcome<string[] | null>>
+```
+
+### `ReadSandboxRouterModelsOptions`
+
+`interface`
+
+```ts
+interface ReadSandboxRouterModelsOptions
 ```
 
 ### `ReadyRunningSandboxOutcome`
@@ -23585,7 +23761,7 @@ interface SandboxPromptExecutionLimits
 
 ### `sandboxPromptRunner`
 
-`function` — The shell's unattended runner.
+`function` — The shell's unattended runner: {@link createComputerStep} over the shell, with the session and isolation the prompt names.
 
 ```ts
 (shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
@@ -23845,6 +24021,14 @@ type SandboxTransientFailureCode
 
 ```ts
 interface SandboxTransientRetryOptions
+```
+
+### `saveComputerFiles`
+
+`function` — Save what the step wrote since `before` into the Vault and return its receipt.
+
+```ts
+(input: { box: SandboxInstance; vault: ComputerVault; before: ComputerFileListing; executionId: string; }) => Promise<C…
 ```
 
 ### `ScopedTokenResult`

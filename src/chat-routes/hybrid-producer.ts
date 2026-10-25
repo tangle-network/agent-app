@@ -46,6 +46,7 @@ import {
   type EscalationInput,
 } from '../sandbox/escalation-speculator'
 import { createSandboxRunTool, SandboxRunError, sandboxRunFailureDetail, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
+import { createComputerStep, type ComputerStepOptions } from '../sandbox/computer-step'
 import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
@@ -69,8 +70,12 @@ export interface HybridTurnBox {
   acquire(signal: AbortSignal): Promise<SandboxInstance>
   /** A start admission already began ({@link startHybridBox}); the producer takes it as the turn's start. */
   started?: Promise<SandboxInstance>
-  /** Runs the task on the box and returns its answer: `sandboxPromptRunner(shell, …)` or the product's runner. */
-  runTask: SandboxRunToolOptions['runTask']
+  /** Runs the task on the box and returns its answer. Omit it and pass `computer` for agent-app's computer step. */
+  runTask?: SandboxRunToolOptions['runTask']
+  /** agent-app's computer step ({@link createComputerStep}): the first of the turn's models the box key allows, one
+   *  session value, stable step ids, durable receipts and the copy of the step's files into the product's Vault.
+   *  `parentExecutionId` defaults to the turn's execution id on the chat route, else the trace id. */
+  computer?: ComputerStepOptions
   /** Wall-clock cap for one `sandbox_run` call, box start included. Default 4 minutes. */
   timeoutMs?: number
   warm?: SandboxRunToolOptions['warm']
@@ -174,6 +179,11 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   })()
 
   try {
+    const step = box.computer
+      ? createComputerStep({ ...box.computer, parentExecutionId: box.computer.parentExecutionId ?? router.traceId })
+      : undefined
+    const runBoxTask = box.runTask ?? step?.runTask
+    if (!runBoxTask) throw new Error('A hybrid box needs runTask or computer')
     const warnings = new Map<string, ProducerNoticeEvent>()
     // Each failed call's redacted cause chain, by call id, recorded before the engine reports the call's error.
     const details = new Map<string, string>()
@@ -188,7 +198,7 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
         stop.throwIfAborted()
         if (unconfirmed || activeTasks > 0) throw new SandboxRunError('sandbox_unconfirmed', 'An earlier computer step may still be running; no further task was dispatched.')
         activeTasks++
-        try { return await box.runTask(...args) }
+        try { return await runBoxTask(...args) }
         catch (error) {
           if (!(error instanceof SandboxRunError) || error.code === 'sandbox_unconfirmed') unconfirmed = true
           throw error
@@ -214,7 +224,7 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
     })
     speculator.onInput({ text: speculateOn ?? router.userMessage, ...(attachments ? { attachments } : {}) })
 
-    const extra = guidance === false ? '' : (guidance ?? HYBRID_TURN_GUIDANCE)
+    const extra = guidance === false ? '' : [guidance ?? HYBRID_TURN_GUIDANCE, step?.guidance].filter(Boolean).join('\n\n')
     const producer = createRouterTurnProducer({
       ...router,
       systemPrompt: Promise.resolve(router.systemPrompt).then(prompt => !extra ? prompt : typeof prompt === 'string'
