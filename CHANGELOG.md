@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.28
+
+- feat: share client chat-error, plan card, terminal, models and invite pieces (#1331)
+
 ## 0.63.27
 
 - docs(lessons): design the one Router-first lane agent-app owns (#1330)
