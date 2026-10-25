@@ -207,22 +207,12 @@ describe('this repository audits itself', () => {
   // The gate agent-app publishes must be one agent-app passes. `fixtures/` is
   // excluded by NAME and for a stated reason: those trees exist to CONTAIN the
   // violation, and a calibration tree that also had to be clean could not
-  // calibrate anything.
-  it('declares no dependency whose source is not the registry', () => {
+  // calibrate anything. The playground's `file:..` is the legitimate in-repo
+  // source exception and must pass through the REAL scan.
+  // One full-tree audit covers both rules; cold installed-byte reads do not
+  // have a portable five-second latency ceiling.
+  it('declares no non-registry dependency and accepts the playground source exception', () => {
     const root = join(here, '..', '..')
-    const report = checkDependencySources({
-      repoDir: root,
-      exclude: ['src/peer-floors/fixtures'],
-    })
-    expect(report.findings.map((f) => `${f.check} ${f.where}`)).toEqual([])
-  })
-
-  // The playground's `file:..` is the exception's reference shape, and it must
-  // pass through the REAL scan, not only the unit rule above.
-  it('accepts the playground pointing at its own parent package', () => {
-    const root = join(here, '..', '..')
-    // The real declaration, resolved against the real tree — not a restatement
-    // of the fixture. This is the exception's reference shape.
     expect(resolveLocalPathSource({
       fromDir: join(root, 'playground'),
       repoDir: root,
@@ -230,8 +220,9 @@ describe('this repository audits itself', () => {
       name: '@tangle-network/agent-app',
     })).toBe('in-repo-source')
     const report = checkDependencySources({ repoDir: root, exclude: ['src/peer-floors/fixtures'] })
+    expect(report.findings.map((f) => `${f.check} ${f.where}`)).toEqual([])
     expect(report.findings.some((f) => f.where.startsWith('playground/'))).toBe(false)
-  })
+  }, 30_000)
 })
 
 describe('installed integrity — what the store-CAS basis can and cannot see', () => {
