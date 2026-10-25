@@ -202,6 +202,26 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
     } finally { await peer.close() }
   })
 
+  it.each(['missing-id', 'missing-provenance', 'missing-readiness', 'transitioning-without-provenance', 'null-provenance', 'invalid-provenance', 'blank-id'])(
+    'refuses partial stopped incarnation metadata: %s without changing recovery', async kind => {
+      const peer = await boundary()
+      try {
+        if (kind === 'missing-id') delete peer.state.original!.filesystemIncarnationId
+        else if (kind === 'missing-provenance') delete peer.state.original!.filesystemIncarnationProvenance
+        else if (kind === 'missing-readiness') delete peer.state.original!.filesystemIncarnationReadiness
+        else if (kind === 'transitioning-without-provenance') {
+          delete peer.state.original!.filesystemIncarnationProvenance
+          peer.state.original!.filesystemIncarnationReadiness = 'transitioning'
+        } else if (kind === 'null-provenance') peer.state.original!.filesystemIncarnationProvenance = null
+        else if (kind === 'invalid-provenance') peer.state.original!.filesystemIncarnationProvenance = 'invalid'
+        else peer.state.original!.filesystemIncarnationId = ' '
+        expect((await peer.reconcile()).status).toBe('unverified')
+        expect(await peer.manager.read(workspaceId)).toEqual(pending())
+        expect(peer.requests.every(request => request.startsWith('GET '))).toBe(true)
+      } finally { await peer.close() }
+    },
+  )
+
   it.each(['missing', 'failed', 'suspending', 'running', 'unknown-phase', 'transitioning', 'foreign-id', 'foreign-workspace', 'missing-stop'])(
     'refuses an unverified %s original without changing recovery or physical state', async kind => {
       const peer = await boundary()

@@ -40,8 +40,13 @@ A positive original witness requires two stable ordinary SDK GETs of the exact s
 original ID around an authenticated snapshot-list GET. The original must be
 `stopped` with the public `lifecycleState: suspended` and a valid `suspendedAt`.
 The API defines suspended as final snapshot commit finished, and stamps
-suspendedAt before the final capture. Missing stopped incarnation fields are
-allowed; explicit transitioning or a changed incarnation is refused.
+suspendedAt before the final capture. Legacy stopped records with all three
+incarnation fields absent are allowed. Any partial tuple, invalid value,
+explicit transitioning or changed incarnation is refused. Both original GETs
+use the SDK's authenticated transport and the bounded JSON reader directly:
+SDK instance normalization otherwise erases partial tuples, making them
+indistinguishable from legacy absence. Each read validates one response, with
+no separate preflight observation.
 
 The newest snapshot must belong to this original, carry `pre-suspend`, report
 remote synchronization `synced`, have been captured at or after this stop and
@@ -51,8 +56,8 @@ record cannot be skipped to pick an older synced record. The snapshot envelope
 uses the existing bounded JSON reader through the SDK's authenticated transport:
 one response of at most 256 KiB and 256 records, with no continuation or partial
 listing. It refuses oversized/truncated/ambiguous responses instead of inferring
-absence. SDK GETs use the application's finite request timeout and cancellation
-signal; the snapshot GET also has a finite per-request timeout.
+absence. All GETs use the application's cancellation signal and a finite
+per-request timeout.
 
 The CAS records `original_recovered`, the original key and the exact positive
 snapshot receipt. It retains the pending replacement key as invalidation evidence.

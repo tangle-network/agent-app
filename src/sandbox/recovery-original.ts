@@ -1,4 +1,4 @@
-import type { Sandbox, SandboxInstance } from '@tangle-network/sandbox'
+import type { Sandbox } from '@tangle-network/sandbox'
 import { parseJsonObjectBody } from '../web/core'
 import {
   WORKSPACE_SANDBOX_MISSING, WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS,
@@ -9,7 +9,7 @@ export interface WorkspaceSandboxOriginalRecoveryOptions {
   workspaceId: string
   /** The application's authenticated SDK client, with a finite request timeout
    * and the caller's cancellation signal. No admin credentials or lifecycle calls. */
-  client: Pick<Sandbox, 'get' | 'fetch'>
+  client: Pick<Sandbox, 'fetch'>
   /** Server-owned namespace policy. Accept historical generations for this
    * workspace, never a key supplied by a browser or a freshly computed epoch. */
   ownsOriginalBoxKey: (identity: { workspaceId: string; sandboxId: string; boxKey: string }) => boolean
@@ -32,21 +32,35 @@ type CommittedOriginal = {
   incarnationId: string | undefined
 }
 
-function committedOriginal(
-  box: SandboxInstance | null,
+async function committedOriginal(
   recovery: WorkspaceSandboxRecoveryState,
   options: WorkspaceSandboxOriginalRecoveryOptions,
   now: number,
-): CommittedOriginal | undefined {
-  if (!box || box.id !== recovery.sandboxId || box.status !== 'stopped'
-    || box.lifecycleState !== 'suspended' || !box.name?.trim()) return undefined
-  // Readiness is optional on stopped records. An explicit transition is never
-  // usable; missing running-only incarnation metadata is not proof of failure.
-  if (box.filesystemIncarnationReadiness !== undefined && box.filesystemIncarnationReadiness !== 'ready') return undefined
-  const suspendedAt = box.suspendedAt?.getTime()
-  if (suspendedAt === undefined || !Number.isFinite(suspendedAt) || suspendedAt > now) return undefined
-  if (!options.ownsOriginalBoxKey({ workspaceId: options.workspaceId, sandboxId: box.id, boxKey: box.name })) return undefined
-  return { boxKey: box.name, suspendedAt, incarnationId: box.filesystemIncarnationId }
+): Promise<CommittedOriginal | undefined> {
+  // SDK get() discards incomplete incarnation tuples. Validate the same raw
+  // observation atomically, so partial/transitioning cannot become legacy absence.
+  const response = await options.client.fetch(`/v1/sandboxes/${encodeURIComponent(recovery.sandboxId)}`, { method: 'GET' }, { timeoutMs: 5_000 })
+  if (!response.ok) {
+    await response.body?.cancel()
+    return undefined
+  }
+  const [box, error] = await parseJsonObjectBody(response, { maxBytes: MAX_RECOVERY_READ_BYTES })
+  if (error) {
+    await response.body?.cancel().catch(() => undefined)
+    return undefined
+  }
+  if (box.id !== recovery.sandboxId || box.status !== 'stopped'
+    || box.lifecycleState !== 'suspended' || typeof box.name !== 'string' || !box.name.trim()) return undefined
+  const id = box.filesystemIncarnationId
+  const provenance = box.filesystemIncarnationProvenance
+  const readiness = box.filesystemIncarnationReadiness
+  const absent = id === undefined && provenance === undefined && readiness === undefined
+  if (!absent && (typeof id !== 'string' || !id.trim()
+    || (provenance !== 'fresh' && provenance !== 'restored' && provenance !== 'unknown') || readiness !== 'ready')) return undefined
+  const suspendedAt = typeof box.suspendedAt === 'string' ? Date.parse(box.suspendedAt) : NaN
+  if (!Number.isFinite(suspendedAt) || suspendedAt > now) return undefined
+  if (!options.ownsOriginalBoxKey({ workspaceId: options.workspaceId, sandboxId: recovery.sandboxId, boxKey: box.name })) return undefined
+  return { boxKey: box.name, suspendedAt, incarnationId: typeof id === 'string' ? id : undefined }
 }
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -161,7 +175,7 @@ export async function reconcileWorkspaceSandboxOriginal<Snapshot extends Workspa
     const replacement = await inspectReplacement(options.client, current.replacementBoxKey)
     if (replacement === 'present') return result('conflict', 'replacement_physically_present')
     if (replacement !== 'clear') return result('unverified', 'replacement_listing_unverified')
-    first = committedOriginal(await options.client.get(current.sandboxId), current, options, now)
+    first = await committedOriginal(current, options, now)
     if (!first || first.boxKey === current.replacementBoxKey) return result('unverified', 'original_not_committed_or_owned')
     const response = await options.client.fetch(`/v1/sandboxes/${encodeURIComponent(current.sandboxId)}/snapshots`, { method: 'GET' }, { timeoutMs: 5_000 })
     if (!response.ok) {
@@ -175,7 +189,7 @@ export async function reconcileWorkspaceSandboxOriginal<Snapshot extends Workspa
     }
     snapshot = finalSnapshot(body, current, first, now)
     if (!snapshot) return result('unverified', 'final_snapshot_unverified')
-    last = committedOriginal(await options.client.get(current.sandboxId), current, options, now)
+    last = await committedOriginal(current, options, now)
     const replacementAfter = await inspectReplacement(options.client, current.replacementBoxKey)
     if (replacementAfter === 'present') return result('conflict', 'replacement_physically_present')
     if (replacementAfter !== 'clear') return result('unverified', 'replacement_listing_unverified')
