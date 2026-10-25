@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.25
+
+- fix: settle canceled navigation animations in browser proof (#1329)
+
 ## 0.63.24
 
 - test: restore disposable Git and rollout integration checks (#1328)
