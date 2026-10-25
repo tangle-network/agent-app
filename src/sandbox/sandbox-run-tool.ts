@@ -20,7 +20,9 @@
  */
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
-import { runSandboxPrompt, type SandboxRuntimeConfig, type StreamSandboxPromptOptions } from './index'
+import type { SandboxRuntimeConfig } from './configuration'
+import type { StreamSandboxPromptOptions } from './prompt-options'
+import { createComputerStep } from './computer-step'
 import { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
 import { serializeSandboxProvisioningError } from './diagnostics'
 export { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
@@ -103,31 +105,19 @@ export function sandboxRunFailureDetail(error: unknown): string {
     .slice(0, 2_000)
 }
 
-/** The shell's unattended runner. A supplied execution/turn id seeds child
- * identity with the actual tool callId: different calls stay separate and a
- * retry of that exact call stays idempotent. Without callId, use a fresh child.
+/** The shell's unattended runner: {@link createComputerStep} over the shell, with the session and isolation the
+ *  prompt names. A supplied execution/turn id seeds the step id with the actual tool callId: different calls stay
+ *  separate and a retry of that exact call stays idempotent. Without callId, each call sends fresh.
  *
  * Its failure follows the send witness, in a shared and an isolated session alike: a failure before the prompt
  * was handed to the SDK is `sandbox_unavailable` (nothing runs on the box, so the turn may use it again); after
  * it, the step stays unconfirmed. */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
-  return async (box, task, { callId, signal, timeoutMs, trace, span }) => {
-    const parent = prompt.executionId?.trim() || prompt.turnId?.trim()
-    const identity = parent ? new TextEncoder().encode(JSON.stringify([parent, prompt.sessionId, callId?.trim() || crypto.randomUUID()])) : undefined
-    const digest = identity ? await crypto.subtle.digest('SHA-256', identity) : undefined
-    const child = digest ? Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') : undefined
-    let sent = false
-    try {
-      return await runSandboxPrompt(shell, box, task, {
-        ...prompt, ...(child ? { executionId: child, turnId: child } : {}), signal, timeoutMs, disallowQuestions: true,
-        ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
-        onDispatch: () => { sent = true; prompt.onDispatch?.() },
-      })
-    } catch (error) {
-      if (sent || error instanceof SandboxRunError || signal.aborted) throw error
-      throw new SandboxRunError('sandbox_unavailable', 'The computer step was refused before it was sent to the box.', { cause: error })
-    }
-  }
+  const { executionId, turnId, sessionId, secretProfileIsolation, ...rest } = prompt
+  const parent = executionId?.trim() || turnId?.trim()
+  return createComputerStep({ shell, prompt: rest, ...(parent ? { parentExecutionId: parent } : {}),
+    ...(sessionId ? { session: { id: sessionId, ...(secretProfileIsolation ? { isolated: true } : {}) } } : {}),
+  }).runTask
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {

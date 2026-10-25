@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.30
+
+- feat(sandbox): own the Router-first lane's computer step, receipts and Vault copy for every app (#1332)
+
 ## 0.63.29
 
 - feat(conformance): agent-app-conformance checks a deployed app's basics (#1333)

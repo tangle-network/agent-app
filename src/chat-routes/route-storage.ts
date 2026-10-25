@@ -19,7 +19,7 @@ export function createDefaultTurnLock<TContext>(store: Pick<ChatTurnStoreBinding
 export type ResolvedChatTurnRoutesOptions<TContext, TResource = unknown> = Omit<CreateChatTurnRoutesOptions<TContext, TResource>, 'turnStore' | 'turnLock' | 'produce'> & {
   turnStore: TurnEventStore
   turnLock?: Exclude<CreateChatTurnRoutesOptions<TContext, TResource>['turnLock'], false>
-  produce: Exclude<CreateChatTurnRoutesOptions<TContext, TResource>['produce'], undefined | import('./default-backend').ChatTurnDefaultBackend>
+  produce: Exclude<CreateChatTurnRoutesOptions<TContext, TResource>['produce'], undefined | import('./default-backend').ChatTurnDefaultBackend<TContext, TResource>>
 }
 
 export function turnStorageBindings(options: { turnStore: TurnEventStore | ChatTurnStoreBindings; env?: import('./default-backend').ChatTurnEnvironment }): ChatTurnStoreBindings | undefined {

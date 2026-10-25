@@ -6,7 +6,11 @@ import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
 /** The raw HTTP source sends deltas without a cumulative part.text snapshot. */
-it.each([true, false])('commits visible deltas before an outage (visible=%s)', async visible => {
+// `disabled` is the Router's refusal of a model whose provider has no enabled credential (`403 provider_disabled`),
+// as the box agent relays it (Tax 2026-10-25): model-scoped, so the chain must move on despite the 403.
+it.each([
+  { visible: true, disabled: false }, { visible: false, disabled: false }, { visible: false, disabled: true },
+])('commits visible deltas before an outage (visible=$visible, disabled provider=$disabled)', async ({ visible, disabled }) => {
   const { sqlite, d1 } = sqliteD1('CREATE TABLE message(id TEXT PRIMARY KEY, thread TEXT, role TEXT, content TEXT)')
   const requested: string[] = [], pending: Promise<unknown>[] = []
   const server = createServer((request, response) => {
@@ -17,7 +21,9 @@ it.each([true, false])('commits visible deltas before an outage (visible=%s)', a
     emit({ type: 'start', data: { id: `execution-${model}` } })
     if (model === 'preferred') {
       if (visible) emit({ type: 'message.part.updated', data: { part: { type: 'text', id: 'answer' }, delta: 'Visible first.' } })
-      emit({ type: 'error', data: { errorCode: 'provider_inference_unavailable', message: 'Source unavailable.' } })
+      emit({ type: 'error', data: disabled
+        ? { status: 403, message: 'opencode execution failed: Tangle-funded openai inference is unavailable for "preferred": HTTP 403 provider_disabled' }
+        : { errorCode: 'provider_inference_unavailable', message: 'Source unavailable.' } })
     } else {
       emit({ type: 'message.part.updated', data: { part: { type: 'text', id: 'answer' }, delta: 'Fallback answer.' } })
       emit({ type: 'result', data: { outcome: { type: 'completed' }, finalText: 'Fallback answer.', toolInvocations: [] } })
