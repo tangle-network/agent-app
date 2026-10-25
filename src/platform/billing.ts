@@ -45,8 +45,9 @@ export interface PlatformBillingHttpOptions {
   /** Platform root, e.g. https://id.tangle.tools (trailing slashes stripped). */
   baseUrl: string
   /** Used only by `deduct()`; resolved lazily so reads never require it.
-   *  Throws at call time when empty. */
-  serviceToken: string | (() => string)
+   *  Throws at call time when empty. Default: the deployment's
+   *  `PLATFORM_SERVICE_TOKEN`. */
+  serviceToken?: string | (() => string | undefined)
   /** Product slug — the `X-Service-Name` header and the deduct `product` field. */
   productSlug: string
   fetchImpl?: typeof fetch
@@ -187,6 +188,11 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
   const timeoutMs = opts.timeoutMs ?? 10_000
 
   function resolveServiceToken(): string {
+    if (opts.serviceToken === undefined) {
+      const token = typeof process !== 'undefined' ? process.env.PLATFORM_SERVICE_TOKEN : undefined
+      if (!token) throw new Error('PLATFORM_SERVICE_TOKEN is required for platform billing calls')
+      return token
+    }
     const token = typeof opts.serviceToken === 'function' ? opts.serviceToken() : opts.serviceToken
     if (!token) throw new Error('A platform service token is required for deduct')
     return token

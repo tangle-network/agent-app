@@ -356,7 +356,40 @@ export function createMembersApi(opts: MembersApiOptions) {
 
   const { listMembers, getUserByEmail, getOrganizationMember, findExistingProjectInvite, hasPendingOrgInvite } = createMemberQueries(db, users, organizationMembers, workspaceMembers, workspaces, access)
 
-  return { listMembers, inviteMember, updateMemberRole, removeMember, acceptInvite }
+  /**
+   * The members route: GET lists, POST invites, PATCH changes a role, DELETE
+   * removes, each against `workspaceId` (query for GET, JSON body otherwise).
+   * `actor` is the authenticated caller, or null for a 401.
+   */
+  async function handleMembersRequest(request: Request, actor: MembersApiActor | null): Promise<Response> {
+    if (!actor) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      const workspaceId = new URL(request.url).searchParams.get('workspaceId')
+      if (!workspaceId) return Response.json({ error: 'Missing workspaceId' }, { status: 400 })
+      return listMembers({ workspaceId, actor })
+    }
+
+    const raw = await request.json().catch(() => null)
+    if (!raw || typeof raw !== 'object') return Response.json({ error: 'Invalid body' }, { status: 400 })
+    const body = raw as Record<string, unknown>
+    const str = (key: string) => (typeof body[key] === 'string' ? (body[key] as string) : undefined)
+
+    const workspaceId = str('workspaceId')
+    if (!workspaceId) return Response.json({ error: 'Missing workspaceId' }, { status: 400 })
+
+    if (request.method === 'POST') {
+      return inviteMember({ workspaceId, actor, email: str('email'), role: str('role') })
+    }
+    if (request.method === 'PATCH') {
+      return updateMemberRole({ workspaceId, actor, memberId: str('memberId'), role: str('role') })
+    }
+    if (request.method === 'DELETE') {
+      return removeMember({ workspaceId, actor, memberId: str('memberId') })
+    }
+    return Response.json({ error: 'Method not allowed' }, { status: 405 })
+  }
+
+  return { listMembers, inviteMember, updateMemberRole, removeMember, acceptInvite, handleMembersRequest }
 }
 
 function createMemberQueries(
