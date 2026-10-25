@@ -76,6 +76,7 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
 
 - Sign-in happens over HTTP and is cached per identity, so no frame shows a login form. Never press Sign out in a shared session; a journey that signs out opens its context with `{ fresh: true }`.
 - `finish()` scrubs each trace (cookies, authorization headers, token query values, auth and session bodies, every password, cookie value and identity email) and then re-reads every output file, inside the zips too. It throws `REFUSING …` if a password or cookie value survived; copy nothing from that folder.
+- After that scan, `finish()` removes stale recorder-owned media, screenshots and turn replies from earlier runs of the same journey id. Other evidence files are left untouched; a failed finish does not prune the previous run.
 - Raw recordings and unscrubbed traces stay in the state directory on the recording host (`~/.local/state/agent-app-journeys/<app>`).
 - Use test identities and test workspaces only, and press nothing that sends, posts, schedules, publishes, approves or pays for something outside the app.
 
