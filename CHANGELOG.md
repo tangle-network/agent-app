@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.27
+
+- docs(lessons): design the one Router-first lane agent-app owns (#1330)
+
 ## 0.63.26
 
 - feat(sandbox): own computer-step safety for every app (#1320)

@@ -4,7 +4,7 @@
 
 Source: `src/teams/members-api.ts`
 
-9 exports.
+10 exports.
 
 ### `createMembersApi`
 
@@ -20,6 +20,14 @@ Source: `src/teams/members-api.ts`
 
 ```ts
 interface EnforceSeatSeam
+```
+
+### `InviteDetails`
+
+`interface` — A pending-member invite as the invite page shows it.
+
+```ts
+interface InviteDetails
 ```
 
 ### `MemberListEntry`
