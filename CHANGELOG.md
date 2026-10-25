@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.21
+
+- fix(deps): admit a coherent published Eval Runtime Knowledge cohort
+- ci: move catalog build and post-release checks off production runner
+
 ## 0.63.20
 
 - fix(sandbox): prefer verified newer original recovery and fence canceled returns
