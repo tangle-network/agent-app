@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.22
+
+- test: retire invalid generic recovered-original state case
+
 ## 0.63.21
 
 - fix(deps): admit a coherent published Eval Runtime Knowledge cohort
