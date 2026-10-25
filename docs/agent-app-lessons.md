@@ -58,6 +58,25 @@ A computer step is the box work a Router turn asks for through `sandbox_run`. GT
 | **A computer failure's cause is in the transcript.** The redacted cause chain of a failed computer step is kept with the turn, where operators and support read it, not only in a log line. | GTM, 2026-10-24: causes went only to `console.error`, which Workers Logs did not keep, so failing threads read only `sandbox_failed` until [#1920](https://github.com/tangle-network/gtm-agent/pull/1920) wrote them to D1. | `createHybridTurnProducer` persists `sandboxRunFailureDetail` as the warning notice's `detail` and logs it when the app passes no `onFailure`; [`tests/chat-routes/hybrid-fallback.integration.test.ts`](../tests/chat-routes/hybrid-fallback.integration.test.ts) (real SDK refusals, credentials redacted). *in review*: the box's own failure text in `runSandboxPrompt`'s error ([#1319](https://github.com/tangle-network/agent-app/pull/1319)). |
 | **Every release proves a computer turn.** The release canary runs a plain turn and a turn only the workspace computer can answer, and fails the release when the computer step fails, naming its recorded cause. | Each of the three causes above reached production and was found from failing production threads (#1919 to #1922 cite them). | The create-agent-app chat template's `scripts/release-canary.mjs`, which `pnpm deploy` runs after `wrangler deploy`, and its `tests/release-canary.e2e.test.ts`. *planned*: the same two turns in each existing app's release canary (GTM `scripts/chat-canary.mjs`, Creative, Legal). |
 
+### One Router-first lane
+
+Design, 2026-10-25. Around `createHybridTurnProducer`, GTM, Creative and Legal each wrote their own turn key, computer model choice, computer session, receipt and Vault copy: 490 lines in Creative, 870 in Legal and about 1,240 in GTM (default branches on 2026-10-25). Tax had no computer step at all. Every computer-step failure on 2026-10-24 was in one of those copies.
+agent-app takes over the lane through the surfaces apps already call:
+
+- **Computer step.** `HybridTurnBox.computer` runs every `sandbox_run` call through `createComputerStep`, which a product's own producer can also call.
+  The step runs the first of the turn's models that the box key allows (`readSandboxRouterModels`, which reads Platform's `GET /v1/keys/sandbox-router-models`).
+  Its session is one value, `{ id, isolated }`, which sets both `secretProfileIsolation` and the send witness.
+  The step's child execution id comes from the turn and the tool call, so a repeated call reattaches to its run and is never sent twice.
+- **Receipt.** `receipts` stores each step's answer, model and saved files (`createD1ComputerStepReceipts`), so a repeated call returns the stored receipt.
+- **Vault copy.** `files` copies each file the step wrote under the box's workspace root into the app's Vault, through the app's `save`.
+  It then appends one receipt line to the answer. That line is the only statement about saved files that the model may repeat.
+- **Turn key.** Who pays stays the app's funding policy. The app passes it as `apiKey`: a per-turn child of the payer's key (`createDelegatedTurnKeys`), an agent key, or a flat-plan seat. The producer revokes the key when the turn settles.
+- **App configuration.** An app passes only its prompt, tools, profile, box `acquire`, funding and Vault adapter. `createDefaultChatBackend` accepts the same options, so an app made from the template gets the whole lane through configuration.
+
+The order of work: agent-app first, then GTM, Creative, Legal and Tax, where Tax gets its first Router-first computer step.
+Each app's release canary must pass both a plain turn and a computer turn.
+The target is at most 150 lines of lane code per app.
+
 ## Delivery
 
 | Lesson | Taught by | Enforced by |
