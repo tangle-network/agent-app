@@ -218,7 +218,7 @@ Failures retain their SDK cause for the redacted diagnostic serializer and prese
 ```bash
 pnpm install
 pnpm typecheck && pnpm test && pnpm build
-pnpm test:eval-compat # admitted Eval lines, including the 0.221 application contracts
+pnpm test:eval-compat # application contracts for the declared Eval compatibility lines
 ```
 
 The compatibility suite reruns the Eval, campaign, profile, knowledge, and catalog seams against each published line named by `test:eval-compat`.
