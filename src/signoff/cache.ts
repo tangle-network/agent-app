@@ -285,6 +285,7 @@ function removeEntry(entry: CacheEntry): boolean {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
+  if (missingGitMetadata(entry.path)) { entry.orphaned = true; return false }
   // Trees are registered Git worktrees, not ordinary scratch directories.
   const git = spawnSync('git', ['-C', entry.path, 'worktree', 'remove', '--force', entry.path], { encoding: 'utf8' })
   if (git.error) throw new Error(`signoff: cannot start Git to retire cached worktree ${entry.path}`, { cause: git.error })
@@ -355,7 +356,7 @@ export async function pruneSignoffCache(cacheDir: string, options: CachePruneOpt
       for (const key of entry.inodes) orphanedInodes.add(key)
     }
     return { beforeBytes, afterBytes: bytes, removed,
-      orphaned: candidates.filter((entry) => entry.orphaned).map((entry) => entry.path),
+      orphaned: candidates.filter((entry) => entry.orphaned && entry.inodes.size).map((entry) => entry.path),
       orphanedBytes: [...orphanedInodes].reduce((sum, key) => sum + (retained.get(key) ?? 0), 0),
       overBudgetBytes: Math.max(0, bytes - maxBytes) }
   })
