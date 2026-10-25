@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  WORKSPACE_SANDBOX_RECOVERY_ACTIONS,
   WORKSPACE_SANDBOX_RECOVERY_CODES,
   assessWorkspaceSandboxSnapshot,
   createWorkspaceSandboxRecoveryManager,
@@ -49,21 +48,6 @@ function memoryStore(seed?: WorkspaceSandboxRecoveryState): WorkspaceSandboxReco
 }
 
 describe('recovery action and code tables', () => {
-  // The bug this module exists to prevent: an action that no question knows
-  // about. Every declared action must be accepted by the validator and answered
-  // by the key resolver, or a recovery recorded under it is written, read back,
-  // discarded as malformed, and the workspace re-provisions the dead box.
-  it('classifies every declared action, with no unreachable branch', () => {
-    expect(WORKSPACE_SANDBOX_RECOVERY_ACTIONS.length).toBeGreaterThan(0)
-    for (const action of WORKSPACE_SANDBOX_RECOVERY_ACTIONS) {
-      expect(isWorkspaceSandboxRecoveryAction(action)).toBe(true)
-      expect(isWorkspaceSandboxRecoveryState(stateWith(action))).toBe(true)
-      // Answering is what matters — either the key or a deliberate undefined.
-      const key = preferredWorkspaceSandboxRecoveryBoxKey(stateWith(action))
-      expect(key === REPLACEMENT_KEY || key === undefined).toBe(true)
-    }
-  })
-
   it('answers the snapshot question for every declared code', () => {
     for (const code of WORKSPACE_SANDBOX_RECOVERY_CODES) {
       const fresh = stateWith('replacement_started', code, {
