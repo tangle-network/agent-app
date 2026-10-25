@@ -278,7 +278,7 @@ export async function provisionWorkspaceSandbox(
 
   // Stage 3 — create fresh.
   signal?.throwIfAborted()
-  const { payload, deferredFiles } = await prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal)
+  const { payload, deferredFiles } = await measure('payload', () => prepareWorkspacePayload(shell, workspaceId, userId, scope, harness, name, recoveryRestore, resources, billingOwnerId, signal))
 
   // The client signal aborts each request; the create's own signal also ends
   // its Retry-After pacing between POSTs, so a canceled caller sends no later create.

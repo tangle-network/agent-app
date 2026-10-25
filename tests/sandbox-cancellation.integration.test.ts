@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import type { ServerResponse } from 'node:http'
 import { DatabaseSync } from 'node:sqlite'
@@ -29,17 +30,26 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
 
 /** Real SDK requests to a loopback HTTP peer. No replaced fetch, SDK method,
  * clock, lifecycle function, or production request. */
-async function boundary(mode: 'read' | 'resume' | 'create' | 'connection') {
+async function boundary(mode: 'read' | 'resume' | 'create' | 'connection' | 'ready') {
   const entered = deferred()
   const closed = deferred()
   const twoEntered = deferred()
   const pending: ServerResponse[] = []
   const requests: string[] = []
+  const name = mode === 'ready' ? `cancel-ready-${randomUUID()}` : 'cancel-workspace'
   const server = createServer((request, response) => {
     request.resume()
     const path = new URL(request.url!, 'http://localhost').pathname
     requests.push(`${request.method} ${path}`)
     const json = (body: unknown) => response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    if (mode === 'ready') {
+      const box = { id: 'cancel-original', name, status: 'running', metadata: { harness: 'opencode' },
+        filesystemIncarnationId: name, filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
+        connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/cancel-original/runtime` } }
+      if (path === '/v1/sandboxes') return json({ sandboxes: [box] })
+      if (path === '/v1/sandboxes/cancel-original') return json(box)
+      if (path.endsWith('/runtime/config/config/app-env')) return json({ injected: 1 })
+    }
     if (mode === 'read' || path.endsWith('/resume') || (mode === 'connection' && path.endsWith('/cancel-original')) || (mode === 'create' && request.method === 'POST')) {
       pending.push(response)
       if (pending.length === 2) twoEntered.resolve()
@@ -50,7 +60,7 @@ async function boundary(mode: 'read' | 'resume' | 'create' | 'connection') {
     if (path === '/v1/sandboxes') {
       const stopped = new URL(request.url!, 'http://localhost').searchParams.get('status') === 'stopped'
       const found = (stopped && mode === 'resume') || (!stopped && mode === 'connection')
-      return json({ sandboxes: found ? [{ id: 'cancel-original', name: 'cancel-workspace', status: stopped ? 'stopped' : 'running', lifecycleState: stopped ? 'suspended' : undefined, metadata: { harness: 'opencode' }, filesystemIncarnationId: 'cancel-incarnation', filesystemIncarnationReadiness: 'ready' }] : [] })
+      return json({ sandboxes: found ? [{ id: 'cancel-original', name: 'cancel-workspace', status: stopped ? 'stopped' : 'running', lifecycleState: stopped ? 'suspended' : undefined, metadata: { harness: 'opencode' }, filesystemIncarnationId: 'cancel-incarnation', filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready' }] : [] })
     }
     response.writeHead(500).end('Unexpected lifecycle request')
   })
@@ -58,7 +68,7 @@ async function boundary(mode: 'read' | 'resume' | 'create' | 'connection') {
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const shell: SandboxRuntimeConfig = {
     credentials: () => ({ apiKey: 'local-cancellation-fixture', baseUrl }),
-    name: () => 'cancel-workspace', metadata: harness => ({ harness }),
+    name: () => name, metadata: harness => ({ harness }),
     connectedIntegrationIds: async () => [], env: async () => ({}),
     files: async () => [], secrets: async () => [],
     profile: () => {
@@ -233,4 +243,60 @@ describe('request cancellation through SDK and fenced provisioning', () => {
       expect(peer.requests.filter(line => line.startsWith('POST'))).toEqual([])
     } finally { controller.abort(); await peer.close(); db.close() }
   })
+  it.each(['observation', 'persistence'] as const)('refuses a box after async %s canceled the caller', async phase => {
+    const peer = await boundary('ready')
+    const { db } = sqliteClaims()
+    db.exec('CREATE TABLE observations (sandbox TEXT); CREATE TABLE reuse_state (name TEXT PRIMARY KEY, value TEXT)')
+    const controller = new AbortController()
+    const shell: SandboxRuntimeConfig = { ...peer.shell, runtimeEnv: async () => ({ LOCAL_PROOF: 'yes' }),
+      reuseState: {
+        async load() { return null },
+        async save(name, value) {
+          db.prepare('INSERT INTO reuse_state VALUES (?, ?)').run(name, JSON.stringify(value))
+          if (phase === 'persistence') controller.abort()
+        },
+        async drop(name) { db.prepare('DELETE FROM reuse_state WHERE name = ?').run(name) },
+      },
+    }
+    try {
+      await expect(ensureWorkspaceSandbox(shell, { workspaceId: `after-${phase}`, harness: 'opencode', signal: controller.signal,
+        spend: { async onProvisioned(value) {
+          db.prepare('INSERT INTO observations VALUES (?)').run(value.sandboxId)
+          if (phase === 'observation') controller.abort()
+        } },
+      })).rejects.toMatchObject({ name: 'AbortError' })
+      expect(db.prepare('SELECT COUNT(*) AS n FROM observations').get()).toMatchObject({ n: 1 })
+      expect(db.prepare('SELECT COUNT(*) AS n FROM reuse_state').get()).toMatchObject({ n: phase === 'persistence' ? 1 : 0 })
+      expect(peer.requests.some(line => /POST \/v1\/sandboxes(?:$|\/cancel-original\/(?:resume|stop))/.test(line))).toBe(false)
+    } finally { controller.abort(); await peer.close(); db.close() }
+  })
+
+  it('refuses a box after async adoption canceled the caller without releasing a later owner', async () => {
+    const peer = await boundary('ready')
+    const { db, store } = sqliteClaims()
+    db.exec('CREATE TABLE adoptions (sandbox TEXT)')
+    const scope = { workspaceId: 'after-adoption', harness: 'opencode' as const }
+    const key = sandboxPrewarmClaimKey(scope)
+    const prior = await store.acquireLease(key, 180)
+    const controller = new AbortController()
+    let released: Promise<void> | undefined
+    try {
+      const result = runForegroundSandboxSingleFlight({ ...scope, claim: store, signal: controller.signal, pollIntervalMs: 1,
+        onEvent(event) { if (event.type === 'waiting') released = store.releaseLease(prior!) },
+        provision: async () => { throw new Error('Waiter must not provision') },
+        peek: async signal => { await released; return peekWorkspaceSandbox(peer.shell, { workspaceId: scope.workspaceId, signal }) },
+        async adopt(value) {
+          db.prepare('INSERT INTO adoptions VALUES (?)').run(value.box.id)
+          expect(await store.acquireLease(key, 180)).not.toBeNull()
+          controller.abort()
+          return value.box
+        },
+      })
+      await expect(bounded(result)).rejects.toMatchObject({ name: 'AbortError' })
+      expect(db.prepare('SELECT COUNT(*) AS n FROM adoptions').get()).toMatchObject({ n: 1 })
+      expect((await store.inspect(key)).status).toBe('held')
+      expect(peer.requests.filter(line => line.startsWith('POST'))).toEqual([])
+    } finally { controller.abort(); await peer.close(); db.close() }
+  })
+
 })
