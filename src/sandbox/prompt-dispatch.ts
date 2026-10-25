@@ -23,6 +23,7 @@ import { traceSandboxPromptEvents } from './prompt-trace'
 import { dropTrustedBox } from './runtime-cache'
 import { SandboxRunError } from './sandbox-run-error'
 import { SandboxModelResolutionError } from './model'
+import { assertIsolatedDispatchWithinCap } from './payload-limits'
 
 /** Fire an activity tap without letting it affect the turn it reports on. */
 export function emitSandboxActivity(spend: SandboxSpendHooks | undefined, box: SandboxInstance): void {
@@ -86,10 +87,15 @@ export async function* streamSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
+  const prompt =
+    typeof message === 'string'
+      ? flattenHistory(message, options?.history)
+      : mergeHistoryIntoParts(message, options?.history)
   let backend: Awaited<ReturnType<typeof resolveSandboxPromptBackend>>
   try {
     options?.signal?.throwIfAborted()
     backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
+    assertIsolatedDispatchWithinCap({ prompt, backend, expectedSecretProfileReceipt: options?.expectedSecretProfileReceipt })
     options?.signal?.throwIfAborted()
   } catch (error) {
     // A known local refusal before dispatch differs from losing observation of
@@ -97,33 +103,32 @@ export async function* streamSandboxPrompt(
     if (error instanceof SandboxModelResolutionError) throw error
     throw new SandboxRunError('sandbox_unavailable', error instanceof Error ? error.message : 'The sandbox prompt was not dispatched because its configuration or admission was refused.', { cause: error })
   }
-  const prompt =
-    typeof message === 'string'
-      ? flattenHistory(message, options?.history)
-      : mergeHistoryIntoParts(message, options?.history)
 
-  const dispatch = () => options?.detach
-    ? detachedSandboxPromptEvents(box, prompt, options, backend)
-    : box.streamPrompt(prompt, {
-        sessionId: options?.sessionId,
-        executionId: options?.executionId,
-        turnId: options?.turnId,
-        lastEventId: options?.lastEventId,
-        ...(options?.signal ? { signal: options.signal } : {}),
-        ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-        ...(options?.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
-        ...(options?.requireVisibleAssistantOutput !== undefined
-          ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
-          : {}),
-        ...(options?.expectedPublicProfileRequestDigest
-          ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
-          : {}),
-        ...(options?.expectedSecretProfileReceipt
-          ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
-          : {}),
-        ...(options?.trace ? { traceId: options.trace.traceId } : {}),
-        backend,
-      } as StreamPromptOptions)
+  const dispatch = () => {
+    if (options?.detach) return detachedSandboxPromptEvents(box, prompt, options, backend)
+    // A cursor resumes an execution already sent; only a new send is witnessed.
+    if (!options?.lastEventId) options?.onDispatch?.()
+    return box.streamPrompt(prompt, {
+      sessionId: options?.sessionId,
+      executionId: options?.executionId,
+      turnId: options?.turnId,
+      lastEventId: options?.lastEventId,
+      ...(options?.signal ? { signal: options.signal } : {}),
+      ...(options?.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options?.ttlMs !== undefined ? { ttlMs: options.ttlMs } : {}),
+      ...(options?.requireVisibleAssistantOutput !== undefined
+        ? { requireVisibleAssistantOutput: options.requireVisibleAssistantOutput }
+        : {}),
+      ...(options?.expectedPublicProfileRequestDigest
+        ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
+        : {}),
+      ...(options?.expectedSecretProfileReceipt
+        ? { expectedSecretProfileReceipt: options.expectedSecretProfileReceipt }
+        : {}),
+      ...(options?.trace ? { traceId: options.trace.traceId } : {}),
+      backend,
+    } as StreamPromptOptions)
+  }
   const stream = options?.lastEventId ? dispatch() : resendRefusedDispatch(dispatch, options?.signal)
 
   emitSandboxActivity(options?.spend, box)

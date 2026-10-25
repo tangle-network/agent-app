@@ -29,9 +29,8 @@ import {
   createChatTurnRoutes,
   createUploadRoute,
   type ChatTurnAuthorization,
-  type ChatTurnProduceArgs,
-  type ChatTurnRouteProducer,
   type ChatTurnRoutes,
+  type CreateChatTurnRoutesOptions,
   type SandboxUploadSink,
 } from '@tangle-network/agent-app/chat-routes'
 import {
@@ -55,8 +54,9 @@ export interface ChatAppOverrides {
   db?: ChatDatabase
   /** Test seam: `createMemoryTurnEventStore()`. Default: D1-backed buffer. */
   turnStore?: TurnEventStore
-  /** Test seam: a fake producer. Default: the real hybrid lane. */
-  produce?: (args: ChatTurnProduceArgs<void>) => ChatTurnRouteProducer | Promise<ChatTurnRouteProducer>
+  /** Test seam: a fake producer, or the hybrid lane's `{ router }` configuration over local protocol peers.
+   *  Default: the real hybrid lane. */
+  produce?: CreateChatTurnRoutesOptions<void>['produce']
   /** Test seam: where large uploads land. Default: the workspace box's fs. */
   uploadSink?: (scope: { workspaceId: string; userId: string }) => Promise<SandboxUploadSink | null>
   /** Server-trusted identity for a private gateway chat assembly. Never read

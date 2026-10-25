@@ -9783,7 +9783,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined, detail?: string | undefined) => NoticePer…",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {
@@ -17400,7 +17400,7 @@
           "name": "buildSandboxToolFileMounts",
           "kind": "function",
           "signature": "(options: BuildSandboxToolFileMountsOptions) => AgentProfileFileMount[]",
-          "doc": "Build file mounts for sandbox tools based on provided options and tool configurations"
+          "doc": "Build file mounts for sandbox tools based on provided options and tool configurations."
         },
         {
           "name": "BuildSandboxToolFileMountsOptions",
@@ -18375,6 +18375,12 @@
           "doc": "Typed computer-task outcomes shared by prompt observation and the Router tool."
         },
         {
+          "name": "sandboxRunFailureDetail",
+          "kind": "function",
+          "signature": "(error: unknown) => string",
+          "doc": "The redacted cause chain of a computer-step failure, one line, for a durable record: each cause's name, code, status and message, outermost first, credentials and signed URLs removed."
+        },
+        {
           "name": "SandboxRuntimeAuthRefreshError",
           "kind": "class",
           "signature": "class SandboxRuntimeAuthRefreshError",
@@ -18466,9 +18472,9 @@
         },
         {
           "name": "SandboxToolSpec",
-          "kind": "interface",
-          "signature": "interface SandboxToolSpec",
-          "doc": "Define the specification for a sandbox tool including its name, content, and optional executability"
+          "kind": "type",
+          "signature": "type SandboxToolSpec",
+          "doc": "One tool name on a sandbox PATH: a program mounted from its own bytes, or a second name for a program another entry in the same call mounts."
         },
         {
           "name": "sandboxTransientBackoffMs",
@@ -29099,7 +29105,7 @@
         {
           "name": "noticePart",
           "kind": "function",
-          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined) => NoticePersistedPart",
+          "signature": "(noticeKind: NoticeKind, id: string, text: string, code?: string | undefined, detail?: string | undefined) => NoticePer…",
           "doc": "Builds the persisted/streamed `notice` part — a one-line transcript notice explaining an out-of-band event (warning, auto-declined interaction, turn error)."
         },
         {

@@ -50,6 +50,7 @@ The turn test uses real migrations and shell factories with a fake sandbox event
 The parent repository's fresh packed-generation gate also runs a local Worker/D1 browser proof.
 That proof checks real auth and thread persistence across a Worker restart, but makes no model request.
 For deployment, complete environment configuration, apply the required database migrations, and exercise the actual page and turn flow.
+`pnpm deploy` ends with the release canary (`scripts/release-canary.mjs`): a plain turn and a computer turn on the deployed origin, judged from the persisted transcript. Keep both turns; a release whose computer step fails must fail.
 Record hosted/model/disconnect proofs separately; do not claim them from compilation or an injected producer.
 Fix failures without weakening the protected behavior.
 

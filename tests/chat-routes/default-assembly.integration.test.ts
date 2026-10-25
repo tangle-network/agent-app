@@ -8,6 +8,7 @@ import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '.
 import { PREWARM_CLAIM_TABLE_DDL } from '../../src/sandbox/prewarm-claim-d1'
 import { WARM_RECEIPT_TABLE_DDL } from '../../src/sandbox/warm-receipts'
 import { sandboxPromptRunner } from '../../src/sandbox/sandbox-run-tool'
+import { buildSandboxToolFileMounts } from '../../src/sandbox/app-tools'
 import { streamSandboxPrompt } from '../../src/sandbox/index'
 import { defaultChatShell } from '../../src/chat-routes/default-backend'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
@@ -24,6 +25,8 @@ async function boundary() {
     CREATE TABLE message(id TEXT PRIMARY KEY,thread TEXT,role TEXT,content TEXT,parts TEXT)`)
   const requests: RouterPayload[] = []
   const nativeRequests: string[] = []
+  // Each computer request's wire size and the profile files it carried inline.
+  const computerRequests: Array<{ sessionId: string; bytes: number; files: Array<{ path: string; bytes: number }> }> = []
   const channels: string[] = []
   const pending: Promise<unknown>[] = []
   const held: Array<() => void> = []
@@ -44,8 +47,17 @@ async function boundary() {
       }
       if (request.url === '/v1/sandboxes/observation-box/runtime/agents/run/stream') {
         nativeRequests.push(`${request.method} ${request.url}`)
-        const input = JSON.parse(body) as { sessionId: string; parts?: Array<{ type: string; text?: string }> }
+        const input = JSON.parse(body) as { sessionId: string; parts?: Array<{ type: string; text?: string }>
+          backend?: { profile?: { resources?: { files?: Array<{ path: string; resource?: { content?: string } }> } } } }
+        computerRequests.push({ sessionId: input.sessionId, bytes: Buffer.byteLength(body),
+          files: (input.backend?.profile?.resources?.files ?? []).map(file => ({ path: file.path, bytes: Buffer.byteLength(file.resource?.content ?? '') })) })
         response.writeHead(200, { 'content-type': 'text/event-stream' })
+        if (input.sessionId.startsWith('confirmed-')) {
+          const ids = { executionId: String(request.headers['x-execution-id'] ?? 'confirmed-execution'), sessionId: input.sessionId }
+          response.end(`event: execution.started\ndata: ${JSON.stringify(ids)}\n\nevent: result\ndata: ${JSON.stringify({
+            ...ids, finalText: 'Confirmed computer answer.' })}\n\nevent: done\ndata: ${JSON.stringify({ ...ids, status: 'completed' })}\n\n`)
+          return
+        }
         if (request.headers['x-execution-id']) response.write(`id: admitted\nevent: execution.started\ndata: ${JSON.stringify({
           executionId: request.headers['x-execution-id'], sessionId: input.sessionId,
         })}\n\n`)
@@ -137,7 +149,7 @@ async function boundary() {
   const turn = (threadId: string, content = 'Hello.') => post('/api/chat', { threadId, turnId: crypto.randomUUID(), content })
   const ctx = { waitUntil(work: Promise<unknown>) { pending.push(work) } }
   const flush = async () => { for (let at = 0; at < pending.length; at++) await pending[at] }
-  return { db, store, requests, nativeRequests, channels, routes, post, turn, ctx, flush, origin,
+  return { db, store, requests, nativeRequests, computerRequests, channels, routes, post, turn, ctx, flush, origin,
     holdStarted: () => heldModelStarted ? Promise.resolve() : new Promise<void>(resolve => modelStarted.push(resolve)),
     release: () => { for (const send of held.splice(0)) send() },
     close: async () => {
@@ -534,8 +546,9 @@ it('gives detached tool calls distinct native identities and reuses only the exa
     const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: origin }).get('identity-box')
     if (!box) throw new Error('Local identity box is missing')
     const shell = defaultChatShell('identity-proof', { TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: origin }, { model: 'native/model' })
+    let witnessed = 0
     const run = sandboxPromptRunner(shell, { model: 'native/model', sessionId: 'same-child-session',
-      executionId: 'same-parent-execution', turnId: 'same-parent-turn', detach: true })
+      executionId: 'same-parent-execution', turnId: 'same-parent-turn', detach: true, onDispatch: () => { witnessed++ } })
     const options = (callId?: string) => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000, emit() {}, ...(callId ? { callId } : {}) })
     expect(await run(box, 'first task', options('call-one'))).toBe('Answer:first task')
     expect(await run(box, 'second task', options('call-two'))).toBe('Answer:second task')
@@ -551,8 +564,112 @@ it('gives detached tool calls distinct native identities and reuses only the exa
     expect(admissions).toHaveLength(4)
     expect(new Set(admissions.map(turn => turn.executionId)).size).toBe(4)
     expect(new Set(admissions.map(turn => turn.turnId)).size).toBe(4)
+    // Every detached run was handed to the SDK once, the exact retry included; its cached answer sent no new run.
+    expect(witnessed).toBe(5)
   } finally {
     server.closeAllConnections()
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
 }, 15_000)
+
+type Peer = Awaited<ReturnType<typeof boundary>>
+
+/** One hybrid turn whose computer step runs through the shared runner on the real SDK, read back from the transcript. */
+async function computerTurn(peer: Peer, thread: string, prompt: Parameters<typeof sandboxPromptRunner>[1],
+  env: { TANGLE_API_KEY?: string; TANGLE_ROUTER_URL?: string } = { TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: peer.origin }) {
+  const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: peer.origin }).get('observation-box')
+  if (!box) throw new Error('Local observation box is missing')
+  const shell = defaultChatShell('default-assembly', env, { model: 'native/model' })
+  const routes = peer.routes({ produce: {
+    router: () => ({
+      apiKey: 'loopback-only-router-key', model: 'requested/default', baseUrl: peer.origin,
+      systemPrompt: 'Use the workspace computer when asked.',
+      box: { acquire: async () => box, runTask: sandboxPromptRunner(shell, prompt), timeoutMs: 5_000 },
+    }),
+  } })
+  const reply = await routes.turn(peer.turn(thread, 'Please use the computer.'), peer.ctx)
+  await reply.text()
+  await peer.flush()
+  const assistant = (await peer.store.listMessages(thread)).find(message => message.role === 'assistant')
+  const parts = (assistant?.parts ?? []) as Array<Record<string, unknown>>
+  return {
+    result: String(peer.requests.at(-1)?.messages.find(message => message.role === 'tool')?.content),
+    notice: parts.find(part => part.type === 'notice'),
+  }
+}
+
+/** Whether the workspace admits its next turn, i.e. the computer step did not leave it fenced. */
+async function admitsNextTurn(peer: Peer, thread: string): Promise<number> {
+  const next = await peer.routes().turn(peer.turn(thread), peer.ctx)
+  await next.text()
+  await peer.flush()
+  return next.status
+}
+
+const program = (seed: string) => `#!/bin/sh\n# ${seed}\n${'x'.repeat(600_000)}\n`
+const tools = (files: ReturnType<typeof buildSandboxToolFileMounts>) =>
+  ({ name: 'default-assembly', prompt: { systemPrompt: 'Run the workspace tools.' }, resources: { files } })
+
+it('witnesses the real send of a shared computer step, before the box receives it', async () => {
+  const peer = await boundary()
+  try {
+    const { result, notice } = await computerTurn(peer, 'shared-step', { model: 'native/model', sessionId: 'confirmed-shared',
+      onDispatch: () => { peer.nativeRequests.push('witness') } })
+    expect(peer.nativeRequests.filter(request => request === 'witness' || request.startsWith('POST'))).toEqual([
+      'witness', 'POST /v1/sandboxes/observation-box/runtime/agents/run/stream',
+    ])
+    expect(result).toContain('Confirmed computer answer.')
+    expect(notice).toBeUndefined()
+  } finally { await peer.close() }
+})
+
+it('refuses an isolated computer dispatch over the request cap before sending it, and records the named cause', async () => {
+  const peer = await boundary()
+  try {
+    const files = buildSandboxToolFileMounts({ appName: 'default-assembly',
+      tools: [{ name: 'render-ad', content: program('ad') }, { name: 'render-video', content: program('video') }] })
+    let witnessed = 0
+    const { result, notice } = await computerTurn(peer, 'isolated-over-cap', { model: 'native/model', sessionId: 'confirmed-isolated',
+      secretProfileIsolation: true, profile: tools(files), onDispatch: () => { witnessed++ } })
+    expect(peer.computerRequests).toEqual([])
+    expect(witnessed).toBe(0)
+    expect(result).toContain('sandbox_unavailable')
+    expect(notice).toMatchObject({ type: 'notice', noticeKind: 'warning', code: 'sandbox_unavailable' })
+    expect(String(notice?.detail)).toContain("over the sandbox gateway's 1048576-byte request cap")
+    expect(String(notice?.detail)).toMatch(/largest: \/home\/agent\/tools\/default-assembly\/bin\/render-(ad|video)=\d+B/)
+    // Nothing reached the box, so the workspace is not held for a run that never started.
+    expect(await admitsNextTurn(peer, 'after-isolated-over-cap')).toBe(200)
+  } finally { await peer.close() }
+})
+
+it('sends one copy of a program mounted under several names, so the isolated dispatch fits', async () => {
+  const peer = await boundary()
+  try {
+    const files = buildSandboxToolFileMounts({ appName: 'default-assembly', tools: [{ name: 'render-ad', content: program('ad') },
+      { name: 'render-video', aliasOf: 'render-ad' }, { name: 'render-still', aliasOf: 'render-ad' }] })
+    // A prepared secret revision's receipt makes the SDK send the whole profile inline, as an isolated session does.
+    const { result, notice } = await computerTurn(peer, 'isolated-alias', { model: 'native/model', sessionId: 'confirmed-alias',
+      secretProfileIsolation: true, expectedSecretProfileReceipt: `hmac-sha256:${'0'.repeat(64)}`, profile: tools(files) })
+    expect(result).toContain('Confirmed computer answer.')
+    expect(notice).toBeUndefined()
+    expect(peer.computerRequests).toHaveLength(1)
+    const [sent] = peer.computerRequests
+    expect(sent!.bytes).toBeLessThan(1_048_576)
+    const bin = '/home/agent/tools/default-assembly/bin'
+    expect(sent!.files.map(file => file.path)).toEqual(expect.arrayContaining([`${bin}/render-ad`, `${bin}/render-video`, `${bin}/render-still`]))
+    expect(sent!.files.filter(file => file.bytes > 1_000).map(file => file.path)).toEqual([`${bin}/render-ad`])
+  } finally { await peer.close() }
+})
+
+it('releases the workspace when a computer step is refused before its send', async () => {
+  const peer = await boundary()
+  try {
+    // A shell with no Router credential cannot carry the per-turn model, so the prompt is refused before the SDK.
+    const { result, notice } = await computerTurn(peer, 'refused-before-send', { model: 'native/model', sessionId: 'confirmed-refused' }, {})
+    expect(peer.computerRequests).toEqual([])
+    expect(result).toContain('sandbox_unavailable')
+    expect(notice).toMatchObject({ code: 'sandbox_unavailable' })
+    expect(String(notice?.detail)).toContain('is not transportable')
+    expect(await admitsNextTurn(peer, 'after-refused-before-send')).toBe(200)
+  } finally { await peer.close() }
+})

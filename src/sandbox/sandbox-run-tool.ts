@@ -22,6 +22,7 @@ import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { TurnSpan, TurnTrace } from '../turn-trace/recorder'
 import { runSandboxPrompt, type SandboxRuntimeConfig, type StreamSandboxPromptOptions } from './index'
 import { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
+import { serializeSandboxProvisioningError } from './diagnostics'
 export { SandboxRunError, type SandboxRunFailureCode } from './sandbox-run-error'
 
 /** The engine's per-call tool context (`RouterTurnToolContext`), kept structural so this module does not import the engine. */
@@ -66,8 +67,10 @@ export interface SandboxRunToolOptions {
   signal?: AbortSignal
   /** The box's warm lease, so the call is recorded as a turn on it. */
   warm?: { leases: { turn(key: string): Promise<unknown> }; key: string }
-  /** Every failure with its cause, for the product's logs. The model only reads the typed message. */
-  onFailure?(error: SandboxRunError): void
+  /** Every failure with its cause and the tool call it belongs to. The model only reads the typed message;
+   *  {@link sandboxRunFailureDetail} is the redacted cause chain to keep. `createHybridTurnProducer` already
+   *  persists that chain on the turn's warning notice. */
+  onFailure?(error: SandboxRunError, call: { callId?: string }): void
   name?: string
   description?: string
 }
@@ -90,30 +93,46 @@ export const SANDBOX_RUN_DESCRIPTION =
   'runs the code and returns its answer. Takes seconds to minutes, ' +
   'so use it only when the answer needs the computer.'
 
+/** The redacted cause chain of a computer-step failure, one line, for a durable record: each cause's name, code,
+ *  status and message, outermost first, credentials and signed URLs removed. */
+export function sandboxRunFailureDetail(error: unknown): string {
+  return serializeSandboxProvisioningError(error).causes
+    .map(cause => [cause.name, cause.code !== undefined ? `code=${cause.code}` : '',
+      cause.status !== undefined ? `status=${cause.status}` : '', cause.message].filter(Boolean).join(' '))
+    .join(' <- ')
+    .slice(0, 2_000)
+}
+
 /** The shell's unattended runner. A supplied execution/turn id seeds child
  * identity with the actual tool callId: different calls stay separate and a
- * retry of that exact call stays idempotent. Without callId, use a fresh child. */
+ * retry of that exact call stays idempotent. Without callId, use a fresh child.
+ *
+ * Its failure follows the send witness, in a shared and an isolated session alike: a failure before the prompt
+ * was handed to the SDK is `sandbox_unavailable` (nothing runs on the box, so the turn may use it again); after
+ * it, the step stays unconfirmed. */
 export function sandboxPromptRunner(shell: SandboxRuntimeConfig, prompt: Omit<StreamSandboxPromptOptions, 'signal' | 'history'> = {}): SandboxRunToolOptions['runTask'] {
   return async (box, task, { callId, signal, timeoutMs, trace, span }) => {
     const parent = prompt.executionId?.trim() || prompt.turnId?.trim()
     const identity = parent ? new TextEncoder().encode(JSON.stringify([parent, prompt.sessionId, callId?.trim() || crypto.randomUUID()])) : undefined
     const digest = identity ? await crypto.subtle.digest('SHA-256', identity) : undefined
     const child = digest ? Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('') : undefined
-    return runSandboxPrompt(shell, box, task, {
-      ...prompt, ...(child ? { executionId: child, turnId: child } : {}), signal, timeoutMs, disallowQuestions: true,
-      ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
-    })
+    let sent = false
+    try {
+      return await runSandboxPrompt(shell, box, task, {
+        ...prompt, ...(child ? { executionId: child, turnId: child } : {}), signal, timeoutMs, disallowQuestions: true,
+        ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
+        onDispatch: () => { sent = true; prompt.onDispatch?.() },
+      })
+    } catch (error) {
+      if (sent || error instanceof SandboxRunError || signal.aborted) throw error
+      throw new SandboxRunError('sandbox_unavailable', 'The computer step was refused before it was sent to the box.', { cause: error })
+    }
   }
 }
 
 export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRunTool {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const runTask = options.runTask
-  const fail = (code: SandboxRunFailureCode, message: string, cause?: unknown): never => {
-    const error = new SandboxRunError(code, message, cause === undefined ? undefined : { cause })
-    options.onFailure?.(error)
-    throw error
-  }
   return {
     name: options.name ?? 'sandbox_run',
     description: options.description ?? SANDBOX_RUN_DESCRIPTION,
@@ -124,6 +143,11 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
       additionalProperties: false,
     },
     async run(args, context) {
+      const fail = (code: SandboxRunFailureCode, message: string, cause?: unknown): never => {
+        const error = new SandboxRunError(code, message, cause === undefined ? undefined : { cause })
+        options.onFailure?.(error, { ...(context?.callId ? { callId: context.callId } : {}) })
+        throw error
+      }
       const emit = (kind: string, data?: unknown) => { try { context?.emit(kind, data) } catch { /* a view never fails the call */ } }
       const task = typeof args.task === 'string' ? args.task.trim() : ''
       if (!task || task.length > TASK_LIMIT) {
