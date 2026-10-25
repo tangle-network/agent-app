@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.24
+
+- test: restore disposable Git and rollout integration checks (#1328)
+
 ## 0.63.23
 
 - Do not warn about a substitution when only the provider prefix differs (#1326)
