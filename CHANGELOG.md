@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.23
+
+- Do not warn about a substitution when only the provider prefix differs (#1326)
+
 ## 0.63.22
 
 - test: retire invalid generic recovered-original state case
