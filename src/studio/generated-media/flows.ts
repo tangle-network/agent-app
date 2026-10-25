@@ -10,6 +10,7 @@
 import { requiredText, type GenerateInputs } from '../../media/generate-request'
 import {
   browserUsableSourceUrl,
+  metadataResultUrl,
   normalizeProviderJobStatus,
   providerImageBytes,
   type GenerationMetadataFields,
@@ -303,9 +304,11 @@ async function generateAvatar<Context>(config: GeneratedMediaFlowsConfig<Context
 async function generateSpeech<Context>(config: GeneratedMediaFlowsConfig<Context>, input: MediaActor<Context> & {
   voice: string
   apiKey: string
+  /** The request's checked inputs; the stored record adds how the spoken text was produced. */
+  inputs: GenerateInputs
   resolveSpeechInput(prompt: string, apiKey: string): Promise<SpeechInput>
   speak(request: { input: string; model: string; voice: string }): Promise<unknown>
-}): Promise<{ media: PersistedGeneratedMedia; speechInput: SpeechInput }> {
+}): Promise<{ media: PersistedGeneratedMedia; speechInput: SpeechInput; fields: GenerationMetadataFields }> {
   const speechInput = await input.resolveSpeechInput(input.prompt, input.apiKey)
   const audio = await withTimeout(
     () => input.speak({ input: speechInput.input, model: input.model, voice: input.voice }),
@@ -327,7 +330,22 @@ async function generateSpeech<Context>(config: GeneratedMediaFlowsConfig<Context
     metadata: { voice: input.voice },
     recheck: input.recheck,
   })
-  return { media, speechInput }
+  return {
+    media,
+    speechInput,
+    fields: {
+      status: 'succeeded',
+      provider: 'speech',
+      inputs: {
+        ...input.inputs,
+        speechInputMode: speechInput.mode,
+        speechInput: speechInput.input,
+        scriptCostUsd: speechInput.scriptCostUsd,
+      },
+      resultUrl: metadataResultUrl(media.url),
+      ...mediaFields(config, media),
+    },
+  }
 }
 
 /** Transcribe the request's audio URL and write the transcript into the Vault. */
@@ -340,7 +358,7 @@ async function transcribe<Context>(config: GeneratedMediaFlowsConfig<Context>, i
   inputs: GenerateInputs
   apiKey: string
   createdAt: Date
-}): Promise<{ text: string; vaultPath: string }> {
+}): Promise<{ text: string; fields: GenerationMetadataFields }> {
   const { inputs, model } = input
   const audioUrl = requiredText(inputs.audioUrl)
   if (!audioUrl) throw new Error('audioUrl is required')
@@ -380,7 +398,7 @@ async function transcribe<Context>(config: GeneratedMediaFlowsConfig<Context>, i
     createdAt: input.createdAt,
     status: 'succeeded',
   })
-  return { text, vaultPath: file.vaultPath }
+  return { text, fields: { status: 'succeeded', provider: 'transcription', vaultPath: file.vaultPath } }
 }
 
 /**
