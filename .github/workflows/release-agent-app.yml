@@ -92,7 +92,6 @@ jobs:
         if: ${{ hashFiles('pnpm-lock.yaml') != '' }}
         # Keep the action self-install separate from the caller's canonical project store.
         env:
-          pnpm_config_store_dir: ${{ runner.temp }}/pnpm-bootstrap-store
           PNPM_CONFIG_STORE_DIR: ${{ runner.temp }}/pnpm-bootstrap-store
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
@@ -283,7 +282,6 @@ jobs:
         if: ${{ hashFiles('pnpm-lock.yaml') != '' }}
         # Keep the action self-install separate from the caller's canonical project store.
         env:
-          pnpm_config_store_dir: ${{ runner.temp }}/pnpm-bootstrap-store
           PNPM_CONFIG_STORE_DIR: ${{ runner.temp }}/pnpm-bootstrap-store
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
