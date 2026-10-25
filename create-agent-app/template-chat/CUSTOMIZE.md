@@ -42,6 +42,7 @@ Discovery: **Does the public-package frontend work on the real Worker origin?**
 
 - [ ] Run `pnpm build`. Worker and DOM typechecks are separate; Vite emits `dist/client`.
 - [ ] Run `pnpm exec wrangler deploy --dry-run` to check the Worker bundle without deploying.
+- [ ] Before `pnpm deploy`, export `CANARY_URL` (the deployed origin), `CANARY_EMAIL` and `CANARY_PASSWORD` for the release canary. It runs a plain turn and a computer turn on the deployed app and fails the release, naming the cause, when either fails.
 - [ ] Run `pnpm dev`, open the Worker origin, sign up, open History, create a conversation, and retain its `?threadId=...` URL.
 - [ ] Confirm desktop and mobile navigation, sign-out, fresh login, and reopening a saved thread after a local Worker restart.
 

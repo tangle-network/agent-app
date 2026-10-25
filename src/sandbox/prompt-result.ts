@@ -8,6 +8,7 @@ import type { StreamSandboxPromptOptions } from './prompt-options'
 import type { SandboxRuntimeConfig } from './configuration'
 import type { SandboxInstance, TurnDriveResult } from '@tangle-network/sandbox'
 import { streamSandboxPrompt, emitSandboxActivity } from './prompt-dispatch'
+import { assertIsolatedDispatchWithinCap } from './payload-limits'
 import { type Outcome, ok, fail } from './outcome'
 import { isTerminalPromptEvent } from './prompt-events'
 import { SandboxRunError } from './sandbox-run-error'
@@ -267,7 +268,10 @@ export async function driveSandboxTurn(
     typeof message === 'string'
       ? flattenHistory(message, options.history)
       : mergeHistoryIntoParts(message, options.history)
+  assertIsolatedDispatchWithinCap({ prompt, backend, expectedSecretProfileReceipt: options.expectedSecretProfileReceipt })
   try {
+    // A tick may dispatch the turn, so each one is witnessed as a possible send.
+    options.onDispatch?.()
     const drive = await box.driveTurn(prompt, {
       sessionId: options.sessionId,
       ...(options.turnId ? { turnId: options.turnId } : {}),

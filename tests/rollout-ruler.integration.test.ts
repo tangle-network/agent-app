@@ -100,7 +100,8 @@ it('the CLI refuses a hold only on turns since the deployed commit went live', a
     expect(sinceChange.status, sinceChange.stderr).toBe(0)
     expect(sinceChange.decision).toMatchObject({ decision: 'undecided', recommendation: 'narrow' })
   } finally { rmSync(dir, { recursive: true, force: true }) }
-})
+// Three real commits run the host's own Git hooks before four CLI launches; on a shared gate host that exceeds 5 s.
+}, 30_000)
 
 it('migrates historical SQLite rows and persists the route timing origin and arm without inventing old metadata', async () => {
   const sqlite = new Database(':memory:')

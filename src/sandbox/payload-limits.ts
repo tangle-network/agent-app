@@ -1,5 +1,7 @@
 
 
+import { DISPATCH_REQUEST_MAX_BYTES } from '../chat-routes/wire'
+
 // ---------------------------------------------------------------------------
 // Provision-time S-cost gates. Both run immediately before `client.create` —
 // each catches an input class that can NEVER produce a working sandbox, so
@@ -110,4 +112,46 @@ export function assertEnvWithinLimits(env: Record<string, string>): void {
         `Write large content to a file mount or resource instead of env vars.`,
     )
   }
+}
+
+/**
+ * Throw when a dispatch into a secret-isolated session cannot fit the sandbox gateway's
+ * {@link DISPATCH_REQUEST_MAX_BYTES} request cap. An isolated dispatch carries its whole profile inline, every file
+ * mount's content included, to the profile preparation and to the run; a shared session's file mounts are written
+ * to the box separately, so a shared dispatch is not measured here. The measure (prompt plus backend) is a lower
+ * bound of what the SDK sends, so a refusal is never a request that could have passed. The error names the
+ * largest mounts.
+ *
+ * GTM, 2026-10-24: one 342 KB program mounted under five names made a 2,065,490-byte isolated profile, and every
+ * computer child failed at the gateway with a cause only `console.error` saw.
+ */
+export function assertIsolatedDispatchWithinCap(input: {
+  prompt: unknown
+  /** The profile sent inline, and the isolation mark `resolveSandboxPromptBackend` sets from `secretProfileIsolation`. */
+  backend: {
+    profile?: string | { resources?: { files?: ReadonlyArray<{ path?: unknown }> } }
+    metadata?: { profileSecretIsolation?: unknown }
+  }
+  /** A prepared secret revision's receipt; the SDK then sends the full profile too. */
+  expectedSecretProfileReceipt?: string
+}): void {
+  const isolated = input.backend.metadata?.profileSecretIsolation === true || Boolean(input.expectedSecretProfileReceipt)
+  if (!isolated) return
+  const total = utf8ByteLength({ parts: input.prompt, backend: input.backend })
+  if (total <= DISPATCH_REQUEST_MAX_BYTES) return
+  const profile = input.backend.profile
+  const files = (typeof profile === 'string' ? undefined : profile?.resources?.files) ?? []
+  const largest = files
+    .map(file => ({ path: typeof file.path === 'string' ? file.path : '(unnamed)', bytes: utf8ByteLength(file) }))
+    .sort((a, b) => b.bytes - a.bytes)
+    .slice(0, 5)
+    .map(file => `${file.path}=${file.bytes}B`)
+  throw new Error(
+    `The isolated computer dispatch is ${total} bytes, over the sandbox gateway's ${DISPATCH_REQUEST_MAX_BYTES}-byte ` +
+      `request cap, so it was not sent. An isolated session sends every file mount inline. ` +
+      `prompt=${utf8ByteLength(input.prompt)}B, profile files=${utf8ByteLength(files)}B` +
+      (largest.length ? `; largest: ${largest.join(', ')}` : '') + '. ' +
+      'Mount one program under several names with `aliasOf` in buildSandboxToolFileMounts, or move large content ' +
+      'out of the isolated profile.',
+  )
 }

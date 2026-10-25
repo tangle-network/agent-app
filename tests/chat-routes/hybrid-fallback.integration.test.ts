@@ -72,7 +72,7 @@ it.each([
         executions++
         const input = JSON.parse(body) as { env?: Record<string, unknown> }
         executedCallIds.push(input.env?.GTM_FIXTURE_CALL_ID)
-        if (mode === 'execution') return json({ code: 'EXECUTION_REFUSED', message: 'Fixture execution refused' }, 409)
+        if (mode === 'execution') return json({ code: 'EXECUTION_REFUSED', message: 'Fixture execution refused (Authorization: Bearer fixture-secret-token)' }, 409)
         if (mode === 'runner-timeout') {
           lateReply = setTimeout(() => { lateExecutionCompleted = true; json({ answer: 'Late answer' }) }, 2_500)
           return
@@ -151,6 +151,12 @@ it.each([
     expect(warnings).toHaveLength(code ? 1 : 0)
     if (code) {
       expect(warnings[0]).toMatchObject({ noticeKind: 'warning', code })
+      // The cause is kept with the transcript, redacted, not only in a log line the Worker does not keep.
+      const detail = String(warnings[0]!.detail)
+      if (mode === 'provision') expect(detail).toContain('Fixture placement refused')
+      if (mode === 'execution') expect(detail).toContain('Fixture execution refused')
+      if (mode === 'empty') expect(detail).toContain('The sandbox finished without an answer.')
+      expect(detail).not.toContain('fixture-secret-token')
       expect(wire).toContain(code)
       expect(draft.filter(part => part.type === 'notice')).toEqual(warnings)
       const messages = requests[1]!.messages as Array<{ role: string; content: string }>
