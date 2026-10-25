@@ -100,106 +100,150 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
   let model: string | undefined
   let budgetEnforced = false
   let toolTokens: number | undefined
+  const controller = new AbortController()
+  const pendingTools = new Set<Promise<unknown>>()
+  let execution: Promise<void> | undefined
+  let reader: ReadableStreamDefaultReader<unknown> | undefined
+  let writer: WritableStreamDefaultWriter<unknown> | undefined
+  let terminalObserved = false
+  let closing: Promise<void> | undefined
+
+  // A local execution owns its completion evidence. A projected result can arrive
+  // before cleanup, and Runtime cancellation can finish before a tool's effects.
+  function close(reason?: unknown): Promise<void> {
+    controller.abort(reason)
+    closing ??= (async () => {
+      const errors: unknown[] = []
+      try { await reader?.cancel() } catch (error) { errors.push(error) }
+      try { await execution } catch (error) { errors.push(error) }
+      while (pendingTools.size) await Promise.allSettled([...pendingTools])
+      try { reader?.releaseLock() } catch (error) { errors.push(error) }
+      try { writer?.releaseLock() } catch (error) { errors.push(error) }
+      terminalObserved = true
+      if (errors.length) throw errors[0]
+    })()
+    return closing
+  }
 
   async function* events(): AsyncGenerator<unknown> {
     if (started) throw new Error('A protected chat producer can only execute once')
     started = true
-    options.signal?.throwIfAborted()
-    if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
-    const settings = protectedTurnSettings(profile, new Set(tools.keys()))
-    const controller = new AbortController()
-    const signal = AbortSignal.any([
-      controller.signal, AbortSignal.timeout(Math.max(1, options.grant.deadlineAtMs - Date.now())),
-      ...(options.signal ? [options.signal] : []),
-    ])
-    const channel = new TransformStream<unknown, unknown>()
-    const writer = channel.writable.getWriter()
-    const reader = channel.readable.getReader()
-    const emit = (event: unknown) => writer.write(event)
-    // Each model call's text, by segment. The answer is the last segment the model wrote.
-    const segments: string[] = []
-    const execution = runProtectedRouterTurn({
-      ...settings,
-      grant: options.grant,
-      userMessage: options.prompt,
-      history: [...(options.priorMessages ?? [])],
-      signal,
-      // The grant's ledger expects one buffered completion per model call.
-      stream: false,
-      maxToolCalls: options.maxToolCalls,
-      // The grant bounds model calls; the loop must not stop the turn earlier.
-      maxToolTurns: options.grant.reserve.limits.maxModelCalls,
-      tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
-        run: async (args: Record<string, unknown>) => {
-          signal.throwIfAborted()
-          toolCalls += 1
-          const id = `tool-${toolCalls}`
-          await emit({ type: 'tool_call', data: { id, name: tool.name, arguments: args } })
-          try {
-            const result = await tool.run(args, { signal })
-            await emit({ type: 'tool_result', data: { id, name: tool.name, output: result } })
-            return result
-          } catch (error) {
-            const message = error instanceof Error ? error.message : 'Tool failed'
-            await emit({ type: 'tool_result', data: { id, name: tool.name, error: message } })
-            throw error
-          }
-        } })),
-      toolError: error => ({ code: 'tool_failed', message: error instanceof Error ? error.message : 'Tool failed' }),
-      renderToolResult: (_toolName, outcome) => protectedToolResultText(outcome),
-      onEvent: event => {
-        if (event.type === 'text') segments[event.segment - 1] = (segments[event.segment - 1] ?? '') + event.delta
-      },
-    }).then(async outcome => {
-      if (outcome.settlement) {
-        usage = { ...outcome.settlement.usage }
-        budgetEnforced = outcome.settlement.budgetEnforced
-        model = outcome.settlement.model
-        // Tool-result text is billed as input under a grant.
-        toolTokens = 0
-      }
-      // A settlement check fails after the turn answered; the answer stands beside the failure.
-      if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
-        const finalText = segments.filter(Boolean).at(-1) ?? ''
-        if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
-        await emit({ type: 'result', data: { finalText } })
-      }
-      if (outcome.failure) throw new Error(outcome.failure.message)
-      await writer.close()
-    }).catch(error => writer.abort(error))
     try {
+      controller.signal.throwIfAborted()
+      options.signal?.throwIfAborted()
+      if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
+      const settings = protectedTurnSettings(profile, new Set(tools.keys()))
+      const signal = AbortSignal.any([
+        controller.signal, AbortSignal.timeout(Math.max(1, options.grant.deadlineAtMs - Date.now())),
+        ...(options.signal ? [options.signal] : []),
+      ])
+      const channel = new TransformStream<unknown, unknown>()
+      const channelWriter = channel.writable.getWriter()
+      const channelReader = channel.readable.getReader()
+      writer = channelWriter
+      reader = channelReader
+      const emit = (event: unknown) => channelWriter.write(event)
+      // Each model call's text, by segment. The answer is the last segment the model wrote.
+      const segments: string[] = []
+      execution = runProtectedRouterTurn({
+        ...settings,
+        grant: options.grant,
+        userMessage: options.prompt,
+        history: [...(options.priorMessages ?? [])],
+        signal,
+        // The grant's ledger expects one buffered completion per model call.
+        stream: false,
+        maxToolCalls: options.maxToolCalls,
+        // The grant bounds model calls; the loop must not stop the turn earlier.
+        maxToolTurns: options.grant.reserve.limits.maxModelCalls,
+        tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
+          run: (args: Record<string, unknown>) => {
+            const work = (async () => {
+              signal.throwIfAborted()
+              toolCalls += 1
+              const id = `tool-${toolCalls}`
+              await emit({ type: 'tool_call', data: { id, name: tool.name, arguments: args } })
+              signal.throwIfAborted()
+              try {
+                const result = await tool.run(args, { signal })
+                await emit({ type: 'tool_result', data: { id, name: tool.name, output: result } })
+                return result
+              } catch (error) {
+                const message = error instanceof Error ? error.message : 'Tool failed'
+                await emit({ type: 'tool_result', data: { id, name: tool.name, error: message } })
+                throw error
+              }
+            })()
+            pendingTools.add(work)
+            void work.then(() => pendingTools.delete(work), () => pendingTools.delete(work))
+            return work
+          } })),
+        toolError: error => ({ code: 'tool_failed', message: error instanceof Error ? error.message : 'Tool failed' }),
+        renderToolResult: (_toolName, outcome) => protectedToolResultText(outcome),
+        onEvent: event => {
+          if (event.type === 'text') segments[event.segment - 1] = (segments[event.segment - 1] ?? '') + event.delta
+        },
+      }).then(async outcome => {
+        if (outcome.settlement) {
+          usage = { ...outcome.settlement.usage }
+          budgetEnforced = outcome.settlement.budgetEnforced
+          model = outcome.settlement.model
+          // Tool-result text is billed as input under a grant.
+          toolTokens = 0
+        }
+        // A settlement check fails after the turn answered; the answer stands beside the failure.
+        if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
+          const finalText = segments.filter(Boolean).at(-1) ?? ''
+          if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
+          await emit({ type: 'result', data: { finalText } })
+        }
+        if (outcome.failure) throw new Error(outcome.failure.message)
+        await channelWriter.close()
+      }).catch(error => channelWriter.abort(error))
       for (;;) {
-        const next = await reader.read()
+        const next = await channelReader.read()
         if (next.done) break
         yield next.value
       }
       await execution
     } finally {
-      controller.abort()
-      await reader.cancel().catch(() => undefined)
-      await execution
-      reader.releaseLock()
-      writer.releaseLock()
+      await close()
     }
   }
 
   const producer = createSandboxChatProducer({ events: events(), model: profile.model?.default })
+  const stream = (async function* () {
+    let failure: ChatRouteEvent | undefined
+    for await (const event of producer.stream) {
+      if (event.type === 'error') failure = event
+      else yield event
+    }
+    if (usage.inputTokens !== undefined && usage.outputTokens !== undefined && usage.costUsd !== undefined) {
+      yield { type: 'usage' as const, usage: { promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens, providerCostUsd: usage.costUsd,
+        reasoningTokens: usage.reasoningTokens, toolTokens,
+        toolCallCount: toolCalls, budgetEnforced } }
+    }
+    if (failure) yield failure
+  })()
+  // AsyncGenerator.return before its first pull never enters the body/finally.
+  // Abort and drain independently, also waking a pending read before return queues.
+  const end = stream.return.bind(stream)
+  const fail = stream.throw.bind(stream)
+  stream.return = async value => {
+    const stopped = close(new Error('The chat route stopped reading this turn'))
+    void stopped.catch(() => undefined)
+    try { return await end(value) } finally { await stopped }
+  }
+  stream.throw = async error => {
+    const stopped = close(error)
+    void stopped.catch(() => undefined)
+    try { return await fail(error) } finally { await stopped }
+  }
   return {
     ...producer,
-    stream: (async function* () {
-      let failure: ChatRouteEvent | undefined
-      for await (const event of producer.stream) {
-        if (event.type === 'error') failure = event
-        else yield event
-      }
-      if (usage.inputTokens !== undefined && usage.outputTokens !== undefined && usage.costUsd !== undefined) {
-        yield { type: 'usage' as const, usage: { promptTokens: usage.inputTokens,
-          completionTokens: usage.outputTokens, providerCostUsd: usage.costUsd,
-          reasoningTokens: usage.reasoningTokens, toolTokens,
-          toolCallCount: toolCalls, budgetEnforced } }
-      }
-      if (failure) yield failure
-    })(),
+    stream,
+    terminalObserved: () => terminalObserved,
     get model() { return model ?? profile.model?.default },
     usage: () => ({ ...usage }),
   }
