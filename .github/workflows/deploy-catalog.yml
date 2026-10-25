@@ -1,6 +1,15 @@
 name: Deploy component catalog
 on:
   workflow_call:
+    inputs:
+      build-only:
+        description: Prepare the immutable catalog artifact without deployment secrets
+        type: boolean
+        default: false
+      suites-only:
+        description: Run full signoff after release without deployment secrets
+        type: boolean
+        default: false
     secrets:
       CLOUDFLARE_API_TOKEN:
         required: false
@@ -10,9 +19,123 @@ permissions:
   contents: read
   deployments: write
 jobs:
+  build:
+    if: >-
+      inputs.build-only && github.repository == 'tangle-network/agent-app' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on:
+      group: public-app-production
+      labels: [self-hosted, ci-deploy]
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Reject conflicting catalog modes
+        if: inputs.suites-only
+        run: |
+          echo '::error::build-only and suites-only are mutually exclusive.'
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm build-storybook
+      - name: Read the shared catalog attestor at an immutable revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: tangle-network/sandbox-ui
+          ref: e57326f593b8262d873ed4e55a56d2dd5e924d94
+          path: .catalog-tools
+          sparse-checkout: scripts/build-catalog-manifest.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - run: node .catalog-tools/scripts/build-catalog-manifest.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-app-catalog-${{ github.sha }}
+          path: storybook-static
+          if-no-files-found: error
+          retention-days: 1
+
+  suites:
+    if: >-
+      inputs.suites-only && !inputs.build-only &&
+      github.repository == 'tangle-network/agent-app' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on:
+      group: public-app-production
+      labels: [self-hosted, ci-deploy]
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Verify the exact source head with the maintained signoff gate
+        env:
+          VITEST_MAX_WORKERS: '2'
+          TMPDIR: ${{ runner.temp }}
+          VERIFICATION_DIR: ${{ runner.temp }}/agent-app-signoff-evidence
+        run: pnpm signoff --source head --max-parallel 1 --keep-going --json "$RUNNER_TEMP/agent-app-signoff.json"
+      - name: Retain the maintained receipt and intentional browser proof outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: agent-app-signoff-${{ github.sha }}
+          # Never archive generated projects, local databases or .dev.vars.
+          path: |
+            ${{ runner.temp }}/agent-app-signoff.json
+            ${{ runner.temp }}/agent-app-signoff-evidence/*.png
+            ${{ runner.temp }}/agent-app-signoff-evidence/workspace-proof.json
+          if-no-files-found: warn
+          retention-days: 1
+
+  suite-failure-issue:
+    needs: suites
+    if: ${{ always() && inputs.suites-only && !inputs.build-only && needs.suites.result == 'failure' }}
+    runs-on:
+      group: public-app-production
+      labels: [self-hosted, ci-deploy]
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const title = 'Component catalog post-release signoff is red';
+            const body = [
+              `Source: ${context.sha}`,
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              'Catalog deployment and its immutable manifest verification succeeded before this full signoff ran.',
+              'Fix forward. A later suite failure does not roll back the released catalog.',
+            ].join('\n');
+            const existing = await github.paginate(github.rest.issues.listForRepo, { ...context.repo, state: 'open', per_page: 100 });
+            const issue = existing.find(value => !value.pull_request && value.title === title);
+            if (issue) await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body });
+            else await github.rest.issues.create({ ...context.repo, title, body });
+
   deploy:
     if: >-
-      github.repository == 'tangle-network/agent-app' && (
+      !inputs.build-only && !inputs.suites-only && github.repository == 'tangle-network/agent-app' && (
         (github.event_name != 'pull_request' && github.ref == 'refs/heads/main') ||
         (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
       )

@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.63.18
+
+- test(peer-floors): consolidate repository source audit
+- fix(journeys): prune stale run artifacts
+
+## 0.63.17
+
+- fix(chat): report unfinished Router turns as deadline failures (#1321)
+
+## 0.63.16
+
+- fix: harden dependencies and prompt execution
+
+## 0.63.15
+
+- fix(sandbox): report why a sandbox prompt produced no answer (#1319)
+
+## 0.63.14
+
+- ci: release the catalog before full signoff suites
+
+## 0.63.13
+
+- fix(sandbox): carry caller cancellation through shared provisioning (#1317)
+
+## 0.63.12
+
+- ci: prepare catalog through its retained deployment workflow
+
+## 0.63.11
+
+- fix: preserve archive and release boundaries
+- fix(sandbox): preserve prompt refusal details
+- chore: register integration fixture entrypoints
+- fix(auth): forward password reset session revocation
+
+## 0.63.10
+
+- ci: keep local and deployment checks, remove PR CI
+
+## 0.63.9
+
+- ci(catalog): cancel superseded pull request catalog runs (#1314)
+
+## 0.63.8
+
+- fix(chat): persist canonical Router failure notices
+
+## 0.63.7
+
+- feat: make chat turn assembly binding-aware by default
+
 ## 0.63.6
 
 - fix(web-react): preserve plan requests for inline clients (#1288)

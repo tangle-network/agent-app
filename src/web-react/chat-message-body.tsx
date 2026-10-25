@@ -1,7 +1,6 @@
 /** Chronological text, tool, and notice segments within one turn. */
 import { useMemo, type ReactNode } from 'react'
 import { useSmoothText } from './smooth-text'
-import { ChevronDown } from './controls'
 import { pendingApprovalOf, toolCallFailed, ToolCallCard } from './chat-tool-call'
 import type { ChatToolCallInfo, ChatUiMessage, ChatMessageSegment, ChatNoticeTone, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 

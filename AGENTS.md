@@ -78,6 +78,7 @@ Approvals attach to an action's effects, such as spending or publishing, rather 
 ## Develop and verify
 
 Use the repository's package scripts and configured Node runtime.
+Local Beelink gate: `beelink-gate auto https://github.com/tangle-network/agent-app.git "$(git rev-parse HEAD)" -- sh -c 'pnpm typecheck && pnpm exec vitest run "$@"' -- <touched-integration-files>`; the gate installs dependencies with the frozen lockfile before running the command.
 When another checkout consumes local declarations, run the declaration watcher as well as the JavaScript watcher.
 For new or changed tests, demonstrate that breaking the protected behavior makes the test fail, then restore and confirm it passes.
 Record both results in the PR; assertion presence alone does not prove the test detects the defect.

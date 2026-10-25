@@ -21,6 +21,8 @@ import {
 } from './prompt-events'
 import { traceSandboxPromptEvents } from './prompt-trace'
 import { dropTrustedBox } from './runtime-cache'
+import { SandboxRunError } from './sandbox-run-error'
+import { SandboxModelResolutionError } from './model'
 
 /** Fire an activity tap without letting it affect the turn it reports on. */
 export function emitSandboxActivity(spend: SandboxSpendHooks | undefined, box: SandboxInstance): void {
@@ -84,9 +86,17 @@ export async function* streamSandboxPrompt(
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
 ): AsyncGenerator<unknown> {
-  options?.signal?.throwIfAborted()
-  const backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
-  options?.signal?.throwIfAborted()
+  let backend: Awaited<ReturnType<typeof resolveSandboxPromptBackend>>
+  try {
+    options?.signal?.throwIfAborted()
+    backend = await resolveSandboxPromptBackend(shell, options ?? {}, 'streamSandboxPrompt')
+    options?.signal?.throwIfAborted()
+  } catch (error) {
+    // A known local refusal before dispatch differs from losing observation of
+    // an admitted execution. Callers can release admission for this outcome.
+    if (error instanceof SandboxModelResolutionError) throw error
+    throw new SandboxRunError('sandbox_unavailable', error instanceof Error ? error.message : 'The sandbox prompt was not dispatched because its configuration or admission was refused.', { cause: error })
+  }
   const prompt =
     typeof message === 'string'
       ? flattenHistory(message, options?.history)

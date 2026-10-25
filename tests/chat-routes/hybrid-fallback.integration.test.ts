@@ -27,8 +27,8 @@ async function close(server: Server) {
 it.each([
   { mode: 'plain', code: undefined },
   { mode: 'provision', code: 'sandbox_unavailable' },
-  { mode: 'execution', code: 'sandbox_failed' },
-  { mode: 'runner-timeout', code: 'sandbox_failed' },
+  { mode: 'execution', code: 'sandbox_unconfirmed' },
+  { mode: 'runner-timeout', code: 'sandbox_unconfirmed' },
   { mode: 'acquire-timeout', code: 'sandbox_unavailable' },
   { mode: 'empty', code: 'sandbox_empty' },
   { mode: 'success', code: undefined },

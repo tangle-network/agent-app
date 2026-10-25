@@ -90,3 +90,22 @@ export interface StreamSandboxPromptOptions {
   /** The span the prompt hangs from. Default: the trace's root. */
   traceParent?: TurnSpan
 }
+
+export interface SandboxPromptExecutionLimits {
+  maxOutputTokens?: number
+  maxReasoningTokens?: number
+}
+
+export function sandboxPromptExecutionOptions(
+  limits: SandboxPromptExecutionLimits | undefined,
+  effort: StreamSandboxPromptOptions['effort'],
+): Pick<StreamSandboxPromptOptions, 'effort' | 'maxOutputTokens' | 'maxReasoningTokens' | 'maxTotalOutputTokens'> {
+  return {
+    effort: limits?.maxReasoningTokens === 0 ? 'none' : effort,
+    ...(limits?.maxOutputTokens !== undefined ? {
+      maxOutputTokens: limits.maxOutputTokens,
+      maxTotalOutputTokens: limits.maxOutputTokens,
+    } : {}),
+    ...(limits?.maxReasoningTokens ? { maxReasoningTokens: limits.maxReasoningTokens } : {}),
+  }
+}

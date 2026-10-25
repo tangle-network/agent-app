@@ -3,8 +3,7 @@ import base from './vitest.config.ts'
 
 // Run the application seams against another admitted Eval line, leaving the
 // current Runtime/Knowledge development cohort intact: the retained 0.204 line
-// by default, or the line AGENT_EVAL_COMPAT names (agent-eval-0211,
-// agent-eval-0217, agent-eval-0218, agent-eval-0221).
+// by default, or the line AGENT_EVAL_COMPAT names (agent-eval-0211, agent-eval-0217, agent-eval-0218).
 const compat = process.env.AGENT_EVAL_COMPAT ?? 'agent-eval-0204'
 
 export default defineConfig({
@@ -17,9 +16,6 @@ export default defineConfig({
   },
   test: {
     ...base.test,
-    // The default projects add broad file includes. This dedicated suite
-    // owns its file selection and executes the package identity check once.
-    projects: undefined,
     include: [
       'tests/eval-compat/identity.compat.ts',
       'tests/eval.test.ts',

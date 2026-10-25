@@ -321,10 +321,10 @@ export function classifySeveredStream(event: unknown): SandboxStepTransition | n
   return { kind: 'step-finish', reason, severed: SEVERED_FINISH_REASONS.has(reason) }
 }
 
-/** Determine if an event is a terminal prompt event with type 'result' or 'done */
+/** A backend result or terminal event, excluding SDK cleanup after observation loss. */
 export function isTerminalPromptEvent(event: unknown): boolean {
-  const t = asPlainRecord(event)?.type
-  return t === 'result' || t === 'done'
+  const root = asPlainRecord(event)
+  return root?.type === 'result' || (root?.type === 'done' && asPlainRecord(root.data)?.status !== 'failed')
 }
 
 // Interactive-question detector. Returns the question text or null. Used by

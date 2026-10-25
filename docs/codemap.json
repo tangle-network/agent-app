@@ -2503,6 +2503,7 @@
       "source": "src/chat-routes/index.ts",
       "dependsOn": [
         "chat-store",
+        "harness",
         "interactions",
         "launch-invariants",
         "model-resolution",
@@ -2891,6 +2892,18 @@
           "kind": "interface",
           "signature": "interface ChatTurnCompleteInput",
           "doc": "What a settled turn reports to `onTurnComplete` — the product's post-processing seam (billing, titles, audit)."
+        },
+        {
+          "name": "ChatTurnDefaultBackend",
+          "kind": "interface",
+          "signature": "interface ChatTurnDefaultBackend",
+          "doc": "Domain data for the default lane, instead of constructing producers or admission hooks."
+        },
+        {
+          "name": "ChatTurnEnvironment",
+          "kind": "interface",
+          "signature": "interface ChatTurnEnvironment",
+          "doc": "Worker bindings are explicit; no ambient deployment credentials replace product policy."
         },
         {
           "name": "ChatTurnExecutionLimits",
@@ -17290,6 +17303,7 @@
         "chat-routes",
         "harness",
         "profile",
+        "redact",
         "runtime",
         "tools",
         "turn-stream",
@@ -17775,7 +17789,7 @@
           "name": "isTerminalPromptEvent",
           "kind": "function",
           "signature": "(event: unknown) => boolean",
-          "doc": "Determine if an event is a terminal prompt event with type 'result' or 'done"
+          "doc": "A backend result or terminal event, excluding SDK cleanup after observation loss."
         },
         {
           "name": "isWorkspaceSandboxRecoveryAction",
@@ -17870,7 +17884,7 @@
         {
           "name": "peekWorkspaceSandbox",
           "kind": "function",
-          "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…",
+          "signature": "(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; signal?: AbortSignal | undef…",
           "doc": "Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything."
         },
         {
@@ -18282,10 +18296,22 @@
           "doc": "Configuration needed to prepare a turn without provisioning a workspace."
         },
         {
+          "name": "SandboxPromptExecutionLimits",
+          "kind": "interface",
+          "signature": "interface SandboxPromptExecutionLimits",
+          "doc": null
+        },
+        {
+          "name": "sandboxPromptExecutionOptions",
+          "kind": "function",
+          "signature": "(limits: SandboxPromptExecutionLimits | undefined, effort: \"none\" | \"auto\" | \"minimal\" | \"low\" | \"medium\" | \"high\" | \"x…",
+          "doc": null
+        },
+        {
           "name": "sandboxPromptRunner",
           "kind": "function",
           "signature": "(shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, \"signal\" | \"history\">) => (box: SandboxInstance…",
-          "doc": "The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused)."
+          "doc": "The shell's unattended runner."
         },
         {
           "name": "SandboxPromptTokenLimits",
@@ -18339,13 +18365,13 @@
           "name": "SandboxRunError",
           "kind": "class",
           "signature": "class SandboxRunError",
-          "doc": "A typed `sandbox_run` failure."
+          "doc": null
         },
         {
           "name": "SandboxRunFailureCode",
           "kind": "type",
           "signature": "type SandboxRunFailureCode",
-          "doc": null
+          "doc": "Typed computer-task outcomes shared by prompt observation and the Router tool."
         },
         {
           "name": "SandboxRuntimeAuthRefreshError",

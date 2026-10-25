@@ -11,6 +11,7 @@
 import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import { redactErrorMessage } from '../redact/index'
+import { noticePart } from '../interactions/contract'
 import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 import type { ProducerWireEvent } from './wire'
 
@@ -24,7 +25,7 @@ export type RouterTurnProducerOptions = Omit<RouterTurnOptions, 'onEvent' | 'sys
   systemPrompt: RouterTurnPrompt | Promise<RouterTurnPrompt>
   /** Final admission: model text may start earlier, but every tool waits for this request's committed domain state. */
   admitted?: Promise<unknown>
-  /** Observe the finished turn or supply domain-authored final text/failure; projection and persistence stay shared. */
+  /** Observe the finished turn or supply domain-authored final text/failure. An unfinished checkpoint is a turn_deadline failure here; durable continuation belongs to runRouterTurn callers. */
   onOutcome?: (outcome: RouterTurnOutcome) => void | { trailingText?: string; failure?: RouterTurnFailure } |
     Promise<void | { trailingText?: string; failure?: RouterTurnFailure }>
   /** Observe each engine event after the producer has projected it (a box speculator, metrics). A throw is ignored. */
@@ -146,6 +147,11 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
       },
     })
   }).then(async result => {
+    // This producer settles chat; it has no durable owner to resume a checkpoint.
+    // Classify unfinished work before domain settlement observes the outcome.
+    if (result.continuation && !result.failure) {
+      result.failure = { code: 'turn_deadline', message: 'The reply was stopped before it finished.' }
+    }
     outcome = result
     const final = await options.onOutcome?.(result)
     if (final && final.trailingText) {
@@ -155,6 +161,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
     }
     if (final && final.failure) result.failure = final.failure
     if (result.failure) {
+      parts.push(noticePart('error', 'router-error', result.failure.message, result.failure.code))
       push({ type: 'error', data: { message: result.failure.message, code: result.failure.code } })
     }
   }).finally(async () => {

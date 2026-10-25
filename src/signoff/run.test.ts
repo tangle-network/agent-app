@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Readable } from 'node:stream'
@@ -329,10 +329,10 @@ describe('runSignoff (end to end)', { timeout: E2E_TIMEOUT_MS }, () => {
     const pruned: string[] = []
     const report = await runSignoff({ repoDir: repo, cacheDir, source: 'head', onEvent: (event) => {
       if (event.kind === 'cache-prune') pruned.push(...event.removed)
-      if (event.kind === 'install-start') expect(pruned).toContain(expired)
+      if (event.kind === 'install-start') expect(pruned).toContain(join(realpathSync(cacheDir), 'stores', 'a'.repeat(64)))
     } })
     expect(report.ok).toBe(true)
-    expect(pruned).toContain(expired)
+    expect(pruned).toContain(join(realpathSync(cacheDir), 'stores', 'a'.repeat(64)))
     expect(existsSync(expired)).toBe(false)
   })
 

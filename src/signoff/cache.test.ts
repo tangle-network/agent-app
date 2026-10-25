@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -44,7 +44,7 @@ describe('signoff cache retention', () => {
     utimesSync(old, new Date(now - 4 * 24 * 60 * 60 * 1000), new Date(now - 4 * 24 * 60 * 60 * 1000))
 
     const result = await pruneSignoffCache(cacheDir, { nowMs: now, maxBytes: 512 * 1024 })
-    expect(result.removed).toEqual([old])
+    expect(result.removed).toEqual([join(realpathSync(cacheDir), 'stores', 'a'.repeat(64))])
     expect(existsSync(old)).toBe(false)
     expect(existsSync(recent)).toBe(true)
     expect(result.afterBytes).toBeLessThan(512 * 1024)
@@ -75,7 +75,7 @@ describe('signoff cache retention', () => {
     expect(existsSync(path)).toBe(true)
     await session.close()
     const after = await pruneSignoffCache(cacheDir, { maxBytes: 0 })
-    expect(after.removed).toEqual([path])
+    expect(after.removed).toEqual([join(realpathSync(cacheDir), 'stores', key)])
     expect(existsSync(path)).toBe(false)
   })
 
@@ -136,7 +136,7 @@ describe('signoff cache retention', () => {
     const session = await openSignoffCacheSession(alias, join(alias, 'trees', 'cached-tree'))
     expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([])
     await session.close()
-    expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([tree])
+    expect((await pruneSignoffCache(cacheDir, { maxBytes: 0 })).removed).toEqual([join(realpathSync(cacheDir), 'trees', 'cached-tree')])
     expect(existsSync(tree)).toBe(false)
     expect(existsSync(join(outside, 'keep'))).toBe(true)
     const list = spawnSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8' })

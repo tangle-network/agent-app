@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-282 exports.
+284 exports.
 
 ### `adaptSandboxStream`
 
@@ -640,7 +640,7 @@ interface InspectablePrewarmClaimStore
 
 ### `isTerminalPromptEvent`
 
-`function` — Determine if an event is a terminal prompt event with type 'result' or 'done
+`function` — A backend result or terminal event, excluding SDK cleanup after observation loss.
 
 ```ts
 (event: unknown) => boolean
@@ -771,7 +771,7 @@ type Outcome
 `function` — Read-only twin of {@link ensureWorkspaceSandbox }: report whether a workspace's box exists and is fully ready, WITHOUT provisioning, resuming, or bootstrapping anything.
 
 ```ts
-(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; }) => Promise<PeekWorkspaceS…
+(shell: SandboxRuntimeConfig, options: { workspaceId: string; userId?: string | undefined; signal?: AbortSignal | undef…
 ```
 
 ### `PeekWorkspaceSandboxOutcome`
@@ -1318,9 +1318,25 @@ interface SandboxPrewarmScope
 type SandboxPromptConfig
 ```
 
+### `SandboxPromptExecutionLimits`
+
+`interface`
+
+```ts
+interface SandboxPromptExecutionLimits
+```
+
+### `sandboxPromptExecutionOptions`
+
+`function`
+
+```ts
+(limits: SandboxPromptExecutionLimits | undefined, effort: "none" | "auto" | "minimal" | "low" | "medium" | "high" | "x…
+```
+
 ### `sandboxPromptRunner`
 
-`function` — The default `runTask`: the shell's own `runSandboxPrompt`, unattended (questions refused).
+`function` — The shell's unattended runner.
 
 ```ts
 (shell: SandboxRuntimeConfig, prompt?: Omit<StreamSandboxPromptOptions, "signal" | "history">) => (box: SandboxInstance…
@@ -1392,7 +1408,7 @@ interface SandboxRestoreSpec
 
 ### `SandboxRunError`
 
-`class` — A typed `sandbox_run` failure.
+`class`
 
 ```ts
 class SandboxRunError
@@ -1400,7 +1416,7 @@ class SandboxRunError
 
 ### `SandboxRunFailureCode`
 
-`type`
+`type` — Typed computer-task outcomes shared by prompt observation and the Router tool.
 
 ```ts
 type SandboxRunFailureCode

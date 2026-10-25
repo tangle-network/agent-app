@@ -66,7 +66,8 @@ export function createTarInspector(stats: TarStats, exclude: readonly string[] =
   let held: Uint8Array[] = []
   let ended = false
 
-  const isExcluded = (name: string) => excluded.size > 0 && name.split('/').some((segment) => excluded.has(segment))
+  // Excluded directories and AppleDouble metadata must not cross the archive boundary.
+  const isExcluded = (name: string) => excluded.size > 0 && name.split('/').some((segment) => excluded.has(segment) || segment.startsWith('._'))
 
   function onHeader(emit: (bytes: Uint8Array) => void): void {
     const block = header.slice()
@@ -74,6 +75,7 @@ export function createTarInspector(stats: TarStats, exclude: readonly string[] =
       ended = true
       for (const part of held) emit(part)
       held = []
+      emit(block)
       emit(block)
       return
     }

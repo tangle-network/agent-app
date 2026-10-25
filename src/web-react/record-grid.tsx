@@ -68,14 +68,6 @@ import {
   recordGridEditorText,
   recordGridRowLabel,
   sameRecordGridValue,
-  validateRecordGridRow,
-  withRecordGridCreated,
-  withRecordGridRemoved,
-  withRecordGridServerRow,
-  withRecordGridUpdate,
-  withoutRecordGridCreated,
-  withoutRecordGridRemoved,
-  withoutRecordGridUpdate,
   type RecordGridCellDiff,
   type RecordGridColumn,
   type RecordGridOverlay,
@@ -86,7 +78,7 @@ import {
 export * from './record-grid-model'
 
 export type { RecordGridCellChange, RecordGridWriteOutcome, RecordGridCreateOutcome, RecordGridProps } from './record-grid-types'
-import type { RecordGridWriteOutcome, RecordGridCreateOutcome, RecordGridProps } from './record-grid-types'
+import type { RecordGridProps } from './record-grid-types'
 import { ReviewActions } from './record-grid-review-actions'
 import { CellEditor, AddRecordForm } from './record-grid-editors'
 import { SourceMarker } from './record-grid-source-marker'
