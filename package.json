@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.63.18",
+  "version": "0.63.19",
   "packageManager": "pnpm@11.24.0",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -875,7 +875,7 @@
     "@tangle-network/brand": ">=1.21.1",
     "@tangle-network/browser-agent-driver": "^0.36.1",
     "@tangle-network/hub-sdk": ">=0.19.3 <0.21.0 || >=0.21.0 <0.22.0 || >=0.22.1 <0.25.0 || >=0.27.0 <0.28.0 || >=0.28.0 <0.29.0 || >=0.29.5 <0.30.0 || >=0.30.2 <0.31.0 || >=0.31.0 <0.32.0",
-    "@tangle-network/sandbox": ">=0.45.0 <0.48.0 || ^0.49.0 || ^0.50.0 || ^0.51.0 || ^0.52.0 || ^0.53.0 || ^0.54.0 || ^0.55.0 || >=0.58.1 <0.60.0 || >=0.60.3 <0.61.0 || >=0.61.1 <0.64.0 || >=0.63.10 <0.65.0",
+    "@tangle-network/sandbox": ">=0.64.22 <0.65.0",
     "@tangle-network/sandbox-ui": ">=0.134.10 <0.137.0",
     "@tangle-network/tcloud": "^0.5.2 || >=0.8.1 <0.9.0",
     "@tangle-network/ui": ">=11.40.0 <12.0.0",
