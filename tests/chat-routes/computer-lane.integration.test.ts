@@ -60,9 +60,11 @@ async function boundary(options: { policy?: 'down' } = {}) {
           connection: { runtimeUrl: `${origin}/v1/sandboxes/lane-box/runtime` } })
       }
       if (url.pathname === '/v1/sandboxes/lane-box/runtime/files/tree') {
+        // As the sidecar does: the root and every path relative to the box workspace, here the temporary disk.
         const path = url.searchParams.get('path') ?? root
-        const files = walk(path)
-        return json({ data: { root: path, directories: [], files, stats: { totalDirectories: 0, totalFiles: files.length, scanDurationMs: 1, truncated: false } } })
+        const files = walk(path).map(file => ({ ...file, path: relative(disk, file.path) }))
+        return json({ data: { root: relative(disk, path), directories: [], files,
+          stats: { totalDirectories: 0, totalFiles: files.length, scanDurationMs: 1, truncated: false } } })
       }
       if (url.pathname === '/v1/sandboxes/lane-box/runtime/files/read') {
         const { path } = JSON.parse(body) as { path: string }

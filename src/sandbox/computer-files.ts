@@ -79,9 +79,12 @@ export async function listComputerFiles(box: SandboxInstance, root: string): Pro
   try {
     const tree = await box.fs.tree(root)
     if (tree.stats.truncated) return { succeeded: false, error: 'the workspace tree is too large to list completely' }
-    // The scan reports paths under the root it echoes, under the requested root, or already relative to it.
+    // The sidecar reports the root and every path relative to the box workspace (`/home/agent`): for the root
+    // `/home/agent/entities` it echoes root `entities` and file `entities/proof/a.md`. Strip the echoed root whether it
+    // arrives relative or absolute; `.` means the paths are already relative (Legal #551 found the doubled path).
+    const echoed = tree.root.replace(/\/+$/, '')
     const prefixes = [`${root.replace(/\/+$/, '')}/`]
-    if (tree.root.startsWith('/') && tree.root.length > 1) prefixes.unshift(`${tree.root.replace(/\/+$/, '')}/`)
+    if (echoed && echoed !== '.') prefixes.unshift(`${echoed}/`)
     const files: Record<string, { size: number; mtime: number }> = {}
     for (const file of tree.files) {
       const prefix = prefixes.find(candidate => file.path.startsWith(candidate))
