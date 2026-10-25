@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.20
+
+- fix(sandbox): prefer verified newer original recovery and fence canceled returns
+
 ## 0.63.19
 
 - docs: state rules without who, when or quotes (#1324)
