@@ -44,7 +44,7 @@ async function boundary(mode: 'read' | 'resume' | 'create' | 'connection' | 'rea
     const json = (body: unknown) => response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
     if (mode === 'ready') {
       const box = { id: 'cancel-original', name, status: 'running', metadata: { harness: 'opencode' },
-        filesystemIncarnationId: name, filesystemIncarnationReadiness: 'ready',
+        filesystemIncarnationId: name, filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
         connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/cancel-original/runtime` } }
       if (path === '/v1/sandboxes') return json({ sandboxes: [box] })
       if (path === '/v1/sandboxes/cancel-original') return json(box)
@@ -60,7 +60,7 @@ async function boundary(mode: 'read' | 'resume' | 'create' | 'connection' | 'rea
     if (path === '/v1/sandboxes') {
       const stopped = new URL(request.url!, 'http://localhost').searchParams.get('status') === 'stopped'
       const found = (stopped && mode === 'resume') || (!stopped && mode === 'connection')
-      return json({ sandboxes: found ? [{ id: 'cancel-original', name: 'cancel-workspace', status: stopped ? 'stopped' : 'running', lifecycleState: stopped ? 'suspended' : undefined, metadata: { harness: 'opencode' }, filesystemIncarnationId: 'cancel-incarnation', filesystemIncarnationReadiness: 'ready' }] : [] })
+      return json({ sandboxes: found ? [{ id: 'cancel-original', name: 'cancel-workspace', status: stopped ? 'stopped' : 'running', lifecycleState: stopped ? 'suspended' : undefined, metadata: { harness: 'opencode' }, filesystemIncarnationId: 'cancel-incarnation', filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready' }] : [] })
     }
     response.writeHead(500).end('Unexpected lifecycle request')
   })
