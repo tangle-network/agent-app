@@ -4,7 +4,7 @@
  * needs a computer escalates to the workspace box through one `sandbox_run`
  * call whose answer comes back to the model.
  *
- * WHY THIS IS THE DEFAULT. Measured on production (2026-10-19/20): the
+ * WHY THIS IS THE DEFAULT. Measured on production: the
  * Hospitality Router lane gave first text at 3.6 s with 0 of 39 failures; its
  * sandbox lane 31.0 s with 2 of 8. Legal's sandbox lane gave first text at
  * p50 137 s because the box agent writes nothing until its last tool call. The
@@ -52,7 +52,7 @@ import type { ChatTurnRouteProducer } from './turn-routes'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { ProducerNoticeEvent } from './wire'
 
-// The lead-in covers every tool, not only sandbox_run: on Legal's Router lane (2026-10-20) the model streamed a
+// The lead-in covers every tool, not only sandbox_run: on Legal's Router lane the model streamed a
 // submit_proposal payload for 45 s before its first word, so first text came at 54.9 s after a first token at 3.8 s.
 /** What the default prompt adds so the Router lane answers first and escalates out loud. */
 export const HYBRID_TURN_GUIDANCE =

@@ -43,7 +43,7 @@ Harness extensions remain reserved for native controls that their provider expli
 
 `ModelPicker` opens with a bounded shortlist from the live Router catalogue.
 The catalogue recommends current families that served live probes: GPT 6.1 Sol, GPT 6 Astra, Gemini 3.7 Flash, and GLM 5.3.
-The Router response checked on 2026-09-30 contained no release dates in 568 entries.
+The Router response checked contained no release dates in 568 entries.
 The catalogue supplements exact IDs with vendor-announced launch dates and applies the 120-day window to them.
 A future model without a verified date uses its family version floor; that fallback does not assert a launch month.
 An explicitly unavailable route never enters the catalogue, even if its name looks newer.

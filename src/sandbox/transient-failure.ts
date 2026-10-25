@@ -4,7 +4,7 @@
  * Both callers that meet them use this one policy: the run dispatch, which
  * resends the same execution, and the completion Workflow, which observes it.
  * A box restarting under load answers "filesystem incarnation is not ready"
- * for minutes (8 minutes for GTM's busiest box on 2026-10-10, 10:37 to 10:45
+ * for minutes (8 minutes for GTM's busiest box, 10:37 to 10:45
  * UTC), and its gateway refuses dispatches with 502 or 503 while it does.
  * Failing on the first such answer lost those turns; retrying forever would
  * hold a lock on a box that never comes back. The policy backs off from 5 s

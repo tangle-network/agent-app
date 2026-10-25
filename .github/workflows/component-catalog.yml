@@ -3,6 +3,33 @@ name: Component catalog
 on:
   push:
     branches: [main]
+    # Catalog/package inputs and the generated-template signoff contract.
+    # Documentation and test-only pushes do not publish an unchanged catalog.
+    paths:
+      - '.storybook/**'
+      - 'src/**'
+      - 'create-agent-app/index.mjs'
+      - 'create-agent-app/package.json'
+      - 'create-agent-app/template*/**'
+      - 'create-agent-app/proof/workspace-browser.mjs'
+      - 'bin/**'
+      - '.github/scripts/test-generated-projects.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - 'tsup.config.ts'
+      - 'tsconfig*.json'
+      - 'tailwind.config.cjs'
+      - 'postcss.config.cjs'
+      - 'signoff.config.mjs'
+      - 'knip.ts'
+      - '.github/workflows/component-catalog.yml'
+      - '.github/workflows/deploy-catalog.yml'
+      - '!**/*.test.*'
+      - '!**/*.spec.*'
+      - '!**/__tests__/**'
+      - '!**/tests/**'
   workflow_dispatch:
 
 permissions:

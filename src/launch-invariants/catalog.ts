@@ -1,7 +1,7 @@
 /**
  * The launch invariants every agent app holds, and the budgets they are held to.
  *
- * Each one is a failure GTM shipped to production on 2026-10-10 and fixed by
+ * Each one is a failure GTM shipped to production and fixed by
  * hand. They are listed here once so every app checks the same rule with the
  * same numbers, and `agent-app-invariants` reports each by its id.
  */
@@ -30,13 +30,13 @@ export const LAUNCH_BUDGETS = {
   d1RowsPerQuery: 250_000,
   /** A workspace box's disk: the Sandbox SDK's default tier (10 GB). */
   sandboxDiskBytes: 10 * 1024 ** 3,
-  /** Platform snapshots per box; the cap GTM hit on 2026-10-10. */
+  /** Platform snapshots per box; the cap GTM hit. */
   snapshotCount: 25,
   /** Operator key requests per minute. */
   keyRatePerMinute: 60,
   /** Hours one resource's limit alarm waits before it repeats. */
   alarmRepeatHours: 6,
-  /** Cloudflare's gzip limit on a Worker's Total Upload on the paid plan, in KiB; Legal deployed 9,659 KiB (94%) on 2026-10-19. */
+  /** Cloudflare's gzip limit on a Worker's Total Upload on the paid plan, in KiB; Legal deployed 9,659 KiB (94%). */
   workerUploadGzipKiB: 10 * 1024,
   /** Cloudflare's raw limit on a Worker's Total Upload, in KiB. */
   workerUploadRawKiB: 64 * 1024,
@@ -109,7 +109,7 @@ export const LAUNCH_INVARIANTS: readonly LaunchInvariant[] = [
     id: 'limit-alarms',
     title: 'Platform-limit alarms at 80%',
     rule: 'Worker memory, D1 rows per query, sandbox disk, snapshot count and key rate each have a declared limit and an alarm that fires at 80%.',
-    incident: '19 platform-limit events on 2026-10-10, each found after it failed a customer.',
+    incident: '19 platform-limit events, each found after it failed a customer.',
   },
   {
     id: 'pasted-code-reaches-chat',

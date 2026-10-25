@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join } from 'node:path'
 import type { Browser, BrowserContext, Locator, Page } from 'playwright'
+import { pruneJourneyArtifacts } from './artifacts.js'
 import { loadJourneysConfig, resolveJourneysConfig, threadRouteIn, type JourneysConfig, type ResolvedJourneysConfig, type ThreadRoute } from './config.js'
 import { promptHead, readChatPage } from './page-reading.js'
 import { scoreTurn, turnLooksActive, TurnEvidence, type TranscriptSnapshot, type TurnOutcome } from './score.js'
@@ -125,6 +126,7 @@ export class Journey {
   readonly turns: TurnRecord[] = []
   private recorded: Recorded[] = []
   private phones = new Map<string, BrowserContext>()
+  private screenshots = new Set<string>()
   private readonly startedAt = Date.now()
 
   constructor(readonly id: string, readonly config: ResolvedJourneysConfig, readonly browser: Browser, private readonly opts: { cursor: boolean }) {
@@ -306,6 +308,7 @@ export class Journey {
     const cursor = (display: string) => r.page.evaluate((d) => { const c = document.getElementById('__journey_cursor'); if (c) c.style.display = d }, display).catch(() => {})
     await cursor('none')
     await r.page.screenshot({ path: desktop, fullPage: opts.fullPage ?? false })
+    this.screenshots.add(desktop)
     await cursor('')
     if (opts.phone === false) return { desktop }
     const phonePath = join(this.outDir, `${slug}-phone.png`)
@@ -321,6 +324,7 @@ export class Journey {
       await phone.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {})
       await sleep(1_500)
       await phone.screenshot({ path: phonePath, fullPage: opts.fullPage ?? false })
+      this.screenshots.add(phonePath)
     } finally {
       await phone.close()
     }
@@ -587,6 +591,11 @@ export class Journey {
     writeFileSync(join(this.outDir, 'timings.json'), JSON.stringify({ journey: this.id, app: this.config.app, base: this.config.baseUrl, startedAt: new Date(this.startedAt).toISOString(), wallS: secs(Date.now() - this.startedAt), steps: this.steps, turns: this.turns }, null, 2))
     await this.browser.close()
     assertNoSecrets(this.outDir, needles)
+    pruneJourneyArtifacts(this.outDir, new Set([
+      ...files,
+      ...this.screenshots,
+      ...this.turns.flatMap((turn) => turn.replyFile ? [join(this.outDir, turn.replyFile)] : []),
+    ]))
     console.log(`\n${this.id}: ${this.steps.length} steps, ${this.turns.length} turns, wall ${secs(Date.now() - this.startedAt)} s`)
     for (const t of this.turns) {
       console.log(`  turn[${t.label}] ${t.outcome}: progress ${t.firstProgressS ?? '-'} s, first text ${t.firstTextS ?? '-'} s, end ${t.completeS ?? '-'} s, ${t.replyChars} chars${t.error ? ` | ${oneLine(t.error, 100)}` : ''}`)

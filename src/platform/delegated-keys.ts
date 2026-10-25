@@ -4,7 +4,7 @@
  * never sends the user's own key to Router or Sandbox.
  *
  * WHY ONE. Seven apps minted these by hand (Tax, Legal, GTM, Creative,
- * Builder, Hardware, workcomp; survey 2026-10-12) with different scope,
+ * Builder, Hardware, workcomp; survey) with different scope,
  * expiry and revocation rules, and four never noticed a key Platform had
  * revoked, superseded or expired.
  *
@@ -96,7 +96,7 @@ export interface DelegatedKeyRequest {
   /**
    * Keep asking while Platform answers `delegated_key.unavailable` (no answer, 5xx, 429, busy), with jittered
    * backoff, for at most `forMs` from the first attempt; then return that refusal. Platform's origin was unreachable
-   * for 84.8 s and 54.5 s across restarts on 2026-10-22, and each such failure ended a member's Router turn, so a
+   * for 84.8 s and 54.5 s across restarts, and each such failure ended a member's Router turn, so a
    * turn-scoped mint passes about 90 000 here, inside its turn's budget. `signal` stops the wait early. A retried
    * request may have reached Platform; the next attempt uses the same name, so it replaces that child in its slot
    * rather than leaving a second one.

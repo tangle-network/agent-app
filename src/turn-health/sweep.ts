@@ -838,7 +838,7 @@ export function createD1TurnHealthSource(
         return new Map(results.map((row) => [String(row.id), row.parts]))
       }
       // One row per part with only what classifyTurnOutcome reads, so a day of
-      // tool output never leaves the database: on 2026-10-11 the full read
+      // tool output never leaves the database: the full read
       // returned 141.9 MB per run for 500 turns.
       const { results } = await db
         .prepare(`SELECT m.id AS id, CAST(p.key AS INTEGER) AS idx, ${PART_PROJECTION}

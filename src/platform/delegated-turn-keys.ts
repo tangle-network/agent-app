@@ -5,7 +5,7 @@ import type { DelegatedKeyOutcome, DelegatedKeyRequest, PlatformDelegatedKeyClie
 
 /**
  * Pre-minted turn keys. Creative minted each Router turn's child on the turn's critical path, ~320 ms of a
- * 6,419 ms first-visible p50 (router-spec, 2026-10-22). `createDelegatedTurnKeys` keeps one child per turn with
+ * 6,419 ms first-visible p50 (router-spec). `createDelegatedTurnKeys` keeps one child per turn with
  * the same cap and expiry, and mints the next turn's child in the background (`waitUntil`) into a D1 slot. The
  * next turn takes it with one `DELETE ... RETURNING`, so a parked key serves exactly one turn and a racing second
  * turn mints inline. A parked key is used only when it was minted for the same request (source key, product,

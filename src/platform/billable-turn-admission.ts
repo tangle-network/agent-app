@@ -3,7 +3,7 @@ import { createWarmCache, type WarmCacheOptions, type WarmCacheSource } from '..
 /**
  * A billable turn's seat and balance verdict, read from Platform once per user
  * per window instead of on every turn. Lifted from Creative
- * (creative-agent#692): in production on 2026-10-21 its seat and balance reads
+ * (creative-agent#692): in production its seat and balance reads
  * took 723 ms each, most of the 949 ms of its turn gates.
  *
  * Only a passing verdict is kept. A refusal is never cached, so a seatless or

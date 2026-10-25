@@ -1,6 +1,6 @@
 # Launch invariants
 
-Every agent app holds nine invariants before launch. Each is a failure GTM shipped on 2026-10-10 or 2026-10-11 and fixed by hand. They live in `@tangle-network/agent-app/launch-invariants`, so every app checks the same rule with the same numbers and gets each fix once.
+Every agent app holds nine invariants before launch. Each is a failure GTM shipped and fixed by hand. They live in `@tangle-network/agent-app/launch-invariants`, so every app checks the same rule with the same numbers and gets each fix once.
 
 | Id | Rule | Runtime piece | Check |
 |---|---|---|---|
@@ -133,5 +133,5 @@ Build the app's alarms with `createProductLimitAlarms({ product, webhookUrl, ove
 
 ### Pasted code reaches the chat
 
-Send each of `PASTED_CODE_SAMPLES` through the app's mounted chat route as an authenticated request (with a stubbed producer), and pass the handler to `checkChatAcceptsCode`. It expects the route's normal 2xx and cancels the stream. In process this catches an app filter or sanitizer; an edge rule only exists on the deployed route, so a live probe sends the same samples to the deployed route and judges the response with `isEdgeBlock`. On 2026-10-11 Cloudflare's managed WAF answered `cat /etc/passwd` on gtm.tangle.tools with its 403 block page.
+Send each of `PASTED_CODE_SAMPLES` through the app's mounted chat route as an authenticated request (with a stubbed producer), and pass the handler to `checkChatAcceptsCode`. It expects the route's normal 2xx and cancels the stream. In process this catches an app filter or sanitizer; an edge rule only exists on the deployed route, so a live probe sends the same samples to the deployed route and judges the response with `isEdgeBlock`. Cloudflare's managed WAF answered `cat /etc/passwd` on gtm.tangle.tools with its 403 block page.
 

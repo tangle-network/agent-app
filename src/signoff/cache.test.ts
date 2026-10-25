@@ -26,6 +26,7 @@ function git(args: string[], cwd: string): void {
     encoding: 'utf8',
     env: {
       ...process.env,
+      GIT_ALLOW_TEST_IDENTITY: '1',
       GIT_AUTHOR_NAME: 'Signoff fixture',
       GIT_AUTHOR_EMAIL: 'signoff-fixture@example.invalid',
       GIT_COMMITTER_NAME: 'Signoff fixture',

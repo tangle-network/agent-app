@@ -13943,7 +13943,7 @@ readonly SettlementScenario[]
 
 ### `SettlementScenario`
 
-`interface` — The failure shapes GTM shipped on 2026-10-10, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s.
+`interface` — The failure shapes GTM shipped, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s.
 
 ```ts
 interface SettlementScenario
@@ -22253,7 +22253,7 @@ interface RuntimeTelemetryTruncation
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · depends on `chat-routes`, `harness`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`
+Source: `src/sandbox/index.ts` · depends on `chat-routes`, `harness`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web`
 
 ### `adaptSandboxStream`
 
@@ -24373,6 +24373,22 @@ interface WorkspaceSandboxManager
 
 ```ts
 interface WorkspaceSandboxManagerOptions
+```
+
+### `WorkspaceSandboxOriginalRecoveryOptions`
+
+`interface`
+
+```ts
+interface WorkspaceSandboxOriginalRecoveryOptions
+```
+
+### `WorkspaceSandboxOriginalRecoveryResult`
+
+`type`
+
+```ts
+type WorkspaceSandboxOriginalRecoveryResult
 ```
 
 ### `WorkspaceSandboxRecoveryAction`
@@ -35158,10 +35174,10 @@ interface KvLike
 
 ### `parseJsonObjectBody`
 
-`function` — Parse + object-narrow a Request body.
+`function` — Parse + object-narrow a Request or Response body.
 
 ```ts
-(request: Request, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObject, null] | [null, Response]>
+(request: Pick<Request, "json" | "body" | "headers">, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObj…
 ```
 
 ### `RateLimitBudget`

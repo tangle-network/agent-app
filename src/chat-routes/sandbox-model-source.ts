@@ -110,7 +110,7 @@ export function createSandboxModelSource(options: SandboxChatProducerOptions, lo
       !options.model ||
       !sentModel ||
       !parsed.servedModel ||
-      parsed.servedModel === sentModel
+      sameModel(parsed.servedModel, sentModel)
     ) return
     substitutionNoticeQueued = true
     pendingModelNotices.push({
@@ -119,4 +119,11 @@ export function createSandboxModelSource(options: SandboxChatProducerOptions, lo
     })
   }
   return { pendingModelNotices, source, captureEffectiveBackend, servedModel, servingModel, failover, modelState, openAttempts: () => openAttempts }
+}
+
+/** The same model under a provider prefix (`zai-coding-plan/glm-5.3-flash` vs
+ *  `glm-5.3-flash`) is not a substitution; only a different model is. */
+function sameModel(a: string, b: string): boolean {
+  const bare = (id: string) => id.slice(id.lastIndexOf('/') + 1).trim().toLowerCase()
+  return bare(a) === bare(b)
 }

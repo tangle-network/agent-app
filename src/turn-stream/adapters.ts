@@ -189,7 +189,7 @@ export async function acquireDurableTurnLock(
  *
  * The first request to a Durable Object that has never been used creates it,
  * which measured 1.3-2.4 s for a thread's first turn in GTM production
- * (2026-10-10) against 0.05-0.33 s once it exists; every lock now lives on the
+ * against 0.05-0.33 s once it exists; every lock now lives on the
  * workspace channel, which exists after the workspace's first turn. A peek
  * sent as soon as a turn is admitted wakes that object if it was evicted.
  */

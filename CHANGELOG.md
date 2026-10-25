@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.63.25
+
+- fix: settle canceled navigation animations in browser proof (#1329)
+
+## 0.63.24
+
+- test: restore disposable Git and rollout integration checks (#1328)
+
+## 0.63.23
+
+- Do not warn about a substitution when only the provider prefix differs (#1326)
+
+## 0.63.22
+
+- test: retire invalid generic recovered-original state case
+
+## 0.63.21
+
+- fix(deps): admit a coherent published Eval Runtime Knowledge cohort
+- ci: move catalog build and post-release checks off production runner
+
+## 0.63.20
+
+- fix(sandbox): prefer verified newer original recovery and fence canceled returns
+
+## 0.63.19
+
+- docs: state rules without who, when or quotes (#1324)
+
+## 0.63.18
+
+- test(peer-floors): consolidate repository source audit
+- fix(journeys): prune stale run artifacts
+
+## 0.63.17
+
+- fix(chat): report unfinished Router turns as deadline failures (#1321)
+
+## 0.63.16
+
+- fix: harden dependencies and prompt execution
+
 ## 0.63.15
 
 - fix(sandbox): report why a sandbox prompt produced no answer (#1319)

@@ -18,29 +18,34 @@ const frozen = JSON.parse(readFileSync(new URL('./fixtures/rollout/creative-e8.j
 // Frozen install's prepare builds the exact CLI named by the package bin.
 const cli = fileURLToPath(new URL('../dist/rollout/cli.js', import.meta.url))
 
-it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only on turns since the deployed commit went live, and narrows on an injected failure breach', async () => {
+function frozenRolloutFixture(dir: string) {
+  writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "*"\n`)
+  const plan = { name: frozen.rollout, variable: frozen.variable, stages: [
+    { name: 'qa', value: frozen.from.value, minSamples: 20, kill: {
+      first_visible_p50_delta_ms: { max: 0 }, failure_rate_delta: { max: 0.01 },
+    } },
+    { name: 'all', value: '*', minSamples: 100, kill: { failure_rate_delta: { max: 0.01 } } },
+  ] }
+  // `from`: 'since' measures from the CLI's `since`, as a product reading only rows at or after it does; an ISO time is a
+  // fixed window the instrument chose; absent keeps the frozen seven-day window.
+  const run = (breach: boolean, args: string[], from?: string) => {
+    const measured = structuredClone(frozen.measured)
+    if (breach) measured.metrics.failure_rate_delta = 0.02
+    const window = from === 'since' ? '{ ...m.window, from: new Date(since).toISOString() }'
+      : from ? `{ ...m.window, from: ${JSON.stringify(from)} }` : 'm.window'
+    const measure = `async measure({ since }) { const m = ${JSON.stringify(measured)}; return { ...m, window: ${window} } }`
+    writeFileSync(join(dir, 'rollout.config.mjs'), `export default { plans: ${JSON.stringify([plan])}, ${measure} }`)
+    const child = spawnSync(process.execPath, [cli, dir, ...args, '--record', 'decisions.jsonl'], { encoding: 'utf8' })
+    const records = readFileSync(join(dir, 'decisions.jsonl'), 'utf8').trim().split('\n')
+    return { ...child, decision: JSON.parse(records.at(-1)!) }
+  }
+  return run
+}
+
+it('the CLI reports frozen lane deficits and permits hold or narrowing', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
   try {
-    writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "*"\n`)
-    const plan = { name: frozen.rollout, variable: frozen.variable, stages: [
-      { name: 'qa', value: frozen.from.value, minSamples: 20, kill: {
-        first_visible_p50_delta_ms: { max: 0 }, failure_rate_delta: { max: 0.01 },
-      } },
-      { name: 'all', value: '*', minSamples: 100, kill: { failure_rate_delta: { max: 0.01 } } },
-    ] }
-    // `from`: 'since' measures from the CLI's `since`, as a product reading only rows at or after it does; an ISO time is a
-    // fixed window the instrument chose; absent keeps the frozen seven-day window.
-    const run = (breach: boolean, args: string[], from?: string) => {
-      const measured = structuredClone(frozen.measured)
-      if (breach) measured.metrics.failure_rate_delta = 0.02
-      const window = from === 'since' ? '{ ...m.window, from: new Date(since).toISOString() }'
-        : from ? `{ ...m.window, from: ${JSON.stringify(from)} }` : 'm.window'
-      const measure = `async measure({ since }) { const m = ${JSON.stringify(measured)}; return { ...m, window: ${window} } }`
-      writeFileSync(join(dir, 'rollout.config.mjs'), `export default { plans: ${JSON.stringify([plan])}, ${measure} }`)
-      const child = spawnSync(process.execPath, [cli, dir, ...args, '--record', 'decisions.jsonl'], { encoding: 'utf8' })
-      const records = readFileSync(join(dir, 'decisions.jsonl'), 'utf8').trim().split('\n')
-      return { ...child, decision: JSON.parse(records.at(-1)!) }
-    }
+    const run = frozenRolloutFixture(dir)
     const qa = ['--from', frozen.from.value]
     const widening = run(false, [...qa, '--to', '*'])
     expect(widening.status, widening.stderr).toBe(3)
@@ -54,11 +59,17 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
     const narrowing = run(true, [...qa, '--to', ''])
     expect(narrowing.status).toBe(0)
     expect(narrowing.decision).toMatchObject({ decision: 'allowed', recommendation: 'narrow', measured: { samples: 6 } })
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
 
+it('the CLI refuses a hold only on turns since the deployed commit went live', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ruler-e8-'))
+  try {
+    const run = frozenRolloutFixture(dir)
     // The value's history: empty, set to the QA stage inside the frozen window, then the deployed (base) commit after it closed.
     const commit = (at: string, value: string, message: string) => {
       writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "${value}"\nOTHER = "${message}"\n`)
-      const env = { ...process.env, GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
+      const env = { ...process.env, GIT_ALLOW_TEST_IDENTITY: '1', GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
         GIT_COMMITTER_NAME: 'rollout', GIT_COMMITTER_EMAIL: 'rollout@example.com', GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at }
       for (const args of [['add', 'wrangler.toml'], ['commit', '-q', '-m', message]]) {
         const git = spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' })

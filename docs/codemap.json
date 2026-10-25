@@ -10821,7 +10821,7 @@
           "name": "SettlementScenario",
           "kind": "interface",
           "signature": "interface SettlementScenario",
-          "doc": "The failure shapes GTM shipped on 2026-10-10, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s."
+          "doc": "The failure shapes GTM shipped, as scenarios a product seeds into its own storage, settles with its own scheduled jobs, and reads back as {@link SettledTurnRecord}s."
         },
         {
           "name": "SIZED_READ_BYTES",
@@ -17307,7 +17307,8 @@
         "runtime",
         "tools",
         "turn-stream",
-        "turn-trace"
+        "turn-trace",
+        "web"
       ],
       "error": null,
       "exports": [
@@ -18900,6 +18901,18 @@
           "kind": "interface",
           "signature": "interface WorkspaceSandboxManagerOptions",
           "doc": "Define configuration options for managing workspace sandboxes."
+        },
+        {
+          "name": "WorkspaceSandboxOriginalRecoveryOptions",
+          "kind": "interface",
+          "signature": "interface WorkspaceSandboxOriginalRecoveryOptions",
+          "doc": null
+        },
+        {
+          "name": "WorkspaceSandboxOriginalRecoveryResult",
+          "kind": "type",
+          "signature": "type WorkspaceSandboxOriginalRecoveryResult",
+          "doc": null
         },
         {
           "name": "WorkspaceSandboxRecoveryAction",
@@ -27267,8 +27280,8 @@
         {
           "name": "parseJsonObjectBody",
           "kind": "function",
-          "signature": "(request: Request, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObject, null] | [null, Response]>",
-          "doc": "Parse + object-narrow a Request body."
+          "signature": "(request: Pick<Request, \"json\" | \"body\" | \"headers\">, options?: { maxBytes?: number | undefined; }) => Promise<[JsonObj…",
+          "doc": "Parse + object-narrow a Request or Response body."
         },
         {
           "name": "RateLimitBudget",

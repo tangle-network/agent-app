@@ -24,9 +24,7 @@ jobs:
       inputs.build-only && github.repository == 'tangle-network/agent-app' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on:
-      group: public-app-production
-      labels: [self-hosted, ci-deploy]
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: read
@@ -72,9 +70,7 @@ jobs:
       github.repository == 'tangle-network/agent-app' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on:
-      group: public-app-production
-      labels: [self-hosted, ci-deploy]
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
       contents: read
@@ -111,9 +107,7 @@ jobs:
   suite-failure-issue:
     needs: suites
     if: ${{ always() && inputs.suites-only && !inputs.build-only && needs.suites.result == 'failure' }}
-    runs-on:
-      group: public-app-production
-      labels: [self-hosted, ci-deploy]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       issues: write
