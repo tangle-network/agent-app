@@ -17308,6 +17308,7 @@
       "dependsOn": [
         "chat-routes",
         "harness",
+        "model-resolution",
         "profile",
         "redact",
         "runtime",

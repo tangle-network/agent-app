@@ -7,6 +7,8 @@
  * - runs the first of the turn's models the box key allows: the box calls the
  *   Router on its own key, whose models are the payer's sandbox policy
  *   (`readSandboxRouterModels`), so a model outside it is refused before a token;
+ *   a run that ends refused for its model (`provider_disabled`, quota) moves to the
+ *   next allowed one under its own execution id;
  * - takes its session as one value, `{ id, isolated }`, which sets both
  *   `secretProfileIsolation` and the send witness;
  * - sends under a step id derived from the turn, the session and the tool call,
@@ -26,6 +28,7 @@ import { SandboxRunError } from './sandbox-run-error'
 import { COMPUTER_FILES_GUIDANCE, computerFileContract, listComputerFiles, saveComputerFiles, type ComputerFileListing, type ComputerVault } from './computer-files'
 import type { ComputerStepReceipts } from './computer-receipts'
 import { modelWithinAllowList } from './router-models'
+import { isUpstreamUnavailable } from '../model-resolution/failover'
 import type { Outcome } from './outcome'
 import type { SandboxRunToolOptions, SandboxTaskOptions } from './sandbox-run-tool'
 
@@ -95,21 +98,32 @@ function errorText(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 300)
 }
 
-async function chooseModel(models: ComputerStepOptions['models'], signal: AbortSignal): Promise<string | undefined> {
-  if (!models?.preferred.length) return undefined
+/** The models the step tries in order. `undefined` runs the product's own model; it leads when no policy constrains
+ *  the turn's models, and each later entry is a fallback for a run its model's provider refused. */
+async function modelChain(models: ComputerStepOptions['models'], signal: AbortSignal): Promise<Array<string | undefined>> {
+  if (!models?.preferred.length) return [undefined]
   const policy = await models.allowed(AbortSignal.any([signal, AbortSignal.timeout(ALLOW_LIST_BUDGET_MS)]))
     .catch((error: unknown): Outcome<never> => ({ succeeded: false, error: error instanceof Error ? error : new Error(String(error)) }))
   if (!policy.succeeded) {
     // An unread policy keeps the product's model; a refusal then names itself in the step's failure.
     console.warn(JSON.stringify({ event: 'agent_app_computer_model_policy_unread', error: errorText(policy.error) }))
-    return undefined
   }
-  if (policy.value === null) return undefined
-  const model = modelWithinAllowList(models.preferred, policy.value)
-  if (model !== models.preferred[0]) {
-    console.info(JSON.stringify({ event: 'agent_app_computer_model_within_policy', requested: models.preferred[0], model: model ?? null }))
+  if (!policy.succeeded || policy.value === null) return [undefined, ...models.preferred.slice(1)]
+  const allowed = policy.value
+  const first = modelWithinAllowList(models.preferred, allowed)
+  if (first !== models.preferred[0]) {
+    console.info(JSON.stringify({ event: 'agent_app_computer_model_within_policy', requested: models.preferred[0], model: first ?? null }))
   }
-  return model
+  return [...new Set([first, ...models.preferred.filter(model => allowed.includes(model))])]
+}
+
+/** A run that reached its end refused for its model: nothing is left running, and another model may serve. */
+function refusedForModel(error: unknown): boolean {
+  if (error instanceof SandboxRunError && error.code !== 'sandbox_failed') return false
+  for (let cause: unknown = error, depth = 0; cause && depth < 5; cause = (cause as { cause?: unknown }).cause, depth++) {
+    if (isUpstreamUnavailable(cause)) return true
+  }
+  return false
 }
 
 export function createComputerStep(options: ComputerStepOptions): ComputerStep {
@@ -143,7 +157,8 @@ export function createComputerStep(options: ComputerStepOptions): ComputerStep {
       return prior.answer
     }
 
-    const model = await chooseModel(options.models, signal)
+    const models = await modelChain(options.models, signal)
+    let model = models[0]
     const before: ComputerFileListing | undefined = vault
       ? prior?.before ?? await listComputerFiles(box, vault.root.replace(/\/+$/, ''))
       : undefined
@@ -156,26 +171,40 @@ export function createComputerStep(options: ComputerStepOptions): ComputerStep {
     }
 
     const framed = vault ? computerFileContract(vault.root.replace(/\/+$/, ''), frame(task)) : frame(task)
-    let answer: string
-    try {
+    const send = (attemptModel: string | undefined, executionId: string | undefined): Promise<string> => {
       if (options.run) {
-        answer = await options.run(box, framed, { ...taskOptions, ...(stepId ? { executionId: stepId } : {}),
-          ...(session ? { session } : {}), ...(model ? { model } : {}), onDispatch: () => { sent = true } })
-      } else {
-        const prompt = options.prompt ?? {}
-        answer = await runSandboxPrompt(options.shell!, box, framed, {
-          ...prompt, ...(model ? { model } : {}),
-          ...(stepId ? { executionId: stepId, turnId: stepId } : {}),
-          ...(session ? { sessionId: session.id } : {}),
-          ...(session?.isolated ? { secretProfileIsolation: true as const } : {}),
-          signal, timeoutMs, disallowQuestions: true,
-          ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
-          onDispatch: () => { sent = true; prompt.onDispatch?.() },
-        })
+        return options.run(box, framed, { ...taskOptions, ...(executionId ? { executionId } : {}),
+          ...(session ? { session } : {}), ...(attemptModel ? { model: attemptModel } : {}), onDispatch: () => { sent = true } })
       }
-    } catch (error) {
-      if (sent || !witnessed) throw error
-      return notSent(error)
+      const prompt = options.prompt ?? {}
+      return runSandboxPrompt(options.shell!, box, framed, {
+        ...prompt, ...(attemptModel ? { model: attemptModel } : {}),
+        ...(executionId ? { executionId, turnId: executionId } : {}),
+        ...(session ? { sessionId: session.id } : {}),
+        ...(session?.isolated ? { secretProfileIsolation: true as const } : {}),
+        signal, timeoutMs, disallowQuestions: true,
+        ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
+        onDispatch: () => { sent = true; prompt.onDispatch?.() },
+      })
+    }
+    let answer: string
+    for (let attempt = 0; ; attempt++) {
+      model = models[attempt]
+      try {
+        // A fallback is a new run: its own execution id, so a repeat attaches to the same attempt.
+        answer = await send(model, stepId && attempt > 0 ? `${stepId}-f${attempt + 1}` : stepId)
+        break
+      } catch (error) {
+        // A run without a witness counts as sent; one refused for its model has ended, so the next may go.
+        if ((sent || !witnessed) && attempt + 1 < models.length && !signal.aborted && refusedForModel(error)) {
+          console.warn(JSON.stringify({ event: 'agent_app_computer_model_fallback', stepId: stepId ?? null,
+            from: model ?? null, to: models[attempt + 1] ?? null, error: errorText(error) }))
+          sent = false
+          continue
+        }
+        if (sent || !witnessed) throw error
+        return notSent(error)
+      }
     }
     // An empty answer stays empty, so the tool reports `sandbox_empty`; a file receipt must not hide it.
     if (!answer.trim()) return answer

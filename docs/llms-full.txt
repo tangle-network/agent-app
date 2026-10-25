@@ -22261,7 +22261,7 @@ interface RuntimeTelemetryTruncation
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · depends on `chat-routes`, `harness`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web`
+Source: `src/sandbox/index.ts` · depends on `chat-routes`, `harness`, `model-resolution`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web`
 
 ### `adaptSandboxStream`
 

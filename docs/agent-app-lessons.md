@@ -67,13 +67,14 @@ agent-app takes over the lane through the surfaces apps already call:
   The step runs the first of the turn's models that the box key allows (`readSandboxRouterModels`, which reads Platform's `GET /v1/keys/sandbox-router-models`).
   Its session is one value, `{ id, isolated }`, which sets both `secretProfileIsolation` and the send witness.
   The step's child execution id comes from the turn and the tool call, so a repeated call reattaches to its run and is never sent twice.
+  A run refused for its model (the Router's `403 provider_disabled`, a spent quota) moves to the next allowed model under an execution id of its own; the sandbox model failover treats `provider_disabled` as model-scoped too (Tax, 2026-10-25: every computer step failed on gpt-6-luna with the OpenAI company credential off).
 - **Receipt.** `receipts` stores each step's answer, model and saved files (`createD1ComputerStepReceipts`), so a repeated call returns the stored receipt.
 - **Vault copy.** `files` copies each file the step wrote under the box's workspace root into the app's Vault, through the app's `save`.
   It then appends one receipt line to the answer. That line is the only statement about saved files that the model may repeat.
 - **Turn key.** Who pays stays the app's funding policy. The app passes it as `apiKey`: a per-turn child of the payer's key (`createDelegatedTurnKeys`), an agent key, or a flat-plan seat. The producer revokes the key when the turn settles.
 - **App configuration.** An app passes only its prompt, tools, profile, box `acquire`, funding and Vault adapter. The default backend (`produce` given as data) takes the same `funding`, `tools` and `computer` options, so an app made from the template gets the whole lane through configuration.
 
-Proof: [`tests/chat-routes/computer-lane.integration.test.ts`](../tests/chat-routes/computer-lane.integration.test.ts) runs the lane over a real Sandbox SDK, Router and Platform protocol and a real directory: the step runs the allowed model, copies its text file into the Vault and names its binary one as computer-only, settles one receipt, attaches a repeated call to its run after a lost request, sets isolation from the session value, and revokes the turn's lease once.
+Proof: [`tests/chat-routes/computer-lane.integration.test.ts`](../tests/chat-routes/computer-lane.integration.test.ts) runs the lane over a real Sandbox SDK, Router and Platform protocol and a real directory: the step runs the allowed model, copies its text file into the Vault and names its binary one as computer-only, settles one receipt, attaches a repeated call to its run after a lost request, moves past a disabled provider to the next allowed model, sets isolation from the session value, and revokes the turn's lease once; [`tests/chat-routes/delta-failover-route.integration.test.ts`](../tests/chat-routes/delta-failover-route.integration.test.ts) holds the sandbox failover to the same refusal.
 
 The order of work: agent-app first, then GTM, Creative, Legal and Tax, where Tax gets its first Router-first computer step.
 Each app's release canary must pass both a plain turn and a computer turn.

@@ -28,8 +28,10 @@ type AgentRequest = { executionId: string; sessionId: string; task: string; back
  * file under the Vault root; the peer replays a known execution id instead of
  * running its agent twice, as the sidecar does for a repeated turn id.
  */
-async function boundary(options: { policy?: 'down' } = {}) {
+async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?: string[] } = {}) {
   const disk = mkdtempSync(join(tmpdir(), 'computer-lane-'))
+  // The policy reader keeps answers per key, so each boundary has a payer of its own.
+  const payerKey = `payer-key-${crypto.randomUUID()}`
   const root = join(disk, 'vault')
   mkdirSync(join(root, 'notes'), { recursive: true })
   writeFileSync(join(root, 'notes', 'earlier.md'), 'already in the vault\n')
@@ -51,8 +53,8 @@ async function boundary(options: { policy?: 'down' } = {}) {
       const json = (value: unknown, status = 200) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value))
       if (url.pathname === '/v1/keys/sandbox-router-models') {
         if (options.policy === 'down') return json({ error: 'unavailable' }, 503)
-        if (request.headers.authorization !== 'Bearer payer-key') return json({ error: 'unauthorized' }, 401)
-        return json({ success: true, data: { allowedModels: ['flat/model-a'] } })
+        if (request.headers.authorization !== `Bearer ${payerKey}`) return json({ error: 'unauthorized' }, 401)
+        return json({ success: true, data: { allowedModels: options.allowed ?? ['flat/model-a'] } })
       }
       if (url.pathname === '/v1/sandboxes/lane-box') {
         return json({ id: 'lane-box', status: 'running', filesystemIncarnationId: 'lane-incarnation',
@@ -83,6 +85,12 @@ async function boundary(options: { policy?: 'down' } = {}) {
           + `event: done\ndata: ${JSON.stringify({ ...ids, status: 'completed' })}\n\n`)
         const known = completed.get(executionId)
         if (known !== undefined) return finish(known)
+        const model = String((input.backend.model as { model?: unknown } | undefined)?.model ?? '')
+        if (options.refused?.includes(model)) {
+          // As the Router refuses a disabled provider, relayed by the box agent at its run's end.
+          return response.end(`event: done\ndata: ${JSON.stringify({ ...ids, status: 'failed',
+            message: `opencode execution failed: Tangle-funded openai inference is unavailable for "${model}": the company credential is off (HTTP 403 provider_disabled)` })}\n\n`)
+        }
         // The box agent's own work: one file under the Vault root, written once per execution.
         agentRuns++
         mkdirSync(join(root, 'proof'), { recursive: true })
@@ -122,7 +130,7 @@ async function boundary(options: { policy?: 'down' } = {}) {
   const computer = (extra: Partial<ComputerStepOptions> = {}): ComputerStepOptions => ({
     shell, prompt: { model: 'turn/model' }, session: { id: 'computer-lane-session' }, files: vault, receipts,
     models: { preferred: ['turn/model', 'flat/model-a'],
-      allowed: signal => readSandboxRouterModels({ platformUrl: `${origin}/any/path`, apiKey: 'payer-key', signal }) },
+      allowed: signal => readSandboxRouterModels({ platformUrl: `${origin}/any/path`, apiKey: payerKey, signal }) },
     ...extra,
   })
   return { origin, root, box: box as SandboxInstance, shell, receipts, receiptsDb, vault, vaultFiles, computer,
@@ -300,4 +308,20 @@ it('runs the default backend on the product funding lease and tools', async () =
   } finally {
     chatDb.$client.close(); events.sqlite.close(); await peer.close()
   }
+}, 20_000)
+
+it('moves to the next allowed model when the box refuses a disabled provider, under its own execution id', async () => {
+  const peer = await boundary({ allowed: ['flat/model-a', 'flat/model-b'], refused: ['flat/model-a'] })
+  try {
+    const step = createComputerStep({ ...peer.computer({ files: undefined }),
+      models: { ...peer.computer().models!, preferred: ['turn/model', 'flat/model-a', 'flat/model-b'] },
+      parentExecutionId: 'turn-execution' })
+    const answer = await step.runTask(peer.box, 'Read the workspace.', taskOptions('fallback-call'))
+    expect(answer).toContain('Saved')
+    expect(peer.agentRequests.map(request => (request.backend.model as { model?: string }).model)).toEqual(['flat/model-a', 'flat/model-b'])
+    const [first, second] = peer.agentRequests.map(request => request.executionId)
+    expect(second).toBe(`${first}-f2`)
+    const row = peer.receiptsDb.sqlite.prepare("SELECT receipt FROM computer_step_receipts WHERE state = 'settled'").get() as { receipt: string }
+    expect(JSON.parse(row.receipt)).toMatchObject({ model: 'flat/model-b' })
+  } finally { await peer.close() }
 }, 20_000)
