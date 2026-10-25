@@ -3,6 +3,7 @@ import { CostLedger as retainedCostLedger } from 'agent-eval-0204'
 import { CostLedger as currentLineCostLedger } from 'agent-eval-0211'
 import { CostLedger as nextLineCostLedger } from 'agent-eval-0217'
 import { CostLedger as previousFloorCostLedger } from 'agent-eval-0218'
+import { CostLedger as previousDevelopmentCostLedger } from 'agent-eval-0220'
 import { expect, it } from 'vitest'
 
 const compat = process.env.AGENT_EVAL_COMPAT ?? 'agent-eval-0204'
@@ -11,6 +12,7 @@ const compatCostLedger: Record<string, unknown> = {
   'agent-eval-0211': currentLineCostLedger,
   'agent-eval-0217': nextLineCostLedger,
   'agent-eval-0218': previousFloorCostLedger,
+  'agent-eval-0220': previousDevelopmentCostLedger,
 }
 
 it('executes the compat Eval package instead of the current development peer', () => {
