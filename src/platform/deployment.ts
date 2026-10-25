@@ -7,8 +7,11 @@
  * The platform base URL: `TANGLE_PLATFORM_URL`, or the legacy `TANGLE_SSO_URL`
  * until every environment is migrated.
  */
+const env = (): Record<string, string | undefined> =>
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
+
 export function platformBaseUrlFromEnv(): string {
-  const url = process.env.TANGLE_PLATFORM_URL ?? process.env.TANGLE_SSO_URL
+  const url = env().TANGLE_PLATFORM_URL ?? env().TANGLE_SSO_URL
   if (!url) throw new Error('TANGLE_PLATFORM_URL is required (or legacy TANGLE_SSO_URL)')
   return url
 }
@@ -26,7 +29,7 @@ export function platformAuthClientOptionsFromEnv(
 ): { baseUrl: string; appId: string; fetchImpl: typeof fetch } {
   return {
     baseUrl: overrides.baseUrl ?? platformBaseUrlFromEnv(),
-    appId: overrides.appId ?? process.env.TANGLE_PLATFORM_APP_ID ?? defaultAppId,
+    appId: overrides.appId ?? env().TANGLE_PLATFORM_APP_ID ?? defaultAppId,
     fetchImpl: overrides.fetchImpl ?? ((input, init) => globalThis.fetch(input, init)),
   }
 }

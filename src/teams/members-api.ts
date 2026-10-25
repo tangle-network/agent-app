@@ -127,9 +127,10 @@ export interface MemberListEntry {
 }
 
 /**
- * Build the members API bound to one product's db/tables/access. Returns five
- * handlers; an app maps its route methods onto them (GET→list, POST→invite,
- * PATCH→updateRole, DELETE→remove; accept on its own route).
+ * Build the members API bound to one product's db/tables/access. Returns the
+ * handlers an app maps its route methods onto (GET→list, POST→invite,
+ * PATCH→updateRole, DELETE→remove; accept on its own route), and
+ * `handleMembersRequest`, which does that mapping for a single members route.
  */
 export function createMembersApi(opts: MembersApiOptions) {
   const { db, tables, userTable, workspaceTable, access, enforceSeat, memberSyncSeam } = opts

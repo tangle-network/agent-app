@@ -189,7 +189,7 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
 
   function resolveServiceToken(): string {
     if (opts.serviceToken === undefined) {
-      const token = typeof process !== 'undefined' ? process.env.PLATFORM_SERVICE_TOKEN : undefined
+      const token = (typeof process !== 'undefined' ? process.env.PLATFORM_SERVICE_TOKEN : undefined)?.trim()
       if (!token) throw new Error('PLATFORM_SERVICE_TOKEN is required for platform billing calls')
       return token
     }

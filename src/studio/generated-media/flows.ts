@@ -118,6 +118,11 @@ export interface GeneratedMediaFlowsConfig<Context> {
   recordVaultSave?: boolean
   /** The provider error stored on a row; defaults to the message, capped at 500 characters. */
   sanitizeProviderError?: (message: string) => string
+  /**
+   * A result URL the store rejects as tool input fails the generation by default.
+   * False records it as a storage failure instead, keeping the provider's result row.
+   */
+  failOnRejectedResultUrl?: boolean
 }
 
 interface MediaActor<Context> {
@@ -170,7 +175,8 @@ function mediaFields<Context>(config: GeneratedMediaFlowsConfig<Context>, media:
 /**
  * Ingest a provider result URL into the workspace. A storage failure is
  * reported rather than thrown, so the provider's work is not discarded; an
- * authorization or tool-input failure still throws.
+ * authorization failure still throws, and so does a rejected result URL unless
+ * `failOnRejectedResultUrl` is false.
  */
 async function ingestFromUrl<Context>(config: GeneratedMediaFlowsConfig<Context>, input: {
   context: Context
@@ -193,7 +199,7 @@ async function ingestFromUrl<Context>(config: GeneratedMediaFlowsConfig<Context>
     )
     return { media, storageStatus: 'saved' }
   } catch (err) {
-    if (err instanceof ToolInputError) throw err
+    if (err instanceof ToolInputError && config.failOnRejectedResultUrl !== false) throw err
     const message = err instanceof Error ? err.message : String(err)
     console.error(`Generated ${input.generationType} storage failed:`, message)
     return {
