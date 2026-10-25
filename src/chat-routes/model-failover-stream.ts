@@ -21,7 +21,7 @@
  * `liveLifecycleEvents` relaxes the buffer for progress only. `start`,
  * `status`, `model-processing`, and session lifecycle carry no answer and no
  * receipt, so a product may take them the moment they arrive and show what
- * the turn is waiting on. Measured 2026-09-11 on a warm production box:
+ * the turn is waiting on.
  * OpenCode reports whole parts, so the buffer held every event for 16 s and
  * the product could show nothing through provisioning and agent startup. Off
  * by default: with it on, an abandoned model's progress stays in the stream.
@@ -105,7 +105,7 @@ export function isCommittingSandboxEvent(event: unknown): boolean {
 
   // Session/turn lifecycle, progress status, and warnings belong to the
   // attempt, not the transcript — discardable with an abandoned model.
-  // Captured examples (2026-07-26): a dead model
+  // Captured examples: a dead model
   // emits `start`, `execution.started`, `status`×3, `session.updated`×2,
   // `warning`×2 BEFORE its terminal `error` — any one of them committing
   // would pin the turn to the dead model and kill the failover.
@@ -415,7 +415,7 @@ function deadlineAfter(timeoutMs: number): {
  * True when `event` is a terminal receipt (`result` / `done`) carrying no
  * assistant text.
  *
- * Measured on production `sandbox.tangle.tools` (2026-07-27, 28 turns through
+ * Measured on production `sandbox.tangle.tools` (28 turns through
  * the gtm-agent profile): a turn can end `{ outcome: { type: 'completed' } }`
  * with `finalText: ''` and zero token events — the platform reports success and
  * the customer's message is blank. It is not an outage, nothing throws, and

@@ -1,7 +1,7 @@
 /**
  * Alarms that fire at 80% of a platform limit, before the limit fails a customer.
  *
- * On 2026-10-10 GTM recorded 19 platform-limit events (Worker memory, D1,
+ * GTM recorded 19 platform-limit events (Worker memory, D1,
  * sandbox disk, snapshot count, key rate) and learned of each one after it had
  * failed someone. Each resource here has a declared limit; an observation at
  * or above 80% of it delivers a warning, and at or above the limit a critical

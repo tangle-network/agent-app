@@ -1,7 +1,7 @@
 /**
  * Reads of a large column a bounded batch at a time.
  *
- * On 2026-10-10 GTM's scheduled jobs exceeded the Worker's 128 MB by reading a
+ * GTM's scheduled jobs exceeded the Worker's 128 MB by reading a
  * day of stored turns at once: the outcome sweep held about 93 MB of turn
  * events, the reliability report read 1.63 M events, and turn health read
  * 121.8 MB of message parts in one query. D1 refuses the same read on its side

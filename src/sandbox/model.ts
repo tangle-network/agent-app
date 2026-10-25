@@ -34,7 +34,7 @@ export interface ProviderResolutionConfig {
  * and the platform's strict backend schema refuses the extra keys:
  * agent-app 0.53.10–0.54.0 emitted both, and every sandbox chat turn on a
  * product resolving sandbox < 0.60.16 failed with "unrecognized_keys
- * provider, apiKey, baseUrl, modelId at path backend" (Creative, 2026-10-06).
+ * provider, apiKey, baseUrl, modelId at path backend" (Creative).
  */
 export function backendModelFields(model: ResolvedModel): {
   model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string };

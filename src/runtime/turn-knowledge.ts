@@ -2,7 +2,7 @@
  * Knowledge in every turn: the index of an app's knowledge files, the full
  * text of the small ones, and the rule that keeps answers on them.
  *
- * Measured on Hospitality production (2026-10-11): a Router turn that had to
+ * Measured on Hospitality production: a Router turn that had to
  * discover files through list/read tools answered 17/17 correctly but needed
  * 3 tool calls (first words 12-17 s), and a turn that skipped the tools
  * answered from model defaults ("checkout 11:00" when the file said 12 pm).

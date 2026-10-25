@@ -71,7 +71,7 @@ export async function materializeDeferredFilesForExistingBox(
   if (typeof stampedHash === 'string' && stampedHash === corpusHash) return ok(box)
   // The create-time stamp goes stale on the first release that changes the
   // corpus, and without this the box rewrote the whole corpus on every reuse
-  // after it (a ~0.7 s file batch per GTM turn, 2026-10-11). The marker is
+  // after it (a ~0.7 s file batch per GTM turn). The marker is
   // written only after a corpus write succeeds and lives on the same disk as
   // the files, so a lost disk loses both and the corpus is written again.
   // What this isolate last found on the box stands in for reading the marker

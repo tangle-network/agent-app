@@ -3,7 +3,7 @@
 A user opens a project, does nothing for ten minutes, clicks **Terminal** — and
 gets a spinner over a box that does not exist. That is not a slow cold start.
 Cold starts are fast: **2.34–3.19 s** from nothing to terminal-ready
-(staging-sandbox, n=5, 2026-07-28). It is a product that never provisions at
+(staging-sandbox, n=5). It is a product that never provisions at
 all, because the only provisioning path is lazy and its guard never passes.
 
 `createSandboxPrewarmer` (`@tangle-network/agent-app/sandbox`) is the shell
@@ -48,7 +48,7 @@ original bug: a dead panel that claims to be provisioning.
 
 The platform does **not** dedupe by box name. Two concurrent
 `POST /v1/sandboxes` with an identical name both returned HTTP 201 and left two
-running boxes (measured, staging-sandbox, 2026-07-28). Two tabs racing a warm
+running boxes (measured, staging-sandbox). Two tabs racing a warm
 leak a paid box, so `claim` has no default — supply a store, or write
 `claim: 'single-isolate-only'` and own the fact that you only get per-isolate
 dedupe. On Workers, "same isolate" guarantees nothing.

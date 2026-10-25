@@ -3,7 +3,7 @@
 Every common page concept has at most one rendering owner.
 This page records which `agent-app` export owns each concept, how the nine agent apps in the design-system program render it today, and the order in which building the missing pages deletes the most local code.
 
-Read from default branches on 2026-10-05: `agent-app` `main` at `7b655935` (0.53.9) and the commit named in each app's section below.
+Read from default branches: `agent-app` `main` at `7b655935` (0.53.9) and the commit named in each app's section below.
 The decision behind it is in the company wiki, `wiki/decision-2026-10-05-one-design-system.md`; this page is the "agent-app page map" its slice 5 refers to.
 How to build and accept a page is in [app-shell.md](./app-shell.md), [product-surfaces.md](./product-surfaces.md) and [workspace-ui-parity.md](./workspace-ui-parity.md); this page does not repeat it.
 

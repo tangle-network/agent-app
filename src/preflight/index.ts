@@ -1,7 +1,7 @@
 /**
  * `/preflight` — deploy-time secret-liveness probes.
  *
- * WHY THIS EXISTS: on 2026-07-15 four secrets were simultaneously dead in one
+ * WHY THIS EXISTS: four secrets were simultaneously dead in one
  * production day — a dead `SANDBOX_API_KEY`, a stale `SANDBOX_API_URL`, and a
  * dead LiteLLM router key + URL. Each one was present in `wrangler secret list`
  * (so nothing looked wrong) yet invalid against its live endpoint, and nothing

@@ -4,7 +4,7 @@ A journey drives an agent app's real UI the way a person does, as a test identit
 They live in `@tangle-network/agent-app/journeys`, so every app proves its product flows with the same recorder, the same turn scorer and the same report.
 The `prove-journeys` skill runs the method end to end: record each flow in parallel, review the evidence skeptically, and write one INDEX.md with a ranked fix list.
 
-GTM's recorded journeys on 2026-10-11 proved 2 of its 4 minimum-customer-path checks, and the hand-built harness that recorded them scored 6 of 6 failed turns "completed".
+GTM's recorded journeys proved 2 of its 4 minimum-customer-path checks, and the hand-built harness that recorded them scored 6 of 6 failed turns "completed".
 This kit is that harness made app-agnostic, with the scoring rule fixed: see [How a turn is scored](#how-a-turn-is-scored).
 
 ## Adopt the kit

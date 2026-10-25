@@ -131,7 +131,7 @@ export function workspaceChannelKey(workspaceId: string): string {
  *  stay independent because each has its own storage key
  *  ({@link turnLockStorageKey}). A thread lock on its own channel created a
  *  new Durable Object on every thread's first turn, 0.8-1.9 s inside Creative's
- *  admission on staging (2026-10-20) against an object that already exists. */
+ *  admission on staging against an object that already exists. */
 export function turnLockChannelKey(workspaceId: string, _threadId: string, _scope: TurnLockScope): string {
   return workspaceChannelKey(workspaceId)
 }

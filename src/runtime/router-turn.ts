@@ -187,7 +187,7 @@ export interface RouterTurnOptions {
   continueFrom?: RouterTurnContinuation
   /** Runaway watchdog on model turns. Default: the tool loop's own watchdog, far above any legitimate turn, so
    *  `budgetMs` bounds the turn. A fixed 12 failed Legal's formation turns, which need 12 tools in 13 model calls
-   *  (2026-10-20, turn_backstop on 2 of 6). */
+   *  (turn_backstop on 2 of 6). */
   maxToolTurns?: number
   maxTokens?: number
   /** Sent as `x-tangle-trace-id` so the router's generation joins the app's trace. Characters the Router
@@ -274,7 +274,7 @@ const RETRY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
 const DEAD_CREDENTIAL_CATEGORIES = new Set(['provider_quota_exhausted', 'provider_key_invalid', 'provider_account_suspended'])
 const MAX_RETRY_DELAY_MS = 8_000
 // How long a request that may resend keeps resending a retryable answer. The Router answers 503 without calling a
-// model while Platform cannot verify the turn's key: on 2026-10-20 Platform's event loop stalled 16 s (10:30) and a
+// model while Platform cannot verify the turn's key: Platform's event loop stalled 16 s (10:30) and a
 // Platform deploy restarted it (11:36), and three sends inside 1 to 16 s failed two Legal turns that 45 s
 // would have carried through.
 const RETRY_WINDOW_MS = 45_000
@@ -348,8 +348,8 @@ function underTestRunner(): boolean {
  * actually calls.
  *
  * A provider serves a repeated prompt prefix from its cache: through the Router, Gemini served 38,685 of
- * 40,734 prompt tokens from cache on each repeat of a stable 150 kB prefix, and none when a timestamp came first
- * (2026-10-22). One per-turn byte early in the prompt therefore costs the whole prompt on every turn, so nothing
+ * 40,734 prompt tokens from cache on each repeat of a stable 150 kB prefix, and none when a timestamp came first.
+ * One per-turn byte early in the prompt therefore costs the whole prompt on every turn, so nothing
  * per-turn belongs in `stable` or the profile's prompt; under a test runner a clock or a repeated `context` section in
  * the prefix throws (`checkStablePrefix`).
  */
@@ -480,7 +480,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   // switches models silently. A reasoning-only finish or a stall arrives as an error frame (`empty_completion`,
   // `stream_idle_timeout`), which ends the call by name and takes the safe repeat on the next fallback model, so
   // the option is sent only while that repeat is on. The stall timer stays the Router's own (120 s): Gemini sends a
-  // tool call whole, so a stream is silent while the model writes the call. On Legal (2026-10-20) healthy calls went
+  // tool call whole, so a stream is silent while the model writes the call. On Legal healthy calls went
   // up to 44.6 s from their last word to their tool call and 66 s from their first frame to it, and a 45 s timer cut
   // 2 of 30 turns after their first sentence.
   const bodyFor = (model: string) => options.showReasoning && options.onEvent && options.repeat !== false &&
@@ -690,7 +690,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   }
   if (stop !== 'completed') return outcome({ code: `turn_${stop}`, message: 'The reply was stopped before it finished.' })
   // A model can end its turn with neither a word nor a tool call (gemini-2.5-flash did on 8 of
-  // 53 "remember" turns, 2026-10-11). Nothing was said and nothing ran, so one repeat is safe;
+  // 53 "remember" turns). Nothing was said and nothing ran, so one repeat is safe;
   // an answer still blank is a typed failure, never a successful empty reply.
   if (!segments.some(part => part.trim()) && !options.continueFrom?.text.trim()) {
     const next = repeats.shift()
