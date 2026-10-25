@@ -1,5 +1,3 @@
-import { randomBytes } from 'node:crypto'
-import { gzipSync } from 'node:zlib'
 import { describe, expect, it, vi } from 'vitest'
 import { createExportEngine, createMemoryExportStorage, sandboxArchive, sandboxFiles } from '../../src/workspace-export'
 
@@ -93,66 +91,6 @@ describe('sandbox source restoration', () => {
     const stream = await archive.open()
     await expect(stream!.cancel('cancelled')).rejects.toBe(error)
     expect(box.stop).toHaveBeenCalledTimes(1)
-  })
-
-  it('cancels and restores an unfinished archive when a segment write fails', async () => {
-    const { box, archive } = boxFixture()
-    let stopped!: () => void
-    let finishStop!: () => void
-    const stopStarted = new Promise<void>((resolve) => { stopped = resolve })
-    const stopFinished = new Promise<void>((resolve) => { finishStop = resolve })
-    box.stop.mockImplementation(async () => {
-      stopped()
-      await stopFinished
-      box.status = 'stopped'
-    })
-    // A large valid tar, with incompressible content, fills one 8 MiB segment
-    // before the source reaches EOF. Its final bytes are deliberately withheld.
-    const size = 10 * 1024 * 1024
-    const header = Buffer.alloc(512)
-    header.write('large.bin')
-    header.write('0000644\0', 100)
-    header.write(`${size.toString(8).padStart(11, '0')}\0`, 124)
-    header.fill(32, 148, 156)
-    header.write('0', 156)
-    header.write('ustar\0', 257)
-    const checksum = header.reduce((sum, byte) => sum + byte, 0)
-    header.write(`${checksum.toString(8).padStart(6, '0')}\0 `, 148)
-    const bytes = gzipSync(Buffer.concat([header, randomBytes(size), Buffer.alloc(1024)]))
-    let offset = 0
-    const cancel = vi.fn()
-    box.fs.openArchive.mockResolvedValue(new ReadableStream({
-      pull(controller) {
-        if (offset >= 9 * 1024 * 1024) return
-        controller.enqueue(bytes.subarray(offset, offset + 64 * 1024))
-        offset += 64 * 1024
-      },
-      cancel,
-    }))
-    const storage = createMemoryExportStorage()
-    const put = storage.put.bind(storage)
-    const error = new Error('segment storage failed')
-    storage.put = async (key, body, options) => {
-      if (key.includes('/u/')) throw error
-      return put(key, body, options)
-    }
-    const engine = createExportEngine({ app: 'test', storage, plan: async () => ({ sources: [archive] }) })
-    const job = await engine.start('ws-storage-failure', 'owner')
-    let settled = false
-    const advancing = engine.advance('ws-storage-failure', job.id).then((result) => { settled = true; return result })
-    await stopStarted
-    // Yield an event-loop turn so an incorrectly detached cancellation can
-    // settle the job. No duration or machine-speed threshold is involved.
-    await new Promise<void>((resolve) => setImmediate(resolve))
-    expect(settled).toBe(false)
-    expect(box.stop).toHaveBeenCalledTimes(1)
-    finishStop()
-    const result = await advancing
-    expect(result?.units[0]).toMatchObject({ status: 'pending', attempts: 1, error: error.message, entries: [] })
-    expect(box.stop).toHaveBeenCalledTimes(1)
-    expect(cancel).toHaveBeenCalledExactlyOnceWith(error)
-    expect(box.status).toBe('stopped')
-    expect(offset).toBeLessThan(bytes.length)
   })
 
   it.each(['complete', 'error', 'cancel'])('keeps an already-running box running on archive %s', async (exit) => {

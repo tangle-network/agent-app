@@ -58,7 +58,7 @@ it('the CLI reports lane deficits on the frozen E8 window, refuses a hold only o
     // The value's history: empty, set to the QA stage inside the frozen window, then the deployed (base) commit after it closed.
     const commit = (at: string, value: string, message: string) => {
       writeFileSync(join(dir, 'wrangler.toml'), `[vars]\n${frozen.variable} = "${value}"\nOTHER = "${message}"\n`)
-      const env = { ...process.env, GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
+      const env = { ...process.env, GIT_ALLOW_TEST_IDENTITY: '1', GIT_AUTHOR_NAME: 'rollout', GIT_AUTHOR_EMAIL: 'rollout@example.com',
         GIT_COMMITTER_NAME: 'rollout', GIT_COMMITTER_EMAIL: 'rollout@example.com', GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at }
       for (const args of [['add', 'wrangler.toml'], ['commit', '-q', '-m', message]]) {
         const git = spawnSync('git', args, { cwd: dir, env, encoding: 'utf8' })
