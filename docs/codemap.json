@@ -4900,6 +4900,63 @@
       ]
     },
     {
+      "id": "./conformance",
+      "source": "src/conformance/index.ts",
+      "dependsOn": [
+        "operator",
+        "signoff"
+      ],
+      "error": null,
+      "exports": [
+        {
+          "name": "checkDeployedApp",
+          "kind": "function",
+          "signature": "(options: ConformanceOptions) => Promise<CheckResult[]>",
+          "doc": "Runs the checks against one deployed app and returns every result, in the order they ran."
+        },
+        {
+          "name": "CheckName",
+          "kind": "type",
+          "signature": "type CheckName",
+          "doc": null
+        },
+        {
+          "name": "CheckResult",
+          "kind": "interface",
+          "signature": "interface CheckResult",
+          "doc": "One check's verdict."
+        },
+        {
+          "name": "ComputerProof",
+          "kind": "type",
+          "signature": "type ComputerProof",
+          "doc": null
+        },
+        {
+          "name": "ConformanceOptions",
+          "kind": "interface",
+          "signature": "interface ConformanceOptions",
+          "doc": null
+        },
+        {
+          "name": "SignInMode",
+          "kind": "type",
+          "signature": "type SignInMode",
+          "doc": "Sign-in for the conformance runner: the two ways a member reaches an agent app, and one question both answer, \"does the app accept this session?\"."
+        }
+      ]
+    },
+    {
+      "id": "./conformance/cli",
+      "source": "src/conformance/cli.ts",
+      "dependsOn": [
+        "operator",
+        "signoff"
+      ],
+      "error": null,
+      "exports": []
+    },
+    {
       "id": "./copy-quality",
       "source": "src/copy-quality/index.ts",
       "dependsOn": [

@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_152 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -33,6 +33,8 @@ _152 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
+| [`./conformance`](api/conformance.md) | 6 | `operator`, `signoff` |
+| [`./conformance/cli`](api/conformance-cli.md) | 0 | `operator`, `signoff` |
 | [`./copy-quality`](api/copy-quality.md) | 15 | `work-product` |
 | [`./crypto`](api/crypto.md) | 11 | `billing` |
 | [`./design-canvas`](api/design-canvas.md) | 99 | `tools`, `web` |
@@ -406,6 +408,24 @@ Depends on: `knowledge`, `runtime`
 `AgentAppConfig`, `agentAppConfigJsonSchema`, `AgentIdentityConfig`, `AgentIntegrationsConfig`, `AgentKnowledgeConfig`, `AgentTaxonomyConfig`, `AgentUiConfig`, `defineAgentApp`, `KnowledgeLoopConfig`, `KnowledgeRequirementSpec`, `KnowledgeSourceSpec`, `SatisfiedByRule`, `TangleModelConfig`
 
 [Full API →](api/config.md)
+
+## `./conformance`
+
+Source: `src/conformance/index.ts` · 6 exports
+
+Depends on: `operator`, `signoff`
+
+`checkDeployedApp`, `CheckName`, `CheckResult`, `ComputerProof`, `ConformanceOptions`, `SignInMode`
+
+[Full API →](api/conformance.md)
+
+## `./conformance/cli`
+
+Source: `src/conformance/cli.ts` · 0 exports
+
+Depends on: `operator`, `signoff`
+
+_No public exports._
 
 ## `./copy-quality`
 
