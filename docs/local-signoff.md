@@ -102,6 +102,8 @@ content for the owning lane; their allocated bytes remain in the cache total.
 The CLI reports these orphaned trees separately from reclaimed entries and
 reports any bytes still above the idle cap. Other Git retirement failures
 remain errors rather than being counted as reclaimed space.
+The retained standard linked-tree pointer is evidence for preservation only,
+not proof of historical registration or authority to delete its content.
 Four generations are kept, so moving between a branch and `main` finds both warm.
 
 Measured, install wall clock, same commit either side:

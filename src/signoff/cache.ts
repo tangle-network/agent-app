@@ -6,7 +6,7 @@ import {
 } from 'node:fs'
 import type { Stats } from 'node:fs'
 import { hostname } from 'node:os'
-import { basename, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import lockfile from 'proper-lockfile'
 
 /** Defaults owned by signoff; callers can override only when explicitly testing. */
@@ -44,6 +44,7 @@ interface CacheEntry {
   readonly path: string
   readonly kind: 'tree' | 'store'
   readonly mtimeMs: number
+  readonly rootInode: string
   readonly protected: boolean
   orphaned: boolean
   readonly inodes: Set<string>
@@ -233,19 +234,31 @@ function collectInodes(path: string, keys: Set<string>, sizes: Map<string, numbe
 
 /** Only ENOENT proves vanished metadata; permission and I/O failures still refuse pruning. */
 function missingGitMetadata(tree: string): boolean {
+  let gitDir: string
   try {
     const marker = join(tree, '.git')
     if (!lstatSync(marker).isFile()) return false
     const pointer = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(readFileSync(marker, 'utf8'))
     if (!pointer) return false
-    const gitDir = resolve(tree, pointer[1]!)
-    statSync(gitDir)
-    // A linked tree names its common repository relative to its private Git directory.
-    const common = readFileSync(join(gitDir, 'commondir'), 'utf8').trim()
-    if (!common) return false
-    statSync(resolve(gitDir, common))
-    return false
+    gitDir = resolve(tree, pointer[1]!)
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
+  try { statSync(gitDir) } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    // The retained standard worktrees/<tree basename> pointer earns preservation,
+    // not proof of historical registration or authority to delete anything.
+    // An arbitrary missing separate Git directory is not this evidence.
+    return basename(dirname(gitDir)) === 'worktrees' && basename(gitDir) === basename(tree)
+  }
+  let common: string
+  try { common = readFileSync(join(gitDir, 'commondir'), 'utf8').trim() } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
+  }
+  if (!common) return false
+  try { statSync(resolve(gitDir, common)); return false } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true
     throw error
   }
@@ -262,12 +275,13 @@ function entries(cacheDir: string, protectedSet: Set<string>, unknown: boolean):
       const recognized = kind === 'store' ? /^[a-f0-9]{64}$/.test(entry.name)
         : existsSync(join(path, '.git'))
       const orphaned = kind === 'tree' && recognized && missingGitMetadata(path)
-      let mtimeMs: number
-      try { mtimeMs = statSync(path).mtimeMs } catch (error) {
+      let current: Stats
+      try { current = lstatSync(path) } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
         throw error
       }
-      found.push({ path, kind, mtimeMs, orphaned,
+      if (!current.isDirectory()) continue
+      found.push({ path, kind, mtimeMs: current.mtimeMs, rootInode: `${current.dev}:${current.ino}`, orphaned,
         protected: unknown || protectedSet.has(path) || !recognized || orphaned, inodes: new Set() })
     }
   }
@@ -278,7 +292,7 @@ function removeEntry(entry: CacheEntry): boolean {
   if (entry.kind === 'store') { rmSync(entry.path, { recursive: true, force: true }); return true }
   try {
     const current = lstatSync(entry.path)
-    if (!current.isDirectory() || !entry.inodes.has(`${current.dev}:${current.ino}`)) {
+    if (!current.isDirectory() || entry.rootInode !== `${current.dev}:${current.ino}`) {
       throw new Error(`signoff: cached worktree changed before retirement: ${entry.path}`)
     }
   } catch (error) {

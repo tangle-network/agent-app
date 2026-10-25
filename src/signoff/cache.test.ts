@@ -163,7 +163,17 @@ describe('signoff cache retention', () => {
     const content = Buffer.alloc(32 * 1024, 19)
     writeFileSync(join(tree, 'only-copy'), content)
     const privateGit = readFileSync(join(tree, '.git'), 'utf8').trim().slice('gitdir: '.length)
-    renameSync(missing === 'private' ? privateGit : join(privateGit, 'commondir'), join(root(), 'retained-metadata'))
+    if (missing === 'private') {
+      renameSync(privateGit, join(root(), 'retained-metadata'))
+    } else {
+      // Keep the real private Git directory intact while its explicit common target vanishes.
+      const retained = join(root(), 'private-metadata')
+      renameSync(privateGit, retained)
+      writeFileSync(join(tree, '.git'), `gitdir: ${retained}\n`)
+      writeFileSync(join(retained, 'commondir'), `${join(repo, '.git')}\n`)
+      git(['rev-parse', '--is-inside-work-tree'], tree)
+      renameSync(join(repo, '.git'), join(root(), 'retained-common-metadata'))
+    }
     const idleStore = store(cacheDir, 'e'.repeat(64), 32 * 1024)
 
     const result = await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })
@@ -183,7 +193,7 @@ describe('signoff cache retention', () => {
     const cacheDir = root()
     const tree = join(cacheDir, 'trees', 'orphaned-tree')
     mkdirSync(tree, { recursive: true })
-    writeFileSync(join(tree, '.git'), `gitdir: ${join(root(), 'missing-metadata')}\n`)
+    writeFileSync(join(tree, '.git'), `gitdir: ${join(root(), 'worktrees', 'orphaned-tree')}\n`)
     writeFileSync(join(tree, 'only-copy'), 'retained orphan content\n')
     const idleStore = store(cacheDir, 'f'.repeat(64), 32 * 1024)
     mkdirSync(join(cacheDir, 'active'))
@@ -211,5 +221,18 @@ describe('signoff cache retention', () => {
     expect(readFileSync(join(tree, 'README.md'), 'utf8')).toBe('fixture\n')
     git(['worktree', 'unlock', tree], repo)
     expect((await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })).removed).toEqual([tree])
+  })
+
+  it('keeps a valid separate Git directory failure distinct from an orphaned linked tree', async () => {
+    const cacheDir = root()
+    const tree = join(cacheDir, 'trees', 'separate-main')
+    mkdirSync(join(cacheDir, 'trees'))
+    git(['init', '--quiet', '--initial-branch=main', '--separate-git-dir', join(root(), 'git-dir'), tree], cacheDir)
+    writeFileSync(join(tree, 'README.md'), 'separate Git repository\n')
+    git(['add', '.'], tree)
+    git(['commit', '--quiet', '-m', 'fixture'], tree)
+    git(['rev-parse', '--is-inside-work-tree'], tree)
+    await expect(pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })).rejects.toThrow('cannot retire cached worktree')
+    expect(readFileSync(join(tree, 'README.md'), 'utf8')).toBe('separate Git repository\n')
   })
 })
