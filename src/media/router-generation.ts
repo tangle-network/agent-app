@@ -186,3 +186,26 @@ function bytesToBase64(bytes: Uint8Array): string {
   }
   return btoa(binary)
 }
+
+/**
+ * Where the Router posts provider job updates for this deployment, or
+ * undefined when webhooks are off. `TCLOUD_WEBHOOK_SECRET` turns them on;
+ * `TCLOUD_WEBHOOKS_ENABLED` without the secret is a configuration error. The
+ * origin is `PUBLIC_ORIGIN`, else `APP_ORIGIN`, else the request's own.
+ */
+export function tcloudWebhookCallbackUrl(env: Record<string, unknown> | undefined, requestUrl: string): string | undefined {
+  const secret = configuredText(env?.TCLOUD_WEBHOOK_SECRET)
+  const enabled = secret || truthy(env?.TCLOUD_WEBHOOKS_ENABLED)
+  if (!enabled) return undefined
+  if (!secret) throw new Error('TCLOUD_WEBHOOK_SECRET is required when tcloud webhooks are enabled')
+  const origin = configuredText(env?.PUBLIC_ORIGIN) ?? configuredText(env?.APP_ORIGIN) ?? new URL(requestUrl).origin
+  return `${origin.replace(/\/+$/, '')}/api/webhooks/tcloud`
+}
+
+function configuredText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function truthy(value: unknown): boolean {
+  return value === true || (typeof value === 'string' && /^(1|true|yes|on)$/i.test(value.trim()))
+}

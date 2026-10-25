@@ -15,7 +15,7 @@ export interface ThreadAccessOptions<Role extends string = WorkspaceRole> {
 
 /**
  * Bind the thread check to a product's thread table and workspace access.
- * The returned check answers the thread's workspace id, or the Response the
+ * The returned check answers the thread and its workspace id, or the Response the
  * route returns: 400 for a missing id, 404 for an unknown or denied thread.
  */
 export function createThreadAccessCheck<Role extends string = WorkspaceRole>(options: ThreadAccessOptions<Role>) {
@@ -23,7 +23,7 @@ export function createThreadAccessCheck<Role extends string = WorkspaceRole>(opt
     threadId: string | undefined,
     userId: string,
     role: Role,
-  ): Promise<{ workspaceId: string } | Response> {
+  ): Promise<{ threadId: string; workspaceId: string } | Response> {
     if (!threadId) return Response.json({ error: 'Missing threadId' }, { status: 400 })
     const workspaceId = await options.findThreadWorkspace(threadId)
     if (!workspaceId) return Response.json({ error: 'Thread not found' }, { status: 404 })
@@ -32,6 +32,6 @@ export function createThreadAccessCheck<Role extends string = WorkspaceRole>(opt
     } catch {
       return Response.json({ error: 'Thread not found' }, { status: 404 })
     }
-    return { workspaceId }
+    return { threadId, workspaceId }
   }
 }
