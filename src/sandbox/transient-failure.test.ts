@@ -81,6 +81,4 @@ describe('transport failures (network: true)', () => {
     expect(classifySandboxTransientFailure(Object.assign(new Error('aborted'), { name: 'AbortError' }), { network: true })).toBeNull()
     expect(classifySandboxTransientFailure(new Error('runtime exploded'), { network: true })).toBeNull()
   })
-
-
 })

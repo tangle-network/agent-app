@@ -50,6 +50,7 @@ import { createComputerStep, type ComputerStepOptions } from '../sandbox/compute
 import type { PersistedChatMessageForTurn } from '../stream/index'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
+import type { ChatRouteEvent } from './turn-route-contracts'
 import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { ProducerNoticeEvent } from './wire'
 
@@ -73,7 +74,7 @@ export interface HybridTurnBox {
   /** Runs the task on the box and returns its answer. Omit it and pass `computer` for agent-app's computer step. */
   runTask?: SandboxRunToolOptions['runTask']
   /** agent-app's computer step ({@link createComputerStep}): the first of the turn's models the box key allows, one
-   *  session value, stable step ids, durable receipts and the copy of the step's files into the product's Vault.
+   *  session value, a turn id the runtime's admission makes idempotent, and the copy of the step's files into the product's Vault.
    *  `parentExecutionId` defaults to the turn's execution id on the chat route, else the trace id. */
   computer?: ComputerStepOptions
   /** Wall-clock cap for one `sandbox_run` call, box start included. Default 4 minutes. */
@@ -262,6 +263,10 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
     const events = (async function* () {
       for await (const event of producer.stream) {
         yield event
+        // A box agent's question (`computer.questions`) reaches the member as the interaction it is; the answer
+        // goes to the box through the app's interaction route.
+        const side = event.type === 'tool.event' ? event.data as { kind?: unknown; data?: unknown } | undefined : undefined
+        if (side?.kind === 'computer_interaction' && side.data && typeof side.data === 'object') yield side.data as ChatRouteEvent
         if (event.type === 'tool_result') {
           const warning = warnings.get(event.toolCallId)
           if (warning) yield warning

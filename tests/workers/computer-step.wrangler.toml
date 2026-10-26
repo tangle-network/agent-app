@@ -1,0 +1,9 @@
+name = "agent-app-computer-step-proof"
+main = "./computer-step.worker.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "agent-app-computer-step-proof"
+database_id = "00000000-0000-0000-0000-000000000031"
