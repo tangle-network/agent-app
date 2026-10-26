@@ -11,10 +11,9 @@
  * token in its local tokens.css). CSS resolves the missing var to nothing, the
  * surface paints transparent, and NOTHING errors. It ships invisible.
  *
- * `tests/theme/tokens-contract.test.ts` guards agent-app's OWN components. This
- * module lifts that walking logic into a function every CONSUMER app can run
- * against ITS OWN source in CI, comparing references to the tokens.css agent-app
- * ships plus any extra CSS the app defines.
+ * Consumer apps scan their own source against the tokens.css agent-app ships
+ * plus any extra CSS they define. `tests/theme/packed-styles-consumer.mjs`
+ * exercises this public API with the packed stylesheet in a browser.
  *
  * ── What each check covers (scope is deliberately honest) ────────────────────
  *
@@ -23,9 +22,7 @@
  *     template strings) is matched and compared against the defined token set.
  *     This is exact: a `var(--x)` reference is unambiguous. It is a raw-text
  *     scan (no AST), so a `var(--x)` written inside a comment or string literal
- *     counts too — deliberate: it keeps the single-source logic identical to the
- *     agent-app self-test, and a dangling `var(--x)` in a comment is a smell
- *     worth surfacing. Suppress a deliberate one with `allowlist`.
+ *     counts too. Suppress intentional runtime-defined variables with `allowlist`.
  *
  *  2. Tailwind-utility check — INTENTIONALLY PARTIAL. Bare classes like
  *     `bg-card` carry no `var(--)` and so are invisible to check 1; Tailwind

@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 import postcss from 'postcss'
 import { describe, expect, it } from 'vitest'
 
-import { checkThemeContract } from '../../src/theme-contract/index'
 import preset from '../../src/theme/tailwind-preset'
 import { darkTheme, lightTheme, themeToCssVars } from '../../src/theme/theme'
 
@@ -59,21 +58,6 @@ describe('canonical Brand source', () => {
     expect(bareRadius).toEqual([])
   })
 
-  it('defines every variable used by the composed stylesheet and owned React surfaces', () => {
-    const definitions = new Set<string>()
-    const uses = new Set<string>()
-    postcss.parse(packed).walkDecls((declaration) => {
-      if (declaration.prop.startsWith('--')) definitions.add(declaration.prop)
-      for (const match of declaration.value.matchAll(/var\(\s*(--[\w-]+)/g)) uses.add(match[1]!)
-    })
-    expect([...uses].filter((name) => !definitions.has(name))).toEqual([])
-    const result = checkThemeContract({
-      srcDirs: ['design-canvas-react', 'sequences-react', 'web-react', 'studio-react'].map((area) =>
-        join(root, 'src', area)),
-      tokensCss: join(root, 'src/theme/tokens.css'),
-    })
-    expect(result.missing).toEqual([])
-  })
 })
 
 describe('legacy compatibility', () => {
