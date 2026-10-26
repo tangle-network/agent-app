@@ -51,6 +51,7 @@ export * from './chat-mentions'
 export * from './message-projection'
 // `wire` is import-free, so the handle spelling is safe in a browser bundle.
 export { agentHandle, AGENT_HANDLE_PATTERN } from '../chat-routes/wire'
+export type { AgentMention, ChatMention } from '../chat-routes/wire'
 export * from './mention-pill'
 export * from './entry-composer'
 export * from './composer-mode-controls'
