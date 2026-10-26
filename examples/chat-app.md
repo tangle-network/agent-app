@@ -344,7 +344,14 @@ with the thread's history and none seeing another's answer, and persists one
 assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and labels each answer with its
 author (`expandSpeakerRows` in `/web`); the live stream carries the same
 boundary as a `speaker` event (`onSpeaker` in `ChatStreamCallbacks`), so
-a viewer opens a new block as each agent starts. A mention of an agent the
+a viewer opens a new block as each agent starts. When a product projects history for a
+mentioned agent, it passes the point of view: `projectDispatchHistory(prior,
+{ pov: args.agent?.id, owner })` keeps that agent's own answers as
+`assistant` turns and turns every other agent's answer, including the
+thread's owner, into a `user` turn tagged `[Name] …`, the same rule
+agent-runtime's conversations use. Without a point of view, a multi-speaker
+row projects as tagged `assistant` turns, so the owner still sees who said
+what. Reasoning and tool parts never project. A mention of an agent the
 resolver does not return is refused as `unknown_agent`; a route without
 `agents` refuses any agent mention as `agents_unsupported`. The rail lists
 the roster through `AgentWorkspaceLayout`'s `agents` config, one row per
