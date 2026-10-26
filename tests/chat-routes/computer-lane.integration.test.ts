@@ -1,8 +1,8 @@
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import { Sandbox, type SandboxInstance } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
@@ -11,22 +11,22 @@ import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
 import { COMPUTER_FILES_GUIDANCE, type ComputerVault } from '../../src/sandbox/computer-files'
-import { COMPUTER_STEP_RECEIPT_TABLE_DDL, createD1ComputerStepReceipts } from '../../src/sandbox/computer-receipts'
 import { createComputerStep, type ComputerStepOptions } from '../../src/sandbox/computer-step'
 import { readSandboxRouterModels } from '../../src/sandbox/router-models'
 import { SandboxRunError } from '../../src/sandbox/sandbox-run-error'
 import { openDatabase } from '../teams/db-helper'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
+import { createSidecarRuntimePeer, type RuntimeRun } from '../helpers/sidecar-runtime-peer'
 
 type RouterPayload = { messages: Array<{ role: string; content: unknown }>; tools?: Array<{ function: { name: string } }> }
-type AgentRequest = { executionId: string; sessionId: string; task: string; backend: Record<string, unknown> }
 
 /**
  * Real HTTP peers for the Router, Platform's model policy and the box's runtime
- * (agent run stream, file tree and file read over a real directory), the real
- * Sandbox SDK, the shared route and SQLite receipts. The box agent writes a real
- * file under the Vault root; the peer replays a known execution id instead of
- * running its agent twice, as the sidecar does for a repeated turn id.
+ * (`tests/helpers/sidecar-runtime-peer`: detached admission, replay, the session's
+ * execution ledger, completed turns by turn id, a real directory as the file
+ * tree), the real Sandbox SDK and the shared route. The box agent writes a real
+ * file under the Vault root; a repeated turn id is the same run, as the sidecar
+ * makes it.
  */
 async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?: string[] } = {}) {
   const disk = mkdtempSync(join(tmpdir(), 'computer-lane-'))
@@ -35,16 +35,31 @@ async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?
   const root = join(disk, 'vault')
   mkdirSync(join(root, 'notes'), { recursive: true })
   writeFileSync(join(root, 'notes', 'earlier.md'), 'already in the vault\n')
+  // Written long before this step's run, as an earlier turn's file is.
+  const anHourAgo = new Date(Date.now() - 3_600_000)
+  utimesSync(join(root, 'notes', 'earlier.md'), anHourAgo, anHourAgo)
   const routerRequests: Array<{ authorization?: string; payload: RouterPayload }> = []
-  const agentRequests: AgentRequest[] = []
-  const completed = new Map<string, string>()
   const held: Array<() => void> = []
   let agentRuns = 0
   let holdNextRun = false
   let origin = ''
-  const walk = (dir: string): Array<{ path: string; size: number; mtime: number }> => readdirSync(dir, { withFileTypes: true })
-    .flatMap(entry => entry.isDirectory() ? walk(join(dir, entry.name)) : [{ path: join(dir, entry.name),
-      size: statSync(join(dir, entry.name)).size, mtime: Math.floor(statSync(join(dir, entry.name)).mtimeMs) }])
+  const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) => {
+    const model = String((run.backend.model as { model?: unknown } | undefined)?.model ?? '')
+    if (options.refused?.includes(model)) {
+      // As the Router refuses a disabled provider, relayed by the box agent at its run's end.
+      return peer.fail(run, `opencode execution failed: Tangle-funded openai inference is unavailable for "${model}": the company credential is off (HTTP 403 provider_disabled)`)
+    }
+    // The box agent's own work: one file under the Vault root, written once per run.
+    agentRuns++
+    const work = () => {
+      mkdirSync(join(root, 'proof'), { recursive: true })
+      writeFileSync(join(root, 'proof', 'a.md'), `summary for ${run.executionId.slice(0, 8)}\n`)
+      writeFileSync(join(root, 'proof', 'chart.png'), Buffer.from([137, 80, 78, 71]))
+      peer.finish(run, `Saved ${join(root, 'proof', 'a.md')}`)
+    }
+    if (holdNextRun) { holdNextRun = false; held.push(work); return }
+    work()
+  } })
   const server = createServer((request, response) => {
     let body = ''
     request.on('data', chunk => { body += chunk })
@@ -61,46 +76,9 @@ async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?
           filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
           connection: { runtimeUrl: `${origin}/v1/sandboxes/lane-box/runtime` } })
       }
-      if (url.pathname === '/v1/sandboxes/lane-box/runtime/files/tree') {
-        // As the sidecar does: the root and every path relative to the box workspace, here the temporary disk.
-        const path = url.searchParams.get('path') ?? root
-        const files = walk(path).map(file => ({ ...file, path: relative(disk, file.path) }))
-        return json({ data: { root: relative(disk, path), directories: [], files,
-          stats: { totalDirectories: 0, totalFiles: files.length, scanDurationMs: 1, truncated: false } } })
-      }
-      if (url.pathname === '/v1/sandboxes/lane-box/runtime/files/read') {
-        const { path } = JSON.parse(body) as { path: string }
-        return json({ success: true, data: { content: readFileSync(path, 'utf8'), encoding: 'utf8' } })
-      }
-      if (url.pathname === '/v1/sandboxes/lane-box/runtime/agents/run/stream') {
-        const input = JSON.parse(body) as { sessionId: string; parts?: Array<{ type: string; text?: string }>; backend: Record<string, unknown> }
-        const executionId = String(request.headers['x-execution-id'] ?? '')
-        const task = (input.parts ?? []).filter(part => part.type === 'text')
-          .map(part => Buffer.from(part.text ?? '', 'base64').toString('utf8')).join('\n')
-        agentRequests.push({ executionId, sessionId: input.sessionId, task, backend: input.backend })
-        const ids = { executionId, sessionId: input.sessionId }
-        response.writeHead(200, { 'content-type': 'text/event-stream' })
-        response.write(`event: execution.started\ndata: ${JSON.stringify(ids)}\n\n`)
-        const finish = (finalText: string) => response.end(`event: result\ndata: ${JSON.stringify({ ...ids, finalText })}\n\n`
-          + `event: done\ndata: ${JSON.stringify({ ...ids, status: 'completed' })}\n\n`)
-        const known = completed.get(executionId)
-        if (known !== undefined) return finish(known)
-        const model = String((input.backend.model as { model?: unknown } | undefined)?.model ?? '')
-        if (options.refused?.includes(model)) {
-          // As the Router refuses a disabled provider, relayed by the box agent at its run's end.
-          return response.end(`event: done\ndata: ${JSON.stringify({ ...ids, status: 'failed',
-            message: `opencode execution failed: Tangle-funded openai inference is unavailable for "${model}": the company credential is off (HTTP 403 provider_disabled)` })}\n\n`)
-        }
-        // The box agent's own work: one file under the Vault root, written once per execution.
-        agentRuns++
-        mkdirSync(join(root, 'proof'), { recursive: true })
-        writeFileSync(join(root, 'proof', 'a.md'), `summary for ${executionId.slice(0, 8)}\n`)
-        writeFileSync(join(root, 'proof', 'chart.png'), Buffer.from([137, 80, 78, 71]))
-        const answer = `Saved ${join(root, 'proof', 'a.md')}`
-        completed.set(executionId, answer)
-        if (holdNextRun) { holdNextRun = false; held.push(() => finish(answer)); return }
-        return finish(answer)
-      }
+      if (url.pathname === '/v1/backends') return json({ backends: [{ type: 'opencode', capabilities: { interactions: ['question'] } }] })
+      const prefix = '/v1/sandboxes/lane-box/runtime'
+      if (url.pathname.startsWith(prefix) && runtime.handle(request, response, url.pathname.slice(prefix.length), url, body)) return
       if (request.method === 'POST' && ['/chat/completions', '/v1/chat/completions'].includes(url.pathname)) {
         const payload = JSON.parse(body) as RouterPayload
         routerRequests.push({ authorization: request.headers.authorization, payload })
@@ -121,27 +99,25 @@ async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const box = await new Sandbox({ apiKey: 'loopback-only-sandbox-key', baseUrl: origin }).get('lane-box')
   if (!box) throw new Error('The local box is missing')
-  const receiptsDb = sqliteD1(COMPUTER_STEP_RECEIPT_TABLE_DDL)
-  const receipts = createD1ComputerStepReceipts(receiptsDb.d1)
   // The app's Vault: a store the app owns, keyed by path relative to the root.
   const vaultFiles = new Map<string, string>()
   const vault: ComputerVault = { root, save: async file => { vaultFiles.set(file.path, file.content) } }
   const shell = defaultChatShell('computer-lane', { TANGLE_API_KEY: 'loopback-only-router-key', TANGLE_ROUTER_URL: origin }, { model: 'turn/model' })
   const computer = (extra: Partial<ComputerStepOptions> = {}): ComputerStepOptions => ({
-    shell, prompt: { model: 'turn/model' }, session: { id: 'computer-lane-session' }, files: vault, receipts,
+    shell, prompt: { model: 'turn/model' }, session: { id: 'computer-lane-session' }, files: vault,
     models: { preferred: ['turn/model', 'flat/model-a'],
       allowed: signal => readSandboxRouterModels({ platformUrl: `${origin}/any/path`, apiKey: payerKey, signal }) },
     ...extra,
   })
-  return { origin, root, box: box as SandboxInstance, shell, receipts, receiptsDb, vault, vaultFiles, computer,
-    routerRequests, agentRequests, held, completed,
+  const agentRequests = () => [...runtime.runs.values()].map(run => ({ executionId: run.executionId, sessionId: run.sessionId, task: run.task, backend: run.backend }))
+  return { origin, root, box: box as SandboxInstance, shell, vault, vaultFiles, computer, routerRequests, runtime, held,
+    get agentRequests() { return agentRequests() },
     get agentRuns() { return agentRuns },
     holdNextRun: () => { holdNextRun = true },
     close: async (closer?: Server) => {
       for (const release of held.splice(0)) release()
       server.closeAllConnections()
       await new Promise<void>((resolve, reject) => (closer ?? server).close(error => error ? reject(error) : resolve()))
-      receiptsDb.sqlite.close()
       rmSync(disk, { recursive: true, force: true })
     },
   }
@@ -199,11 +175,8 @@ it('copies the files a computer step wrote into the Vault and gives the Router m
     expect(peer.routerRequests.map(request => request.authorization)).toEqual(['Bearer per-turn-lease', 'Bearer per-turn-lease'])
     expect(revoked).toBe(1)
 
-    // The step's durable receipt holds the answer the model read and the file it saved.
-    const row = peer.receiptsDb.sqlite.prepare('SELECT state, receipt FROM computer_step_receipts').get() as { state: string; receipt: string }
-    expect(row.state).toBe('settled')
-    expect(JSON.parse(row.receipt)).toMatchObject({ model: 'flat/model-a', sessionId: 'computer-lane-session',
-      files: { checked: true, saved: ['proof/a.md'] } })
+    // The box ran it detached under the step's turn id, so the run outlives the request that sent it.
+    expect([...peer.runtime.runs.values()][0]).toMatchObject({ terminal: 'completed', sessionId: 'computer-lane-session' })
     expect(wire).toContain('Done.')
     const assistant = (await store.listMessages('thread')).find(message => message.role === 'assistant')!
     expect(assistant.content).toContain('Workspace vault: the app saved proof/a.md')
@@ -212,52 +185,55 @@ it('copies the files a computer step wrote into the Vault and gives the Router m
   }
 }, 20_000)
 
-it('returns a settled receipt for a repeated call and copies the right files after a lost request', async () => {
+it('keeps a run its request lost going, and a repeated call reads that run instead of sending another', async () => {
   const peer = await boundary()
   try {
     const step = createComputerStep({ ...peer.computer(), parentExecutionId: 'turn-execution' })
-    // The first request is lost after the send: the box agent wrote its file, the answer never arrived.
+    // The first request is lost after the send, while the box agent is still working.
     peer.holdNextRun()
     const lost = new AbortController()
     const first = step.runTask(peer.box, 'Write the summary.', taskOptions('call-1', lost.signal))
-    while (peer.agentRuns === 0) await new Promise(resolve => setTimeout(resolve, 10))
+    while (peer.held.length === 0) await new Promise(resolve => setTimeout(resolve, 10))
     lost.abort(new Error('The request was lost'))
     // A failure after the send is never reported as never sent.
     const lostError = await first.then(() => undefined, (error: unknown) => error)
     expect(lostError).toBeDefined()
     expect(lostError instanceof SandboxRunError && lostError.code === 'sandbox_unavailable').toBe(false)
     expect(peer.vaultFiles.size).toBe(0)
-    const prepared = peer.receiptsDb.sqlite.prepare('SELECT state FROM computer_step_receipts').get() as { state: string }
-    expect(prepared.state).toBe('prepared')
+    // It was sent detached: the box runs it on with nobody listening, and finishes.
+    const [run] = [...peer.runtime.runs.values()]
+    expect(run!.terminal).toBe(null)
+    peer.held.shift()!()
+    expect(run!.terminal).toBe('completed')
 
-    // The repeated call attaches to the same execution, runs no second agent, and diffs against the first listing.
+    // The repeated call reads the finished run by its turn id: no second run, and it copies that run's file.
     const answer = await step.runTask(peer.box, 'Write the summary.', taskOptions('call-1'))
     expect(peer.agentRuns).toBe(1)
-    expect(peer.agentRequests.map(request => request.executionId)).toEqual([peer.agentRequests[0]!.executionId, peer.agentRequests[0]!.executionId])
+    expect(peer.runtime.runs.size).toBe(1)
     expect([...peer.vaultFiles.keys()]).toEqual(['proof/a.md'])
     expect(answer).toContain('Workspace vault: the app saved proof/a.md into it after this step.')
 
-    // Once settled, the same call sends nothing and returns the receipt.
-    const again = await step.runTask(peer.box, 'Write the summary.', taskOptions('call-1'))
-    expect(again).toBe(answer)
-    expect(peer.agentRequests).toHaveLength(2)
+    // Again, nothing is sent: the runtime's completed turn is the answer.
+    const sends = peer.runtime.sends.length
+    expect(await step.runTask(peer.box, 'Write the summary.', taskOptions('call-1'))).toBe(answer)
+    expect(peer.runtime.sends.length).toBe(sends)
 
     // Another call of the same turn is another step.
     await step.runTask(peer.box, 'Write the summary.', taskOptions('call-2'))
-    expect(new Set(peer.agentRequests.map(request => request.executionId)).size).toBe(2)
+    expect(peer.runtime.runs.size).toBe(2)
   } finally { await peer.close() }
 }, 20_000)
 
 it('derives isolation and the send witness from one session value', async () => {
   const peer = await boundary()
   try {
-    const isolated = createComputerStep({ ...peer.computer({ session: { id: 'isolated-session', isolated: true }, files: undefined, receipts: undefined }),
+    const isolated = createComputerStep({ ...peer.computer({ session: { id: 'isolated-session', isolated: true }, files: undefined }),
       parentExecutionId: 'turn-execution' })
     await isolated.runTask(peer.box, 'Read the workspace.', taskOptions('isolated-call'))
     expect(peer.agentRequests[0]).toMatchObject({ sessionId: 'isolated-session', backend: { metadata: { profileSecretIsolation: true } } })
 
     // A session the product cannot prepare is never sent, so the turn may use the computer again.
-    const unprepared = createComputerStep({ ...peer.computer({ files: undefined, receipts: undefined,
+    const unprepared = createComputerStep({ ...peer.computer({ files: undefined,
       session: async () => { throw new Error('The isolated session could not be created') } }), parentExecutionId: 'turn-execution' })
     const refusal = await unprepared.runTask(peer.box, 'Read the workspace.', taskOptions('refused-call')).catch((error: unknown) => error)
     expect(refusal).toBeInstanceOf(SandboxRunError)
@@ -269,7 +245,7 @@ it('derives isolation and the send witness from one session value', async () => 
 it('keeps the product model when the box key policy cannot be read', async () => {
   const peer = await boundary({ policy: 'down' })
   try {
-    const step = createComputerStep({ ...peer.computer({ files: undefined, receipts: undefined }), parentExecutionId: 'turn-execution' })
+    const step = createComputerStep({ ...peer.computer({ files: undefined }), parentExecutionId: 'turn-execution' })
     expect(await step.runTask(peer.box, 'Read the workspace.', taskOptions('policy-call'))).toContain('Saved')
     expect((peer.agentRequests[0]!.backend.model as { model?: string }).model).toBe('turn/model')
   } finally { await peer.close() }
@@ -321,7 +297,6 @@ it('moves to the next allowed model when the box refuses a disabled provider, un
     expect(peer.agentRequests.map(request => (request.backend.model as { model?: string }).model)).toEqual(['flat/model-a', 'flat/model-b'])
     const [first, second] = peer.agentRequests.map(request => request.executionId)
     expect(second).toBe(`${first}-f2`)
-    const row = peer.receiptsDb.sqlite.prepare("SELECT receipt FROM computer_step_receipts WHERE state = 'settled'").get() as { receipt: string }
-    expect(JSON.parse(row.receipt)).toMatchObject({ model: 'flat/model-b' })
+    expect(peer.runtime.runs.get(second!)?.terminal).toBe('completed')
   } finally { await peer.close() }
 }, 20_000)

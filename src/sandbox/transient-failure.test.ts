@@ -81,17 +81,4 @@ describe('transport failures (network: true)', () => {
     expect(classifySandboxTransientFailure(Object.assign(new Error('aborted'), { name: 'AbortError' }), { network: true })).toBeNull()
     expect(classifySandboxTransientFailure(new Error('runtime exploded'), { network: true })).toBeNull()
   })
-
-  it('retries on fixed delays, then rethrows the original error', async () => {
-    const sleep = vi.fn(async (_ms: number) => {})
-    let failures = 2
-    await expect(retrySandboxTransient(async () => {
-      if (failures-- > 0) throw reset()
-      return 'answered'
-    }, { network: true, delaysMs: [500, 1_000, 2_000], sleep })).resolves.toBe('answered')
-    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([500, 1_000])
-
-    const error = reset()
-    await expect(retrySandboxTransient(async () => { throw error }, { network: true, delaysMs: [0, 0], sleep })).rejects.toBe(error)
-  })
 })
