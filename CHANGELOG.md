@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.58
+
+- chore(deps): admit agent-runtime 0.351-0.352, agent-eval 0.222 and materialize 0.28 (#1371)
+- chore(deps): adopt 8 @tangle-network/* packages (#1370)
+
 ## 0.63.57
 
 - ci: run adopt-stack from agent-eval 29aa1697 (#1369)
