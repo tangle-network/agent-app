@@ -48,6 +48,7 @@ import {
 import { createSandboxRunTool, SandboxRunError, sandboxRunFailureDetail, type SandboxRunToolOptions } from '../sandbox/sandbox-run-tool'
 import { createComputerStep, type ComputerStepOptions } from '../sandbox/computer-step'
 import type { PersistedChatMessageForTurn } from '../stream/index'
+import { projectDispatchHistory, type DispatchHistoryPov } from './dispatch-parts'
 import { createRouterTurnProducer, type RouterTurnProducerOptions } from './router-producer'
 import type { ChatTurnRouteProducer } from './turn-routes'
 import type { ChatRouteEvent } from './turn-route-contracts'
@@ -140,16 +141,17 @@ export function turnCarriesFiles(prompt: string | readonly ChatTurnPartInput[]):
 }
 
 /** The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant
- *  messages that have text. Tool parts are not replayed. */
+ *  messages that have text, read through the responder's point of view when the turn was addressed to agents
+ *  (a row several agents wrote becomes one tagged message per speaker). Tool and reasoning parts are not replayed. */
 export function routerTurnHistory(
-  priorMessages: ReadonlyArray<Pick<PersistedChatMessageForTurn, 'role' | 'content'>>,
+  priorMessages: ReadonlyArray<Pick<PersistedChatMessageForTurn, 'role' | 'content'> & { parts?: ReadonlyArray<Record<string, unknown>> | null }>,
   limit = 40,
+  view: Pick<DispatchHistoryPov, 'pov' | 'owner'> = {},
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
-  return priorMessages
-    .filter((message): message is { role: 'user' | 'assistant'; content: string } =>
-      (message.role === 'user' || message.role === 'assistant') && Boolean(message.content?.trim()))
+  const rows = priorMessages.filter((message) => message.role === 'user' || message.role === 'assistant')
+  return projectDispatchHistory(rows, { ...view, attachments: false })
+    .filter((message) => Boolean(message.content.trim()))
     .slice(-limit)
-    .map(({ role, content }) => ({ role, content }))
 }
 
 export function createHybridTurnProducer(options: HybridTurnProducerOptions): ChatTurnRouteProducer {
