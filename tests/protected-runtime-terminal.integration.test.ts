@@ -169,7 +169,7 @@ async function collect(producer: ReturnType<typeof createProtectedRuntimeChatPro
   return events
 }
 
-describe.sequential('protected local HTTP terminal ownership', () => {
+describe('protected local HTTP terminal ownership', { concurrent: false }, () => {
   it('retains a real HTTP503 failure and reports terminal only after local execution drains', async () => {
     const peer = await protectedHttpPeer('failure')
     try {
