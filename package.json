@@ -803,7 +803,7 @@
     "@tangle-network/agent-knowledge": "22.0.18",
     "@tangle-network/agent-profile-materialize": "0.27.5",
     "@tangle-network/agent-runtime": "0.350.2",
-    "@tangle-network/brand": "1.27.1",
+    "@tangle-network/brand": "1.28.0",
     "@tangle-network/browser-agent-driver": "0.37.0",
     "@tangle-network/hub-sdk": "0.33.4",
     "@tangle-network/sandbox": "0.69.11",
