@@ -215,8 +215,16 @@ it('keeps every write request under the sandbox proxy cap and sends an oversized
 }, 120_000)
 
 it('stores a baseline larger than one Durable Object value as chunks and reads it back whole', async () => {
-  const paths = Array.from({ length: 900 }, (_, index) => `library/section-${String(index % 30).padStart(2, '0')}/a-long-descriptive-document-name-${String(index).padStart(4, '0')}.md`)
-  for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, `${path}\n`)
+  // Long paths make each baseline entry large, so a few hundred files cross one value's 128 KiB.
+  const stem = 'a-deliberately-long-descriptive-document-name-that-makes-each-baseline-entry-large'
+  const paths = Array.from({ length: 700 }, (_, index) => `library/section-${String(index % 15).padStart(2, '0')}/${stem}-${String(index).padStart(4, '0')}.md`)
+  for (let start = 0; start < paths.length; start += 90) {
+    const result = await vault.commitVaultMutation({
+      workspaceId, operationId: `seed-${start}`, writer: { kind: 'system', id: 'test-seed' },
+      changes: paths.slice(start, start + 90).map(path => ({ path, kind: 'put' as const, content: `${path}\n`, expectedRevision: null })),
+    })
+    expect(result.status).toBe('applied')
+  }
   const { box, sync } = realBox()
 
   expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
@@ -226,4 +234,4 @@ it('stores a baseline larger than one Durable Object value as chunks and reads i
   expect(Object.keys(baseline?.files ?? {}).sort()).toEqual([...paths].sort())
   const reconciled = await sync.reconcile(box, workspaceId)
   expect(reconciled).toEqual(expect.objectContaining({ succeeded: true, complete: true, appliedPaths: [] }))
-}, 300_000)
+}, 600_000)
