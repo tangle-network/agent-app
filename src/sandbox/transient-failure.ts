@@ -90,7 +90,9 @@ const RUN_DISPATCH_ENDPOINT = /\/runtime\/agents\/run\/stream(?:[?#]|$)/
 const RUN_DISPATCH_REFUSAL_MESSAGE = /\/runtime\/agents\/run\/stream: error code: (50[234])\b/
 
 const NETWORK_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'EPIPE', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT'])
-const NETWORK_MESSAGE = /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|fetch failed|network (error|connection)|platform_unavailable|temporarily unavailable|verification unavailable/i
+const NETWORK_MESSAGE = /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|fetch failed|network (error|connection)|connection lost|platform_unavailable|temporarily unavailable|verification unavailable|\b(502|503|504|524)\b/i
+/** Gateway and origin statuses that clear on their own: bad gateway, unavailable, gateway timeout, origin timeout. */
+const NETWORK_STATUSES = new Set([502, 503, 504, 524])
 
 export interface SandboxTransientClassifyOptions {
   /**
@@ -106,7 +108,9 @@ function networkTransient(chain: Record<string, unknown>[]): SandboxTransientFai
   if (chain.some(cause => cause.name === 'AbortError')) return null
   for (const cause of chain) {
     const message = typeof cause.message === 'string' ? cause.message : ''
-    if (cause.name === 'TimeoutError' || (typeof cause.code === 'string' && NETWORK_CODES.has(cause.code)) || NETWORK_MESSAGE.test(message)) {
+    const answered = status(cause.status)
+    if (cause.name === 'TimeoutError' || (typeof cause.code === 'string' && NETWORK_CODES.has(cause.code))
+      || (answered !== undefined && NETWORK_STATUSES.has(answered)) || NETWORK_MESSAGE.test(message)) {
       return { code: 'network.transient', message: 'The request did not reach a service that could answer' }
     }
   }

@@ -76,6 +76,8 @@ describe('transport failures (network: true)', () => {
     expect(classifySandboxTransientFailure(reset(), { network: true })?.code).toBe('network.transient')
     expect(classifySandboxTransientFailure(new Error('wrapped', { cause: new TypeError('fetch failed') }), { network: true })?.code).toBe('network.transient')
     expect(classifySandboxTransientFailure(timeout(), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(Object.assign(new Error('origin timed out'), { status: 524 }), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(new Error('Network connection lost.'), { network: true })?.code).toBe('network.transient')
     expect(classifySandboxTransientFailure(Object.assign(new Error('aborted'), { name: 'AbortError' }), { network: true })).toBeNull()
     expect(classifySandboxTransientFailure(new Error('runtime exploded'), { network: true })).toBeNull()
   })
