@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.42
+
+- Pin the adopt-stack caller to an agent-eval commit so publish runs again (#1356)
+- Make the computer step a thin client of the Sandbox runtime's durability (#1354)
+- Adopt each new @tangle-network release with the shared adopt-stack bot (#1353)
+
 ## 0.63.41
 
 - Fail a scheduled invocation for a listed job; classify transport failures on request (#1349)
