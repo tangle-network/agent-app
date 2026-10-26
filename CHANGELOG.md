@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.34
+
+- fix(chat): drain protected Router execution before confirming terminal (#1340)
+
 ## 0.63.33
 
 - fix(signoff): preserve orphaned cached worktrees at startup (#1339)
