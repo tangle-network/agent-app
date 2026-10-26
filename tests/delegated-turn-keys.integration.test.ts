@@ -21,7 +21,11 @@ import {
 const SOURCE = 'sk-tan-payer-linked-key-0001'
 
 /** Platform (`/v1/keys/delegate`, `DELETE /v1/keys/:id`) and Router (`/v1/chat/completions`) in one local server. */
-async function platformAndRouter(options: { ssoSource?: boolean; routerStream?: boolean; delegationRefused?: boolean } = {}) {
+async function platformAndRouter(options: {
+  ssoSource?: boolean; routerStream?: boolean; delegationRefused?: boolean
+  /** Platform binds the slot to its source key (Health, Tax, Legal): revoke-slot needs the source key's id. */
+  sourceBoundRevocation?: boolean
+} = {}) {
   const minted: Array<{ id: string; key: string; name: string; expiresAt: string; request: Record<string, any> }> = []
   const revoked = new Set<string>()
   const expired = new Set<string>()
@@ -69,11 +73,13 @@ async function platformAndRouter(options: { ssoSource?: boolean; routerStream?: 
       }
       if (req.method === 'GET' && req.url?.startsWith('/v1/keys/')) {
         const child = minted.find(k => k.id === decodeURIComponent(req.url!.slice('/v1/keys/'.length)))
-        return child ? json(200, { success: true, data: { id: child.id, name: child.name, product: 'router' } }) : json(404, {})
+        return child ? json(200, { success: true, data: { id: child.id, name: child.name, product: 'router', parentKeyId: 'key_source' } })
+          : json(404, {})
       }
       if (req.method === 'POST' && req.url === '/v1/keys/auto-provisioned/revoke-slot') {
-        const body = JSON.parse(raw) as { userId?: string; childKeyId?: string }
+        const body = JSON.parse(raw) as { userId?: string; childKeyId?: string; sourceKeyId?: string }
         if (body.userId !== 'usr_payer' || !body.childKeyId) return json(400, { success: false })
+        if (options.sourceBoundRevocation && body.sourceKeyId !== 'key_source') return json(400, { success: false })
         revocationCalls.push(body.childKeyId)
         revoked.add(body.childKeyId)
         return json(200, { success: true })
@@ -375,6 +381,20 @@ describe('pre-minted turn keys', () => {
     expect(p.minted).toHaveLength(1)
     expect(p.revoked.has(p.minted[0]!.id)).toBe(true)
     expect(stored()).toHaveLength(0)
+  })
+
+  it('retires an SSO-source turn key through a slot Platform binds to its source key', async () => {
+    // Health's Platform refuses the SSO source's DELETE and answers revoke-slot only with the source key's id,
+    // which the app never stored: the child's own row names it as its parent.
+    const p = await platformAndRouter({ ssoSource: true, sourceBoundRevocation: true })
+    close = p.close
+    const client = createPlatformDelegatedKeyClient({ platformUrl: p.url, serviceName: 'creative-agent', serviceToken: 'svc' })
+    const keys = createDelegatedTurnKeys({ client, db: null, crypto: createFieldCrypto('ab'.repeat(32)) })
+    const lease = await keys.forTurn({ slot: 'usr_payer:w1:router', scope: scope(), ttlMs: 30 * 60_000, turnId: 'exec-1', payerId: 'usr_payer' })
+    if (!lease.succeeded) throw new Error(lease.error.code)
+    await lease.value.revoke()
+    expect(p.revocationCalls).toEqual([lease.value.id])
+    expect(p.revoked.has(lease.value.id)).toBe(true)
   })
 
   it('mints every turn inline when pre-minting is off', async () => {

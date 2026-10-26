@@ -140,11 +140,11 @@ export interface DelegatedKeyVerdict {
 }
 
 /**
- * Identifies a key's slot for Platform's service-authenticated `revoke-slot`. Without `name` and `product`,
- * the client reads them from the key itself (`GET /v1/keys/:id`, which an SSO source may call), so a
- * provisioner restarted since the mint can still retire the key. Tax and Legal need `sourceKeyId`; GTM
- * and Builder admit `revoke-slot` only for their protected and preview keys, so their other keys keep
- * the refused DELETE as a typed error.
+ * Identifies a key's slot for Platform's service-authenticated `revoke-slot`. Without `name`, `product` or
+ * `sourceKeyId`, the client reads them from the key itself (`GET /v1/keys/:id`, which an SSO source may
+ * call; the child's parent is its source key), so a provisioner restarted since the mint can still retire
+ * the key. Health, Tax and Legal bind the slot to its source key; GTM and Builder admit `revoke-slot` only
+ * for their protected and preview keys, so their other keys keep the refused DELETE as a typed error.
  */
 export interface DelegatedKeySlotRef {
   userId: string
@@ -388,23 +388,23 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
         return { succeeded: true, value: null }
       }
       if (result.status === 403 && slot) {
-        let name = slot.name
-        let product = slot.product
-        if (!name || !product) {
+        let { name, product, sourceKeyId } = slot
+        if (!name || !product || !sourceKeyId) {
           const row = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'GET', bearer: sourceKey, service: false })
-          const data = record(row?.body?.data)
           if (row?.status === 404) return { succeeded: true, value: null }
-          if (!row || row.status !== 200 || typeof data?.name !== 'string' || typeof data.product !== 'string') {
-            return { succeeded: false, error: refusal(row?.status ?? 503, null) }
-          }
-          if (data.revokedAt) return { succeeded: true, value: null }
-          name = data.name
-          product = data.product
+          const data = row?.status === 200 ? record(row.body?.data) : null
+          if (data?.revokedAt) return { succeeded: true, value: null }
+          const text = (value: unknown) => typeof value === 'string' && value ? value : undefined
+          name ||= text(data?.name)
+          product ||= text(data?.product)
+          // The child's parent is the source key a source-bound slot names.
+          sourceKeyId ||= text(data?.parentKeyId)
+          if (!name || !product) return { succeeded: false, error: refusal(row?.status ?? 503, null) }
         }
         const retired = await call('/v1/keys/auto-provisioned/revoke-slot', {
           method: 'POST', bearer: serviceToken(), service: true, body: {
             userId: slot.userId, name, product, childKeyId: keyId,
-            ...(slot.sourceKeyId ? { sourceKeyId: slot.sourceKeyId } : {}),
+            ...(sourceKeyId ? { sourceKeyId } : {}),
           },
         })
         if (!retired) return { succeeded: false, error: refusal(503, null) }
