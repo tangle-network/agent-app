@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.60
+
+- chore: align generated sandbox and UI cohorts (#1381)
+- fix: keep vault file checks portable (#1378)
+- chore(deps): adopt 4 @tangle-network/* packages (#1377)
+- chore: align generated sandbox cohort (#1376)
+- Sync engine options for GTM's box sync, plus converged copies and engine defect fixes (#1368)
+
 ## 0.63.59
 
 - feat: allow product-owned tool row presentation (#1372)
