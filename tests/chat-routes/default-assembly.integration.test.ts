@@ -647,9 +647,10 @@ it('sends one copy of a program mounted under several names, so the isolated dis
   try {
     const files = buildSandboxToolFileMounts({ appName: 'default-assembly', tools: [{ name: 'render-ad', content: program('ad') },
       { name: 'render-video', aliasOf: 'render-ad' }, { name: 'render-still', aliasOf: 'render-ad' }] })
-    // A prepared secret revision's receipt makes the SDK send the whole profile inline, as an isolated session does.
+    // A prepared secret revision's digest and receipt keep the isolated profile inline.
     const { result, notice } = await computerTurn(peer, 'isolated-alias', { model: 'native/model', sessionId: 'confirmed-alias',
-      secretProfileIsolation: true, expectedSecretProfileReceipt: `hmac-sha256:${'0'.repeat(64)}`, profile: tools(files) })
+      secretProfileIsolation: true, expectedPublicProfileRequestDigest: `sha256:${'0'.repeat(64)}`,
+      expectedSecretProfileReceipt: `hmac-sha256:${'0'.repeat(64)}`, profile: tools(files) })
     expect(result).toContain('Confirmed computer answer.')
     expect(notice).toBeUndefined()
     expect(peer.computerRequests).toHaveLength(1)
