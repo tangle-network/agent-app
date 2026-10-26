@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.33
+
+- fix(signoff): preserve orphaned cached worktrees at startup (#1339)
+
 ## 0.63.32
 
 - fix(release): isolate pnpm action bootstrap store (#1335)

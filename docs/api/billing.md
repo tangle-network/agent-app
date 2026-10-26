@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-34 exports.
+36 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -180,6 +180,22 @@ interface PlatformIdentity
 
 ```ts
 interface PlatformProductUsage
+```
+
+### `readSharedBillingState`
+
+`function` — The plan, limits and balance behind one platform key.
+
+```ts
+<Plan extends string>(apiKey: string | null | undefined, reads: SharedBillingReads<Plan>) => Promise<Omit<SharedBilling…
+```
+
+### `SharedBillingReads`
+
+`interface` — Reads one platform key's plan and balance for {@link readSharedBillingState}.
+
+```ts
+interface SharedBillingReads
 ```
 
 ### `SharedBillingState`

@@ -129,7 +129,8 @@ function progressWriter(): (event: SignoffEvent) => void {
     switch (event.kind) {
       case 'cache-prune':
         process.stderr.write(`· cache ${event.beforeBytes} → ${event.afterBytes} allocated bytes; ` +
-          `${event.removed.length} idle entries removed${event.overBudgetBytes ? `; ${event.overBudgetBytes} bytes held by active or kept trees` : ''}\n`)
+          `${event.removed.length} idle entries removed; ${event.orphaned.length} orphaned trees preserved (${event.orphanedBytes} bytes)` +
+          `${event.overBudgetBytes ? `; ${event.overBudgetBytes} bytes above idle cap retained` : ''}\n`)
         break
       case 'tree':
         process.stderr.write(`· clean tree at ${event.path} (${event.head.slice(0, 12)}${event.dirty ? ' + working tree' : ''})\n`)

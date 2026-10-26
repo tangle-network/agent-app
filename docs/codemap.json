@@ -662,6 +662,24 @@
       "error": null,
       "exports": [
         {
+          "name": "createGithubIssueAlertChannel",
+          "kind": "function",
+          "signature": "(options: GithubIssueAlertOptions) => GithubIssueAlertChannel",
+          "doc": null
+        },
+        {
+          "name": "GithubIssueAlertChannel",
+          "kind": "interface",
+          "signature": "interface GithubIssueAlertChannel",
+          "doc": null
+        },
+        {
+          "name": "GithubIssueAlertOptions",
+          "kind": "interface",
+          "signature": "interface GithubIssueAlertOptions",
+          "doc": "A rolling GitHub-issue alert channel: the first alert files an issue under a label, later alerts comment on the open one, so a persistent problem is one thread a human can follow instead of a hundred…"
+        },
+        {
           "name": "postSlackAlert",
           "kind": "function",
           "signature": "(options: SlackAlertOptions) => Promise<SlackAlertOutcome>",
@@ -1867,6 +1885,18 @@
           "kind": "interface",
           "signature": "interface PlatformProductUsage",
           "doc": "Per-product spend aggregate."
+        },
+        {
+          "name": "readSharedBillingState",
+          "kind": "function",
+          "signature": "<Plan extends string>(apiKey: string | null | undefined, reads: SharedBillingReads<Plan>) => Promise<Omit<SharedBilling…",
+          "doc": "The plan, limits and balance behind one platform key."
+        },
+        {
+          "name": "SharedBillingReads",
+          "kind": "interface",
+          "signature": "interface SharedBillingReads",
+          "doc": "Reads one platform key's plan and balance for {@link readSharedBillingState}."
         },
         {
           "name": "SharedBillingState",
@@ -4632,6 +4662,12 @@
           "doc": "Persisted work-product anchor card — byte-matches `workProductToPersistedPart` in `/work-product`'s contract."
         },
         {
+          "name": "createAgentRunsTable",
+          "kind": "function",
+          "signature": "<Metadata = Record<string, unknown>>(workspaceTable: ChatParentTable, options?: { indexAgentId?: boolean | undefined; }…",
+          "doc": "Build the `agent_run` table: one row per agent run in a workspace, with the product's run telemetry as JSON `metadata`."
+        },
+        {
           "name": "createChatStore",
           "kind": "function",
           "signature": "<TTables extends ChatTables>(db: ChatDatabase, tables: TTables) => ChatStore<TTables[\"threads\"][\"$inferSelect\"], TTable…",
@@ -4648,6 +4684,12 @@
           "kind": "interface",
           "signature": "interface CreateChatTablesOptions",
           "doc": "Define options to customize chat thread and message table creation including workspace and naming prefixes"
+        },
+        {
+          "name": "createThreadArtifactLinksTable",
+          "kind": "function",
+          "signature": "<const Kind extends string>(threadTable: ChatParentTable, kinds: readonly [Kind, ...Kind[]]) => SQLiteTableWithColumns<…",
+          "doc": "Build the `thread_artifact_link` table: artifacts a thread mentioned or touched beyond its own scope, inserted once on first reference."
         },
         {
           "name": "CreateThreadInput",
@@ -11455,6 +11497,18 @@
           "doc": null
         },
         {
+          "name": "CheckedGenerateRequest",
+          "kind": "interface",
+          "signature": "interface CheckedGenerateRequest",
+          "doc": "A direct generation request after every check that runs before access, billing and provider calls."
+        },
+        {
+          "name": "checkGenerateRequest",
+          "kind": "function",
+          "signature": "(body: GenerateRequestBody, defaults: Record<GenerationType, string>) => Checked<CheckedGenerateRequest>",
+          "doc": "Check a direct generation request body: its workspace, type, inputs, image count, model and output path."
+        },
+        {
           "name": "checkMediaModelSelection",
           "kind": "function",
           "signature": "<M extends MediaCatalogModel>(modelId: string, purpose: string, lookup: (id: string) => Promise<M | null | undefined>)…",
@@ -11675,6 +11729,12 @@
           "kind": "interface",
           "signature": "interface SpeechScriptConfig",
           "doc": null
+        },
+        {
+          "name": "tcloudWebhookCallbackUrl",
+          "kind": "function",
+          "signature": "(bindings: object | undefined, requestUrl: string) => string | undefined",
+          "doc": "Where the Router posts provider job updates for this deployment, or undefined when webhooks are off."
         },
         {
           "name": "validateGenerateRequest",
@@ -12782,6 +12842,12 @@
           "doc": "The operator adapter for an app built on agent-app's chat stack: threads and messages from its chat store, turns through its own chat route."
         },
         {
+          "name": "createGatewayOperatorKeys",
+          "kind": "function",
+          "signature": "<Identity>(options: GatewayOperatorKeysOptions<Identity>) => OperatorKeyStore<PlatformAgentOperatorKey | GatewayOperato…",
+          "doc": null
+        },
+        {
           "name": "createOperatorApi",
           "kind": "function",
           "signature": "<Key extends RequestApiKey, Identity>(options: OperatorApiOptions<Key, Identity>) => OperatorApi",
@@ -12792,6 +12858,30 @@
           "kind": "function",
           "signature": "(options: OperatorClientOptions) => OperatorClient",
           "doc": "A typed client for one app's operator API."
+        },
+        {
+          "name": "GatewayOperatorKey",
+          "kind": "type",
+          "signature": "type GatewayOperatorKey",
+          "doc": "An app key admitted to the operator API."
+        },
+        {
+          "name": "GatewayOperatorKeysOptions",
+          "kind": "interface",
+          "signature": "interface GatewayOperatorKeysOptions",
+          "doc": null
+        },
+        {
+          "name": "GatewayRequestClaim",
+          "kind": "interface",
+          "signature": "interface GatewayRequestClaim",
+          "doc": "The gateway key store's answer to counting one request."
+        },
+        {
+          "name": "GatewayVerifiedApiKey",
+          "kind": "interface",
+          "signature": "interface GatewayVerifiedApiKey",
+          "doc": "An app key as the gateway's `verifyApiKeyFromStore` returns it."
         },
         {
           "name": "matchOperatorRoute",
@@ -13302,6 +13392,12 @@
           "doc": "Validate a plan-decision request body."
         },
         {
+          "name": "parsePlanLookupQuery",
+          "kind": "function",
+          "signature": "(url: URL) => PlanLookupQuery",
+          "doc": "Validate a current-plan lookup (`?workspaceId&threadId[&planId&revision]`)."
+        },
+        {
           "name": "parsePlanSubmittedEvent",
           "kind": "function",
           "signature": "(event: unknown) => ParsePlanSubmittedResult",
@@ -13338,10 +13434,22 @@
           "doc": null
         },
         {
+          "name": "planDecisionRefusalResponse",
+          "kind": "function",
+          "signature": "(error: { status?: number | undefined; code?: string | undefined; message: string; }, options: { reconcile: () => Promi…",
+          "doc": "The response for a sandbox refusal of a plan decision, or null when the refusal is not one the decision flow answers."
+        },
+        {
           "name": "planFollowUpTurnId",
           "kind": "function",
           "signature": "(planId: string, revision: number, outcome: \"approved\" | \"rejected\") => string",
           "doc": "The follow-up turn the Sandbox platform enqueues when one plan revision is decided."
+        },
+        {
+          "name": "PlanLookupQuery",
+          "kind": "type",
+          "signature": "type PlanLookupQuery",
+          "doc": null
         },
         {
           "name": "planPartKey",
@@ -13680,7 +13788,7 @@
         {
           "name": "delegatedKeyFallbackFetch",
           "kind": "function",
-          "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…",
+          "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: URL | R…",
           "doc": "A fetch for one turn that sends a pre-minted key."
         },
         {
@@ -13942,10 +14050,22 @@
           "doc": null
         },
         {
+          "name": "platformAuthClientOptionsFromEnv",
+          "kind": "function",
+          "signature": "(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: ((input: URL…",
+          "doc": "Options for the platform's cross-site SSO client: the base URL, the app id registered in the platform's trusted-apps registry (`TANGLE_PLATFORM_APP_ID`, else the product's own), and a fetch the clien…"
+        },
+        {
           "name": "PlatformBalanceSnapshot",
           "kind": "interface",
           "signature": "interface PlatformBalanceSnapshot",
           "doc": "Describe the platform balance and lifetime spending with an optional update timestamp"
+        },
+        {
+          "name": "platformBaseUrlFromEnv",
+          "kind": "function",
+          "signature": "() => string",
+          "doc": null
         },
         {
           "name": "PlatformBillingConsent",
@@ -18199,6 +18319,12 @@
           "doc": "Reads a sandbox file as base64 and decodes it, verifying the decoded byte length against `expectedSize` (from a prior {@link statSandboxFileSize})."
         },
         {
+          "name": "readSandboxModelPolicy",
+          "kind": "function",
+          "signature": "(apiKey: string, options: { platformUrl: string | undefined; signal?: AbortSignal | undefined; }) => Promise<SandboxMod…",
+          "doc": "Platform's model policy for a box minted under the payer of `apiKey`, cached per key for ten minutes."
+        },
+        {
           "name": "readSandboxRouterModels",
           "kind": "function",
           "signature": "(options: ReadSandboxRouterModelsOptions) => Promise<Outcome<string[] | null>>",
@@ -18445,10 +18571,22 @@
           "doc": null
         },
         {
+          "name": "SandboxModelPolicy",
+          "kind": "type",
+          "signature": "type SandboxModelPolicy",
+          "doc": "The models a workspace box may call."
+        },
+        {
           "name": "SandboxModelResolutionError",
           "kind": "class",
           "signature": "class SandboxModelResolutionError",
           "doc": "Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform."
+        },
+        {
+          "name": "sandboxModelWithinPolicy",
+          "kind": "function",
+          "signature": "(preferred: readonly string[], allowedModels: readonly string[] | null) => string | undefined",
+          "doc": "The first preferred model the policy allows, else the policy's own first model."
         },
         {
           "name": "SandboxPermissionLevel",
@@ -22681,6 +22819,12 @@
           "doc": "Build the expectation-ledger store over the product's drizzle table."
         },
         {
+          "name": "createSpendBoxLedgerTable",
+          "kind": "function",
+          "signature": "(options?: { workspaceTable?: (AnySQLiteTable & { id: AnySQLiteColumn; }) | undefined; }) => SQLiteTableWithColumns<{ n…",
+          "doc": "Build the standard `spend_box_ledger` table."
+        },
+        {
           "name": "listLedgerBillingOwnerIds",
           "kind": "function",
           "signature": "(options: SpendLedgerTableOptions) => Promise<string[]>",
@@ -23251,7 +23395,9 @@
       "id": "./studio",
       "source": "src/studio/index.ts",
       "dependsOn": [
+        "media",
         "runtime",
+        "tools",
         "vault",
         "web"
       ],
@@ -24001,11 +24147,19 @@
       "id": "./studio/generated-media",
       "source": "src/studio/generated-media/index.ts",
       "dependsOn": [
+        "media",
+        "tools",
         "vault",
         "web"
       ],
       "error": null,
       "exports": [
+        {
+          "name": "createGeneratedMediaFlows",
+          "kind": "function",
+          "signature": "<Context>(config: GeneratedMediaFlowsConfig<Context>) => { mediaFields: (media: Omit<PersistedGeneratedMedia, \"url\"> |…",
+          "doc": "Bind the provider-side generation steps to a product's store and Router client."
+        },
         {
           "name": "createGeneratedMediaStore",
           "kind": "function",
@@ -24029,6 +24183,12 @@
           "kind": "function",
           "signature": "(type: GeneratedMediaType, mimeType: string) => string",
           "doc": null
+        },
+        {
+          "name": "GENERATED_MEDIA_INGEST_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "30000",
+          "doc": "How long ingesting a provider result into the workspace may take."
         },
         {
           "name": "GENERATED_MEDIA_MISSING_FILE_METADATA",
@@ -24073,10 +24233,28 @@
           "doc": "Any SQLite drizzle database with D1-style `batch`."
         },
         {
+          "name": "GeneratedMediaFlows",
+          "kind": "type",
+          "signature": "type GeneratedMediaFlows",
+          "doc": null
+        },
+        {
+          "name": "GeneratedMediaFlowsConfig",
+          "kind": "interface",
+          "signature": "interface GeneratedMediaFlowsConfig",
+          "doc": null
+        },
+        {
           "name": "GeneratedMediaGenerationTable",
           "kind": "type",
           "signature": "type GeneratedMediaGenerationTable",
           "doc": "The product's `generation` table."
+        },
+        {
+          "name": "GeneratedMediaIngestion",
+          "kind": "interface",
+          "signature": "interface GeneratedMediaIngestion",
+          "doc": "A provider result ingested into the workspace, or the reason it was not."
         },
         {
           "name": "generatedMediaLabel",
@@ -24151,10 +24329,58 @@
           "doc": null
         },
         {
+          "name": "PersistedMediaFields",
+          "kind": "type",
+          "signature": "type PersistedMediaFields",
+          "doc": "The stored-metadata fields that describe one persisted media file."
+        },
+        {
+          "name": "PersistedProviderImage",
+          "kind": "type",
+          "signature": "type PersistedProviderImage",
+          "doc": "A persisted provider image: its workspace file, or the provider URL kept as the result."
+        },
+        {
+          "name": "PolledGenerationRow",
+          "kind": "interface",
+          "signature": "interface PolledGenerationRow",
+          "doc": "The generation row fields a provider-job poll reads."
+        },
+        {
+          "name": "ProviderJobMediaType",
+          "kind": "type",
+          "signature": "type ProviderJobMediaType",
+          "doc": "The generation types whose provider returns a job that may finish later."
+        },
+        {
+          "name": "ProviderJobRefresh",
+          "kind": "type",
+          "signature": "type ProviderJobRefresh",
+          "doc": "What a poll decided for a generation row; the product writes the row."
+        },
+        {
+          "name": "ProviderMediaJobResponse",
+          "kind": "interface",
+          "signature": "interface ProviderMediaJobResponse",
+          "doc": "A video or avatar provider's submit response."
+        },
+        {
           "name": "resolveGeneratedVaultPath",
           "kind": "function",
           "signature": "(input: { type: GeneratedOutputType; outputPath: string | null | undefined; fileName: string; }) => string",
           "doc": "The Vault path of a generated file: the output path itself when it names a file, else `fileName` under it."
+        },
+        {
+          "name": "SettledProviderJob",
+          "kind": "interface",
+          "signature": "interface SettledProviderJob",
+          "doc": "The settled state of a video or avatar job and the metadata fields it adds to the row."
+        },
+        {
+          "name": "STALE_PENDING_GENERATION_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "How long a pending generation may wait for a provider job id before polling fails it."
         },
         {
           "name": "validateGeneratedMediaSourceUrl",
@@ -24187,6 +24413,12 @@
           "kind": "function",
           "signature": "(actorRole: \"owner\" | \"viewer\" | \"editor\" | \"admin\", targetRole: \"owner\" | \"viewer\" | \"editor\" | \"admin\") => boolean",
           "doc": "Whether `actorRole` may set/clear a member currently at `targetRole`."
+        },
+        {
+          "name": "createThreadAccessCheck",
+          "kind": "function",
+          "signature": "<Role extends string = \"owner\" | \"viewer\" | \"editor\" | \"admin\">(options: ThreadAccessOptions<Role>) => (threadId: strin…",
+          "doc": "Bind the thread check to a product's thread table and workspace access."
         },
         {
           "name": "generateInvitationToken",
@@ -24337,6 +24569,12 @@
           "kind": "type",
           "signature": "type SandboxWorkspaceRole",
           "doc": "Define user roles available within a sandbox workspace environment"
+        },
+        {
+          "name": "ThreadAccessOptions",
+          "kind": "interface",
+          "signature": "interface ThreadAccessOptions",
+          "doc": null
         },
         {
           "name": "validateInviteToken",
@@ -26224,7 +26462,7 @@
         {
           "name": "tracedModelFetch",
           "kind": "function",
-          "signature": "(trace: TurnTrace, inner: (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
+          "signature": "(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
           "doc": "`fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…"
         },
         {
@@ -31162,7 +31400,7 @@
         {
           "name": "installFetchResponseObserver",
           "kind": "function",
-          "signature": "(onResponse: (response: Response, args: [input: RequestInfo | URL, init?: RequestInit | undefined]) => void | Promise<v…",
+          "signature": "(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…",
           "doc": "Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response."
         },
         {
@@ -32233,7 +32471,8 @@
       "id": "./workspace-export",
       "source": "src/workspace-export/index.ts",
       "dependsOn": [
-        "object-store"
+        "object-store",
+        "sandbox"
       ],
       "error": null,
       "exports": [
@@ -32507,7 +32746,8 @@
       "id": "./workspace-export/react",
       "source": "src/workspace-export/react.tsx",
       "dependsOn": [
-        "object-store"
+        "object-store",
+        "sandbox"
       ],
       "error": null,
       "exports": [

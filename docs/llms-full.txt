@@ -817,6 +817,30 @@ _No public exports._
 
 Source: `src/alerting/index.ts`
 
+### `createGithubIssueAlertChannel`
+
+`function`
+
+```ts
+(options: GithubIssueAlertOptions) => GithubIssueAlertChannel
+```
+
+### `GithubIssueAlertChannel`
+
+`interface`
+
+```ts
+interface GithubIssueAlertChannel
+```
+
+### `GithubIssueAlertOptions`
+
+`interface` — A rolling GitHub-issue alert channel: the first alert files an issue under a label, later alerts comment on the open one, so a persistent problem is one thread a human can follow instead of a hundred…
+
+```ts
+interface GithubIssueAlertOptions
+```
+
 ### `postSlackAlert`
 
 `function` — Post one alert to a Slack channel.
@@ -2367,6 +2391,22 @@ interface PlatformIdentity
 
 ```ts
 interface PlatformProductUsage
+```
+
+### `readSharedBillingState`
+
+`function` — The plan, limits and balance behind one platform key.
+
+```ts
+<Plan extends string>(apiKey: string | null | undefined, reads: SharedBillingReads<Plan>) => Promise<Omit<SharedBilling…
+```
+
+### `SharedBillingReads`
+
+`interface` — Reads one platform key's plan and balance for {@link readSharedBillingState}.
+
+```ts
+interface SharedBillingReads
 ```
 
 ### `SharedBillingState`
@@ -5972,6 +6012,14 @@ interface ChatUsageTokens
 type ChatWorkProductPart
 ```
 
+### `createAgentRunsTable`
+
+`function` — Build the `agent_run` table: one row per agent run in a workspace, with the product's run telemetry as JSON `metadata`.
+
+```ts
+<Metadata = Record<string, unknown>>(workspaceTable: ChatParentTable, options?: { indexAgentId?: boolean | undefined; }…
+```
+
 ### `createChatStore`
 
 `function` — Create a chat store managing threads and messages based on the provided database and tables
@@ -5994,6 +6042,14 @@ type ChatWorkProductPart
 
 ```ts
 interface CreateChatTablesOptions
+```
+
+### `createThreadArtifactLinksTable`
+
+`function` — Build the `thread_artifact_link` table: artifacts a thread mentioned or touched beyond its own scope, inserted once on first reference.
+
+```ts
+<const Kind extends string>(threadTable: ChatParentTable, kinds: readonly [Kind, ...Kind[]]) => SQLiteTableWithColumns<…
 ```
 
 ### `CreateThreadInput`
@@ -14730,6 +14786,22 @@ Source: `src/media/index.ts` · depends on `studio`, `web`
 type Checked
 ```
 
+### `CheckedGenerateRequest`
+
+`interface` — A direct generation request after every check that runs before access, billing and provider calls.
+
+```ts
+interface CheckedGenerateRequest
+```
+
+### `checkGenerateRequest`
+
+`function` — Check a direct generation request body: its workspace, type, inputs, image count, model and output path.
+
+```ts
+(body: GenerateRequestBody, defaults: Record<GenerationType, string>) => Checked<CheckedGenerateRequest>
+```
+
 ### `checkMediaModelSelection`
 
 `function` — Admit one model for `purpose`: the id must be given, listed by `lookup`, and not unavailable.
@@ -15024,6 +15096,14 @@ type SpeechInput
 
 ```ts
 interface SpeechScriptConfig
+```
+
+### `tcloudWebhookCallbackUrl`
+
+`function` — Where the Router posts provider job updates for this deployment, or undefined when webhooks are off.
+
+```ts
+(bindings: object | undefined, requestUrl: string) => string | undefined
 ```
 
 ### `validateGenerateRequest`
@@ -16437,6 +16517,14 @@ interface ChatOperatorWorkspace
 <Identity>(options: ChatOperatorAdapterOptions<Identity>) => OperatorAdapter<Identity>
 ```
 
+### `createGatewayOperatorKeys`
+
+`function`
+
+```ts
+<Identity>(options: GatewayOperatorKeysOptions<Identity>) => OperatorKeyStore<PlatformAgentOperatorKey | GatewayOperato…
+```
+
 ### `createOperatorApi`
 
 `function` — Mount the standard operator API.
@@ -16451,6 +16539,38 @@ interface ChatOperatorWorkspace
 
 ```ts
 (options: OperatorClientOptions) => OperatorClient
+```
+
+### `GatewayOperatorKey`
+
+`type` — An app key admitted to the operator API.
+
+```ts
+type GatewayOperatorKey
+```
+
+### `GatewayOperatorKeysOptions`
+
+`interface`
+
+```ts
+interface GatewayOperatorKeysOptions
+```
+
+### `GatewayRequestClaim`
+
+`interface` — The gateway key store's answer to counting one request.
+
+```ts
+interface GatewayRequestClaim
+```
+
+### `GatewayVerifiedApiKey`
+
+`interface` — An app key as the gateway's `verifyApiKeyFromStore` returns it.
+
+```ts
+interface GatewayVerifiedApiKey
 ```
 
 ### `matchOperatorRoute`
@@ -17108,6 +17228,14 @@ interface DurablePlanLike
 (body: Record<string, unknown>) => PlanDecisionBody
 ```
 
+### `parsePlanLookupQuery`
+
+`function` — Validate a current-plan lookup (`?workspaceId&threadId[&planId&revision]`).
+
+```ts
+(url: URL) => PlanLookupQuery
+```
+
 ### `parsePlanSubmittedEvent`
 
 `function` — Parses both direct sandbox events (`data.plan`) and session envelopes (`properties.plan`).
@@ -17156,12 +17284,28 @@ type PlanDecisionBody
 type PlanDecisionOutcome
 ```
 
+### `planDecisionRefusalResponse`
+
+`function` — The response for a sandbox refusal of a plan decision, or null when the refusal is not one the decision flow answers.
+
+```ts
+(error: { status?: number | undefined; code?: string | undefined; message: string; }, options: { reconcile: () => Promi…
+```
+
 ### `planFollowUpTurnId`
 
 `function` — The follow-up turn the Sandbox platform enqueues when one plan revision is decided.
 
 ```ts
 (planId: string, revision: number, outcome: "approved" | "rejected") => string
+```
+
+### `PlanLookupQuery`
+
+`type`
+
+```ts
+type PlanLookupQuery
 ```
 
 ### `planPartKey`
@@ -17595,7 +17739,7 @@ type DelegatedKeyCode
 `function` — A fetch for one turn that sends a pre-minted key.
 
 ```ts
-(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…
+(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: URL | R…
 ```
 
 ### `DelegatedKeyMissingError`
@@ -17942,12 +18086,28 @@ interface PlatformAgentSpend
 interface PlatformAgentSpendOptions
 ```
 
+### `platformAuthClientOptionsFromEnv`
+
+`function` — Options for the platform's cross-site SSO client: the base URL, the app id registered in the platform's trusted-apps registry (`TANGLE_PLATFORM_APP_ID`, else the product's own), and a fetch the clien…
+
+```ts
+(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: ((input: URL…
+```
+
 ### `PlatformBalanceSnapshot`
 
 `interface` — Describe the platform balance and lifetime spending with an optional update timestamp
 
 ```ts
 interface PlatformBalanceSnapshot
+```
+
+### `platformBaseUrlFromEnv`
+
+`function`
+
+```ts
+() => string
 ```
 
 ### `PlatformBillingConsent`
@@ -23418,6 +23578,14 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
+### `readSandboxModelPolicy`
+
+`function` — Platform's model policy for a box minted under the payer of `apiKey`, cached per key for ten minutes.
+
+```ts
+(apiKey: string, options: { platformUrl: string | undefined; signal?: AbortSignal | undefined; }) => Promise<SandboxMod…
+```
+
 ### `readSandboxRouterModels`
 
 `function` — Platform's model policy for a box minted under the payer of `apiKey`: the allowed models, or `null` for any.
@@ -23746,12 +23914,28 @@ type SandboxFileSizeOutcome
 class SandboxFilesystemNotReadyError
 ```
 
+### `SandboxModelPolicy`
+
+`type` — The models a workspace box may call.
+
+```ts
+type SandboxModelPolicy
+```
+
 ### `SandboxModelResolutionError`
 
 `class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform.
 
 ```ts
 class SandboxModelResolutionError
+```
+
+### `sandboxModelWithinPolicy`
+
+`function` — The first preferred model the policy allows, else the policy's own first model.
+
+```ts
+(preferred: readonly string[], allowedModels: readonly string[] | null) => string | undefined
 ```
 
 ### `SandboxPermissionLevel`
@@ -29263,6 +29447,14 @@ Source: `src/spend/drizzle.ts` · depends on `sandbox`
 (options: SpendLedgerTableOptions) => SpendLedgerStorePort
 ```
 
+### `createSpendBoxLedgerTable`
+
+`function` — Build the standard `spend_box_ledger` table.
+
+```ts
+(options?: { workspaceTable?: (AnySQLiteTable & { id: AnySQLiteColumn; }) | undefined; }) => SQLiteTableWithColumns<{ n…
+```
+
 ### `listLedgerBillingOwnerIds`
 
 `function` — Every distinct platform-user id the ledger has recorded as a box's `extras.billingOwnerId` — the set of wallets a full pass needs to read.
@@ -30004,7 +30196,7 @@ interface TurnStatusWriteOptions
 
 ## `./studio`
 
-Source: `src/studio/index.ts` · depends on `runtime`, `vault`, `web`
+Source: `src/studio/index.ts` · depends on `media`, `runtime`, `tools`, `vault`, `web`
 
 ### `aspectRatioFromOptions`
 
@@ -30982,7 +31174,15 @@ interface VaultPathPopoverProps
 
 ## `./studio/generated-media`
 
-Source: `src/studio/generated-media/index.ts` · depends on `vault`, `web`
+Source: `src/studio/generated-media/index.ts` · depends on `media`, `tools`, `vault`, `web`
+
+### `createGeneratedMediaFlows`
+
+`function` — Bind the provider-side generation steps to a product's store and Router client.
+
+```ts
+<Context>(config: GeneratedMediaFlowsConfig<Context>) => { mediaFields: (media: Omit<PersistedGeneratedMedia, "url"> |…
+```
 
 ### `createGeneratedMediaStore`
 
@@ -31014,6 +31214,14 @@ type DeleteGeneratedMediaResult
 
 ```ts
 (type: GeneratedMediaType, mimeType: string) => string
+```
+
+### `GENERATED_MEDIA_INGEST_TIMEOUT_MS`
+
+`const` — How long ingesting a provider result into the workspace may take.
+
+```ts
+30000
 ```
 
 ### `GENERATED_MEDIA_MISSING_FILE_METADATA`
@@ -31072,12 +31280,36 @@ interface GeneratedMediaBucket
 type GeneratedMediaDatabase
 ```
 
+### `GeneratedMediaFlows`
+
+`type`
+
+```ts
+type GeneratedMediaFlows
+```
+
+### `GeneratedMediaFlowsConfig`
+
+`interface`
+
+```ts
+interface GeneratedMediaFlowsConfig
+```
+
 ### `GeneratedMediaGenerationTable`
 
 `type` — The product's `generation` table.
 
 ```ts
 type GeneratedMediaGenerationTable
+```
+
+### `GeneratedMediaIngestion`
+
+`interface` — A provider result ingested into the workspace, or the reason it was not.
+
+```ts
+interface GeneratedMediaIngestion
 ```
 
 ### `generatedMediaLabel`
@@ -31176,12 +31408,76 @@ type GeneratedOutputType
 interface PersistedGeneratedMedia
 ```
 
+### `PersistedMediaFields`
+
+`type` — The stored-metadata fields that describe one persisted media file.
+
+```ts
+type PersistedMediaFields
+```
+
+### `PersistedProviderImage`
+
+`type` — A persisted provider image: its workspace file, or the provider URL kept as the result.
+
+```ts
+type PersistedProviderImage
+```
+
+### `PolledGenerationRow`
+
+`interface` — The generation row fields a provider-job poll reads.
+
+```ts
+interface PolledGenerationRow
+```
+
+### `ProviderJobMediaType`
+
+`type` — The generation types whose provider returns a job that may finish later.
+
+```ts
+type ProviderJobMediaType
+```
+
+### `ProviderJobRefresh`
+
+`type` — What a poll decided for a generation row; the product writes the row.
+
+```ts
+type ProviderJobRefresh
+```
+
+### `ProviderMediaJobResponse`
+
+`interface` — A video or avatar provider's submit response.
+
+```ts
+interface ProviderMediaJobResponse
+```
+
 ### `resolveGeneratedVaultPath`
 
 `function` — The Vault path of a generated file: the output path itself when it names a file, else `fileName` under it.
 
 ```ts
 (input: { type: GeneratedOutputType; outputPath: string | null | undefined; fileName: string; }) => string
+```
+
+### `SettledProviderJob`
+
+`interface` — The settled state of a video or avatar job and the metadata fields it adds to the row.
+
+```ts
+interface SettledProviderJob
+```
+
+### `STALE_PENDING_GENERATION_MS`
+
+`const` — How long a pending generation may wait for a provider job id before polling fails it.
+
+```ts
+number
 ```
 
 ### `validateGeneratedMediaSourceUrl`
@@ -31219,6 +31515,14 @@ type AssignableWorkspaceRole
 
 ```ts
 (actorRole: "owner" | "viewer" | "editor" | "admin", targetRole: "owner" | "viewer" | "editor" | "admin") => boolean
+```
+
+### `createThreadAccessCheck`
+
+`function` — Bind the thread check to a product's thread table and workspace access.
+
+```ts
+<Role extends string = "owner" | "viewer" | "editor" | "admin">(options: ThreadAccessOptions<Role>) => (threadId: strin…
 ```
 
 ### `generateInvitationToken`
@@ -31419,6 +31723,14 @@ type OrganizationRole
 
 ```ts
 type SandboxWorkspaceRole
+```
+
+### `ThreadAccessOptions`
+
+`interface`
+
+```ts
+interface ThreadAccessOptions
 ```
 
 ### `validateInviteToken`
@@ -33822,7 +34134,7 @@ interface ServerTimingEntry
 `function` — `fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…
 
 ```ts
-(trace: TurnTrace, inner: (input: RequestInfo | URL, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…
+(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…
 ```
 
 ### `TracedModelFetchOptions`
@@ -40240,7 +40552,7 @@ interface AppDocumentProps
 `function` — Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response.
 
 ```ts
-(onResponse: (response: Response, args: [input: RequestInfo | URL, init?: RequestInit | undefined]) => void | Promise<v…
+(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…
 ```
 
 ### `svgFaviconHref`
@@ -41580,7 +41892,7 @@ interface CloudArtifactSharePanelProps
 
 ## `./workspace-export`
 
-Source: `src/workspace-export/index.ts` · depends on `object-store`
+Source: `src/workspace-export/index.ts` · depends on `object-store`, `sandbox`
 
 ### `ArchivableBox`
 
@@ -41937,7 +42249,7 @@ interface WorkspaceExportOptions
 
 ## `./workspace-export/react`
 
-Source: `src/workspace-export/react.tsx` · depends on `object-store`
+Source: `src/workspace-export/react.tsx` · depends on `object-store`, `sandbox`
 
 ### `useWorkspaceExport`
 

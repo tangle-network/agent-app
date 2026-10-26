@@ -14,7 +14,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./agent-profiles/switch`](api/agent-profiles-switch.md) | 2 | `tools` |
 | [`./agent-surfaces`](api/agent-surfaces.md) | 18 | — |
 | [`./agent-surfaces/cli`](api/agent-surfaces-cli.md) | 0 | — |
-| [`./alerting`](api/alerting.md) | 5 | — |
+| [`./alerting`](api/alerting.md) | 8 | — |
 | [`./app-auth`](api/app-auth.md) | 13 | `email`, `platform` |
 | [`./app-auth/drizzle`](api/app-auth-drizzle.md) | 9 | `email`, `platform` |
 | [`./app-oauth`](api/app-oauth.md) | 19 | — |
@@ -22,14 +22,14 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./app-oauth/issuer`](api/app-oauth-issuer.md) | 10 | — |
 | [`./assets`](api/assets.md) | 40 | — |
 | [`./assistant`](api/assistant.md) | 69 | `runtime`, `web-react` |
-| [`./billing`](api/billing.md) | 34 | — |
+| [`./billing`](api/billing.md) | 36 | — |
 | [`./brand`](api/brand.md) | 5 | — |
 | [`./brand-extraction`](api/brand-extraction.md) | 18 | — |
 | [`./catalog`](api/catalog.md) | 10 | `runtime` |
 | [`./channels`](api/channels.md) | 47 | `web-react` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 310 | `chat-store`, `harness`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web` |
-| [`./chat-store`](api/chat-store.md) | 61 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
+| [`./chat-store`](api/chat-store.md) | 63 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
@@ -71,19 +71,19 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./launch-invariants/testing`](api/launch-invariants-testing.md) | 38 | `signoff`, `turn-health` |
 | [`./legibility`](api/legibility.md) | 33 | `signoff` |
 | [`./legibility/cli`](api/legibility-cli.md) | 0 | `signoff` |
-| [`./media`](api/media.md) | 42 | `studio`, `web` |
+| [`./media`](api/media.md) | 45 | `studio`, `web` |
 | [`./media/drizzle`](api/media-drizzle.md) | 3 | `studio`, `web` |
 | [`./missions`](api/missions.md) | 65 | — |
 | [`./model-resolution`](api/model-resolution.md) | 31 | `policy-filters` |
 | [`./object-store`](api/object-store.md) | 20 | `crypto` |
 | [`./openui`](api/openui.md) | 35 | `web` |
 | [`./openui-react`](api/openui-react.md) | 8 | `openui` |
-| [`./operator`](api/operator.md) | 57 | `chat-routes`, `crypto`, `platform`, `stream`, `web` |
+| [`./operator`](api/operator.md) | 62 | `chat-routes`, `crypto`, `platform`, `stream`, `web` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
-| [`./plans`](api/plans.md) | 19 | — |
+| [`./plans`](api/plans.md) | 22 | — |
 | [`./plans/drizzle`](api/plans-drizzle.md) | 3 | — |
-| [`./platform`](api/platform.md) | 142 | `billing`, `crypto`, `runtime`, `sandbox`, `web` |
+| [`./platform`](api/platform.md) | 144 | `billing`, `crypto`, `runtime`, `sandbox`, `web` |
 | [`./platform/billing-config`](api/platform-billing-config.md) | 2 | `billing`, `crypto`, `runtime`, `sandbox`, `web` |
 | [`./policy-filters`](api/policy-filters.md) | 17 | — |
 | [`./preflight`](api/preflight.md) | 14 | `signoff` |
@@ -103,7 +103,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./runtime`](api/runtime.md) | 110 | `tools`, `turn-trace` |
 | [`./runtime/router-turn`](api/runtime-router-turn.md) | 30 | `tools`, `turn-trace` |
 | [`./runtime/telemetry-cap`](api/runtime-telemetry-cap.md) | 4 | `tools`, `turn-trace` |
-| [`./sandbox`](api/sandbox.md) | 309 | `chat-routes`, `harness`, `model-resolution`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web` |
+| [`./sandbox`](api/sandbox.md) | 312 | `chat-routes`, `harness`, `model-resolution`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web` |
 | [`./sequences`](api/sequences.md) | 113 | `tools`, `web` |
 | [`./sequences-react`](api/sequences-react.md) | 106 | `sequences`, `web-react` |
 | [`./sequences/drizzle`](api/sequences-drizzle.md) | 13 | `tools`, `web` |
@@ -118,13 +118,13 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./skills-placement/box`](api/skills-placement-box.md) | 2 | `crypto`, `harness`, `sandbox`, `skills` |
 | [`./spend`](api/spend.md) | 70 | `sandbox` |
 | [`./spend/cli`](api/spend-cli.md) | 0 | `sandbox` |
-| [`./spend/drizzle`](api/spend-drizzle.md) | 9 | `sandbox` |
+| [`./spend/drizzle`](api/spend-drizzle.md) | 10 | `sandbox` |
 | [`./store`](api/store.md) | 16 | — |
 | [`./stream`](api/stream.md) | 67 | `interactions`, `plans` |
-| [`./studio`](api/studio.md) | 68 | `runtime`, `vault`, `web` |
+| [`./studio`](api/studio.md) | 68 | `media`, `runtime`, `tools`, `vault`, `web` |
 | [`./studio-react`](api/studio-react.md) | 53 | `runtime`, `studio`, `web-react` |
-| [`./studio/generated-media`](api/studio-generated-media.md) | 26 | `vault`, `web` |
-| [`./teams`](api/teams.md) | 35 | — |
+| [`./studio/generated-media`](api/studio-generated-media.md) | 39 | `media`, `tools`, `vault`, `web` |
+| [`./teams`](api/teams.md) | 37 | — |
 | [`./teams-react`](api/teams-react.md) | 12 | `teams`, `web-react` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 27 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
@@ -156,8 +156,8 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
 | [`./workspace-apps`](api/workspace-apps.md) | 54 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
 | [`./workspace-apps/react`](api/workspace-apps-react.md) | 5 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
-| [`./workspace-export`](api/workspace-export.md) | 44 | `object-store` |
-| [`./workspace-export/react`](api/workspace-export-react.md) | 5 | `object-store` |
+| [`./workspace-export`](api/workspace-export.md) | 44 | `object-store`, `sandbox` |
+| [`./workspace-export/react`](api/workspace-export-react.md) | 5 | `object-store`, `sandbox` |
 | [`./workspace-react`](api/workspace-react.md) | 28 | `session-shell`, `web-react`, `workspace-apps` |
 | [`./workspace-store/d1`](api/workspace-store-d1.md) | 6 | — |
 
@@ -239,9 +239,9 @@ _No public exports._
 
 ## `./alerting`
 
-Source: `src/alerting/index.ts` · 5 exports
+Source: `src/alerting/index.ts` · 8 exports
 
-`postSlackAlert`, `SlackAlertFailure`, `SlackAlertOptions`, `SlackAlertOutcome`, `SlackFailureReason`
+`createGithubIssueAlertChannel`, `GithubIssueAlertChannel`, `GithubIssueAlertOptions`, `postSlackAlert`, `SlackAlertFailure`, `SlackAlertOptions`, `SlackAlertOutcome`, `SlackFailureReason`
 
 [Full API →](api/alerting.md)
 
@@ -309,9 +309,9 @@ Depends on: `runtime`, `web-react`
 
 ## `./billing`
 
-Source: `src/billing/index.ts` · 34 exports
+Source: `src/billing/index.ts` · 36 exports
 
-`createIdentityBoundWorkspaceKeyManager`, `createPlatformBalanceManager`, `createTcloudKeyProvisioner`, `createWorkspaceKeyManager`, `DurableWorkspaceKeyConditionalWrites`, `DurableWorkspaceKeyCreateInput`, `DurableWorkspaceKeyManager`, `DurableWorkspaceKeyManagerOptions`, `DurableWorkspaceKeyProvisioner`, `DurableWorkspaceKeyProvisioningRecord`, `DurableWorkspaceKeyRecord`, `DurableWorkspaceKeyScope`, `DurableWorkspaceKeyStore`, `KeyCrypto`, `KeyProvisioner`, `PlanLimit`, `PlatformBalanceInfo`, `PlatformBalanceManager`, `PlatformBalanceManagerOptions`, `PlatformBillingClient`, `PlatformIdentity`, `PlatformProductUsage`, `SharedBillingState`, `TcloudKeyClient`, `WorkspaceKeyIdentity`, `WorkspaceKeyManager`, `WorkspaceKeyManagerOptions`, `WorkspaceKeyProduct`, `WorkspaceKeyRecord`, `WorkspaceKeyStatus`, `WorkspaceKeyStore`, `WorkspaceKeyUsage`, `WorkspaceModelKeyUsage`, `WorkspaceRuntimeKey`
+`createIdentityBoundWorkspaceKeyManager`, `createPlatformBalanceManager`, `createTcloudKeyProvisioner`, `createWorkspaceKeyManager`, `DurableWorkspaceKeyConditionalWrites`, `DurableWorkspaceKeyCreateInput`, `DurableWorkspaceKeyManager`, `DurableWorkspaceKeyManagerOptions`, `DurableWorkspaceKeyProvisioner`, `DurableWorkspaceKeyProvisioningRecord`, `DurableWorkspaceKeyRecord`, `DurableWorkspaceKeyScope`, `DurableWorkspaceKeyStore`, `KeyCrypto`, `KeyProvisioner`, `PlanLimit`, `PlatformBalanceInfo`, `PlatformBalanceManager`, `PlatformBalanceManagerOptions`, `PlatformBillingClient`, `PlatformIdentity`, `PlatformProductUsage`, `readSharedBillingState`, `SharedBillingReads`, `SharedBillingState`, `TcloudKeyClient`, `WorkspaceKeyIdentity`, `WorkspaceKeyManager`, `WorkspaceKeyManagerOptions`, `WorkspaceKeyProduct`, `WorkspaceKeyRecord`, `WorkspaceKeyStatus`, `WorkspaceKeyStore`, `WorkspaceKeyUsage`, `WorkspaceModelKeyUsage`, `WorkspaceRuntimeKey`
 
 [Full API →](api/billing.md)
 
@@ -373,11 +373,11 @@ Depends on: `chat-store`, `harness`, `interactions`, `launch-invariants`, `model
 
 ## `./chat-store`
 
-Source: `src/chat-store/index.ts` · 61 exports
+Source: `src/chat-store/index.ts` · 63 exports
 
 Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product`
 
-`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsByUpdatedAtInput`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatMessageValues`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyAttachmentsFromMessages`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
+`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsByUpdatedAtInput`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatMessageValues`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createAgentRunsTable`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `createThreadArtifactLinksTable`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyAttachmentsFromMessages`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
 [Full API →](api/chat-store.md)
 
@@ -759,11 +759,11 @@ _No public exports._
 
 ## `./media`
 
-Source: `src/media/index.ts` · 42 exports
+Source: `src/media/index.ts` · 45 exports
 
 Depends on: `studio`, `web`
 
-`browserUsableSourceUrl`, `Checked`, `checkMediaModelSelection`, `createMediaModelCatalog`, `createRouterGeneration`, `createRouterMediaClient`, `createSpeechScriptResolver`, `fetchBoundedAudio`, `GenerateInputs`, `GenerateRequestBody`, `generationMetadata`, `GenerationMetadataFields`, `imageCountForRequest`, `MediaCatalog`, `MediaCatalogModel`, `MediaModelAdmission`, `MediaModelCatalogConfig`, `MediaRouteabilityEndpoint`, `metadataResultUrl`, `modelForRequest`, `normalizeProviderJobStatus`, `optionalHttpsUrl`, `providerImageBytes`, `ProviderImageOutput`, `ProviderJobStatus`, `requiredText`, `RouterAvatarRequest`, `RouterHttpError`, `RouterMediaClient`, `RouterMediaClientConfig`, `RouterMediaModelRow`, `RouterMediaSource`, `routerResponseErrorMessage`, `RouterTranscriptionRequest`, `routerV1Url`, `RouterVideoModelRow`, `RouterVideoRequest`, `SpeechInput`, `SpeechScriptConfig`, `validateGenerateRequest`, `validatePublicHttpUrl`, `validProviderImages`
+`browserUsableSourceUrl`, `Checked`, `CheckedGenerateRequest`, `checkGenerateRequest`, `checkMediaModelSelection`, `createMediaModelCatalog`, `createRouterGeneration`, `createRouterMediaClient`, `createSpeechScriptResolver`, `fetchBoundedAudio`, `GenerateInputs`, `GenerateRequestBody`, `generationMetadata`, `GenerationMetadataFields`, `imageCountForRequest`, `MediaCatalog`, `MediaCatalogModel`, `MediaModelAdmission`, `MediaModelCatalogConfig`, `MediaRouteabilityEndpoint`, `metadataResultUrl`, `modelForRequest`, `normalizeProviderJobStatus`, `optionalHttpsUrl`, `providerImageBytes`, `ProviderImageOutput`, `ProviderJobStatus`, `requiredText`, `RouterAvatarRequest`, `RouterHttpError`, `RouterMediaClient`, `RouterMediaClientConfig`, `RouterMediaModelRow`, `RouterMediaSource`, `routerResponseErrorMessage`, `RouterTranscriptionRequest`, `routerV1Url`, `RouterVideoModelRow`, `RouterVideoRequest`, `SpeechInput`, `SpeechScriptConfig`, `tcloudWebhookCallbackUrl`, `validateGenerateRequest`, `validatePublicHttpUrl`, `validProviderImages`
 
 [Full API →](api/media.md)
 
@@ -827,11 +827,11 @@ Depends on: `openui`
 
 ## `./operator`
 
-Source: `src/operator/index.ts` · 57 exports
+Source: `src/operator/index.ts` · 62 exports
 
 Depends on: `chat-routes`, `crypto`, `platform`, `stream`, `web`
 
-`ChatOperatorAdapterOptions`, `ChatOperatorAdmission`, `ChatOperatorAdmissionStore`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createOperatorApi`, `createOperatorClient`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_TURN_CANCELLED_CODE`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `operatorTurnUsage`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentKeyContext`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
+`ChatOperatorAdapterOptions`, `ChatOperatorAdmission`, `ChatOperatorAdmissionStore`, `ChatOperatorMessage`, `ChatOperatorThread`, `ChatOperatorWorkspace`, `createChatOperatorAdapter`, `createGatewayOperatorKeys`, `createOperatorApi`, `createOperatorClient`, `GatewayOperatorKey`, `GatewayOperatorKeysOptions`, `GatewayRequestClaim`, `GatewayVerifiedApiKey`, `matchOperatorRoute`, `OPERATOR_ACCESS`, `OPERATOR_API_BASE_PATH`, `OPERATOR_API_SCOPES`, `OPERATOR_API_VERSION`, `OPERATOR_ROUTES`, `OPERATOR_SCOPE_DEPENDENCIES`, `OPERATOR_SETTLED_STATES`, `OPERATOR_TURN_CANCELLED_CODE`, `OPERATOR_WORKSPACE_SCOPE_PREFIX`, `OperatorAdapter`, `OperatorApi`, `OperatorApiOptions`, `OperatorAppInfo`, `OperatorApproval`, `OperatorApprovalKind`, `OperatorAssetRef`, `OperatorCapability`, `OperatorClient`, `OperatorClientOptions`, `OperatorContext`, `OperatorError`, `OperatorErrorBody`, `OperatorFile`, `OperatorFileChange`, `OperatorFileEntry`, `OperatorJournalEntry`, `OperatorKeyStore`, `operatorKeyWorkspaces`, `OperatorMetric`, `OperatorPrincipalInfo`, `OperatorResult`, `OperatorRole`, `OperatorRouteId`, `OperatorScope`, `OperatorScorecard`, `OperatorThread`, `OperatorTurn`, `OperatorTurnState`, `operatorTurnUsage`, `OperatorWorkspace`, `operatorWorkspaceScope`, `PlatformAgentKeyAccess`, `PlatformAgentKeyContext`, `PlatformAgentOperatorKey`, `StartTurnInput`, `WaitForTurnOptions`, `withPlatformAgentKeys`
 
 [Full API →](api/operator.md)
 
@@ -857,9 +857,9 @@ Depends on: `signoff`
 
 ## `./plans`
 
-Source: `src/plans/index.ts` · 19 exports
+Source: `src/plans/index.ts` · 22 exports
 
-`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `durablePlanConflictCode`, `DurablePlanLike`, `isTerminalPlanStatus`, `parsePlanDecisionBody`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `PlanDecisionBody`, `PlanDecisionOutcome`, `planFollowUpTurnId`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`, `toChatPlan`
+`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `durablePlanConflictCode`, `DurablePlanLike`, `isTerminalPlanStatus`, `parsePlanDecisionBody`, `parsePlanLookupQuery`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `PlanDecisionBody`, `PlanDecisionOutcome`, `planDecisionRefusalResponse`, `planFollowUpTurnId`, `PlanLookupQuery`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`, `toChatPlan`
 
 [Full API →](api/plans.md)
 
@@ -873,11 +873,11 @@ Source: `src/plans/drizzle.ts` · 3 exports
 
 ## `./platform`
 
-Source: `src/platform/index.ts` · 142 exports
+Source: `src/platform/index.ts` · 144 exports
 
 Depends on: `billing`, `crypto`, `runtime`, `sandbox`, `web`
 
-`AdminGuardOptions`, `AdmitBillableTurnOptions`, `agentOperatorScopes`, `AgentSpendOutcome`, `AgentSpendRefusal`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `BillableTurnAdmission`, `BillableTurnAdmissionOptions`, `BillableTurnAdmissionResult`, `BillableTurnSeatVerdict`, `BillableTurnVerdict`, `BillingConsentOutcome`, `BillingConsentRefusal`, `canonicalDelegatedKeyName`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createBillableTurnAdmission`, `createD1TangleIdentityStore`, `createDelegatedKeyProvisioner`, `createDelegatedTurnKeys`, `createHubSettingsRoutes`, `createPlatformAgentKeyVerifier`, `createPlatformAgentSpend`, `createPlatformBillingConsent`, `createPlatformBillingHttp`, `createPlatformDelegatedKeyClient`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `D1TangleIdentityStoreOptions`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `DELEGATED_KEY_PREMINT_TABLE_DDL`, `DelegatedKey`, `DelegatedKeyBudget`, `DelegatedKeyCode`, `delegatedKeyFallbackFetch`, `DelegatedKeyMissingError`, `DelegatedKeyOutcome`, `DelegatedKeyPremintD1Like`, `DelegatedKeyProvisioner`, `DelegatedKeyRefusal`, `DelegatedKeyRefusalError`, `DelegatedKeyRequest`, `DelegatedKeySlotRef`, `DelegatedKeyVerdict`, `DelegatedTurnKey`, `DelegatedTurnKeyClaimTiming`, `DelegatedTurnKeyEvent`, `DelegatedTurnKeyInput`, `DelegatedTurnKeyLease`, `DelegatedTurnKeys`, `DelegatedTurnKeyScope`, `DelegatedTurnKeysOptions`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PLATFORM_AGENT_KEY_PROVISIONER`, `PLATFORM_KEY_PREFIX`, `PlatformAgentKeyVerification`, `PlatformAgentKeyVerifier`, `PlatformAgentKeyVerifierOptions`, `PlatformAgentSpend`, `PlatformAgentSpendOptions`, `PlatformBalanceSnapshot`, `PlatformBillingConsent`, `PlatformBillingConsentOptions`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformDelegatedKeyClient`, `PlatformDelegatedKeyClientOptions`, `PlatformIdentityStore`, `platformKeyRefusal`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`, `TANGLE_IDENTITY_PROVIDER_ID`, `TangleIdentityD1Like`, `TangleIdentityD1Statement`, `TangleIdentityLegacyLinkTable`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
+`AdminGuardOptions`, `AdmitBillableTurnOptions`, `agentOperatorScopes`, `AgentSpendOutcome`, `AgentSpendRefusal`, `ApiKeyRequestAuthOptions`, `assertBillableBalance`, `AssertBillableBalanceOptions`, `AuthGuard`, `AuthGuardOptions`, `BetterAuthSessionCookieMinterOptions`, `BetterAuthSessionCookieSource`, `BillableBalanceState`, `BillableTurnAdmission`, `BillableTurnAdmissionOptions`, `BillableTurnAdmissionResult`, `BillableTurnSeatVerdict`, `BillableTurnVerdict`, `BillingConsentOutcome`, `BillingConsentRefusal`, `canonicalDelegatedKeyName`, `createAdminGuard`, `createApiKeyRequestAuth`, `createAuthGuard`, `createBetterAuthSessionCookieMinter`, `createBillableTurnAdmission`, `createD1TangleIdentityStore`, `createDelegatedKeyProvisioner`, `createDelegatedTurnKeys`, `createHubSettingsRoutes`, `createPlatformAgentKeyVerifier`, `createPlatformAgentSpend`, `createPlatformBillingConsent`, `createPlatformBillingHttp`, `createPlatformDelegatedKeyClient`, `createSignedSsoState`, `createTanglePlatformBillingClient`, `createTangleSsoHandlers`, `D1TangleIdentityStoreOptions`, `DEFAULT_SEAT_BILLING_ENABLED_ENV_VAR`, `DEFAULT_TANGLE_TIER_POLICY`, `DELEGATED_KEY_PREMINT_TABLE_DDL`, `DelegatedKey`, `DelegatedKeyBudget`, `DelegatedKeyCode`, `delegatedKeyFallbackFetch`, `DelegatedKeyMissingError`, `DelegatedKeyOutcome`, `DelegatedKeyPremintD1Like`, `DelegatedKeyProvisioner`, `DelegatedKeyRefusal`, `DelegatedKeyRefusalError`, `DelegatedKeyRequest`, `DelegatedKeySlotRef`, `DelegatedKeyVerdict`, `DelegatedTurnKey`, `DelegatedTurnKeyClaimTiming`, `DelegatedTurnKeyEvent`, `DelegatedTurnKeyInput`, `DelegatedTurnKeyLease`, `DelegatedTurnKeys`, `DelegatedTurnKeyScope`, `DelegatedTurnKeysOptions`, `FREE_TIER_SPEND_CAP_USD`, `getProductEntitlement`, `guardResolution`, `GuardResolution`, `HubSettingsApiKeyMetadata`, `HubSettingsClient`, `HubSettingsClientBinding`, `HubSettingsContext`, `HubSettingsGrant`, `HubSettingsOAuthInput`, `HubSettingsOperation`, `HubSettingsPrincipal`, `HubSettingsRoutes`, `isPlatformBillingHttpError`, `isProductEntitled`, `isSeatBillingEnabled`, `normalizeTanglePlanTier`, `normalizeTangleSsoEmail`, `parseAdminEmails`, `PLATFORM_AGENT_KEY_PROVISIONER`, `PLATFORM_KEY_PREFIX`, `PlatformAgentKeyVerification`, `PlatformAgentKeyVerifier`, `PlatformAgentKeyVerifierOptions`, `PlatformAgentSpend`, `PlatformAgentSpendOptions`, `platformAuthClientOptionsFromEnv`, `PlatformBalanceSnapshot`, `platformBaseUrlFromEnv`, `PlatformBillingConsent`, `PlatformBillingConsentOptions`, `PlatformBillingHttp`, `PlatformBillingHttpError`, `PlatformBillingHttpOptions`, `PlatformDelegatedKeyClient`, `PlatformDelegatedKeyClientOptions`, `PlatformIdentityStore`, `platformKeyRefusal`, `PlatformSubscriptionInfo`, `PlatformUsageProductRow`, `ProductEntitlement`, `ProductSeatOffer`, `ProductSeatOfferPeriod`, `readTangleTierState`, `RequestApiKey`, `resolveTangleSsoAccount`, `SeatBillingFlagOptions`, `seatCheckoutUrl`, `SeatStatus`, `signSessionCookieValue`, `SsoStateConfig`, `TANGLE_IDENTITY_ACCOUNT_INDEXES_SQL`, `TANGLE_IDENTITY_PROVIDER_ID`, `TangleIdentityD1Like`, `TangleIdentityD1Statement`, `TangleIdentityLegacyLinkTable`, `TangleIdentitySsoAccountStore`, `TangleIdentitySsoAuthClient`, `TangleIdentitySsoExchangeResult`, `TangleIdentitySsoHandlerOptions`, `TangleOidcSsoAccountStore`, `TangleOidcSsoAuthClient`, `TangleOidcSsoHandlerOptions`, `TangleOidcSsoTokens`, `TangleOidcSsoUser`, `TanglePlanTier`, `TangleSsoAccountConflictError`, `TangleSsoAccountConflictReason`, `TangleSsoAccountResolution`, `TangleSsoAccountResolutionInput`, `TangleSsoAccountStore`, `TangleSsoAuthClient`, `TangleSsoExchangeResult`, `TangleSsoHandlerOptions`, `TangleSsoHandlers`, `TangleSsoLocalAccount`, `TangleSsoSessionCookieArgs`, `TangleSsoUserCreateError`, `TangleTierPolicy`, `TangleTierState`, `verifySignedSsoState`
 
 [Full API →](api/platform.md)
 
@@ -1063,11 +1063,11 @@ Depends on: `tools`, `turn-trace`
 
 ## `./sandbox`
 
-Source: `src/sandbox/index.ts` · 309 exports
+Source: `src/sandbox/index.ts` · 312 exports
 
 Depends on: `chat-routes`, `harness`, `model-resolution`, `profile`, `redact`, `runtime`, `tools`, `turn-stream`, `turn-trace`, `web`
 
-`adaptSandboxStream`, `addColdArrival`, `applyPromptTokenLimits`, `AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `assessWorkspaceSandboxSnapshot`, `attachReasoningEffort`, `backendModelFields`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildProductEgressPolicy`, `buildSandboxToolBinDirScript`, `buildSandboxToolBinDirsEnv`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySandboxTransientFailure`, `classifySeveredStream`, `collectSandboxPromptText`, `COMPUTER_FILES_GUIDANCE`, `COMPUTER_STEP_RECEIPT_TABLE_DDL`, `computerFileContract`, `ComputerFileListing`, `ComputerFileReceipt`, `ComputerStep`, `ComputerStepOptions`, `ComputerStepReceipt`, `ComputerStepReceiptD1Like`, `ComputerStepReceipts`, `ComputerStepRun`, `ComputerStepSession`, `ComputerVault`, `ComputerVaultFile`, `createCacheReuseStore`, `createComputerStep`, `createD1ComputerStepReceipts`, `createD1PrewarmClaimStore`, `createD1WarmLeaseStore`, `createD1WarmReceiptStore`, `createEscalationSpeculator`, `createMemoryWarmReceiptStore`, `createSandboxExecTool`, `createSandboxPrewarmer`, `createSandboxRunTool`, `createSandboxTerminalConnectionRoute`, `createWarmCache`, `createWarmLeases`, `createWorkspacePrewarmRoute`, `CreateWorkspacePrewarmRouteOptions`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRecoveryManager`, `D1PrewarmClaimStoreOptions`, `decaySlots`, `DEFAULT_COMPUTER_STEP_RECEIPT_TABLE`, `DEFAULT_ESCALATION_TOOLS`, `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`, `DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS`, `DEFAULT_PREWARM_CLAIM_TABLE`, `DEFAULT_PROVISION_TIMEOUT_MS`, `DEFAULT_SANDBOX_RESOURCES`, `DEFAULT_WARM_LEASE_TABLE`, `DEFAULT_WARM_RECEIPT_TABLE`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `dropTrustedBox`, `EGRESS_PROXY_RECOVERY_PHASE`, `EGRESS_PROXY_RECOVERY_REQUIRED`, `ensureSandboxToolBinDir`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `EscalationHint`, `escalationHints`, `EscalationInput`, `EscalationSpeculator`, `EscalationSpeculatorOptions`, `FencedPrewarmClaimStore`, `flattenHistory`, `ForegroundSandboxSingleFlightEvent`, `ForegroundSandboxSingleFlightOptions`, `formatSandboxProvisioningSupportDetails`, `formatSandboxProvisioningUserMessage`, `getClient`, `InspectablePrewarmClaimStore`, `isAutomatedPrewarmRequest`, `isEgressProxyRecoveryRequiredError`, `isSandboxApiBearerAuthFailure`, `isSandboxApiSandboxMissingFailure`, `isSandboxApiTransientFailure`, `isSandboxAuthFailure`, `isSandboxHostCapacityFailure`, `isTerminalPromptEvent`, `isWorkspaceSandboxRecoveryAction`, `isWorkspaceSandboxRecoveryCode`, `isWorkspaceSandboxRecoveryState`, `isWorkspaceSandboxSnapshotRestoreError`, `listComputerFiles`, `LivenessProbeConfig`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `MissingSandboxFailure`, `ModelSelection`, `ModelSelectionError`, `ModelSelectionFailure`, `ModelSelectionSource`, `modelWithinAllowList`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `plannedHostRestart`, `predictColdArrival`, `preferredWorkspaceSandboxRecoveryBoxKey`, `PREWARM_CLAIM_TABLE_DDL`, `PrewarmClaimD1Like`, `PrewarmClaimLease`, `PrewarmClaimState`, `PrewarmClaimStore`, `PrewarmDecision`, `PrewarmEvent`, `PrewarmOutcome`, `PrewarmResult`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `PYPI_EGRESS_DOMAINS`, `readDuringPlannedHostRestart`, `readSandboxBinaryBytes`, `readSandboxRouterModels`, `ReadSandboxRouterModelsOptions`, `ReadyRunningSandboxOutcome`, `requireTransportableModel`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveModelSelection`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `resolveSandboxPromptBackend`, `retrySandboxTransient`, `ReuseCacheLike`, `ReuseChecks`, `ReuseStateStore`, `reuseWorkspaceSandbox`, `runForegroundSandboxSingleFlight`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SafeSandboxErrorCause`, `SafeSandboxErrorDiagnostics`, `SANDBOX_BACKING_CONTAINER_MISSING_CODE`, `SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS`, `SANDBOX_EXEC_DESCRIPTION`, `SANDBOX_RUN_DESCRIPTION`, `SANDBOX_TRANSIENT_DEADLINE_MS`, `SandboxBoxBusyError`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxEgressPolicyMismatchError`, `SandboxEgressPolicySource`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxExecResult`, `SandboxExecTool`, `SandboxExecToolOptions`, `SandboxExistingBoxStage`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxFilesystemNotReadyError`, `SandboxModelResolutionError`, `SandboxPermissionLevel`, `sandboxPrewarmClaimKey`, `SandboxPrewarmer`, `SandboxPrewarmerOptions`, `SandboxPrewarmScope`, `SandboxPromptConfig`, `SandboxPromptExecutionLimits`, `sandboxPromptExecutionOptions`, `sandboxPromptRunner`, `SandboxPromptTokenLimits`, `SandboxProvisionedObservation`, `SandboxProvisioningFailedElsewhereError`, `SandboxReadiness`, `SandboxRecoveryFailedError`, `SandboxRecoveryPhase`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRunError`, `SandboxRunFailureCode`, `sandboxRunFailureDetail`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxRunTool`, `SandboxRunToolOptions`, `SandboxScope`, `SandboxSpendHooks`, `SandboxStepTransition`, `SandboxStreamEvent`, `SandboxTaskOptions`, `SandboxTerminalConnectionRouteOptions`, `sandboxToolBinDir`, `SandboxToolContext`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `sandboxTransientBackoffMs`, `SandboxTransientDeadlineError`, `SandboxTransientFailure`, `SandboxTransientFailureCode`, `SandboxTransientRetryOptions`, `saveComputerFiles`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `serializeSandboxProvisioningError`, `SharedReuseState`, `shellQuote`, `shouldRestoreWorkspaceSandboxRecovery`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalConnectionBoxLike`, `traceSandboxPromptEvents`, `TraceSandboxPromptOptions`, `utcDay`, `WARM_LEASE_DECLINED_UNTIL_DDL`, `WARM_LEASE_PENDING_DDL`, `WARM_LEASE_TABLE_DDL`, `WARM_RECEIPT_TABLE_DDL`, `WARM_SLOTS`, `warmBinOf`, `WarmBoxOutcome`, `WarmCache`, `WarmCacheOptions`, `WarmCacheSource`, `warmKey`, `WarmLeaseD1Like`, `WarmLeaseEvent`, `WarmLeaseRow`, `WarmLeases`, `WarmLeasesOptions`, `WarmLeaseStore`, `WarmReason`, `WarmReceipt`, `WarmReceiptD1Like`, `warmReceiptId`, `WarmReceiptReport`, `WarmReceiptStore`, `WarmSignalOutcome`, `WarmSignalResult`, `WarmSweepReport`, `WarmTurnResult`, `warmWeekdayOf`, `WORKSPACE_SANDBOX_HOST_EXHAUSTED`, `WORKSPACE_SANDBOX_MISSING`, `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`, `WORKSPACE_SANDBOX_RECOVERY_CODES`, `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`, `WORKSPACE_SANDBOX_UNRECOVERABLE`, `WorkspacePrewarmAuthorization`, `WorkspacePrewarmEvent`, `WorkspacePrewarmOutcome`, `WorkspacePrewarmReason`, `WorkspacePrewarmReport`, `WorkspacePrewarmResponse`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxOriginalRecoveryOptions`, `WorkspaceSandboxOriginalRecoveryResult`, `WorkspaceSandboxRecoveryAction`, `WorkspaceSandboxRecoveryCode`, `WorkspaceSandboxRecoveryDecision`, `workspaceSandboxRecoveryDiagnostic`, `workspaceSandboxRecoveryFromError`, `WorkspaceSandboxRecoveryManager`, `workspaceSandboxRecoveryMessage`, `workspaceSandboxRecoveryRecommendedActions`, `WorkspaceSandboxRecoveryRequiredError`, `WorkspaceSandboxRecoveryState`, `WorkspaceSandboxRecoveryStore`, `WorkspaceSandboxSnapshot`, `WorkspaceSandboxSnapshotAssessment`, `WorkspaceSandboxSnapshotAvailability`, `WorkspaceSandboxSnapshotFreshness`, `WorkspaceWarmStep`, `WorkspaceWarmStepOutcome`, `WorkspaceWarmStepResult`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
+`adaptSandboxStream`, `addColdArrival`, `applyPromptTokenLimits`, `AppToolDescriptor`, `assertEnvWithinLimits`, `assertProvisionPayloadWithinCap`, `assessWorkspaceSandboxSnapshot`, `attachReasoningEffort`, `backendModelFields`, `buildAppToolMcpServers`, `BuildAppToolMcpServersOptions`, `buildProductEgressPolicy`, `buildSandboxToolBinDirScript`, `buildSandboxToolBinDirsEnv`, `buildSandboxToolFileMounts`, `BuildSandboxToolFileMountsOptions`, `buildSandboxToolPathSetupScript`, `classifySandboxTransientFailure`, `classifySeveredStream`, `collectSandboxPromptText`, `COMPUTER_FILES_GUIDANCE`, `COMPUTER_STEP_RECEIPT_TABLE_DDL`, `computerFileContract`, `ComputerFileListing`, `ComputerFileReceipt`, `ComputerStep`, `ComputerStepOptions`, `ComputerStepReceipt`, `ComputerStepReceiptD1Like`, `ComputerStepReceipts`, `ComputerStepRun`, `ComputerStepSession`, `ComputerVault`, `ComputerVaultFile`, `createCacheReuseStore`, `createComputerStep`, `createD1ComputerStepReceipts`, `createD1PrewarmClaimStore`, `createD1WarmLeaseStore`, `createD1WarmReceiptStore`, `createEscalationSpeculator`, `createMemoryWarmReceiptStore`, `createSandboxExecTool`, `createSandboxPrewarmer`, `createSandboxRunTool`, `createSandboxTerminalConnectionRoute`, `createWarmCache`, `createWarmLeases`, `createWorkspacePrewarmRoute`, `CreateWorkspacePrewarmRouteOptions`, `createWorkspaceSandboxManager`, `createWorkspaceSandboxRecoveryManager`, `D1PrewarmClaimStoreOptions`, `decaySlots`, `DEFAULT_COMPUTER_STEP_RECEIPT_TABLE`, `DEFAULT_ESCALATION_TOOLS`, `DEFAULT_FOREGROUND_PROVISION_CLAIM_TTL_SECONDS`, `DEFAULT_FOREGROUND_PROVISION_POLL_INTERVAL_MS`, `DEFAULT_PREWARM_CLAIM_TABLE`, `DEFAULT_PROVISION_TIMEOUT_MS`, `DEFAULT_SANDBOX_RESOURCES`, `DEFAULT_WARM_LEASE_TABLE`, `DEFAULT_WARM_RECEIPT_TABLE`, `deferredCorpusHash`, `deleteSecret`, `detectInteractiveQuestion`, `driveSandboxTurn`, `DriveSandboxTurnOptions`, `dropTrustedBox`, `EGRESS_PROXY_RECOVERY_PHASE`, `EGRESS_PROXY_RECOVERY_REQUIRED`, `ensureSandboxToolBinDir`, `ensureWorkspaceSandbox`, `EnsureWorkspaceSandboxOptions`, `ENV_TOTAL_MAX_BYTES`, `ENV_VALUE_MAX_BYTES`, `EscalationHint`, `escalationHints`, `EscalationInput`, `EscalationSpeculator`, `EscalationSpeculatorOptions`, `FencedPrewarmClaimStore`, `flattenHistory`, `ForegroundSandboxSingleFlightEvent`, `ForegroundSandboxSingleFlightOptions`, `formatSandboxProvisioningSupportDetails`, `formatSandboxProvisioningUserMessage`, `getClient`, `InspectablePrewarmClaimStore`, `isAutomatedPrewarmRequest`, `isEgressProxyRecoveryRequiredError`, `isSandboxApiBearerAuthFailure`, `isSandboxApiSandboxMissingFailure`, `isSandboxApiTransientFailure`, `isSandboxAuthFailure`, `isSandboxHostCapacityFailure`, `isTerminalPromptEvent`, `isWorkspaceSandboxRecoveryAction`, `isWorkspaceSandboxRecoveryCode`, `isWorkspaceSandboxRecoveryState`, `isWorkspaceSandboxSnapshotRestoreError`, `listComputerFiles`, `LivenessProbeConfig`, `MemberSyncSeam`, `mergeExtraMcp`, `mergeHistoryIntoParts`, `mintSandboxScopedToken`, `MissingSandboxFailure`, `ModelSelection`, `ModelSelectionError`, `ModelSelectionFailure`, `ModelSelectionSource`, `modelWithinAllowList`, `Outcome`, `peekWorkspaceSandbox`, `PeekWorkspaceSandboxOutcome`, `plannedHostRestart`, `predictColdArrival`, `preferredWorkspaceSandboxRecoveryBoxKey`, `PREWARM_CLAIM_TABLE_DDL`, `PrewarmClaimD1Like`, `PrewarmClaimLease`, `PrewarmClaimState`, `PrewarmClaimStore`, `PrewarmDecision`, `PrewarmEvent`, `PrewarmOutcome`, `PrewarmResult`, `ProfileComposeOptions`, `PromptInputPart`, `ProviderResolutionConfig`, `PROVISION_PAYLOAD_MAX_BYTES`, `ProvisionPayloadSections`, `ProvisionProfileSection`, `PYPI_EGRESS_DOMAINS`, `readDuringPlannedHostRestart`, `readSandboxBinaryBytes`, `readSandboxModelPolicy`, `readSandboxRouterModels`, `ReadSandboxRouterModelsOptions`, `ReadyRunningSandboxOutcome`, `requireTransportableModel`, `resetClientCache`, `ResolvedModel`, `resolveModel`, `resolveModelSelection`, `resolveSandboxClientCredentials`, `ResolveSandboxClientCredentialsOptions`, `resolveSandboxPromptBackend`, `retrySandboxTransient`, `ReuseCacheLike`, `ReuseChecks`, `ReuseStateStore`, `reuseWorkspaceSandbox`, `runForegroundSandboxSingleFlight`, `runSandboxPrompt`, `runSandboxToolPathSetup`, `SafeSandboxErrorCause`, `SafeSandboxErrorDiagnostics`, `SANDBOX_BACKING_CONTAINER_MISSING_CODE`, `SANDBOX_DISPATCH_TRANSIENT_DEADLINE_MS`, `SANDBOX_EXEC_DESCRIPTION`, `SANDBOX_RUN_DESCRIPTION`, `SANDBOX_TRANSIENT_DEADLINE_MS`, `SandboxBoxBusyError`, `SandboxBuildContext`, `SandboxClientCredentials`, `SandboxCredentialEnvironment`, `SandboxEgressPolicyMismatchError`, `SandboxEgressPolicySource`, `SandboxExecChannel`, `SandboxExecOptions`, `SandboxExecResult`, `SandboxExecTool`, `SandboxExecToolOptions`, `SandboxExistingBoxStage`, `SandboxFileBytesOutcome`, `SandboxFileSizeOutcome`, `SandboxFilesystemNotReadyError`, `SandboxModelPolicy`, `SandboxModelResolutionError`, `sandboxModelWithinPolicy`, `SandboxPermissionLevel`, `sandboxPrewarmClaimKey`, `SandboxPrewarmer`, `SandboxPrewarmerOptions`, `SandboxPrewarmScope`, `SandboxPromptConfig`, `SandboxPromptExecutionLimits`, `sandboxPromptExecutionOptions`, `sandboxPromptRunner`, `SandboxPromptTokenLimits`, `SandboxProvisionedObservation`, `SandboxProvisioningFailedElsewhereError`, `SandboxReadiness`, `SandboxRecoveryFailedError`, `SandboxRecoveryPhase`, `SandboxResourceConfig`, `SandboxRestoreSpec`, `SandboxRunError`, `SandboxRunFailureCode`, `sandboxRunFailureDetail`, `SandboxRuntimeAuthRefreshError`, `SandboxRuntimeConfig`, `SandboxRunTool`, `SandboxRunToolOptions`, `SandboxScope`, `SandboxSpendHooks`, `SandboxStepTransition`, `SandboxStreamEvent`, `SandboxTaskOptions`, `SandboxTerminalConnectionRouteOptions`, `sandboxToolBinDir`, `SandboxToolContext`, `sandboxToolPath`, `SandboxToolPathOptions`, `sandboxToolRootDir`, `SandboxToolSpec`, `sandboxTransientBackoffMs`, `SandboxTransientDeadlineError`, `SandboxTransientFailure`, `SandboxTransientFailureCode`, `SandboxTransientRetryOptions`, `saveComputerFiles`, `ScopedTokenResult`, `SecretStore`, `secretStoreFromClient`, `serializeSandboxProvisioningError`, `SharedReuseState`, `shellQuote`, `shouldRestoreWorkspaceSandboxRecovery`, `splitDeferredProfileFiles`, `statSandboxFileSize`, `StoppedSandboxResumeFailure`, `StoppedSandboxResumeRecovery`, `StorageConfig`, `storeSecret`, `streamSandboxPrompt`, `StreamSandboxPromptOptions`, `syncSandboxMemberAdd`, `syncSandboxMemberRemove`, `syncSandboxMemberRole`, `TerminalConnectionBoxLike`, `traceSandboxPromptEvents`, `TraceSandboxPromptOptions`, `utcDay`, `WARM_LEASE_DECLINED_UNTIL_DDL`, `WARM_LEASE_PENDING_DDL`, `WARM_LEASE_TABLE_DDL`, `WARM_RECEIPT_TABLE_DDL`, `WARM_SLOTS`, `warmBinOf`, `WarmBoxOutcome`, `WarmCache`, `WarmCacheOptions`, `WarmCacheSource`, `warmKey`, `WarmLeaseD1Like`, `WarmLeaseEvent`, `WarmLeaseRow`, `WarmLeases`, `WarmLeasesOptions`, `WarmLeaseStore`, `WarmReason`, `WarmReceipt`, `WarmReceiptD1Like`, `warmReceiptId`, `WarmReceiptReport`, `WarmReceiptStore`, `WarmSignalOutcome`, `WarmSignalResult`, `WarmSweepReport`, `WarmTurnResult`, `warmWeekdayOf`, `WORKSPACE_SANDBOX_HOST_EXHAUSTED`, `WORKSPACE_SANDBOX_MISSING`, `WORKSPACE_SANDBOX_RECOVERY_ACTIONS`, `WORKSPACE_SANDBOX_RECOVERY_CODES`, `WORKSPACE_SANDBOX_SNAPSHOT_MAX_AGE_MS`, `WORKSPACE_SANDBOX_UNRECOVERABLE`, `WorkspacePrewarmAuthorization`, `WorkspacePrewarmEvent`, `WorkspacePrewarmOutcome`, `WorkspacePrewarmReason`, `WorkspacePrewarmReport`, `WorkspacePrewarmResponse`, `WorkspaceSandboxEnsureContext`, `WorkspaceSandboxInstanceLike`, `WorkspaceSandboxManager`, `WorkspaceSandboxManagerOptions`, `WorkspaceSandboxOriginalRecoveryOptions`, `WorkspaceSandboxOriginalRecoveryResult`, `WorkspaceSandboxRecoveryAction`, `WorkspaceSandboxRecoveryCode`, `WorkspaceSandboxRecoveryDecision`, `workspaceSandboxRecoveryDiagnostic`, `workspaceSandboxRecoveryFromError`, `WorkspaceSandboxRecoveryManager`, `workspaceSandboxRecoveryMessage`, `workspaceSandboxRecoveryRecommendedActions`, `WorkspaceSandboxRecoveryRequiredError`, `WorkspaceSandboxRecoveryState`, `WorkspaceSandboxRecoveryStore`, `WorkspaceSandboxSnapshot`, `WorkspaceSandboxSnapshotAssessment`, `WorkspaceSandboxSnapshotAvailability`, `WorkspaceSandboxSnapshotFreshness`, `WorkspaceWarmStep`, `WorkspaceWarmStepOutcome`, `WorkspaceWarmStepResult`, `WriteProfileFilesOptions`, `writeProfileFilesToBox`
 
 [Full API →](api/sandbox.md)
 
@@ -1205,11 +1205,11 @@ _No public exports._
 
 ## `./spend/drizzle`
 
-Source: `src/spend/drizzle.ts` · 9 exports
+Source: `src/spend/drizzle.ts` · 10 exports
 
 Depends on: `sandbox`
 
-`createDrizzleSpendStore`, `listLedgerBillingOwnerIds`, `listWorkspaceSandboxIds`, `loadWorkspaceSpendBudgetConfig`, `SpendBoxLedgerTable`, `SpendBudgetWorkspaceTable`, `SpendDatabase`, `SpendLedgerTableOptions`, `WorkspaceSpendBudgetConfig`
+`createDrizzleSpendStore`, `createSpendBoxLedgerTable`, `listLedgerBillingOwnerIds`, `listWorkspaceSandboxIds`, `loadWorkspaceSpendBudgetConfig`, `SpendBoxLedgerTable`, `SpendBudgetWorkspaceTable`, `SpendDatabase`, `SpendLedgerTableOptions`, `WorkspaceSpendBudgetConfig`
 
 [Full API →](api/spend-drizzle.md)
 
@@ -1235,7 +1235,7 @@ Depends on: `interactions`, `plans`
 
 Source: `src/studio/index.ts` · 68 exports
 
-Depends on: `runtime`, `vault`, `web`
+Depends on: `media`, `runtime`, `tools`, `vault`, `web`
 
 `aspectRatioFromOptions`, `buildGenerationRequestBody`, `curateComposerModels`, `defaultVaultPathFor`, `DeleteGenerations`, `DownloadGenerations`, `failedOptimisticGeneration`, `FALLBACK_VIDEO_MODEL_OPTIONS`, `FetchGenerationsPage`, `Generation`, `GENERATION_TYPES`, `generationAspectRatio`, `generationAssetId`, `generationBatchKey`, `generationError`, `generationMergeKey`, `GenerationPage`, `GenerationPageQuery`, `GenerationRequestFields`, `generationSavedToVault`, `generationsInBatch`, `generationSpecSegments`, `generationStatus`, `GenerationStatus`, `GenerationType`, `generationVaultPath`, `GPT_IMAGE_2_CUSTOM_SIZE`, `GRID_WAVEFORM_BARS`, `hashSeed`, `IMAGE_TO_VIDEO_SIBLINGS`, `imageToVideoSibling`, `isGenerationType`, `isLocalGeneration`, `laneUnavailable`, `latestBatchOf`, `MAX_IMAGE_COUNT`, `MEDIA_TYPE_FILTERS`, `MediaModelCatalogResponse`, `MediaModelOption`, `MediaModelStatus`, `MediaTypeFilter`, `mergeGenerationPages`, `mergeLiveGeneration`, `mergeLoaderAndLive`, `MIN_IMAGE_COUNT`, `ModelOptionMetadata`, `ModelOptionsMetadata`, `ModelOptionValue`, `normalizeImageCount`, `normalizeVaultPath`, `optimisticGeneration`, `optionChoices`, `optionDefault`, `outputPathFor`, `preferredModelId`, `previewWaveformBars`, `reconcileOptionValues`, `relativeTime`, `resolveComposerOptions`, `SaveGenerationsToVault`, `StudioMediaActions`, `supportsCustomImageSize`, `textToVideoSibling`, `userSafeGenerationMessage`, `validateCustomImageSize`, `VaultSaveResult`, `WaveformBar`, `WIDE_WAVEFORM_BARS`
 
@@ -1253,19 +1253,19 @@ Depends on: `runtime`, `studio`, `web-react`
 
 ## `./studio/generated-media`
 
-Source: `src/studio/generated-media/index.ts` · 26 exports
+Source: `src/studio/generated-media/index.ts` · 39 exports
 
-Depends on: `vault`, `web`
+Depends on: `media`, `tools`, `vault`, `web`
 
-`createGeneratedMediaStore`, `DEFAULT_GENERATED_OUTPUT_PATHS`, `DeleteGeneratedMediaResult`, `extensionForGeneratedMimeType`, `GENERATED_MEDIA_MISSING_FILE_METADATA`, `GENERATED_OUTPUT_CONFIG`, `generatedExtensionFromUrl`, `GeneratedMediaAssetTable`, `GeneratedMediaAssetVersionTable`, `GeneratedMediaBucket`, `GeneratedMediaDatabase`, `GeneratedMediaGenerationTable`, `generatedMediaLabel`, `GeneratedMediaStore`, `GeneratedMediaStoreConfig`, `GeneratedMediaTables`, `GeneratedMediaType`, `GeneratedMediaVaultFile`, `generatedMimeTypeFromUrl`, `GeneratedOutputConfig`, `GeneratedOutputType`, `isGeneratedMediaType`, `normalizeGeneratedOutputPath`, `PersistedGeneratedMedia`, `resolveGeneratedVaultPath`, `validateGeneratedMediaSourceUrl`
+`createGeneratedMediaFlows`, `createGeneratedMediaStore`, `DEFAULT_GENERATED_OUTPUT_PATHS`, `DeleteGeneratedMediaResult`, `extensionForGeneratedMimeType`, `GENERATED_MEDIA_INGEST_TIMEOUT_MS`, `GENERATED_MEDIA_MISSING_FILE_METADATA`, `GENERATED_OUTPUT_CONFIG`, `generatedExtensionFromUrl`, `GeneratedMediaAssetTable`, `GeneratedMediaAssetVersionTable`, `GeneratedMediaBucket`, `GeneratedMediaDatabase`, `GeneratedMediaFlows`, `GeneratedMediaFlowsConfig`, `GeneratedMediaGenerationTable`, `GeneratedMediaIngestion`, `generatedMediaLabel`, `GeneratedMediaStore`, `GeneratedMediaStoreConfig`, `GeneratedMediaTables`, `GeneratedMediaType`, `GeneratedMediaVaultFile`, `generatedMimeTypeFromUrl`, `GeneratedOutputConfig`, `GeneratedOutputType`, `isGeneratedMediaType`, `normalizeGeneratedOutputPath`, `PersistedGeneratedMedia`, `PersistedMediaFields`, `PersistedProviderImage`, `PolledGenerationRow`, `ProviderJobMediaType`, `ProviderJobRefresh`, `ProviderMediaJobResponse`, `resolveGeneratedVaultPath`, `SettledProviderJob`, `STALE_PENDING_GENERATION_MS`, `validateGeneratedMediaSourceUrl`
 
 [Full API →](api/studio-generated-media.md)
 
 ## `./teams`
 
-Source: `src/teams/index.ts` · 35 exports
+Source: `src/teams/index.ts` · 37 exports
 
-`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EMAIL_HINT`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInvitationEmail`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
+`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `createThreadAccessCheck`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EMAIL_HINT`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInvitationEmail`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `ThreadAccessOptions`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
 
 [Full API →](api/teams.md)
 
@@ -1561,7 +1561,7 @@ Depends on: `crypto`, `object-store`, `teams`, `tools`, `web-react`
 
 Source: `src/workspace-export/index.ts` · 44 exports
 
-Depends on: `object-store`
+Depends on: `object-store`, `sandbox`
 
 `ArchivableBox`, `createExportEngine`, `createMemoryExportStorage`, `createR2ExportStorage`, `createSecretScanner`, `createWorkspaceExport`, `D1ExportDatabase`, `D1TableCoverage`, `d1WorkspaceTables`, `D1WorkspaceTablesOptions`, `DEFAULT_SANDBOX_EXCLUDE`, `ExportArchiveSource`, `ExportDataClass`, `ExportEngine`, `ExportEngineOptions`, `ExportFile`, `ExportFilesSource`, `ExportJob`, `ExportJsonSource`, `ExportPlan`, `ExportPrincipal`, `ExportProgress`, `ExportRetryLater`, `ExportRow`, `ExportRowsSource`, `ExportSource`, `ExportStatus`, `ExportStorage`, `ExportUnit`, `isCredentialFile`, `isSecretName`, `kvFiles`, `KVFilesNamespace`, `MANIFEST_SCHEMA`, `R2ExportBucket`, `r2Files`, `R2FilesBucket`, `REDACTED`, `sandboxArchive`, `sandboxFiles`, `SecretScanner`, `StoredEntry`, `UnitStatus`, `WorkspaceExportOptions`
 
@@ -1571,7 +1571,7 @@ Depends on: `object-store`
 
 Source: `src/workspace-export/react.tsx` · 5 exports
 
-Depends on: `object-store`
+Depends on: `object-store`, `sandbox`
 
 `useWorkspaceExport`, `UseWorkspaceExportOptions`, `WorkspaceExportPanel`, `WorkspaceExportPanelProps`, `WorkspaceExportState`
 
