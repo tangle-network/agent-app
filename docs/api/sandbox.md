@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-312 exports.
+306 exports.
 
 ### `adaptSandboxStream`
 
@@ -174,14 +174,6 @@ interface BuildSandboxToolFileMountsOptions
 string
 ```
 
-### `COMPUTER_STEP_RECEIPT_TABLE_DDL`
-
-`const` — Paste into a product migration; the store never runs DDL.
-
-```ts
-"CREATE TABLE IF NOT EXISTS computer_step_receipts (\n step_id TEXT PRIMARY KEY,\n state TEXT NOT NULL,\n receipt TEXT…
-```
-
 ### `computerFileContract`
 
 `function` — Appended to the task the box agent receives, so a member's relative path lands under the Vault root.
@@ -220,30 +212,6 @@ interface ComputerStep
 
 ```ts
 interface ComputerStepOptions
-```
-
-### `ComputerStepReceipt`
-
-`interface`
-
-```ts
-interface ComputerStepReceipt
-```
-
-### `ComputerStepReceiptD1Like`
-
-`interface` — The D1 surface the store uses.
-
-```ts
-interface ComputerStepReceiptD1Like
-```
-
-### `ComputerStepReceipts`
-
-`interface`
-
-```ts
-interface ComputerStepReceipts
 ```
 
 ### `ComputerStepRun`
@@ -292,14 +260,6 @@ interface ComputerVaultFile
 
 ```ts
 (options: ComputerStepOptions) => ComputerStep
-```
-
-### `createD1ComputerStepReceipts`
-
-`function` — Receipts in one D1 table, shared by every isolate.
-
-```ts
-(db: ComputerStepReceiptD1Like, options?: { table?: string | undefined; retentionMs?: number | undefined; now?: (() =>…
 ```
 
 ### `createD1PrewarmClaimStore`
@@ -436,14 +396,6 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 (slots: readonly number[], from: number, at: number) => number[]
-```
-
-### `DEFAULT_COMPUTER_STEP_RECEIPT_TABLE`
-
-`const`
-
-```ts
-"computer_step_receipts"
 ```
 
 ### `DEFAULT_ESCALATION_TOOLS`
@@ -1792,10 +1744,10 @@ interface SandboxTransientRetryOptions
 
 ### `saveComputerFiles`
 
-`function` — Save what the step wrote since `before` into the Vault and return its receipt.
+`function` — Save what the step wrote into the Vault and return its receipt.
 
 ```ts
-(input: { box: SandboxInstance; vault: ComputerVault; before: ComputerFileListing; executionId: string; }) => Promise<C…
+(input: { box: SandboxInstance; vault: ComputerVault; since: number | undefined; executionId: string; }) => Promise<Com…
 ```
 
 ### `ScopedTokenResult`
