@@ -60,7 +60,7 @@ beforeAll(async () => {
     '[[durable_objects.bindings]]', 'name = "VAULT_COORDINATOR"', 'class_name = "VaultCoordinatorDO"',
     '[[migrations]]', 'tag = "v1"', 'new_classes = ["VaultCoordinatorDO"]',
   ].join('\n'))
-  execFileSync(process.execPath, [require.resolve('wrangler/bin/wrangler.js'), 'deploy', '--dry-run', '--config', config, '--outdir', bundle],
+  execFileSync(process.execPath, [require.resolve('wrangler'), 'deploy', '--dry-run', '--config', config, '--outdir', bundle],
     { cwd: scratch, stdio: 'pipe' })
   runtime = new Miniflare({
     modules: true, scriptPath: join(bundle, 'sandbox-sync.worker.js'), modulesRoot: bundle,
