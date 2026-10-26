@@ -141,3 +141,23 @@ export async function createMeteredBrowserPage(browser: Browser, options: Browse
   await meterPage(page, meter)
   return { context, page }
 }
+
+// A transient fault on the runner's network (an interface change under WSL or Tailscale) is not the
+// app failing: Creative's release of 95b26f36 passed every functional check and failed one surface
+// check on net::ERR_NETWORK_CHANGED. One retry after such a fault; any other navigation error, or a
+// second fault, still fails the check.
+const TRANSIENT_NAVIGATION = /net::ERR_(NETWORK_CHANGED|NETWORK_IO_SUSPENDED|INTERNET_DISCONNECTED|CONNECTION_RESET|CONNECTION_CLOSED)\b/
+
+/** Navigate a check's page to `url`, retrying once after a transient network fault. */
+export async function gotoRoute(
+  page: { goto(url: string, options: { waitUntil: 'domcontentloaded' }): Promise<unknown> },
+  url: string,
+): Promise<void> {
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+  } catch (error) {
+    if (!TRANSIENT_NAVIGATION.test(error instanceof Error ? error.message : String(error))) throw error
+    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+  }
+}
