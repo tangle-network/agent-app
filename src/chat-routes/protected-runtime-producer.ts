@@ -1,4 +1,4 @@
-import { profileMaterializationAxes, type AgentProfile } from '@tangle-network/agent-interface'
+import type { AgentProfile } from '@tangle-network/agent-interface'
 import { runProtectedRouterTurn, type RouterTurnGrant } from '../runtime/protected-router-turn'
 import type { RouterTurnOptions } from '../runtime/router-turn'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
@@ -25,7 +25,8 @@ const PROTECTED_TURN_AXES: ReadonlySet<string> = new Set([
   'modelMaxTotalOutputTokens', 'modelMetadata',
 ])
 
-function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<string>): Pick<RouterTurnOptions,
+function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<string>,
+  profileMaterializationAxes: typeof import('@tangle-network/agent-interface').profileMaterializationAxes): Pick<RouterTurnOptions,
   'model' | 'systemPrompt' | 'reasoningEffort' | 'maxTokens' | 'maxCompletionTokens'> {
   if (profile.harness && profile.harness !== 'cli-base') throw new Error(`Protected chat runs only the cli-base harness, not ${profile.harness}`)
   if (profile.resources) throw new Error('Protected chat applies prompt text only; run profile resources in the Sandbox lane')
@@ -115,8 +116,10 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
       const emit = (event: unknown) => channelWriter.write(event)
       // Each model call's text, by segment. The answer is the last segment the model wrote.
       const segments: string[] = []
+      // The agent-interface root initializes every schema; only a protected turn needs it, so it loads here.
+      const { profileMaterializationAxes } = await import('@tangle-network/agent-interface')
       execution = runProtectedRouterTurn({
-        ...protectedTurnSettings(profile, tools),
+        ...protectedTurnSettings(profile, tools, profileMaterializationAxes),
         grant: options.grant,
         userMessage: options.prompt,
         history: [...(options.priorMessages ?? [])],

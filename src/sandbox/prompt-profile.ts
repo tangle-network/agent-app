@@ -1,10 +1,6 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
-import {
-  type AgentProfileMcpServer,
-  type AgentProfile,
-  type ReasoningEffort,
-  mergeAgentProfiles,
-} from '@tangle-network/agent-interface'
+import type { AgentProfileMcpServer, AgentProfile, ReasoningEffort } from '@tangle-network/agent-interface'
+import { mergeAgentProfiles } from '@tangle-network/agent-interface/profile'
 import { type Harness, DEFAULT_HARNESS, isHarness, assertHarnessModelCompatible } from '../harness/index'
 import type { SandboxRuntimeConfig } from './configuration'
 import type { StreamSandboxPromptOptions } from './prompt-options'

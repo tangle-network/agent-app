@@ -1,8 +1,4 @@
-import {
-  createProtectedAgentCandidateModelPort,
-  type AgentCandidateModelGrantClient,
-  type AgentCandidateModelPort,
-} from '@tangle-network/agent-runtime/candidate-execution'
+import type { AgentCandidateModelGrantClient, AgentCandidateModelPort } from '@tangle-network/agent-runtime/candidate-execution'
 
 const GATEWAY_ORIGIN = 'https://candidate-router.tangle.tools'
 const CONTROL_ORIGIN = 'https://router.tangle.tools/v1/candidate-model-grants'
@@ -84,14 +80,20 @@ export function createRouterProtectedModelPort(options: RouterProtectedModelPort
       return settlement
     },
   }
-  const port = createProtectedAgentCandidateModelPort({
-    client, resolveModel: (value) => request('resolve', value),
-    gatewayDomain: 'candidate-router.tangle.tools', activationEnvNames: ACTIVATION_NAMES,
-  })
+  // Runtime's candidate execution loads agent-eval and every agent-interface schema, so it loads on a protected
+  // turn's first call instead of at Worker startup.
+  const port = import('@tangle-network/agent-runtime/candidate-execution').then(({ createProtectedAgentCandidateModelPort }) =>
+    createProtectedAgentCandidateModelPort({
+      client, resolveModel: (value) => request('resolve', value),
+      gatewayDomain: 'candidate-router.tangle.tools', activationEnvNames: ACTIVATION_NAMES,
+    }))
+  void port.catch(() => undefined)
   return {
-    ...port,
+    resolve: async (value) => (await port).resolve(value),
+    reserveGrant: async (value) => (await port).reserveGrant(value),
+    activateGrant: async (value) => (await port).activateGrant(value),
     settleGrant: async (value) => {
-      const settlement = await port.settleGrant(value)
+      const settlement = await (await port).settleGrant(value)
       const receipt = receipts.get(value.preparationId)
       if (receipt) {
         try {

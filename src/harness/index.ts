@@ -10,16 +10,16 @@
  * owns session selection; the consumer owns storage and deployment policy.
  */
 
+import type { HarnessType } from '@tangle-network/agent-interface'
+import { harnessTypeSchema } from '@tangle-network/agent-interface/harness'
 import {
   harnessProviders,
   harnessSupportsModel,
-  harnessTypeSchema,
   modelProvider,
   preferredHarnessForModel,
   snapHarnessToModel as aiSnapHarnessToModel,
   snapModelToHarness as aiSnapModelToHarness,
-  type HarnessType,
-} from '@tangle-network/agent-interface'
+} from '@tangle-network/agent-interface/harness-capabilities'
 import {
   selectSessionHarness,
   type SelectionAvailability,

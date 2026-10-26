@@ -1,7 +1,6 @@
-import {
-  agentProfileSchema, defineInlineResource, mergeAgentProfiles,
-  type AgentProfile,
-} from '@tangle-network/agent-interface'
+import type { AgentProfile } from '@tangle-network/agent-interface'
+import { defineInlineResource, mergeAgentProfiles } from '@tangle-network/agent-interface/profile'
+import { agentProfileSchema } from '@tangle-network/agent-interface/profile-schema'
 import {
   buildTangleRouterSearchProfile, fetchTangleRouterSearchConfig,
   type BackendConfig, type LineVoiceOptions,

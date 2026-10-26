@@ -9,12 +9,12 @@
 // (`interaction.cancel`), or the broker times out. A pending interaction is
 // "waiting on the user", not "model working".
 
-import {
-  InteractionRequestSchema,
-  type InteractionData,
-  type InteractionField,
-  type InteractionOutcome,
-  type InteractionRequest,
+import { InteractionRequestSchema } from '@tangle-network/agent-interface/interaction'
+import type {
+  InteractionData,
+  InteractionField,
+  InteractionOutcome,
+  InteractionRequest,
 } from '@tangle-network/agent-interface'
 
 export type { InteractionData, InteractionOutcome, InteractionRequest }
