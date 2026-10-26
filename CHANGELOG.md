@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.32
+
+- fix(release): isolate pnpm action bootstrap store (#1335)
+
+## 0.63.31
+
+- End the receipt DDL with a semicolon and exclude the table from exports by default (#1336)
+- feat: own the server pieces agent apps copied (#1334)
+
 ## 0.63.30
 
 - feat(sandbox): own the Router-first lane's computer step, receipts and Vault copy for every app (#1332)

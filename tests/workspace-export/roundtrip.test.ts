@@ -12,6 +12,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { COMPUTER_STEP_RECEIPT_TABLE_DDL } from '../../src/sandbox/computer-receipts'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   createExportEngine,
@@ -55,6 +56,8 @@ function seed(): DatabaseSync {
     CREATE TABLE eval_global (id INTEGER PRIMARY KEY, score REAL);
     CREATE TABLE _migrations_applied (name TEXT PRIMARY KEY, applied_at INTEGER);
   `)
+  // As `wrangler d1 migrations apply` runs a migration: the file, then its own INSERT in one batch.
+  db.exec(`${COMPUTER_STEP_RECEIPT_TABLE_DDL}\nINSERT INTO _migrations_applied VALUES ('receipts', 0)`)
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(WS, 'Inn', JSON.stringify({ published: { remoteBearerToken: 'bearer-abcdefgh' }, theme: 'dark' }))
   db.prepare('INSERT INTO workspace VALUES (?, ?, ?)').run(OTHER, 'Other', '{}')
   db.prepare('INSERT INTO workspace_member (workspace_id, user_id, role, invite_token) VALUES (?, ?, ?, ?)').run(WS, 'u-owner', 'owner', 'invite-secret-1234')
@@ -198,6 +201,7 @@ describe('workspace export round trip', () => {
     expect(sources.has('db.session')).toBe(false)
     const coverage = new Map(manifest.notes.database.map((c: { table: string; status: string }) => [c.table, c.status]))
     expect(coverage.get('session')).toBe('excluded')
+    expect(coverage.get('computer_step_receipts')).toBe('excluded')
     expect(coverage.get('eval_global')).toBe('unscoped')
     expect(coverage.has('_migrations_applied')).toBe(false)
     const lines = readFileSync(join(out, 'data/db.message.ndjson'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))

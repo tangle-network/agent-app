@@ -210,6 +210,48 @@ export interface SharedBillingState<Plan extends string> {
   overageAllowed: boolean
 }
 
+/** Reads one platform key's plan and balance for {@link readSharedBillingState}. */
+export interface SharedBillingReads<Plan extends string> {
+  getPlan(apiKey: string): Promise<Plan>
+  getBalance(apiKey: string): Promise<PlatformBalanceInfo>
+  /** Plan → limits map (the product's pricing). */
+  planLimits: Record<Plan, PlanLimit>
+  /** The plan a key-less user falls to. */
+  freePlan: Plan
+}
+
+/**
+ * The plan, limits and balance behind one platform key. No key means the user
+ * is not linked: the free plan with zero balance, and no read is issued with
+ * an empty key.
+ */
+export async function readSharedBillingState<Plan extends string>(
+  apiKey: string | null | undefined,
+  reads: SharedBillingReads<Plan>,
+): Promise<Omit<SharedBillingState<Plan>, 'platformUserId'>> {
+  if (!apiKey) {
+    const limits = reads.planLimits[reads.freePlan]
+    return {
+      plan: reads.freePlan,
+      monthlyBalanceUsd: limits.monthlyBalanceUsd,
+      remainingBalanceUsd: 0,
+      lifetimeSpentUsd: 0,
+      concurrency: limits.concurrency,
+      overageAllowed: limits.overageAllowed,
+    }
+  }
+  const [plan, balance] = await Promise.all([reads.getPlan(apiKey), reads.getBalance(apiKey)])
+  const limits = reads.planLimits[plan]
+  return {
+    plan,
+    monthlyBalanceUsd: limits.monthlyBalanceUsd,
+    remainingBalanceUsd: balance.balance,
+    lifetimeSpentUsd: balance.lifetimeSpent,
+    concurrency: limits.concurrency,
+    overageAllowed: limits.overageAllowed,
+  }
+}
+
 /** Define configuration options for managing platform balance based on billing plans */
 export interface PlatformBalanceManagerOptions<Plan extends string> {
   client: PlatformBillingClient<Plan>
@@ -246,30 +288,14 @@ export function createPlatformBalanceManager<Plan extends string>(
   const getState: PlatformBalanceManager<Plan>['getState'] = async (userId) => {
     const identity = await client.resolveIdentity(userId)
     // No SSO account, or linked without a platform key: unlinked free tier with
-    // zero balance. Reads require the user's key — never call them empty.
-    if (!identity || !identity.apiKey) {
-      const limits = planLimits[freePlan]
-      return {
-        platformUserId: identity?.platformUserId ?? null,
-        plan: freePlan,
-        monthlyBalanceUsd: limits.monthlyBalanceUsd,
-        remainingBalanceUsd: 0,
-        lifetimeSpentUsd: 0,
-        concurrency: limits.concurrency,
-        overageAllowed: limits.overageAllowed,
-      }
-    }
-    const [plan, balance] = await Promise.all([client.getPlan(identity.apiKey), client.getBalance(identity.apiKey)])
-    const limits = planLimits[plan]
-    return {
-      platformUserId: identity.platformUserId,
-      plan,
-      monthlyBalanceUsd: limits.monthlyBalanceUsd,
-      remainingBalanceUsd: balance.balance,
-      lifetimeSpentUsd: balance.lifetimeSpent,
-      concurrency: limits.concurrency,
-      overageAllowed: limits.overageAllowed,
-    }
+    // zero balance.
+    const state = await readSharedBillingState(identity?.apiKey, {
+      getPlan: (apiKey) => client.getPlan(apiKey),
+      getBalance: (apiKey) => client.getBalance(apiKey),
+      planLimits,
+      freePlan,
+    })
+    return { platformUserId: identity?.platformUserId ?? null, ...state }
   }
 
   const canStartBillableTurn: PlatformBalanceManager<Plan>['canStartBillableTurn'] = async (userId) => {
