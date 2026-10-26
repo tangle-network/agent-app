@@ -43,8 +43,8 @@ export default {
     'playground/**',
     'tests/theme/fixtures/**',
   ],
-  // The journeys kit shells out to ffmpeg and ffprobe for its videos; they are host tools, not dependencies.
-  ignoreBinaries: ['tsc', 'ffmpeg', 'ffprobe'],
+  // External compiler, media and TLS fixture tools.
+  ignoreBinaries: ['tsc', 'ffmpeg', 'ffprobe', 'openssl'],
   ignoreDependencies: [
     '@anthropic-ai/sdk',
     '@tangle-network/agent-gateway',
