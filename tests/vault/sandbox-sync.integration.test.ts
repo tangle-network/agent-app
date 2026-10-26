@@ -411,14 +411,10 @@ it('runs the product hooks: text writer, after-write, excluded paths, provenance
 }, 60_000)
 
 it('copies within its budget and resumes on the next call, leaving identical files in place', async () => {
-  const paths = Array.from({ length: 101 }, (_, index) => `library/doc-${String(index).padStart(3, '0')}.md`)
-  for (let start = 0; start < paths.length; start += 90) {
-    const result = await vault.commitVaultMutation({
-      workspaceId, operationId: `seed-${start}`, writer: { kind: 'system', id: 'test-seed' },
-      changes: paths.slice(start, start + 90).map(path => ({ path, kind: 'put' as const, content: `${path}\n`, expectedRevision: null })),
-    })
-    expect(result.status).toBe('applied')
-  }
+  // Ten 300,000-character files: one read batch takes eight, which spends the budget.
+  const paths = Array.from({ length: 10 }, (_, index) => `library/doc-${String(index).padStart(2, '0')}.md`)
+  const content = (path: string) => `${path}\n${'x'.repeat(300_000)}`
+  for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, content(path))
   const textWrites: string[] = []
   const { box, root, sync } = realBox('incarnation-1', { config: {
     hydrationBudgetChars: 1,
@@ -433,22 +429,19 @@ it('copies within its budget and resumes on the next call, leaving identical fil
   } })
   // A box restored from a snapshot already holds this file's exact bytes.
   mkdirSync(join(root, 'library'), { recursive: true })
-  writeFileSync(join(root, 'library/doc-000.md'), 'library/doc-000.md\n')
+  writeFileSync(join(root, paths[0]!), content(paths[0]!))
 
-  const calls = []
-  for (let call = 0; call < 5; call += 1) {
-    const result = await sync.hydrate(box, workspaceId)
-    if (!result.succeeded) throw result.error
-    calls.push(result.value)
-    if (!result.value.deferred) break
-  }
-  // The first call spends its budget on one batch and leaves the rest, by name, for the next.
-  expect(calls.length).toBeGreaterThan(1)
-  expect(calls[0]!.deferred?.pendingPaths.length).toBeGreaterThan(0)
-  expect(calls.at(-1)!.deferred).toBeNull()
-  for (const path of paths) expect(readFileSync(join(root, path), 'utf8')).toBe(`${path}\n`)
-  expect(textWrites).not.toContain(join(root, 'library/doc-000.md'))
-  expect(new Set(textWrites).size).toBe(100)
+  const first = await sync.hydrate(box, workspaceId)
+  expect(first).toEqual({ succeeded: true, value: expect.objectContaining({
+    written: 7, deferred: { pendingPaths: paths.slice(8), morePages: false },
+  }) })
+  expect(textWrites).not.toContain(join(root, paths[0]!))
+  expect(existsSync(join(root, paths[8]!))).toBe(false)
+
+  const second = await sync.hydrate(box, workspaceId)
+  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 2, deferred: null }) })
+  for (const path of paths) expect(readFileSync(join(root, path), 'utf8')).toBe(content(path))
+  expect(new Set(textWrites).size).toBe(9)
   expect(Object.keys((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files ?? {}).sort()).toEqual(paths)
 }, 120_000)
 
