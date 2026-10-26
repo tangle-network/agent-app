@@ -292,21 +292,22 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
       git(['commit', '--quiet', '-m', 'real cleanup refusal'], repo)
       const cache = temp('signoff-cleanup-cache-')
       const json = join(temp('signoff-cleanup-report-'), 'report.json')
-      const result = await runCli([repo, '--source', 'head', '--phase', 'suites',
+      const result = await runCli([repo, '--source', 'head',
         '--cache-dir', cache, '--json', json, ...(quiet ? ['--quiet'] : [])])
       expect(result.status, result.stderr).toBe(1)
       const report = JSON.parse(readFileSync(json, 'utf8')) as SignoffReport
       expect(report.ok).toBe(false)
-      expect(report.steps).toHaveLength(1)
-      expect(report.steps[0]?.status).toBe(primaryExit ? 'failed' : 'passed')
-      expect(report.steps[0]?.attempts[0]?.exitCode).toBe(primaryExit)
-      expect(report.steps[0]?.attempts[0]?.output).toContain('PRIMARY-OUTPUT-RETAINED')
+      const primary = report.steps.find(step => step.name === 'primary')!
+      expect(primary.status).toBe(primaryExit ? 'failed' : 'passed')
+      expect(primary.attempts[0]?.exitCode).toBe(primaryExit)
+      expect(primary.attempts[0]?.output).toContain('PRIMARY-OUTPUT-RETAINED')
       expect(report.cleanupErrors?.join('\n')).toMatch(/remove workspace:.*locked/s)
+      expect(() => proofFromSignoffReport({ report, repo: 'agent-app', declaredRequired: [] })).toThrow(/cleanup/i)
       expect(report.workspaceRetained).toBe(true)
       expect(existsSync(join(report.workspace, '.git'))).toBe(true)
       expect(readdirSync(join(cache, 'active'))).toEqual([])
       expect(result.stdout).toBe(`${quiet ? formatSignoffLine(report) : formatSignoffReport(report)}\n`)
-      expect(result.stdout).not.toMatch(/SIGN-OFF PASSED|signoff SUITES PASS/)
+      expect(result.stdout).not.toMatch(/SIGN-OFF PASSED|signoff PASS/)
       if (!quiet) {
         expect(result.stdout).toContain('PRIMARY-OUTPUT-RETAINED')
         expect(result.stdout).toContain('cleanup FAILED')

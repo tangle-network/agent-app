@@ -62,13 +62,13 @@ function seedsFromReport(report: SignoffReport): Record<string, string | number>
 
 export function proofFromSignoffReport(input: ProofFromReportInput): SignoffProof {
   const { report } = input
+  if (report.cleanupErrors?.length) throw new Error('signoff: cleanup failures cannot issue a sign-off proof')
   if (report.phase !== undefined && report.phase !== 'all') {
     throw new Error(`signoff: partial phase ${report.phase} cannot issue a full sign-off proof`)
   }
   const repoDir = input.repoDir ?? report.repo.root
 
-  // HEAD moving during a run makes every later claim ambiguous — the checks ran
-  // over one commit and the proof would name another. Refused, not reconciled.
+  // A proof must name the commit that was checked.
   const facts = readCommitFacts(repoDir, 'HEAD')
   if (facts.commit !== report.repo.head) {
     throw new Error(`HEAD moved during the sign-off: the run verified ${report.repo.head}, ${repoDir} is now at ${facts.commit}`)
