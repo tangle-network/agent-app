@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.55
+
+- Qualify Sandbox 0.68.6 and align generated app cohorts (#1360)
+
 ## 0.63.54
 
 - chore(deps): adopt agent-runtime 0.350.2 and sandbox 0.69.2 (#1366)
