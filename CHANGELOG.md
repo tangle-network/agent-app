@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.43
+
+- Fail an autonomous computer step when its box agent asks through the runtime (#1357)
+
 ## 0.63.42
 
 - Pin the adopt-stack caller to an agent-eval commit so publish runs again (#1356)
