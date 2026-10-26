@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.49
+
+- fix(chat): retain protected Router failures as typed notices (#1362)
+
 ## 0.63.48
 
 - feat(sandbox): collectSandboxPromptText takes an observe callback for raw events (#1361)
