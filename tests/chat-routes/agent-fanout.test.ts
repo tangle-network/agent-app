@@ -121,3 +121,50 @@ describe('a turn addressed to agents', () => {
     } finally { h.close() }
   })
 })
+
+describe('mentioned agents answer at the same time', () => {
+  it('runs every responder at once and still presents them in the order typed', async () => {
+    const tables = createChatTables()
+    const database = openDatabase([tables.threads, tables.messages])
+    const store = createChatStore(database as unknown as ChatDatabase, tables)
+    const started: Record<string, number> = {}
+    const finished: Record<string, number> = {}
+    const routes = createChatTurnRoutes({
+      projectId: 'agent-parallel', store: store as unknown as ChatTurnMessageStore,
+      turnStore: createMemoryTurnEventStore(),
+      authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'user', context: undefined }),
+      agents: { resolve: async ({ mentions }) => ROSTER.filter((agent) => mentions.some((m) => m.agentId === agent.id)) },
+      produce: (args) => {
+        const id = args.agent!.id
+        started[id] = performance.now()
+        const text = `${args.agent!.name} answers.`
+        return {
+          stream: (async function* () {
+            // Each responder takes 200 ms; in sequence that is 400 ms, at once it is about 200 ms.
+            await new Promise((resolve) => setTimeout(resolve, 200))
+            finished[id] = performance.now()
+            yield { type: 'text' as const, text }
+          })(),
+          finalText: () => text,
+        }
+      },
+    })
+    try {
+      const thread = await store.createThread({ workspaceId: 'workspace', title: 'Parallel' })
+      const t0 = performance.now()
+      const { response, text } = await turn(routes, thread.id, {
+        content: '@writer @research-lead go', mentions: [mention(ROSTER[1]!), mention(ROSTER[0]!)],
+      })
+      const wall = performance.now() - t0
+      expect(response.status).toBe(200)
+      // The second responder started before the first finished.
+      expect(started.ap_research).toBeLessThan(finished.ap_writer)
+      expect(wall).toBeLessThan(380)
+      const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
+        .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
+      expect(events.filter((e) => e.type === 'speaker').map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
+      const assistant = (await store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
+      expect(assistant[0]!.content).toBe('Writer answers.\n\nResearch Lead answers.')
+    } finally { database.$client.close() }
+  })
+})

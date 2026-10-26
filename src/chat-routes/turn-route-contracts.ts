@@ -270,9 +270,10 @@ export interface ChatTurnAgentsOptions<TContext> {
 export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
   /** The agent this producer answers as, when the turn was addressed to one
    *  or more agents by mention. The route calls `produce` once per responder,
-   *  one after another in mention order, and persists their answers as one
-   *  assistant row with a speaker part before each. Absent → the thread's own
-   *  agent answers, as before. */
+   *  all at once, each with the same thread history and none seeing another's
+   *  answer, and persists their answers as one assistant row with a speaker
+   *  part before each, in mention order. Absent → the thread's own agent
+   *  answers, as before. */
   agent?: ChatTurnAgentTarget
   /** Every responder of this turn, in mention order. */
   agents?: ChatTurnAgentTarget[]
