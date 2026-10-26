@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
-export type RuntimeEvent = { type: string; data: Record<string, unknown> }
+type RuntimeEvent = { type: string; data: Record<string, unknown> }
 
 export interface RuntimeRun {
   executionId: string
