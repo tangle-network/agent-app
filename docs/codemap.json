@@ -3245,7 +3245,7 @@
           "name": "createProtectedRuntimeChatProducer",
           "kind": "function",
           "signature": "(options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer",
-          "doc": "Run a profile as one Router turn under a protected model grant (`runProtectedRouterTurn`), projected through the shared chat projection."
+          "doc": "Project one protected Router turn, publishing usage only from its settled grant."
         },
         {
           "name": "createRouterTurnProducer",
