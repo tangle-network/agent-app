@@ -805,9 +805,9 @@
     "@tangle-network/agent-runtime": "0.350.2",
     "@tangle-network/brand": "1.27.1",
     "@tangle-network/browser-agent-driver": "0.37.0",
-    "@tangle-network/hub-sdk": "0.33.3",
-    "@tangle-network/sandbox": "0.69.10",
-    "@tangle-network/sandbox-ui": "0.139.0",
+    "@tangle-network/hub-sdk": "0.33.4",
+    "@tangle-network/sandbox": "0.69.11",
+    "@tangle-network/sandbox-ui": "0.139.1",
     "@tangle-network/tcloud": "0.8.5",
     "@tangle-network/ui": "11.44.1",
     "@testing-library/dom": "^10.4.2",
@@ -1008,7 +1008,7 @@
     }
   },
   "dependencies": {
-    "@tangle-network/charts": "0.21.11",
+    "@tangle-network/charts": "0.21.13",
     "proper-lockfile": "4.1.2"
   }
 }
