@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.45
+
+- vault/store: one box↔Vault sync engine, with warm-path skip, over the shared Vault store (#1351)
+
 ## 0.63.44
 
 - signoff: retry a surface check's navigation once after a transient network fault (#1358)
