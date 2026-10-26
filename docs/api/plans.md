@@ -4,7 +4,7 @@
 
 Source: `src/plans/index.ts`
 
-19 exports.
+22 exports.
 
 ### `canTransitionPlanStatus`
 
@@ -70,6 +70,14 @@ interface DurablePlanLike
 (body: Record<string, unknown>) => PlanDecisionBody
 ```
 
+### `parsePlanLookupQuery`
+
+`function` — Validate a current-plan lookup (`?workspaceId&threadId[&planId&revision]`).
+
+```ts
+(url: URL) => PlanLookupQuery
+```
+
 ### `parsePlanSubmittedEvent`
 
 `function` — Parses both direct sandbox events (`data.plan`) and session envelopes (`properties.plan`).
@@ -118,12 +126,28 @@ type PlanDecisionBody
 type PlanDecisionOutcome
 ```
 
+### `planDecisionRefusalResponse`
+
+`function` — The response for a sandbox refusal of a plan decision, or null when the refusal is not one the decision flow answers.
+
+```ts
+(error: { status?: number | undefined; code?: string | undefined; message: string; }, options: { reconcile: () => Promi…
+```
+
 ### `planFollowUpTurnId`
 
 `function` — The follow-up turn the Sandbox platform enqueues when one plan revision is decided.
 
 ```ts
 (planId: string, revision: number, outcome: "approved" | "rejected") => string
+```
+
+### `PlanLookupQuery`
+
+`type`
+
+```ts
+type PlanLookupQuery
 ```
 
 ### `planPartKey`

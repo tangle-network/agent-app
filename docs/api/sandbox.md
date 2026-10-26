@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-309 exports.
+312 exports.
 
 ### `adaptSandboxStream`
 
@@ -1102,6 +1102,14 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 (box: SandboxExecChannel, absolutePath: string, expectedSize: number, options?: SandboxExecOptions | undefined) => Prom…
 ```
 
+### `readSandboxModelPolicy`
+
+`function` — Platform's model policy for a box minted under the payer of `apiKey`, cached per key for ten minutes.
+
+```ts
+(apiKey: string, options: { platformUrl: string | undefined; signal?: AbortSignal | undefined; }) => Promise<SandboxMod…
+```
+
 ### `readSandboxRouterModels`
 
 `function` — Platform's model policy for a box minted under the payer of `apiKey`: the allowed models, or `null` for any.
@@ -1430,12 +1438,28 @@ type SandboxFileSizeOutcome
 class SandboxFilesystemNotReadyError
 ```
 
+### `SandboxModelPolicy`
+
+`type` — The models a workspace box may call.
+
+```ts
+type SandboxModelPolicy
+```
+
 ### `SandboxModelResolutionError`
 
 `class` — Thrown by {@link requireTransportableModel} when a model that was EXPLICITLY requested via a per-turn `{ model }` override cannot be transported to the sandbox platform.
 
 ```ts
 class SandboxModelResolutionError
+```
+
+### `sandboxModelWithinPolicy`
+
+`function` — The first preferred model the policy allows, else the policy's own first model.
+
+```ts
+(preferred: readonly string[], allowedModels: readonly string[] | null) => string | undefined
 ```
 
 ### `SandboxPermissionLevel`
