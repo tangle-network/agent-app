@@ -5,6 +5,7 @@ import { Sandbox } from '@tangle-network/sandbox'
 import { expect, it } from 'vitest'
 import type { LoopMessage } from '../../src/runtime/loop'
 import { createHybridTurnProducer } from '../../src/chat-routes/hybrid-producer'
+import { sandboxRunFailureDetail } from '../../src/sandbox/sandbox-run-tool'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
@@ -27,6 +28,7 @@ async function close(server: Server) {
 it.each([
   { mode: 'plain', code: undefined },
   { mode: 'provision', code: 'sandbox_unavailable' },
+  { mode: 'provision-private', code: 'sandbox_unavailable' },
   { mode: 'execution', code: 'sandbox_unconfirmed' },
   { mode: 'runner-timeout', code: 'sandbox_unconfirmed' },
   { mode: 'acquire-timeout', code: 'sandbox_unavailable' },
@@ -61,7 +63,7 @@ it.each([
       const json = (value: unknown, status = 200) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value))
       if (path === '/v1/sandboxes/computer') {
         boxReads++
-        if (mode === 'provision') return json({ code: 'COMPUTER_UNAVAILABLE', message: 'Fixture placement refused' }, 409)
+        if (mode === 'provision' || mode === 'provision-private') return json({ code: 'COMPUTER_UNAVAILABLE', message: 'Fixture placement refused' }, 409)
         const box = { id: 'computer', status: 'running', filesystemIncarnationId: 'hybrid-fixture',
           filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
           connection: { runtimeUrl: `${baseUrl}/v1/sandboxes/computer/runtime` } }
@@ -101,6 +103,7 @@ it.each([
   await store.createThread({ id: 'thread', workspaceId: 'workspace' })
   const pending: Promise<unknown>[] = []
   const completions: string[] = []
+  const privateCauses: string[] = []
   let draft: Array<Record<string, unknown>> = []
   const routes = createChatTurnRoutes({
     projectId: 'hybrid-fallback', store, turnStore: createD1TurnEventStore(d1), turnTrace: false,
@@ -115,6 +118,9 @@ it.each([
           { role: 'user', content: 'Help me understand the document.' }], hops: 1, text: '' } } : {}),
         speculateOn: 'A question', box: {
           ...(['runner-timeout', 'acquire-timeout'].includes(mode) ? { timeoutMs: 1_000 } : {}),
+          // A product that keeps private platform diagnostics off the transcript records them itself.
+          ...(mode === 'provision-private' ? { failureDetail: () => undefined,
+            onFailure: (error: Parameters<typeof sandboxRunFailureDetail>[0]) => { privateCauses.push(sandboxRunFailureDetail(error)) } } : {}),
           acquire: async () => {
             const box = await client.get('computer')
             if (!box) throw new Error('Computer absent')
@@ -154,6 +160,11 @@ it.each([
       // The cause is kept with the transcript, redacted, not only in a log line the Worker does not keep.
       const detail = String(warnings[0]!.detail)
       if (mode === 'provision') expect(detail).toContain('Fixture placement refused')
+      if (mode === 'provision-private') {
+        expect(warnings[0]).not.toHaveProperty('detail')
+        expect(wire).not.toContain('Fixture placement refused')
+        expect(privateCauses.join('\n')).toContain('Fixture placement refused')
+      }
       if (mode === 'execution') expect(detail).toContain('Fixture execution refused')
       if (mode === 'empty') expect(detail).toContain('The sandbox finished without an answer.')
       expect(detail).not.toContain('fixture-secret-token')
@@ -163,7 +174,7 @@ it.each([
       expect(messages.some(message => message.role === 'tool' && message.content.includes(code))).toBe(true)
     }
     expect(boxReads > 0).toBe(mode !== 'plain')
-    expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision' && mode !== 'acquire-timeout')
+    expect(executions > 0).toBe(mode !== 'plain' && mode !== 'provision' && mode !== 'provision-private' && mode !== 'acquire-timeout')
     if (executions) {
       const expectedCallIds = collisionHistory ? ['sandbox_run-0_']
         : mode === 'anonymous-repeat' ? ['sandbox_run-0', 'sandbox_run-1']
