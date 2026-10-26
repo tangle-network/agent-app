@@ -371,7 +371,7 @@ type AttachmentFileResult
 `function` — All required fields answered → the respond payload; else null (not submittable yet).
 
 ```ts
-(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `buildMentionPromptBlock`
@@ -731,7 +731,7 @@ interface CommandPaletteProps
 `function` — Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings).
 
 ```ts
-(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `composerAnswerDeliveries`
@@ -1395,7 +1395,7 @@ type FetchSessionPage
 `function` — Determine if a chat interaction field allows free text input
 
 ```ts
-(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `fieldAnswer`
@@ -1403,7 +1403,7 @@ type FetchSessionPage
 `function` — The submitted value for one field, or null when it has no answer yet.
 
 ```ts
-(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `fieldPickerTriggerClass`
@@ -1427,7 +1427,7 @@ type FieldValues
 `function` — Converts acknowledged, persisted answers back into the local field state consumed by the shared cards.
 
 ```ts
-(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `FileIndexReadyResponse`
@@ -1483,7 +1483,7 @@ interface FileMention
 `function` — The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null.
 
 ```ts
-(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `formatActivityCost`
@@ -1611,7 +1611,7 @@ interface HarnessPickerProps
 `function` — Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered.
 
 ```ts
-(fields: ({ name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined;…
+(fields: ({ type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…
 ```
 
 ### `hydrateChatInteractions`
@@ -2219,7 +2219,7 @@ interface MessageAttachmentsProps
 `function` — What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button.
 
 ```ts
-(field: { name: string; label: string; type: "text"; required?: boolean | undefined; multiline?: boolean | undefined; p…
+(field: { type: "text"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…
 ```
 
 ### `MissionActivityLane`

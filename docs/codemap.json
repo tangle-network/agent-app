@@ -9672,7 +9672,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -9714,7 +9714,7 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
@@ -28435,7 +28435,7 @@
         {
           "name": "buildAnswerData",
           "kind": "function",
-          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "All required fields answered → the respond payload; else null (not submittable yet)."
         },
         {
@@ -28705,7 +28705,7 @@
         {
           "name": "composerAnswerData",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Shapes composer text into the respond payload for the routed field (select answers are string arrays on the wire; text answers are strings)."
         },
         {
@@ -29203,13 +29203,13 @@
         {
           "name": "fieldAcceptsFreeText",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "Determine if a chat interaction field allows free text input"
         },
         {
           "name": "fieldAnswer",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "The submitted value for one field, or null when it has no answer yet."
         },
         {
@@ -29227,7 +29227,7 @@
         {
           "name": "fieldValuesFromAnswers",
           "kind": "function",
-          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "Converts acknowledged, persisted answers back into the local field state consumed by the shared cards."
         },
         {
@@ -29269,7 +29269,7 @@
         {
           "name": "firstUnansweredRequiredField",
           "kind": "function",
-          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "The first required field still without an answer, or null when every required field has one: the reason `buildAnswerData` returned null."
         },
         {
@@ -29365,7 +29365,7 @@
         {
           "name": "hasSecretField",
           "kind": "function",
-          "signature": "(fields: ({ name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined;…",
+          "signature": "(fields: ({ type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefine…",
           "doc": "Secrets must never leave the sidecar answer channel for the visible chat transcript, so a secret-bearing ask cannot be late-answered."
         },
         {
@@ -29821,7 +29821,7 @@
         {
           "name": "missingAnswerHint",
           "kind": "function",
-          "signature": "(field: { name: string; label: string; type: \"text\"; required?: boolean | undefined; multiline?: boolean | undefined; p…",
+          "signature": "(field: { type: \"text\"; name: string; label: string; multiline?: boolean | undefined; placeholder?: string | undefined;…",
           "doc": "What the reader still has to do before the card's action (`verb`: submit, send) is available, in plain words, for the line beside the disabled button."
         },
         {
