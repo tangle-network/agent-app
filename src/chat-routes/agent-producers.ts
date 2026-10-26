@@ -70,7 +70,9 @@ export async function composeAgentProducers<TContext, TResource>(
     const slot = slots[index]!
     void (async () => {
       try {
-        const producer = await produce({ ...args, agent })
+        // Each responder runs under its own execution id, so two native sessions
+        // started for one turn never share a key; the route keeps the turn's.
+        const producer = await produce({ ...args, agent, executionId: `${args.executionId}-${index + 1}` })
         producers[index] = producer
         if (producer.cleanup) cleanups.push(producer.cleanup)
         for await (const event of producer.stream) {
