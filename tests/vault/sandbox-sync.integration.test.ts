@@ -6,7 +6,7 @@
  * so that removing the mechanism it names makes it fail.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -46,7 +46,7 @@ const codec: VaultFrontmatterCodec = {
   },
 }
 
-const scratch = mkdtempSync(join(tmpdir(), 'agent-app-vault-sync-'))
+const scratch = realpathSync(mkdtempSync(join(tmpdir(), 'agent-app-vault-sync-')))
 let runtime: Runtime
 let vault: ReturnType<typeof createVaultStore<VaultCoordinatorNamespace>>
 let workspace = 0
@@ -91,6 +91,7 @@ beforeEach(() => {
 function realBox(incarnation = 'incarnation-1', options: {
   rootName?: string
   config?: Partial<SandboxVaultSyncConfig>
+  path?: string
   /** The box refuses these uploads for their size, as the sandbox file API does with a 413. */
   tooLarge?: (path: string) => boolean
 } = {}) {
@@ -123,7 +124,10 @@ function realBox(incarnation = 'incarnation-1', options: {
       },
     },
     exec: async (command: string) => {
-      const result = spawnSync('bash', ['-c', command], { encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 })
+      const result = spawnSync('bash', ['-c', command], {
+        encoding: 'utf8', maxBuffer: 512 * 1024 * 1024,
+        env: options.path ? { ...process.env, PATH: options.path } : process.env,
+      })
       return { exitCode: result.status ?? 1, stdout: result.stdout, stderr: result.stderr }
     },
     read: async (path: string) => {
@@ -417,7 +421,11 @@ it('copies within its budget and resumes on the next call, leaving identical fil
   const content = (path: string) => `${path}\n${'x'.repeat(300_000)}`
   for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, content(path))
   const textWrites: string[] = []
-  const { box, root, sync } = realBox('incarnation-1', { config: {
+  const shims = join(scratch, 'no-realpath')
+  mkdirSync(shims, { recursive: true })
+  writeFileSync(join(shims, 'realpath'), '#!/bin/sh\nexit 1\n')
+  chmodSync(join(shims, 'realpath'), 0o755)
+  const { box, root, sync } = realBox('incarnation-1', { path: `${shims}:${process.env.PATH}`, config: {
     skipFilesAlreadyOnBox: true,
     writeText: async (_box, files) => {
       for (const file of files) {
