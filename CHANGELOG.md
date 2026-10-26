@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.56
+
+- Call a preflight probe's fetch as a plain function (#1367)
+
 ## 0.63.55
 
 - Qualify Sandbox 0.68.6 and align generated app cohorts (#1360)
