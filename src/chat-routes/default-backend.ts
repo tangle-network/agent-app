@@ -14,7 +14,6 @@ import type { ChatTurnProduceArgs, ChatTurnHybridConfiguration } from './turn-ro
 import type { RouterTurnTool } from '../runtime/router-turn'
 import type { RouterTurnKey } from './router-producer'
 import type { ComputerVault } from '../sandbox/computer-files'
-import type { ComputerStepReceipts } from '../sandbox/computer-receipts'
 import type { Outcome } from '../sandbox/outcome'
 
 /** Worker bindings are explicit; no ambient deployment credentials replace product policy. */
@@ -47,11 +46,10 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
   funding?(args: ChatTurnProduceArgs<TContext, TResource>): RouterTurnKey | Promise<RouterTurnKey>
   /** The product's in-process tools for the Router model; `sandbox_run` is added after them. */
   tools?(args: ChatTurnProduceArgs<TContext, TResource>): RouterTurnTool[] | Promise<RouterTurnTool[]>
-  /** What the computer step does beyond running the task: copy its files into the product's Vault, keep durable
-   *  receipts, and run a model the box key allows (`readSandboxRouterModels` with the payer's key). */
+  /** What the computer step does beyond running the task: copy its files into the product's Vault, and run a model
+   *  the box key allows (`readSandboxRouterModels` with the payer's key). */
   computer?: {
     files?(args: ChatTurnProduceArgs<TContext, TResource>): ComputerVault | undefined
-    receipts?: ComputerStepReceipts
     allowedModels?(args: ChatTurnProduceArgs<TContext, TResource>, signal: AbortSignal): Promise<Outcome<readonly string[] | null>>
   }
 }
@@ -122,7 +120,6 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
           session: { id: `sandbox-run-${args.identity.sessionId}` },
           ...(allowedModels ? { models: { preferred: [model], allowed: (signal: AbortSignal) => allowedModels(args, signal) } } : {}),
           ...(files ? { files } : {}),
-          ...(config.computer?.receipts ? { receipts: config.computer.receipts } : {}),
         } },
       }
     },

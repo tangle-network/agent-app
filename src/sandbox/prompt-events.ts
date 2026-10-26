@@ -329,6 +329,12 @@ export function isTerminalPromptEvent(event: unknown): boolean {
   return root?.type === 'result' || (root?.type === 'done' && asPlainRecord(root.data)?.status !== 'failed')
 }
 
+/** A box agent's ask (or its withdrawal) that the member answers: what a computer step relays to the turn. */
+export function isComputerInteractionEvent(event: unknown): boolean {
+  const type = asPlainRecord(event)?.type
+  return type === 'interaction' || type === 'interaction.cancel'
+}
+
 // Interactive-question detector. Returns the question text or null. Used by
 // streamSandboxPrompt when disallowQuestions is set.
 /** Resolve the interactive question text from a structured event or return null if none found */
