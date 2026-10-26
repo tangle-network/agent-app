@@ -385,6 +385,8 @@ export type ChatTurnLockResult =
 export interface ChatTurnLock<TContext, TResource = unknown> {
   acquire(args: ChatTurnProduceArgs<TContext, TResource>): ChatTurnLockResult | Promise<ChatTurnLockResult>
   release(handle: unknown): void | Promise<void>
+  /** Record a release for the durable owner to complete without freeing the lock; absent or false, the lock stays held. */
+  park?(handle: unknown): Promise<boolean>
   /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
    *  and while `prepareTurn` and the history read run. Never awaited; a failure
    *  is logged and the turn goes on to `acquire` as usual. */

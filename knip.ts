@@ -29,8 +29,7 @@ export const UNBUILT_ENTRIES = [
   'tests/**/*.test.{ts,tsx}',
   'tests/**/*.integration.ts',
   'tests/turn-stream/durable-stop.transport.ts',
-  'tests/turn-stream/durable-stop.worker.ts',
-  'tests/workers/lock-prewarm.worker.ts',
+  'tests/**/*.worker.ts',
 ]
 
 export default {
@@ -43,9 +42,11 @@ export default {
     'playground/**',
     'tests/theme/fixtures/**',
   ],
-  // External compiler, media and TLS fixture tools.
+  // Journeys and real TLS checks use these host tools rather than npm dependencies.
   ignoreBinaries: ['tsc', 'ffmpeg', 'ffprobe', 'openssl'],
   ignoreDependencies: [
+    // A Wrangler alias in the durable-stop integration bundles the consumer's published turn-stream as an older receiver.
+    'agent-app-published-turn-stream',
     '@anthropic-ai/sdk',
     '@tangle-network/agent-gateway',
     '@tangle-network/agent-profile-materialize',

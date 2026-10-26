@@ -32,6 +32,19 @@ const compatibilityDate = productionConfig.match(/^compatibility_date\s*=\s*"([^
 const flags = productionConfig.match(/^compatibility_flags\s*=\s*\[([\s\S]*?)\]/m)?.[1]
 assert(compatibilityDate && flags, 'Consumer Wrangler config must name its compatibility date and flags')
 const compatibilityFlags = [...flags.matchAll(/"([^"]+)"/g)].map(match => match[1]!)
+// The older receiver for the park refusal control is bound explicitly: AGENT_APP_STOP_OLDER_RECEIVER names the exact
+// published package@version, which must be the version installed in the consumer and pinned (with integrity) by its frozen lock.
+const olderReceiver = process.env.AGENT_APP_STOP_OLDER_RECEIVER?.match(/^(@tangle-network\/agent-app)@(\d+\.\d+\.\d+)$/)
+assert(olderReceiver, 'Set AGENT_APP_STOP_OLDER_RECEIVER=@tangle-network/agent-app@<published version without park>')
+const publishedAppRoot = resolve(consumerRoot, 'node_modules/@tangle-network/agent-app')
+const publishedVersion = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as { version: string }).version
+assert.equal(publishedVersion, olderReceiver[2], 'The installed older receiver must be the bound version')
+const olderIntegrity = consumerLock.toString().match(new RegExp(`^  '@tangle-network/agent-app@${publishedVersion.replaceAll('.', '\\.')}':\n    resolution: \\{integrity: (sha512-[^}]+)\\}`, 'm'))?.[1]
+assert(olderIntegrity, "The consumer's frozen lock must pin the bound older receiver with its integrity")
+const publishedExport = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as {
+  exports: Record<string, { import?: string | { default?: string }; default?: string }> }).exports['./turn-stream']
+const publishedImport = typeof publishedExport?.import === 'string' ? publishedExport.import : publishedExport?.import?.default ?? publishedExport?.default
+assert(publishedImport, "The consumer's published agent-app must export ./turn-stream")
 const { Miniflare, convertV4MiniflareOptions } = wrangler('miniflare') as {
   convertV4MiniflareOptions(options: Record<string, unknown>): Record<string, unknown>
   Miniflare: new (options: Record<string, unknown>) => Runtime
@@ -110,7 +123,7 @@ function start() {
       compatibilityFlags, scriptPath: bundlePath, modulesRoot: bundleDirectory,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
         ['OUTAGE_TURNS', 'ControlOutageTurnStream'], ['DEFERRED_TURNS', 'DeferredTurnStream'], ['SHORT_DEFERRED_TURNS', 'ShortDeferredTurnStream'],
-        ['BARRIER_TURNS', 'BarrierTurnStream']]
+        ['BARRIER_TURNS', 'BarrierTurnStream'], ['PUBLISHED_TURNS', 'PublishedTurnStream']]
         .map(([binding, className]) => [binding, { className, useSQLite: true }])),
       d1Databases: { CHAT: 'chat' }, bindings: { MODEL_URL: modelUrl, TURN_STREAM_AUTH_SECRET: 'isolated-local-durable-stop-fixture-secret' },
     }] }))
@@ -156,7 +169,8 @@ try {
   const configPath = resolve(directory, 'wrangler.json')
   writeFileSync(configPath, JSON.stringify({ name: 'stop-fixture',
     main: fileURLToPath(new URL(`./${workerEntry}.ts`, import.meta.url)),
-    compatibility_date: compatibilityDate, compatibility_flags: compatibilityFlags, send_metrics: false }))
+    compatibility_date: compatibilityDate, compatibility_flags: compatibilityFlags, send_metrics: false,
+    alias: { 'agent-app-published-turn-stream': resolve(publishedAppRoot, publishedImport) } }))
   execFileSync(process.execPath, [consumer.resolve('wrangler'), 'deploy', '--dry-run',
     '--config', configPath, '--outdir', bundleDirectory], { cwd: directory,
     env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, timeout: 60_000, encoding: 'utf8', stdio: 'pipe' })
@@ -304,6 +318,60 @@ try {
     await json('/clear-child', deferredOwner)
     assert.equal((await json<{ released: boolean }>('/recover?deferred=1', deferredOwner)).released, true)
     checks.push('scoped child deferral vetoes recovery until cleared; deferred Stop delivery remains effective')
+
+    // Park records the exact release intent without freeing the lock; only the DO's own completion frees it.
+    const parked = identity('parked')
+    const parkedSuccessor = { ...parked, executionId: 'execution-parked-successor', lockId: 'lock-parked-successor', turnStreamId: 'stream-parked-successor' }
+    await acquire(parked)
+    for (const wrong of [{ ...parked, lockId: 'not-the-owner' }, { ...parked, executionId: 'not-the-owner' }]) {
+      assert.deepEqual(await json('/park', wrong), { parked: false }, 'A wrong lock or execution identity parks nothing')
+    }
+    assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock', parked)).active.releasePending, undefined)
+    assert.deepEqual(await json('/park', parked), { parked: true })
+    const parkedLock = (await json<{ active: DurableTurnLock }>('/raw-lock', parked)).active
+    assert.equal(parkedLock.lockId, parked.lockId)
+    assert.equal(parkedLock.releasePending, true)
+    assert.equal((await json<{ acquired: boolean }>('/lock', parkedSuccessor)).acquired, false, 'A parked lock still refuses a successor')
+    assert.deepEqual(await json('/complete-deferred', { ...parked, executionId: 'not-the-owner' }), { completed: false })
+    assert.equal((await peek(parked))?.lockId, parked.lockId, 'Another execution cannot complete the parked release')
+    assert.deepEqual(await json('/complete-deferred', parked), { completed: true })
+    assert.equal(await peek(parked), null)
+    await acquire(parkedSuccessor)
+    assert.deepEqual(await json('/release', parkedSuccessor), { released: true })
+    checks.push('park leaves the exact lock held with releasePending; wrong identity parks or completes nothing; the successor waits for the same execution')
+
+    // The route parks an unconfirmed end only through a lock that has park; a custom lock without park stays held as before.
+    const customHeld = identity('custom-held')
+    await acquire(customHeld)
+    assert.deepEqual(await json('/route-unconfirmed?custom=1', customHeld), { ended: true })
+    const customLock = (await json<{ active: DurableTurnLock }>('/raw-lock', customHeld)).active
+    assert.equal(customLock.lockId, customHeld.lockId)
+    assert.equal(customLock.releasePending, undefined)
+    assert.deepEqual(await json('/complete-deferred', customHeld), { completed: false }, 'A lock without park leaves nothing to complete')
+    assert.equal((await json<{ acquired: boolean }>('/lock', { ...customHeld, executionId: 'execution-custom-successor',
+      lockId: 'lock-custom-successor', turnStreamId: 'stream-custom-successor' })).acquired, false)
+    assert.deepEqual(await json('/release', customHeld), { released: true })
+    const routeParked = identity('route-parked')
+    await acquire(routeParked)
+    assert.deepEqual(await json('/route-unconfirmed', routeParked), { ended: true })
+    assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock', routeParked)).active.releasePending, true)
+    assert.deepEqual(await json('/complete-deferred', routeParked), { completed: true })
+    assert.equal(await peek(routeParked), null)
+    checks.push('the route parks an unconfirmed end only through a lock with park; a custom lock without park stays held with nothing to complete')
+
+    // An actual published DO from before park has no /chat-turn-lock/park: the intent is refused and the lock stays held.
+    assert.equal('lockPark' in (await json<{ paths: Record<string, string> }>('/published-paths', parked)).paths, false,
+      "The consumer's published agent-app must predate park for this control")
+    const older = identity('older-receiver')
+    await acquire(older, '?published=1')
+    const refused = await json<{ parked: boolean; refused?: string }>('/park?published=1', older)
+    assert.equal(refused.parked, false)
+    assert(refused.refused, 'An older receiver refuses the park request')
+    const olderLock = await peek(older, '?published=1')
+    assert.equal(olderLock?.lockId, older.lockId)
+    assert.equal(olderLock?.releasePending, undefined)
+    assert.deepEqual(await json('/release?published=1', older), { released: true })
+    checks.push(`the published pre-park DO ${olderReceiver[0]} (${olderIntegrity}) refuses park over public HTTP and keeps the lock held`)
 
     const abandoned = identity('abandoned')
     await acquire(abandoned)

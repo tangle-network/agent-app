@@ -140,11 +140,11 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./turn-health`](api/turn-health.md) | 31 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 68 | `chat-routes`, `crypto`, `stream` |
 | [`./turn-trace`](api/turn-trace.md) | 28 | `redact` |
-| [`./vault`](api/vault.md) | 23 | `crypto`, `store`, `teams`, `web`, `web-react` |
-| [`./vault/collaboration`](api/vault-collaboration.md) | 13 | `crypto`, `store`, `teams`, `web`, `web-react` |
-| [`./vault/lazy`](api/vault-lazy.md) | 3 | `crypto`, `store`, `teams`, `web`, `web-react` |
-| [`./vault/server`](api/vault-server.md) | 8 | `crypto`, `store`, `teams`, `web`, `web-react` |
-| [`./vault/store`](api/vault-store.md) | 105 | `crypto`, `store`, `web` |
+| [`./vault`](api/vault.md) | 23 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
+| [`./vault/collaboration`](api/vault-collaboration.md) | 13 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
+| [`./vault/lazy`](api/vault-lazy.md) | 3 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
+| [`./vault/server`](api/vault-server.md) | 8 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
+| [`./vault/store`](api/vault-store.md) | 150 | `crypto`, `sandbox`, `store`, `web` |
 | [`./web`](api/web.md) | 59 | — |
 | [`./web-react`](api/web-react.md) | 524 | `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
 | [`./web-react/agent-profile-editor`](api/web-react-agent-profile-editor.md) | 8 | `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product` |
@@ -1389,7 +1389,7 @@ Source: `src/turn-stream/index.ts` · 68 exports
 
 Depends on: `chat-routes`, `crypto`, `stream`
 
-`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `broadcastThreadCreated`, `broadcastWorkspaceActivity`, `connectDurableTurnCancellation`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DEFAULT_TURN_LOCK_LOCATION_HINT`, `DurableTurnLock`, `interruptedReleaseApplies`, `MAX_RECENT_CREATED`, `MEMORY_TURN_STREAM_AUTH_SECRET`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `mintTurnStreamToken`, `peekDurableTurnLock`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `ReleaseInterruptedDurableTurnLockInput`, `requestDurableTurnCancellation`, `scopeIndexChannelKey`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `TURN_STREAM_TOKEN_HEADER`, `TURN_STREAM_TOKEN_TTL_MS`, `TurnCancellationConnection`, `TurnCancellationIdentity`, `TurnCancellationRequestedError`, `TurnControlUnavailableError`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `turnLockStorageKey`, `turnStorageChannelKey`, `TurnStreamAuth`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamLocationHint`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamTokenClaims`, `TurnStreamUpgradeAuthorization`, `verifyTurnStreamToken`, `workspaceChannelKey`
+`acquireDurableTurnLock`, `AcquireDurableTurnLockInput`, `activeTurnLock`, `ACTIVITY_TTL_MS`, `broadcastThreadCreated`, `broadcastWorkspaceActivity`, `connectDurableTurnCancellation`, `createDurableObjectTurnEventStore`, `createDurableTurnLock`, `CreateDurableTurnLockOptions`, `createMemoryTurnStreamHarness`, `createTurnLock`, `createTurnStreamUpgradeHandler`, `CreateTurnStreamUpgradeHandlerOptions`, `DEFAULT_TURN_LOCK_LOCATION_HINT`, `DurableTurnLock`, `interruptedReleaseApplies`, `MAX_RECENT_CREATED`, `MEMORY_TURN_STREAM_AUTH_SECRET`, `MemoryTurnStreamChannel`, `MemoryTurnStreamHarness`, `MemoryTurnStreamSocket`, `mintTurnStreamToken`, `parkDurableTurnLock`, `peekDurableTurnLock`, `pruneStaleThreads`, `reconcileStaleDurableTurnLock`, `ReconcileStaleDurableTurnLockOptions`, `releaseDurableTurnLock`, `releaseInterruptedDurableTurnLock`, `requestDurableTurnCancellation`, `scopeIndexChannelKey`, `threadChannelKey`, `TURN_LOCK_TTL_MS`, `TURN_STREAM_PATHS`, `TURN_STREAM_STORAGE_KEYS`, `TURN_STREAM_TOKEN_HEADER`, `TURN_STREAM_TOKEN_TTL_MS`, `TurnCancellationConnection`, `TurnCancellationIdentity`, `TurnCancellationRequestedError`, `TurnControlUnavailableError`, `turnEventStorageKey`, `TurnLockAcquireInput`, `TurnLockAcquireResult`, `turnLockChannelKey`, `TurnLockInterruptedReleaseInput`, `turnLockMatchesRelease`, `TurnLockReleaseInput`, `TurnLockScope`, `TurnLockSeamArgs`, `TurnLockSeamResult`, `turnLockStorageKey`, `turnStorageChannelKey`, `TurnStreamAuth`, `TurnStreamDO`, `TurnStreamDOOptions`, `TurnStreamDOState`, `TurnStreamEvent`, `TurnStreamLocationHint`, `TurnStreamNamespaceLike`, `TurnStreamSocket`, `TurnStreamStorage`, `TurnStreamStubLike`, `TurnStreamTokenClaims`, `TurnStreamUpgradeAuthorization`, `verifyTurnStreamToken`, `workspaceChannelKey`
 
 [Full API →](api/turn-stream.md)
 
@@ -1407,7 +1407,7 @@ Depends on: `redact`
 
 Source: `src/vault/index.ts` · 23 exports
 
-Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
+Depends on: `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react`
 
 `ConfirmDialog`, `ConfirmDialogProps`, `VAULT_TREE_CHILD_PAGE`, `VaultArtifactRenderProps`, `VaultContentMatch`, `VaultDataPort`, `VaultDockRenderProps`, `VaultDockToggle`, `VaultEditorMode`, `VaultFile`, `VaultMarkdownCodec`, `VaultOperation`, `VaultOperationFailure`, `VaultOperationPhase`, `VaultPane`, `VaultPaneHandle`, `VaultPaneProps`, `VaultRevision`, `VaultRichParts`, `VaultTree`, `VaultTreeNode`, `VaultTreeProps`, `VaultTreeRenderProps`
 
@@ -1417,7 +1417,7 @@ Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
 
 Source: `src/vault/collaboration.ts` · 13 exports
 
-Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
+Depends on: `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react`
 
 `buildVaultCollaborationBootstrap`, `CollaborationAccess`, `CollaborationEnv`, `CollaborationSessionUser`, `CollaborationVaultFile`, `CollaborationViewer`, `CollaborationWorkspaceAccess`, `createVaultCollaborationRoutes`, `isCollaborationConfigured`, `ReadCollaborationVaultFile`, `refreshVaultCollaborationToken`, `saveVaultCollaborationSnapshot`, `VaultCollaborationRoutesConfig`
 
@@ -1427,7 +1427,7 @@ Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
 
 Source: `src/vault/lazy.tsx` · 3 exports
 
-Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
+Depends on: `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react`
 
 `VaultPaneHandle`, `VaultPaneLazy`, `VaultPaneProps`
 
@@ -1437,7 +1437,7 @@ Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
 
 Source: `src/vault/server.ts` · 8 exports
 
-Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
+Depends on: `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react`
 
 `assessVaultDeletionBatch`, `compareIncarnationBaseline`, `FilesystemIncarnationLike`, `IncarnationComparison`, `VAULT_DELETION_REFUSAL_MIN_LIVE_FILES`, `VAULT_DELETION_REFUSAL_RATIO`, `VaultDeletionAssessment`, `VaultDeletionPolicy`
 
@@ -1445,11 +1445,11 @@ Depends on: `crypto`, `store`, `teams`, `web`, `web-react`
 
 ## `./vault/store`
 
-Source: `src/vault/store/index.ts` · 105 exports
+Source: `src/vault/store/index.ts` · 150 exports
 
-Depends on: `crypto`, `store`, `web`
+Depends on: `crypto`, `sandbox`, `store`, `web`
 
-`applyVaultMutationBatch`, `buildSandboxVaultRenameUnits`, `buildTreeFromPaths`, `createVaultCoordinator`, `createVaultStore`, `flattenVaultTreePaths`, `groupSandboxVaultChanges`, `isHiddenVaultFilePath`, `mapWithConcurrency`, `NormalizedVaultSandboxBaseline`, `normalizeVaultSandboxBaseline`, `normalizeVaultWriterProvenance`, `parseVaultHeadMetadata`, `parseVaultPathErrorResponse`, `readReadySandboxFilesystemIncarnation`, `readVaultHeadState`, `readVaultHeadStateConverged`, `readVaultHeadStateForErasure`, `ReadySandboxFilesystemIncarnation`, `SandboxVaultPathRejection`, `sandboxVaultRejection`, `SandboxVaultRenameItem`, `SandboxVaultSyncChange`, `SandboxVaultSyncProgress`, `validateVaultFilePath`, `validateVaultMutationKeys`, `validateWorkspaceId`, `VAULT_HEAD_SCHEMA`, `VAULT_HISTORY_MAX_REVISIONS`, `VAULT_KV_KEY_MAX_BYTES`, `VAULT_LINEAGE_MAX_REVISIONS`, `VAULT_OPERATION_SCHEMA`, `VAULT_READ_CONVERGENCE_INITIAL_DELAY_MS`, `VAULT_READ_CONVERGENCE_MAX_DELAY_MS`, `VAULT_READ_CONVERGENCE_TIMEOUT_MS`, `VAULT_REVISION_SCHEMA`, `VAULT_SANDBOX_BASELINE_SCHEMA`, `VaultConflictError`, `VaultConvergenceOptions`, `vaultConvergenceResponse`, `VaultCoordinator`, `VaultCoordinatorErrorDetail`, `vaultCoordinatorJson`, `VaultCoordinatorNamespace`, `VaultCoordinatorOptions`, `VaultCoordinatorStorage`, `VaultCreation`, `vaultErasureJobKey`, `vaultErasureKey`, `vaultErasurePrefix`, `VaultFileNotFoundError`, `VaultFileRevision`, `VaultFilesystemIncarnationError`, `VaultFrontmatterCodec`, `VaultFrontmatterParse`, `vaultHeadCreation`, `vaultHeadKey`, `VaultHeadListEntry`, `VaultHeadListOptions`, `VaultHeadListPage`, `VaultHeadListStats`, `vaultHeadMatchesFence`, `VaultHeadMetadata`, `vaultHeadPathPrefix`, `vaultHeadPrefix`, `VaultHeadReader`, `vaultHeadSequence`, `VaultHeadState`, `VaultHydrationError`, `VaultHydrationIncompleteError`, `VaultLearningActor`, `vaultMetaKey`, `VaultMutationChange`, `VaultMutationConflict`, `VaultMutationFileResult`, `VaultMutationOptions`, `VaultMutationPolicy`, `VaultMutationRequest`, `VaultMutationResult`, `VaultNode`, `vaultOperationCommitted`, `vaultOperationKey`, `VaultPathError`, `vaultPathErrorResponse`, `vaultPathErrorResponseBody`, `VaultPathErrorResponseBody`, `VaultPrivateRuntimeFileError`, `VaultReadConvergenceError`, `vaultRevisionKey`, `VaultRevisionMetadata`, `vaultRevisionPrefix`, `VaultRevisionsPage`, `VaultSandboxBaseline`, `VaultSandboxBaselineFile`, `VaultSandboxProgress`, `VaultStorageKeyError`, `VaultStorageKeyKind`, `VaultStore`, `VaultStoreConfig`, `VaultStoredFile`, `VaultVisibilityFence`, `VaultWriteProvenance`, `VaultWriter`, `vaultWriterActor`, `VaultWriterKind`
+`applyVaultMutationBatch`, `assertSandboxVaultReconciliation`, `buildSandboxVaultRenameUnits`, `buildTreeFromPaths`, `createSandboxVaultSync`, `createVaultCoordinator`, `createVaultStore`, `emptyVaultBoxState`, `flattenVaultTreePaths`, `groupSandboxVaultChanges`, `healStaleMutation`, `hydrateSandboxVault`, `isHiddenVaultFilePath`, `isSyncedBoxWriter`, `mapWithConcurrency`, `NormalizedVaultSandboxBaseline`, `normalizeVaultSandboxBaseline`, `normalizeVaultWriterProvenance`, `parseVaultBoxState`, `parseVaultBoxStateView`, `parseVaultBoxSyncSkips`, `parseVaultHeadMetadata`, `parseVaultPathErrorResponse`, `probeSandboxVaultLoss`, `readReadySandboxFilesystemIncarnation`, `readVaultHeadState`, `readVaultHeadStateConverged`, `readVaultHeadStateForErasure`, `ReadySandboxFilesystemIncarnation`, `reconcileSandboxVault`, `SANDBOX_VAULT_SYNC_CONTRACT`, `SandboxBootstrapConfirmation`, `SandboxBootstrapRecord`, `sandboxBootstrapRecorded`, `SandboxVaultPathRejection`, `sandboxVaultRejection`, `SandboxVaultRenameItem`, `SandboxVaultSync`, `SandboxVaultSyncChange`, `SandboxVaultSyncConfig`, `SandboxVaultSyncOptions`, `SandboxVaultSyncProgress`, `SandboxVaultSyncResult`, `SandboxVaultSyncStore`, `StoredVaultBoxState`, `validateVaultFilePath`, `validateVaultMutationKeys`, `validateWorkspaceId`, `VAULT_BASE64_BODY_MARKER`, `VAULT_BOX_MUTATION_STALE_MS`, `VAULT_BOX_STATE_KEY`, `VAULT_BOX_STATE_SCHEMA`, `VAULT_BOX_SYNC_MAX_SKIPS`, `VAULT_HEAD_SCHEMA`, `VAULT_HISTORY_MAX_REVISIONS`, `VAULT_KV_KEY_MAX_BYTES`, `VAULT_LINEAGE_MAX_REVISIONS`, `VAULT_OPERATION_SCHEMA`, `VAULT_READ_CONVERGENCE_INITIAL_DELAY_MS`, `VAULT_READ_CONVERGENCE_MAX_DELAY_MS`, `VAULT_READ_CONVERGENCE_TIMEOUT_MS`, `VAULT_REVISION_SCHEMA`, `VAULT_SANDBOX_BASELINE_SCHEMA`, `vaultBinaryDocument`, `vaultBinaryPayload`, `VaultBoxIdentity`, `vaultBoxInSync`, `VaultBoxStateView`, `VaultBoxSync`, `VaultBoxSyncRecord`, `VaultBoxSyncSkip`, `VaultConflictError`, `VaultConvergenceOptions`, `vaultConvergenceResponse`, `VaultCoordinator`, `VaultCoordinatorErrorDetail`, `vaultCoordinatorJson`, `VaultCoordinatorNamespace`, `VaultCoordinatorOptions`, `VaultCoordinatorStorage`, `VaultCreation`, `vaultErasureJobKey`, `vaultErasureKey`, `vaultErasurePrefix`, `VaultFileNotFoundError`, `VaultFileRevision`, `VaultFilesystemIncarnationError`, `VaultFrontmatterCodec`, `VaultFrontmatterParse`, `vaultHeadCreation`, `vaultHeadKey`, `VaultHeadListEntry`, `VaultHeadListOptions`, `VaultHeadListPage`, `VaultHeadListStats`, `vaultHeadMatchesFence`, `VaultHeadMetadata`, `vaultHeadPathPrefix`, `vaultHeadPrefix`, `VaultHeadReader`, `vaultHeadSequence`, `VaultHeadState`, `VaultHydrationBox`, `VaultHydrationError`, `VaultHydrationFileSystem`, `VaultHydrationIncompleteError`, `VaultHydrationOptions`, `VaultHydrationStats`, `VaultLearningActor`, `vaultMetaKey`, `VaultMutationChange`, `VaultMutationConflict`, `VaultMutationFileResult`, `VaultMutationOptions`, `VaultMutationPolicy`, `VaultMutationRequest`, `VaultMutationResult`, `VaultNode`, `vaultOperationCommitted`, `vaultOperationKey`, `VaultPathError`, `vaultPathErrorResponse`, `vaultPathErrorResponseBody`, `VaultPathErrorResponseBody`, `VaultPrivateRuntimeFileError`, `VaultReadConvergenceError`, `VaultReconcileBox`, `vaultRevisionKey`, `VaultRevisionMetadata`, `vaultRevisionPrefix`, `VaultRevisionsPage`, `VaultSandboxBaseline`, `VaultSandboxBaselineFile`, `VaultSandboxProgress`, `VaultStorageKeyError`, `VaultStorageKeyKind`, `VaultStore`, `VaultStoreConfig`, `VaultStoredFile`, `VaultVisibilityFence`, `VaultWriteProvenance`, `VaultWriter`, `vaultWriterActor`, `VaultWriterKind`, `viewOfVaultBoxState`, `withBootstrap`, `withMutationFinished`, `withMutationStarted`, `withSync`, `withSyncInvalidated`
 
 [Full API →](api/vault-store.md)
 

@@ -104,7 +104,7 @@ interface CreateDurableTurnLockOptions
 
 ### `createTurnStreamUpgradeHandler`
 
-`function` — The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job).
+`function` — The worker-entry WebSocket forwarder — WORKSPACE channel only; a thread's live turn replay is the sandbox session gateway's job.
 
 ```ts
 (options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>
@@ -190,6 +190,14 @@ interface MemoryTurnStreamSocket
 (channelName: string, secret: string, now?: () => number, ttlMs?: number, claims?: TurnStreamTokenClaims | undefined) =…
 ```
 
+### `parkDurableTurnLock`
+
+`function` — Park the exact lock's release for its durable owner; any answer but a parked 200 leaves the lock held.
+
+```ts
+(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth) => Promise<boolean>
+```
+
 ### `peekDurableTurnLock`
 
 `function` — Read a channel's active turn lock without changing it.
@@ -236,14 +244,6 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ```ts
 (namespace: TurnStreamNamespaceLike, input: TurnLockInterruptedReleaseInput, auth: TurnStreamAuth) => Promise<...>
-```
-
-### `ReleaseInterruptedDurableTurnLockInput`
-
-`type` — Define input parameters to release an interrupted durable turn lock in a workspace or thread
-
-```ts
-type ReleaseInterruptedDurableTurnLockInput
 ```
 
 ### `requestDurableTurnCancellation`
