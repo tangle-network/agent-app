@@ -250,7 +250,7 @@ describe.sequential('protected local HTTP terminal ownership', () => {
       const aborted = createProtectedRuntimeChatProducer(optionsFor(peer, stopped.signal))
       expect((await collect(aborted)).some(event => event.type === 'error')).toBe(true)
       expect(aborted.terminalObserved?.()).toBe(true)
-      const expiredOptions = optionsFor(peer); expiredOptions.grant.deadlineAtMs = Date.now() - 1
+      const expiredOptions = optionsFor(peer); expiredOptions.grant = { ...expiredOptions.grant, deadlineAtMs: Date.now() - 1 }
       const expired = createProtectedRuntimeChatProducer(expiredOptions)
       expect((await collect(expired)).some(event => event.type === 'error')).toBe(true)
       expect(expired.terminalObserved?.()).toBe(true)
