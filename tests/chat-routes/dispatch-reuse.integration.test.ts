@@ -59,7 +59,7 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
   const domainAdmitted = new Promise<void>(resolve => { releaseDomain = resolve })
   const server = createServer((request, response) => {
     request.resume()
-    request.on('end', () => {
+    request.on('end', async () => {
       externalRequests++
       if (request.url === '/resource') {
         let finished = false
@@ -77,6 +77,7 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
       } else {
         requests++
         for (const resolve of requestStarts[requests - 1] ?? []) resolve()
+        if (options.concurrent) await modelStarted(2)
         if (options.backend === 'router-data') {
           const delta = requests === 1 ? { tool_calls: [{ index: 0, id: 'write', function: { name: 'write_record', arguments: '{}' } }] }
             : { content: 'A persisted answer.' }
@@ -196,7 +197,7 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
     prepareTurn: async args => { forwardContinuation('prepareTurn', args); return { ok: true as const } },
     turnLock: durable && !options.customLock ? undefined : {
       acquire: async args => {
-        if (!options.cleanup && !args.userMessageId && ['router', 'router-data'].includes(options.backend ?? 'router')) {
+        if ((!durable || options.customLock) && !options.cleanup && !args.userMessageId && ['router', 'router-data'].includes(options.backend ?? 'router')) {
           await modelStarted(options.concurrent ? 2 : 1)
         }
         const locked = database.prepare('INSERT OR IGNORE INTO active_lock VALUES (?)').run(args.identity.sessionId)
@@ -207,7 +208,6 @@ async function harness(options: { backend?: 'router' | 'sandbox' | 'function' | 
       release: handle => { database.prepare('DELETE FROM active_lock WHERE thread=?').run(String(handle)) },
     },
     contextGate: async args => {
-      if (durable && options.concurrent) await modelStarted(2)
       gates++
       if (options.backend === 'router-data' && !options.cleanup) {
         await toolObserved
@@ -373,6 +373,7 @@ it('assembles D1 replay and authenticated default locks while keeping each reque
     const firstResponse = await h.send('first-turn', first, 'first-thread')
     expect(firstResponse.status).toBe(200)
     await firstResponse.text()
+    await Promise.all(first.pending)
     const secondResponse = await h.send('second-turn', second, 'second-thread')
     expect(secondResponse.status).toBe(200)
     await secondResponse.text()
