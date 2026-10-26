@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.57
+
+- ci: run adopt-stack from agent-eval 29aa1697 (#1369)
+
 ## 0.63.56
 
 - Call a preflight probe's fetch as a plain function (#1367)
