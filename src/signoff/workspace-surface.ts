@@ -11,7 +11,7 @@
  * pass it.
  */
 
-import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount, gotoRoute } from './browser-budget'
 
 export interface WorkspaceSurfaceSample {
   readonly route: string
@@ -107,7 +107,7 @@ export async function checkWorkspaceSurface(options: WorkspaceSurfaceOptions): P
         }, meter, options.themeScript)
         for (const route of options.routes) {
           await meter.pace()
-          await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
+          await gotoRoute(page, new URL(route, options.baseUrl).toString())
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
           const sample: WorkspaceSurfaceSample = { route, width, theme, ...(await page.evaluate(collectWorkspaceSurface)) }

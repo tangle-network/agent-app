@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.63.44
+
+- signoff: retry a surface check's navigation once after a transient network fault (#1358)
+
+## 0.63.43
+
+- Fail an autonomous computer step when its box agent asks through the runtime (#1357)
+
+## 0.63.42
+
+- Pin the adopt-stack caller to an agent-eval commit so publish runs again (#1356)
+- Make the computer step a thin client of the Sandbox runtime's durability (#1354)
+- Adopt each new @tangle-network release with the shared adopt-stack bot (#1353)
+
 ## 0.63.41
 
 - Fail a scheduled invocation for a listed job; classify transport failures on request (#1349)
