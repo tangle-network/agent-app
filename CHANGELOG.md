@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.51
+
+- chore: adopt Integrations 0.76.2 through maintained peer floors (#1344)
+
 ## 0.63.50
 
 - fix(signoff): distinguish modern worktrees from legacy PIDs (#1363)
