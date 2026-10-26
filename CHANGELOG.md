@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.50
+
+- fix(signoff): distinguish modern worktrees from legacy PIDs (#1363)
+
 ## 0.63.49
 
 - fix(chat): retain protected Router failures as typed notices (#1362)
