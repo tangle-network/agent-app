@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.59
+
+- feat: allow product-owned tool row presentation (#1372)
+- Retire an SSO-source child through a slot bound to its source key (#1373)
+- chore(deps): adopt 2 @tangle-network/* packages (#1374)
+
 ## 0.63.58
 
 - chore(deps): admit agent-runtime 0.351-0.352, agent-eval 0.222 and materialize 0.28 (#1371)
