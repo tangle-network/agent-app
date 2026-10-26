@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-526 exports.
+528 exports.
 
 ### `acceptRejectionReason`
 
@@ -68,6 +68,14 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `AgentMentionOption`
+
+`interface` — A workspace agent the composer can `@`.
+
+```ts
+interface AgentMentionOption
 ```
 
 ### `AgentProfileChoices`
@@ -379,7 +387,7 @@ type AttachmentFileResult
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly (AgentMention | Pick<FileMention, "name" | "path">)[]) => string
 ```
 
 ### `buildTurnPhaseEvent`
@@ -571,7 +579,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…
+({ messages: storedMessages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentL…
 ```
 
 ### `ChatMessageSegment`
@@ -1467,7 +1475,7 @@ interface FileMention
 `function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
 ### `filterAcceptedFiles`
@@ -2147,7 +2155,7 @@ interface LinkLikeProps
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
 
 ```ts
-(input: FileMention) => ChatMentionPart
+(mention: ChatMention) => ChatMentionPart
 ```
 
 ### `MentionItem`
@@ -2764,6 +2772,14 @@ interface QualityCheckListProps
 
 ```ts
 interface QuestionOptionListProps
+```
+
+### `rankAgentMentions`
+
+`function` — Agents whose name or handle starts with, then contains, the query; an empty query lists them all.
+
+```ts
+(agents: readonly AgentMentionOption[], query: string) => AgentMentionOption[]
 ```
 
 ### `rankFileMentions`
