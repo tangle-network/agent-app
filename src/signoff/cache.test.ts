@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -34,6 +34,18 @@ function git(args: string[], cwd: string): void {
     },
   })
   if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
+}
+
+function worktree(cacheDir: string, name: string): { repo: string; tree: string } {
+  const repo = root()
+  git(['init', '--quiet', '--initial-branch=main'], repo)
+  writeFileSync(join(repo, 'README.md'), 'fixture\n')
+  git(['add', '.'], repo)
+  git(['commit', '--quiet', '-m', 'fixture'], repo)
+  const tree = join(cacheDir, 'trees', name)
+  mkdirSync(join(cacheDir, 'trees'))
+  git(['worktree', 'add', '--detach', '--quiet', tree], repo)
+  return { repo, tree }
 }
 
 describe('signoff cache retention', () => {
@@ -82,14 +94,7 @@ describe('signoff cache retention', () => {
 
   it('keeps a detached check and its store after the coordinator exits', async () => {
     const cacheDir = root()
-    const tree = join(cacheDir, 'trees', 'detached-check')
-    const repo = root()
-    git(['init', '--quiet', '--initial-branch=main'], repo)
-    writeFileSync(join(repo, 'README.md'), 'fixture\n')
-    git(['add', '.'], repo)
-    git(['commit', '--quiet', '-m', 'fixture'], repo)
-    mkdirSync(join(cacheDir, 'trees'))
-    git(['worktree', 'add', '--detach', '--quiet', tree], repo)
+    const { tree } = worktree(cacheDir, 'detached-check')
     const key = 'd'.repeat(64)
     const path = store(cacheDir, key, 32 * 1024)
     const coordinator = spawnSync(process.execPath, ['--input-type=module', '-e', `
@@ -120,14 +125,7 @@ describe('signoff cache retention', () => {
 
   it('retires an idle cached Git worktree through Git but never follows a symlink', async () => {
     const cacheDir = root()
-    const repo = root()
-    git(['init', '--quiet', '--initial-branch=main'], repo)
-    writeFileSync(join(repo, 'README.md'), 'fixture\n')
-    git(['add', '.'], repo)
-    git(['commit', '--quiet', '-m', 'fixture'], repo)
-    const tree = join(cacheDir, 'trees', 'cached-tree')
-    mkdirSync(join(cacheDir, 'trees'))
-    git(['worktree', 'add', '--detach', '--quiet', tree], repo)
+    const { repo, tree } = worktree(cacheDir, 'cached-tree')
     const outside = root()
     writeFileSync(join(outside, 'keep'), 'not cache data')
     symlinkSync(outside, join(cacheDir, 'trees', 'outside-link'))
@@ -150,16 +148,43 @@ describe('signoff cache retention', () => {
     expect(existsSync(outsideStore)).toBe(true)
   })
 
+  it.each(['000000000001', '999999999999'])('retires a completed modern worktree with numeric UUID tail %s', async tail => {
+    const cacheDir = root()
+    const { repo, tree } = worktree(cacheDir, `fixture-${process.pid}-00000000-0000-4000-8000-${tail}`)
+    const key = 'c'.repeat(64)
+    const path = store(cacheDir, key, 32 * 1024)
+    const session = await openSignoffCacheSession(cacheDir, tree)
+    await session.protectStore(key)
+    await session.close()
+
+    const result = await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })
+    expect(result.removed).toEqual(expect.arrayContaining([tree, path]))
+    expect(result.afterBytes).toBe(0)
+    expect(result.overBudgetBytes).toBe(0)
+    expect(existsSync(tree)).toBe(false)
+    expect(existsSync(path)).toBe(false)
+    expect(readdirSync(join(cacheDir, 'active'))).toEqual([])
+    const list = spawnSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8' })
+    expect(list.status, list.stderr).toBe(0)
+    expect(list.stdout).not.toContain(tree)
+  })
+
+  it('protects a live legacy PID worktree and its unrecorded store without a lease', async () => {
+    const cacheDir = root()
+    const { tree } = worktree(cacheDir, `fixture-${process.pid}`)
+    const path = store(cacheDir, 'd'.repeat(64), 32 * 1024)
+
+    const result = await pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })
+    expect(result.removed).toEqual([])
+    expect(existsSync(tree)).toBe(true)
+    expect(existsSync(path)).toBe(true)
+    expect(existsSync(join(cacheDir, 'active'))).toBe(false)
+    expect(result.overBudgetBytes).toBeGreaterThan(0)
+  })
+
   it.each(['private', 'common'])('preserves content and allocated bytes when linked %s Git metadata disappears', async missing => {
     const cacheDir = root()
-    const repo = root()
-    git(['init', '--quiet', '--initial-branch=main'], repo)
-    writeFileSync(join(repo, 'README.md'), 'fixture\n')
-    git(['add', '.'], repo)
-    git(['commit', '--quiet', '-m', 'fixture'], repo)
-    const tree = join(cacheDir, 'trees', 'orphaned-tree')
-    mkdirSync(join(cacheDir, 'trees'))
-    git(['worktree', 'add', '--detach', '--quiet', tree], repo)
+    const { repo, tree } = worktree(cacheDir, 'orphaned-tree')
     const content = Buffer.alloc(32 * 1024, 19)
     writeFileSync(join(tree, 'only-copy'), content)
     const privateGit = readFileSync(join(tree, '.git'), 'utf8').trim().slice('gitdir: '.length)
@@ -208,14 +233,7 @@ describe('signoff cache retention', () => {
 
   it('refuses a real Git retirement failure while its metadata remains intact', async () => {
     const cacheDir = root()
-    const repo = root()
-    git(['init', '--quiet', '--initial-branch=main'], repo)
-    writeFileSync(join(repo, 'README.md'), 'fixture\n')
-    git(['add', '.'], repo)
-    git(['commit', '--quiet', '-m', 'fixture'], repo)
-    const tree = join(cacheDir, 'trees', 'locked-tree')
-    mkdirSync(join(cacheDir, 'trees'))
-    git(['worktree', 'add', '--detach', '--quiet', tree], repo)
+    const { repo, tree } = worktree(cacheDir, 'locked-tree')
     git(['worktree', 'lock', tree], repo)
     await expect(pruneSignoffCache(cacheDir, { maxAgeMs: 0, maxBytes: 0 })).rejects.toThrow('cannot retire cached worktree')
     expect(readFileSync(join(tree, 'README.md'), 'utf8')).toBe('fixture\n')
