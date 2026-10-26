@@ -17601,7 +17601,7 @@
         {
           "name": "classifySandboxTransientFailure",
           "kind": "function",
-          "signature": "(error: unknown) => SandboxTransientFailure | null",
+          "signature": "(error: unknown, options?: SandboxTransientClassifyOptions) => SandboxTransientFailure | null",
           "doc": "The typed transient failure `error` carries anywhere in its cause chain, or null."
         },
         {
@@ -18433,6 +18433,12 @@
           "doc": null
         },
         {
+          "name": "SANDBOX_PLATFORM_CALL_RETRY",
+          "kind": "const",
+          "signature": "SandboxTransientRetryOptions",
+          "doc": "Short platform calls whose blips clear in seconds: transport failures included, three retries over 3.5 s."
+        },
+        {
           "name": "SANDBOX_RUN_DESCRIPTION",
           "kind": "const",
           "signature": "string",
@@ -18773,6 +18779,12 @@
           "kind": "function",
           "signature": "(attempt: number) => number",
           "doc": "Wait before retry `attempt` (1-based): 5 s doubling to a 60 s ceiling."
+        },
+        {
+          "name": "SandboxTransientClassifyOptions",
+          "kind": "interface",
+          "signature": "interface SandboxTransientClassifyOptions",
+          "doc": null
         },
         {
           "name": "SandboxTransientDeadlineError",
