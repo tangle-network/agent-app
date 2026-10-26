@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.41
+
+- Fail a scheduled invocation for a listed job; classify transport failures on request (#1349)
+
 ## 0.63.40
 
 - AGENTS: name platform workflows, routines and AgentGraphs separately (#1348)
