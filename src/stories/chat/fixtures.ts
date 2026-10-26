@@ -236,3 +236,30 @@ export const multiPartyThread: ChatUiMessage[] = [
     content: 'Thanks. I will draft a demand letter today, and you will have it to review by 5pm.',
   },
 ]
+
+/** One turn addressed to two agents: ONE stored assistant row whose parts carry
+ *  a speaker part before each answer. `ChatMessages` draws it as two answers
+ *  under two authors, in the order the person typed the mentions. */
+export const twoAgentsThread: ChatUiMessage[] = [
+  {
+    id: 'ta-1',
+    role: 'user',
+    content: '@writer @research-lead plan the launch announcement for the roster feature.',
+    parts: [
+      { type: 'mention', mentionKind: 'agent', path: 'writer', name: 'Writer', agentId: 'ap_writer' },
+      { type: 'mention', mentionKind: 'agent', path: 'research-lead', name: 'Research Lead', agentId: 'ap_research' },
+    ],
+  },
+  {
+    id: 'ta-2',
+    role: 'assistant',
+    modelUsed: 'anthropic/claude-opus-4',
+    content: 'Draft headline: "Every agent in your workspace, one @ away."\n\nThree risks: the roster is empty on day one for new workspaces; handles collide after a rename; routines post while nobody is watching.',
+    parts: [
+      { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+      { type: 'text', text: 'Draft headline: "Every agent in your workspace, one @ away."\n\nSubhead: address any agent from any thread, and let it run on a schedule while you sleep.' },
+      { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+      { type: 'text', text: 'Three risks to name in the copy: the roster is empty on day one for a new workspace; a renamed agent keeps its old handle reserved, so say so; a routine posts while nobody is watching, so the thread must show who ran it.' },
+    ],
+  },
+]

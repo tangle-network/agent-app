@@ -14,7 +14,8 @@ import type { D1LikeForTurns } from '../stream/turn-buffer'
 import type { TurnStreamAuth } from '../turn-stream/adapters'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
 import type { TurnRoutePhase } from './turn-progress'
-import type { ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
+import type { AgentProfile } from '@tangle-network/agent-interface'
+import type { AgentMention, ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { RouterTurnProducerOptions } from './router-producer'
 import type { HybridTurnProducerOptions } from './hybrid-producer'
 import type { SandboxChatProducerOptions } from './sandbox-producer'
@@ -244,8 +245,37 @@ export interface ChatTurnRequestContext {
   executionLimits?: ChatTurnExecutionLimits
 }
 
+/** A workspace agent a turn is addressed to, resolved by the product from an
+ *  `@` mention. `id` is the stable profile id the mention carried. */
+export interface ChatTurnAgentTarget {
+  id: string
+  handle: string
+  name: string
+  /** The profile this responder runs as. A product's `produce` reads it from
+   *  `args.agent` and runs the turn as that agent instead of the thread's
+   *  bound one; the binding itself does not move. */
+  profile?: AgentProfile
+}
+
+/** How a route turns `@agent` mentions into responders. */
+export interface ChatTurnAgentsOptions<TContext> {
+  /** Resolve the mentioned agents to the targets this caller may address.
+   *  Return only the ids you recognise for this workspace: a mention whose id
+   *  is missing from the result is refused as `unknown_agent` before anything
+   *  runs. Order is ignored; responders answer in mention order. */
+  resolve(args: { identity: ChatTurnIdentity; context: TContext; mentions: AgentMention[] }): Promise<ChatTurnAgentTarget[]>
+}
+
 /** Define the arguments required to produce a chat turn with context and messaging details */
 export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
+  /** The agent this producer answers as, when the turn was addressed to one
+   *  or more agents by mention. The route calls `produce` once per responder,
+   *  one after another in mention order, and persists their answers as one
+   *  assistant row with a speaker part before each. Absent → the thread's own
+   *  agent answers, as before. */
+  agent?: ChatTurnAgentTarget
+  /** Every responder of this turn, in mention order. */
+  agents?: ChatTurnAgentTarget[]
   request: Request
   /** The opaque resource afterAuthorize started; the route disposes it at this turn's end. */
   earlyResource?: Promise<TResource>
@@ -537,6 +567,11 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  product-supplied access step: session auth, thread/workspace access,
    *  seat/balance gates, rate limits all live here. */
   authorize(args: ChatTurnAuthorizeArgs): Promise<ChatTurnAuthorization<TContext>>
+  /** Let a turn address workspace agents by `@` mention: the composer's
+   *  `useFileMentions({ agents })` sends them, this resolves them to the
+   *  profiles they run as, and `produce` answers once per responder. Omit →
+   *  a turn carrying an agent mention is refused as `agents_unsupported`. */
+  agents?: ChatTurnAgentsOptions<TContext>
   /** Resolve the exact authenticated stop target. Without this capability,
    *  cancel returns 405 before parsing or authorization. */
   cancel?: ChatTurnCancelOptions<TContext>

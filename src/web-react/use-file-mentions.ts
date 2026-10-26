@@ -20,7 +20,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { FileIndexResponse, FileIndexReadyResponse } from '../chat-routes/file-index'
-import type { FileMention } from '../chat-routes/wire'
+import type { ChatMention, FileMention } from '../chat-routes/wire'
 
 /** The atomic pill's payload. For a file mention, `id` is the
  *  workspace-relative path (the pill's stable identity and the `@<id>`
@@ -57,6 +57,41 @@ export interface ComposerMentionProp {
 }
 
 const FILE_MENTION_KIND = 'file'
+const AGENT_MENTION_KIND = 'agent'
+
+/** A workspace agent the composer can `@`. `handle` is what the text carries
+ *  after `@` and the pill's identity; `id` is the stable profile id the turn
+ *  is addressed with. */
+export interface AgentMentionOption {
+  id: string
+  handle: string
+  name: string
+  /** One line under the name in the popover, such as what the agent does. */
+  description?: string
+}
+
+function agentToMentionItem(agent: AgentMentionOption): MentionItem {
+  return { id: agent.handle, label: agent.name, detail: agent.description ?? `@${agent.handle}`, kind: AGENT_MENTION_KIND }
+}
+
+/** Agents whose name or handle starts with, then contains, the query; an
+ *  empty query lists them all. Agents come before files in the popover: a
+ *  workspace has a handful, a box has thousands. */
+export function rankAgentMentions(agents: readonly AgentMentionOption[], query: string): AgentMentionOption[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return [...agents]
+  const tier = (agent: AgentMentionOption) => {
+    const name = agent.name.toLowerCase()
+    if (name.startsWith(q) || agent.handle.startsWith(q)) return 0
+    if (name.includes(q) || agent.handle.includes(q)) return 1
+    return -1
+  }
+  return agents
+    .map((agent) => ({ agent, tier: tier(agent) }))
+    .filter((entry) => entry.tier >= 0)
+    .sort((a, b) => a.tier - b.tier || a.agent.name.localeCompare(b.agent.name))
+    .map((entry) => entry.agent)
+}
 
 function toMentionItem(file: FileMention): MentionItem {
   return { id: file.path, label: file.name, detail: file.path, kind: FILE_MENTION_KIND }
@@ -148,15 +183,20 @@ export interface UseFileMentionsOptions {
   /** Text shown in the popover's empty state once the index is loaded and
    *  the query matched nothing. Default {@link DEFAULT_MENTION_EMPTY_TEXT}. */
   emptyText?: string
+  /** The workspace's agents, offered in the same `@` popover before files.
+   *  A picked agent is sent as an `AgentMention` and the turn is addressed
+   *  to it (the route's `agents.resolve` seam). Omit → files only. */
+  agents?: readonly AgentMentionOption[]
 }
 
 /** Provide properties and methods to manage and refresh file mentions in a composer interface */
 export interface UseFileMentionsResult {
   /** Spread straight into `ChatComposer`'s `mention` prop. */
   mention: ComposerMentionProp
-  /** The files currently referenced by mentions in the composer's value —
-   *  the send-body list (map through `fileMentionsToParts`). */
-  mentions: FileMention[]
+  /** The files and agents currently referenced by mentions in the composer's
+   *  value, in document order — the send-body list. Files go through
+   *  `fileMentionsToParts`; agents are addressed by the route. */
+  mentions: ChatMention[]
   /** Drop all currently-referenced mentions (e.g. after a successful send). */
   clearMentions: () => void
   /** Force a re-fetch of the index right now, ignoring `refreshAfterMs` — for
@@ -190,6 +230,7 @@ export function useFileMentions(options: UseFileMentionsOptions): UseFileMention
     limit = DEFAULT_MENTION_LIMIT,
     refreshAfterMs = INDEX_REFRESH_AFTER_MS,
     emptyText = DEFAULT_MENTION_EMPTY_TEXT,
+    agents,
   } = options
   const fetchImpl = options.fetchImpl ?? fetch
 
@@ -205,7 +246,10 @@ export function useFileMentions(options: UseFileMentionsOptions): UseFileMention
   const stateRef = useRef(state)
   stateRef.current = state
   const inFlightRef = useRef<Promise<IndexState> | null>(null)
-  const [mentions, setMentions] = useState<FileMention[]>([])
+  const [mentions, setMentions] = useState<ChatMention[]>([])
+  // Read by handle when the editor reports its pills, so a pill resolves to
+  // the agent's stable id even after the roster re-renders.
+  const agentsByHandle = useMemo(() => new Map((agents ?? []).map((agent) => [agent.handle, agent])), [agents])
 
   const load = useCallback((): Promise<IndexState> => {
     if (inFlightRef.current) return inFlightRef.current
@@ -265,15 +309,25 @@ export function useFileMentions(options: UseFileMentionsOptions): UseFileMention
       } else if (Date.now() - current.attemptedAt > RETRY_AFTER_MS) {
         void load()
       }
-      if (current.kind !== 'ready') return []
-      return rankFileMentions(current.files, query, limit).map(toMentionItem)
+      const agentItems = rankAgentMentions(agents ?? [], query).map(agentToMentionItem)
+      if (current.kind !== 'ready') return agentItems
+      return [...agentItems, ...rankFileMentions(current.files, query, Math.max(0, limit - agentItems.length)).map(toMentionItem)]
     },
-    [load, limit, refreshAfterMs],
+    [load, limit, refreshAfterMs, agents],
   )
 
   const onMentionsChange = useCallback((items: MentionItem[]) => {
-    setMentions(items.filter((item) => item.kind === undefined || item.kind === FILE_MENTION_KIND).map(toFileMention))
-  }, [])
+    const next: ChatMention[] = []
+    for (const item of items) {
+      if (item.kind === AGENT_MENTION_KIND) {
+        const agent = agentsByHandle.get(item.id)
+        if (agent) next.push({ kind: 'agent', agentId: agent.id, handle: agent.handle, name: agent.name })
+      } else if (item.kind === undefined || item.kind === FILE_MENTION_KIND) {
+        next.push(toFileMention(item))
+      }
+    }
+    setMentions(next)
+  }, [agentsByHandle])
 
   const clearMentions = useCallback(() => setMentions([]), [])
 

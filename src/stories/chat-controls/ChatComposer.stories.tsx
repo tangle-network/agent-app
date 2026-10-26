@@ -195,6 +195,35 @@ export const WithMentions: Story = {
   ),
 }
 
+const MENTION_AGENTS: MentionItem[] = [
+  { id: 'research-lead', label: 'Research Lead', detail: 'Finds risks and prior art', kind: 'agent' },
+  { id: 'writer', label: 'Writer', detail: '@writer', kind: 'agent' },
+]
+
+/** Agents and files share the `@` popover: the workspace's agents first (a
+ *  handful), then the box's files. A picked agent serializes to `@<handle>`
+ *  and the turn is addressed to it; `useFileMentions({ agents })` builds
+ *  exactly this provider from a roster and the file index. */
+export const WithAgentMentions: Story = {
+  name: 'With agent mentions',
+  render: () => (
+    <ChatComposer
+      onSend={(message) => console.log('send', message)}
+      placeholder="Type @ to address an agent or mention a file…"
+      controls={useModelPill()}
+      mention={{
+        fetchItems: async (query) => {
+          const q = query.toLowerCase()
+          const agents = MENTION_AGENTS.filter((agent) => agent.label.toLowerCase().includes(q) || agent.id.includes(q))
+          const files = MENTION_FILES.filter((file) => file.label.toLowerCase().includes(q) || file.id.toLowerCase().includes(q))
+          return [...agents, ...files]
+        },
+        onMentionsChange: (mentions) => console.log('mentions', mentions.map((m) => `${m.kind}:${m.id}`)),
+      }}
+    />
+  ),
+}
+
 /** Above placement — the pill floats outside the card; no focus hint. */
 export const AbovePlacement: Story = {
   name: 'Above placement',
