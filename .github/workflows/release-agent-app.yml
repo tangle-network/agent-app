@@ -51,6 +51,7 @@ jobs:
     permissions:
       contents: read
       issues: read
+      actions: read
     # Repository-scoped, identical to the existing production writer group.
     # This job alone holds the lock; post-release suites do not delay writers.
     concurrency:
