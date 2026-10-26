@@ -217,11 +217,10 @@ export async function releaseDurableTurnLock(
   return postJsonOk(namespace, key, TURN_STREAM_PATHS.lockRelease, input, auth)
 }
 
-/** Park the exact lock's release for its durable owner; false (lock still held) unless this DO parked it. */
+/** Park the exact lock's release for its durable owner; any answer but a parked 200 leaves the lock held. */
 export async function parkDurableTurnLock(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth): Promise<boolean> {
   const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
-  const result = await postJson<{ deferred?: boolean }>(namespace, key, TURN_STREAM_PATHS.lockPark, input, auth)
-  return result.status === 200 && result.body.deferred === true
+  return (await postJsonOk<{ deferred?: boolean }>(namespace, key, TURN_STREAM_PATHS.lockPark, input, auth)).deferred === true
 }
 
 /** Fenced out-of-band release — the DO refuses a successor lock (started

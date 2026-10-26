@@ -21,6 +21,10 @@ export function createChatTurnOwnership(state: OwnershipState,
   log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: string,
   options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release' | 'park'> },
 ) {
+  // A cleanup step that fails is logged and never stops the steps after it.
+  const attempt = async (step: string, run: () => unknown): Promise<void> => {
+    try { await run() } catch (err) { log(`[chat-routes] ${step} failed`, { turnId: turnStreamId, error: err instanceof Error ? err.message : String(err) }) }
+  }
   const handoffCompletion = (handoff?: NativeCompletionHandoffOptions): Promise<void> => {
     if (!state.completionHandoffPromise) {
       state.completionHandoffPromise = (async () => {
@@ -34,12 +38,7 @@ export function createChatTurnOwnership(state: OwnershipState,
           registrationFailed = true
           throw error
         } finally {
-          try {
-            await state.tap?.detach()
-          } catch (err) {
-            log('[chat-routes] turn buffer detach failed', { turnId: turnStreamId,
-              error: err instanceof Error ? err.message : String(err) })
-          }
+          await attempt('turn buffer detach', () => state.tap?.detach())
           try {
             await state.draft?.close()
           } catch (err) {
@@ -59,23 +58,15 @@ export function createChatTurnOwnership(state: OwnershipState,
     // Losing the live observation is not evidence that a detached backend stopped.
     // The exact execution stays fenced; a parked intent lets its durable owner release it once proven.
     if (state.producer?.terminalObserved && !state.producer.terminalObserved()) {
-      try { await options.turnLock?.park?.(state.lockHandle) }
-      catch (err) { log('[chat-routes] turnLock.park failed', { turnId: turnStreamId, error: err instanceof Error ? err.message : String(err) }) }
+      await attempt('turnLock.park', () => options.turnLock?.park?.(state.lockHandle))
       await state.closeCancellation?.()
       return
     }
     state.lockReleased = true
     // Expected cooperative completion must not interpret its own release as
     // external loss of execution authority. A close failure must not skip release.
-    try { await state.closeCancellation?.() }
-    catch (err) { log('[chat-routes] turn cancellation close failed', { turnId: turnStreamId,
-      error: err instanceof Error ? err.message : String(err) }) }
-    try {
-      await options.turnLock!.release(state.lockHandle)
-    } catch (err) {
-      log('[chat-routes] turnLock.release failed', { turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err) })
-    }
+    await attempt('turn cancellation close', () => state.closeCancellation?.())
+    await attempt('turnLock.release', () => options.turnLock!.release(state.lockHandle))
   }
   return { handoffCompletion, releaseLock }
 }
