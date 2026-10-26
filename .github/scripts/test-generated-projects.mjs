@@ -13,12 +13,12 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const PNPM_VERSION = '11.24.0'
-const NPM_VERSION = '12.0.2'
 const NODE_RANGE = '>=22.13'
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000
 const PACK_TIMEOUT_MS = 2 * 60 * 1000
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const { packageManager, devDependencies } = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+const PNPM_VERSION = packageManager.replace(/^pnpm@/, '')
 const createAgentAppDir = join(repo, 'create-agent-app')
 const workspaceProof = fileURLToPath(new URL('../../create-agent-app/proof/workspace-browser.mjs', import.meta.url))
 const require = createRequire(import.meta.url)
@@ -161,10 +161,10 @@ function assertGeneratedAppDefaults(project, env) {
 
 function assertToolVersions(env) {
   const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8'))
-  assertEqual(npmPackage.version, NPM_VERSION, 'installed npm package version')
+  assertEqual(npmPackage.version, devDependencies.npm, 'installed npm package version')
   assertEqual(
     capture(process.execPath, [npmCli, '--version'], { env, timeout: PACK_TIMEOUT_MS }).trim(),
-    NPM_VERSION,
+    devDependencies.npm,
     'npm executable version',
   )
   assertEqual(
