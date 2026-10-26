@@ -12,6 +12,7 @@ import {
   reasoningToolThread,
   shortThread,
   streamingAssistantMessage,
+  twoAgentsThread,
   usageReportMessage,
 } from './fixtures'
 import { renderMarkdown } from './markdown'
@@ -93,6 +94,16 @@ export const AgentPreparingWorkspace: Story = {
 /** Three turns: user bubble, assistant with reasoning + approval card, follow-up. */
 export const Short: Story = {
   args: { messages: shortThread, approval },
+}
+
+/**
+ * A turn addressed to two agents. The store holds one assistant row; the
+ * transcript splits it at its speaker parts and labels each answer with the
+ * agent that wrote it, in the order the mentions were typed.
+ */
+export const TwoAgentsAnswer: Story = {
+  name: 'Two agents answer one message',
+  args: { messages: twoAgentsThread, renderMarkdown, approval },
 }
 
 /**

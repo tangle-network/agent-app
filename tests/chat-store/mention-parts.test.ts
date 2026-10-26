@@ -125,3 +125,24 @@ describe('toChatMessageParts — mention is part of the stored vocabulary', () =
     ])).toEqual([])
   })
 })
+
+describe('agent mention and speaker parts', () => {
+  it('persists an agent mention with its handle as the token and its stable id', () => {
+    const part = mentionInputToPart({ kind: 'agent', agentId: 'ap_research', handle: 'research-lead', name: 'Research Lead' })
+    expect(part).toEqual({ type: 'mention', mentionKind: 'agent', path: 'research-lead', name: 'Research Lead', agentId: 'ap_research' })
+    expect(isChatMentionPart(part)).toBe(true)
+    // An agent mention without its id is not storable: a rename would orphan it.
+    expect(isChatMentionPart({ type: 'mention', mentionKind: 'agent', path: 'research-lead', name: 'Research Lead' })).toBe(false)
+    expect(mentionPartsFromMessageParts([part, { type: 'text', text: 'hi' }])).toEqual([part])
+  })
+
+  it('stores a speaker part and drops a malformed one', () => {
+    const [kept, ...dropped] = toChatMessageParts([
+      { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+      { type: 'speaker', id: '', name: 'Nobody' },
+      { type: 'speaker', name: 'No id' },
+    ])
+    expect(kept).toEqual({ type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' })
+    expect(dropped).toEqual([])
+  })
+})

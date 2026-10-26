@@ -115,6 +115,9 @@ export interface ChatStreamCallbacks {
   /** The turn's intent line (`session.run.intent`): show it as a labeled status line until the first `onText`. */
   onIntent?: (intent: TurnIntentData) => void
   onText?: (delta: string) => void
+  /** The next responder of a turn addressed to several agents starts: open a
+   *  new assistant block under this author; text that follows is theirs. */
+  onSpeaker?: (speaker: { id: string; name: string; handle?: string }) => void
   onReasoning?: (delta: string) => void
   /** The message's reasoning so far, when it started and when it ended, after every reasoning delta and once
    *  when thinking ends. Spread it onto `ReasoningRow`. `consumeChatStream` and `streamChatTurn` keep it;
@@ -316,6 +319,11 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       if (typeof evt.text === 'string') {
         cb.onText?.(evt.text)
         receivedContent = true
+      }
+      break
+    case 'speaker':
+      if (typeof evt.id === 'string' && typeof evt.name === 'string') {
+        cb.onSpeaker?.({ id: evt.id, name: evt.name, ...(typeof evt.handle === 'string' ? { handle: evt.handle } : {}) })
       }
       break
     case 'reasoning':

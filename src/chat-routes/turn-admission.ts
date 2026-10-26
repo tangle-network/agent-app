@@ -9,10 +9,10 @@ import {
   assertPromptPartsWithinCap,
   ChatTurnInputError,
   parseChatTurnParts,
-  parseFileMentions,
+  parseMentions,
   type ChatTurnFilePartInput,
   type ChatTurnRequestPayload,
-  type FileMention,
+  type ChatMention,
 } from './wire'
 
 /** A turn whose body parsed and whose caller `authorize` admitted. */
@@ -35,7 +35,7 @@ export interface ParsedTurnBody {
   payload: ChatTurnRequestPayload
   content: string
   fileParts: ChatTurnFilePartInput[]
-  mentions: FileMention[]
+  mentions: ChatMention[]
   turnId: string | undefined
 }
 
@@ -76,7 +76,7 @@ export function validateTurnBody(body: Record<string, unknown>): ParsedTurnBody 
   const fileParts = parseChatTurnParts(body.parts)
   // Path references, not bytes — validated for traversal/charset/count, never
   // counted against the inline-parts byte budget below.
-  const mentions = parseFileMentions(body.mentions)
+  const mentions = parseMentions(body.mentions)
   // A mention is a turn's whole payload often enough to count: "@chart.png"
   // with no prose is a real ask, and the pointer block the mentions produce is
   // prompt content the model reads.
@@ -121,7 +121,7 @@ export function validateTurnBody(body: Record<string, unknown>): ParsedTurnBody 
 export function userPartsWithFiles(
   userParts: Array<Record<string, unknown>>,
   fileParts: ChatTurnFilePartInput[],
-  mentions: FileMention[],
+  mentions: ChatMention[],
 ): ChatMessagePart[] {
   return toChatMessageParts([
     ...userParts,

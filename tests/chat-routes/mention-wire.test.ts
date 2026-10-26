@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  agentMentionsOf,
   buildMentionPromptBlock,
   ChatTurnInputError,
+  fileMentionsOf,
+  parseMentions,
   fileMentionsToParts,
   mediaTypeForMentionPath,
   MENTION_MAX_COUNT,
@@ -230,5 +233,52 @@ describe('parseFileMentions', () => {
     expect(fileMentionsToParts(parsed)).toEqual([
       { type: 'image', filename: 'logo.png', path: 'assets/logo.png', mediaType: 'image/png' },
     ])
+  })
+})
+
+describe('agent mentions on the wire', () => {
+  it('parses an agent beside files, in order, deduped by id', () => {
+    const mentions = parseMentions([
+      { kind: 'agent', agentId: 'ap_research', handle: 'research-lead', name: 'Research Lead' },
+      { path: 'notes.md', name: 'notes.md' },
+      { kind: 'agent', agentId: 'ap_research', handle: 'research-lead', name: 'Research Lead' },
+      { kind: 'agent', agentId: 'ap_writer', handle: 'writer', name: 'Writer' },
+    ])
+    expect(mentions).toEqual([
+      { kind: 'agent', agentId: 'ap_research', handle: 'research-lead', name: 'Research Lead' },
+      { path: 'notes.md', name: 'notes.md' },
+      { kind: 'agent', agentId: 'ap_writer', handle: 'writer', name: 'Writer' },
+    ])
+    expect(agentMentionsOf(mentions).map((m) => m.handle)).toEqual(['research-lead', 'writer'])
+    expect(fileMentionsOf(mentions)).toEqual([{ path: 'notes.md', name: 'notes.md' }])
+    // The file-only reader keeps its contract for products that never address agents.
+    expect(parseFileMentions([{ kind: 'agent', agentId: 'ap_x', handle: 'x', name: 'X' }, { path: 'a.md', name: 'a.md' }]))
+      .toEqual([{ path: 'a.md', name: 'a.md' }])
+  })
+
+  it('refuses a handle that is not what a person types after @, and an unnamed agent', () => {
+    expect(() => parseMentions([{ kind: 'agent', agentId: 'ap_x', handle: 'Research Lead', name: 'Research Lead' }]))
+      .toThrow(ChatTurnInputError)
+    expect(() => parseMentions([{ kind: 'agent', agentId: '', handle: 'x', name: 'X' }])).toThrow(/agentId/)
+    expect(() => parseMentions([{ kind: 'agent', agentId: 'ap_x', handle: 'x', name: '   ' }])).toThrow(/name/)
+  })
+
+  it('counts agents and files against one cap', () => {
+    const many = Array.from({ length: MENTION_MAX_COUNT + 1 }, (_, i) =>
+      i % 2 ? { path: `f${i}.md`, name: `f${i}.md` } : { kind: 'agent', agentId: `ap_${i}`, handle: `a${i}`, name: `A${i}` })
+    expect(() => parseMentions(many)).toThrow(/exceed/)
+  })
+})
+
+describe('agent mentions never reach the box', () => {
+  it('are left out of file parts and the pointer block', () => {
+    const mentions = parseMentions([
+      { kind: 'agent', agentId: 'ap_research', handle: 'research-lead', name: 'Research Lead' },
+      { path: 'notes.md', name: 'notes.md' },
+    ])
+    expect(fileMentionsToParts(mentions)).toEqual([{ type: 'file', filename: 'notes.md', path: 'notes.md' }])
+    expect(buildMentionPromptBlock(mentions)).toContain('notes.md')
+    expect(buildMentionPromptBlock(mentions)).not.toContain('research-lead')
+    expect(buildMentionPromptBlock([{ kind: 'agent', agentId: 'ap_x', handle: 'x', name: 'X' }])).toBe('')
   })
 })
