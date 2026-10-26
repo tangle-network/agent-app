@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.44
+
+- signoff: retry a surface check's navigation once after a transient network fault (#1358)
+
 ## 0.63.43
 
 - Fail an autonomous computer step when its box agent asks through the runtime (#1357)
