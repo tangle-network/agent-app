@@ -129,7 +129,7 @@ surface pairings; inspect it in the consuming product.
 
 `tests/theme/tokens-contract.test.ts` checks the canonical input hash,
 self-contained packed stylesheet, generated freshness, required HSL and bitmap
-forms, source variable references, and utility mappings. The theme-contract
+forms, and utility mappings. The theme-contract
 scanner follows the source stylesheet's local and package CSS imports; the
 installed public stylesheet has already inlined them. Focus and loading
 announcement tests keep their independent accessibility protections.

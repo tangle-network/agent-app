@@ -4,8 +4,8 @@
  *
  * A box keeps workspace files under one directory; the app's Vault is a
  * different store, and a file the box agent saves proves nothing about it.
- * So the step lists the box's tree before and after the run, saves each new or
- * changed file through the app's `save`, and appends one receipt line to the
+ * So when the step's run has ended, the step lists the box's tree, saves each
+ * file changed since the run started through the app's `save`, and appends one receipt line to the
  * answer. That line is the only statement about Vault contents the model may
  * relay ({@link COMPUTER_FILES_GUIDANCE}). Legal learned this in production:
  * a child saved a file outside the Vault and the model said it was saved (#547).
@@ -96,21 +96,29 @@ export async function listComputerFiles(box: SandboxInstance, root: string): Pro
   }
 }
 
-/** Save what the step wrote since `before` into the Vault and return its receipt. */
+// Filesystem mtimes are coarser than the runtime's clock; a file written in the run's first second still counts.
+const MTIME_TOLERANCE_MS = 1_000
+
+/**
+ * Save what the step wrote into the Vault and return its receipt. `since` is when the step's run started, from the
+ * runtime's execution ledger (`session.runs()`): the box's own clock, so the files it changed since then are this
+ * step's, with no listing kept from before the send. A live call, a reattached call and a later sweep each copy the
+ * same files; `vault.save` must be idempotent for a path and content.
+ */
 export async function saveComputerFiles(input: {
   box: SandboxInstance
   vault: ComputerVault
-  before: ComputerFileListing
+  since: number | undefined
   executionId: string
 }): Promise<ComputerFileReceipt> {
-  const { box, vault, before, executionId } = input
+  const { box, vault, since, executionId } = input
   const root = vault.root.replace(/\/+$/, '')
   const unchecked = (error: string): ComputerFileReceipt => {
     console.warn(JSON.stringify({ event: 'agent_app_computer_files_unchecked', executionId, error }))
     return { checked: false, saved: [], computerOnly: [],
       text: 'Workspace vault: the app could not check which files this step saved, so none is confirmed to be in it.' }
   }
-  if (!before.succeeded) return unchecked(before.error)
+  if (since === undefined || !Number.isFinite(since)) return unchecked('the runtime ledger did not report when the step started')
   const after = await listComputerFiles(box, root)
   if (!after.succeeded) return unchecked(after.error)
 
@@ -119,8 +127,7 @@ export async function saveComputerFiles(input: {
   const saved: string[] = []
   const computerOnly: Array<{ path: string; reason: string }> = []
   for (const [path, file] of Object.entries(after.files)) {
-    const earlier = before.files[path]
-    if (earlier && earlier.size === file.size && earlier.mtime === file.mtime) continue
+    if (file.mtime < since - MTIME_TOLERANCE_MS) continue
     if (!isWorkspaceFileExportable(path)) continue
     const refusal = saved.length + computerOnly.length >= maxFiles ? `more than ${maxFiles} files changed` : refuse(path, file.size)
     if (refusal) {

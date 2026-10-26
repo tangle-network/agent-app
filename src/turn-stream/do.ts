@@ -236,6 +236,8 @@ export class TurnStreamDO {
           return jsonResponse({ active: await this.loadActiveLock(Date.now(), lockStorageKeyOf(await jsonBody(request))) })
         case TURN_STREAM_PATHS.lockRelease:
           return this.handleLockRelease(request)
+        case TURN_STREAM_PATHS.lockPark:
+          return this.handleLockRelease(request, true)
         case TURN_STREAM_PATHS.lockReleaseInterrupted:
           return this.handleLockReleaseInterrupted(request)
         case TURN_STREAM_PATHS.turnEventsAppend:
@@ -410,12 +412,6 @@ export class TurnStreamDO {
         this.recentCreated = this.recentCreated.slice(-MAX_RECENT_CREATED)
       }
     }
-    // (The per-turn rebroadcast lane that used to live here — segment
-    // buffering + terminal-event lock auto-release — was REMOVED with the
-    // deprecated segment store. Lock release is owned by the cooperative
-    // release and the stale-lock reconciler, which are the paths that
-    // actually free a wedged lane.)
-
     // Fan out to live sockets for this session. Enumerate accepted sockets so
     // fan-out is correct after WebSocket hibernation (no in-memory socket map).
     // Only `synced` sockets receive live frames; an un-synced socket is still
@@ -546,7 +542,7 @@ export class TurnStreamDO {
     return jsonResponse({ acquired: true, lock } satisfies TurnLockAcquireResult)
   }
 
-  private async handleLockRelease(request: Request): Promise<Response> {
+  private async handleLockRelease(request: Request, park = false): Promise<Response> {
     const body = await jsonBody(request)
     const executionId = stringValue(body?.executionId)
     const lockId = stringValue(body?.lockId)
@@ -555,7 +551,7 @@ export class TurnStreamDO {
     }
 
     const key = lockStorageKeyOf(body)
-    if (await this.shouldDeferLockRelease(executionId)) {
+    if (park || await this.shouldDeferLockRelease(executionId)) {
       const deferred = await this.deferLockRelease(key, { executionId, lockId })
       return jsonResponse({ released: false, deferred })
     }

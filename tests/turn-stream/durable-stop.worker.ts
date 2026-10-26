@@ -4,7 +4,7 @@ import { requestDurableTurnCancellation, type TurnCancellationIdentity } from '.
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
 import type { ChatTurnMessageStore } from '../../src/chat-routes/turn-route-contracts'
 import { handleDurableStopTransport, type StopFixtureEnv as Env, type StopFixtureContext as Context } from './durable-stop.transport'
-export { FixtureTurnStream, ShortTurnStream, ControlOutageTurnStream, DeferredTurnStream, ShortDeferredTurnStream, BarrierTurnStream } from './durable-stop.transport'
+export { FixtureTurnStream, ShortTurnStream, ControlOutageTurnStream, DeferredTurnStream, ShortDeferredTurnStream, BarrierTurnStream, PublishedTurnStream } from './durable-stop.transport'
 
 function messages(env: Env): ChatTurnMessageStore {
   return {

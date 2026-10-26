@@ -66,3 +66,19 @@ describe('retrySandboxTransient', () => {
     expect(sleep).not.toHaveBeenCalled()
   })
 })
+
+describe('transport failures (network: true)', () => {
+  const reset = () => Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET' })
+  const timeout = () => Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' })
+
+  it('stays off by default and classifies a reset, fetch failed and a pre-stream timeout when asked', () => {
+    expect(classifySandboxTransientFailure(reset())).toBeNull()
+    expect(classifySandboxTransientFailure(reset(), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(new Error('wrapped', { cause: new TypeError('fetch failed') }), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(timeout(), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(Object.assign(new Error('origin timed out'), { status: 524 }), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(new Error('Network connection lost.'), { network: true })?.code).toBe('network.transient')
+    expect(classifySandboxTransientFailure(Object.assign(new Error('aborted'), { name: 'AbortError' }), { network: true })).toBeNull()
+    expect(classifySandboxTransientFailure(new Error('runtime exploded'), { network: true })).toBeNull()
+  })
+})

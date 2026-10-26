@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-312 exports.
+308 exports.
 
 ### `adaptSandboxStream`
 
@@ -147,7 +147,7 @@ interface BuildSandboxToolFileMountsOptions
 `function` — The typed transient failure `error` carries anywhere in its cause chain, or null.
 
 ```ts
-(error: unknown) => SandboxTransientFailure | null
+(error: unknown, options?: SandboxTransientClassifyOptions) => SandboxTransientFailure | null
 ```
 
 ### `classifySeveredStream`
@@ -172,14 +172,6 @@ interface BuildSandboxToolFileMountsOptions
 
 ```ts
 string
-```
-
-### `COMPUTER_STEP_RECEIPT_TABLE_DDL`
-
-`const` — Paste into a product migration; the store never runs DDL.
-
-```ts
-"CREATE TABLE IF NOT EXISTS computer_step_receipts (\n step_id TEXT PRIMARY KEY,\n state TEXT NOT NULL,\n receipt TEXT…
 ```
 
 ### `computerFileContract`
@@ -220,30 +212,6 @@ interface ComputerStep
 
 ```ts
 interface ComputerStepOptions
-```
-
-### `ComputerStepReceipt`
-
-`interface`
-
-```ts
-interface ComputerStepReceipt
-```
-
-### `ComputerStepReceiptD1Like`
-
-`interface` — The D1 surface the store uses.
-
-```ts
-interface ComputerStepReceiptD1Like
-```
-
-### `ComputerStepReceipts`
-
-`interface`
-
-```ts
-interface ComputerStepReceipts
 ```
 
 ### `ComputerStepRun`
@@ -292,14 +260,6 @@ interface ComputerVaultFile
 
 ```ts
 (options: ComputerStepOptions) => ComputerStep
-```
-
-### `createD1ComputerStepReceipts`
-
-`function` — Receipts in one D1 table, shared by every isolate.
-
-```ts
-(db: ComputerStepReceiptD1Like, options?: { table?: string | undefined; retentionMs?: number | undefined; now?: (() =>…
 ```
 
 ### `createD1PrewarmClaimStore`
@@ -436,14 +396,6 @@ interface D1PrewarmClaimStoreOptions
 
 ```ts
 (slots: readonly number[], from: number, at: number) => number[]
-```
-
-### `DEFAULT_COMPUTER_STEP_RECEIPT_TABLE`
-
-`const`
-
-```ts
-"computer_step_receipts"
 ```
 
 ### `DEFAULT_ESCALATION_TOOLS`
@@ -1302,6 +1254,14 @@ number
 string
 ```
 
+### `SANDBOX_PLATFORM_CALL_RETRY`
+
+`const` — Short platform calls whose blips clear in seconds: transport failures included, three retries over 3.5 s.
+
+```ts
+SandboxTransientRetryOptions
+```
+
 ### `SANDBOX_RUN_DESCRIPTION`
 
 `const`
@@ -1758,6 +1718,14 @@ type SandboxToolSpec
 (attempt: number) => number
 ```
 
+### `SandboxTransientClassifyOptions`
+
+`interface`
+
+```ts
+interface SandboxTransientClassifyOptions
+```
+
 ### `SandboxTransientDeadlineError`
 
 `class` — The error a caller raises when a transient failure outlasted the deadline.
@@ -1792,10 +1760,10 @@ interface SandboxTransientRetryOptions
 
 ### `saveComputerFiles`
 
-`function` — Save what the step wrote since `before` into the Vault and return its receipt.
+`function` — Save what the step wrote into the Vault and return its receipt.
 
 ```ts
-(input: { box: SandboxInstance; vault: ComputerVault; before: ComputerFileListing; executionId: string; }) => Promise<C…
+(input: { box: SandboxInstance; vault: ComputerVault; since: number | undefined; executionId: string; }) => Promise<Com…
 ```
 
 ### `ScopedTokenResult`

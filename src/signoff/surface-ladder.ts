@@ -25,7 +25,7 @@
  * they are unit-tested without a browser.
  */
 
-import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount, gotoRoute } from './browser-budget'
 
 /** sRGB channels 0–255. */
 export type Rgb = readonly [number, number, number]
@@ -382,7 +382,7 @@ export async function checkSurfaceLadder(options: SurfaceLadderOptions): Promise
         }, meter, options.themeScript)
         for (const route of options.routes) {
           await meter.pace()
-          await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
+          await gotoRoute(page, new URL(route, options.baseUrl).toString())
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
           if (options.injectCss) await page.addStyleTag({ content: options.injectCss })

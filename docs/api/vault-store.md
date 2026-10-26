@@ -4,7 +4,7 @@
 
 Source: `src/vault/store/index.ts`
 
-105 exports.
+150 exports.
 
 ### `applyVaultMutationBatch`
 
@@ -12,6 +12,14 @@ Source: `src/vault/store/index.ts`
 
 ```ts
 (kv: KVStore, request: VaultMutationRequest, readHead?: VaultHeadReader, policy?: VaultMutationPolicy) => Promise<...>
+```
+
+### `assertSandboxVaultReconciliation`
+
+`function` — Fail the caller when reconciliation could not establish what the box holds, and report a divergence it deliberately parked.
+
+```ts
+(workspaceId: string, reconciliation: SandboxVaultSyncResult) => void
 ```
 
 ### `buildSandboxVaultRenameUnits`
@@ -30,6 +38,14 @@ Source: `src/vault/store/index.ts`
 (paths: string[]) => VaultNode[]
 ```
 
+### `createSandboxVaultSync`
+
+`function` — Bind the sync engine to a product's Vault store and box directory.
+
+```ts
+(config: SandboxVaultSyncConfig) => { root: string; hydrate: (box: VaultHydrationBox, workspaceId: string, options?: Va…
+```
+
 ### `createVaultCoordinator`
 
 `function` — Create the coordinator for one workspace Durable Object.
@@ -44,6 +60,14 @@ Source: `src/vault/store/index.ts`
 
 ```ts
 <Namespace extends VaultCoordinatorNamespace = VaultCoordinatorNamespace>(config: VaultStoreConfig) => { findVaultRevis…
+```
+
+### `emptyVaultBoxState`
+
+`function`
+
+```ts
+() => StoredVaultBoxState
 ```
 
 ### `flattenVaultTreePaths`
@@ -62,12 +86,36 @@ Source: `src/vault/store/index.ts`
 <T extends SandboxVaultRenameItem>(changes: T[], groupSize: number) => T[][]
 ```
 
+### `healStaleMutation`
+
+`function` — Clears an in-flight marker whose request cannot still be running, moving the generation.
+
+```ts
+(state: StoredVaultBoxState, now: number) => StoredVaultBoxState | null
+```
+
+### `hydrateSandboxVault`
+
+`function` — Hydrate every live Vault head into the box, page by page, until the listing ends.
+
+```ts
+(config: SandboxVaultSyncConfig, box: VaultHydrationBox, workspaceId: string, options?: VaultHydrationOptions) => Promi…
+```
+
 ### `isHiddenVaultFilePath`
 
 `function` — Whether any segment of `filePath` is hidden (starts with a dot).
 
 ```ts
 (filePath: string) => boolean
+```
+
+### `isSyncedBoxWriter`
+
+`function` — Whether a mutation leaves the synced box's copy current without moving the generation: only the reconcile of that same box writes what the box already holds.
+
+```ts
+(state: StoredVaultBoxState, writer: { kind?: unknown; id?: unknown; } | undefined) => boolean
 ```
 
 ### `mapWithConcurrency`
@@ -102,6 +150,30 @@ interface NormalizedVaultSandboxBaseline
 (writer: VaultWriter, allowedSources: readonly string[]) => VaultWriter
 ```
 
+### `parseVaultBoxState`
+
+`function` — The stored state, or a fresh one.
+
+```ts
+(value: unknown) => StoredVaultBoxState
+```
+
+### `parseVaultBoxStateView`
+
+`function` — Parses a view returned by the coordinator; anything else is unknown (null).
+
+```ts
+(value: unknown) => VaultBoxStateView | null
+```
+
+### `parseVaultBoxSyncSkips`
+
+`function` — The skips a sync may carry, or null when the value is not a bounded list of them.
+
+```ts
+(value: unknown) => VaultBoxSyncSkip[] | null
+```
+
 ### `parseVaultHeadMetadata`
 
 `function`
@@ -116,6 +188,14 @@ interface NormalizedVaultSandboxBaseline
 
 ```ts
 (value: unknown) => VaultPathError | null
+```
+
+### `probeSandboxVaultLoss`
+
+`function` — The live baseline paths when the box's Vault directory holds no file at all: a box that lost its disk would otherwise read as a member deleting every file.
+
+```ts
+(config: SandboxVaultSyncConfig, box: VaultReconcileBox, workspaceId: string) => Promise<string[]>
 ```
 
 ### `readReadySandboxFilesystemIncarnation`
@@ -158,6 +238,46 @@ interface NormalizedVaultSandboxBaseline
 interface ReadySandboxFilesystemIncarnation
 ```
 
+### `reconcileSandboxVault`
+
+`function`
+
+```ts
+(config: SandboxVaultSyncConfig, box: VaultReconcileBox, workspaceId: string, options?: SandboxVaultSyncOptions) => Pro…
+```
+
+### `SANDBOX_VAULT_SYNC_CONTRACT`
+
+`const` — The engine's own hydration contract; a product appends its own when its box layout changes.
+
+```ts
+"agent-app-sandbox-vault-sync-v1"
+```
+
+### `SandboxBootstrapConfirmation`
+
+`interface` — What a confirmed bootstrap asks the coordinator to record.
+
+```ts
+interface SandboxBootstrapConfirmation
+```
+
+### `SandboxBootstrapRecord`
+
+`interface` — The box and filesystem whose product bootstrap marker was confirmed.
+
+```ts
+interface SandboxBootstrapRecord
+```
+
+### `sandboxBootstrapRecorded`
+
+`function` — Whether this exact box's filesystem already holds the product bootstrap this marker names.
+
+```ts
+(view: VaultBoxStateView | null, box: VaultBoxIdentity, marker: string) => boolean
+```
+
 ### `SandboxVaultPathRejection`
 
 `interface`
@@ -182,6 +302,14 @@ interface SandboxVaultPathRejection
 interface SandboxVaultRenameItem
 ```
 
+### `SandboxVaultSync`
+
+`type`
+
+```ts
+type SandboxVaultSync
+```
+
 ### `SandboxVaultSyncChange`
 
 `interface`
@@ -190,12 +318,52 @@ interface SandboxVaultRenameItem
 interface SandboxVaultSyncChange
 ```
 
+### `SandboxVaultSyncConfig`
+
+`interface`
+
+```ts
+interface SandboxVaultSyncConfig
+```
+
+### `SandboxVaultSyncOptions`
+
+`interface`
+
+```ts
+interface SandboxVaultSyncOptions
+```
+
 ### `SandboxVaultSyncProgress`
 
 `interface`
 
 ```ts
 interface SandboxVaultSyncProgress
+```
+
+### `SandboxVaultSyncResult`
+
+`interface`
+
+```ts
+interface SandboxVaultSyncResult
+```
+
+### `SandboxVaultSyncStore`
+
+`interface` — The store calls the sync engine makes; `createVaultStore` returns all of them.
+
+```ts
+interface SandboxVaultSyncStore
+```
+
+### `StoredVaultBoxState`
+
+`interface`
+
+```ts
+interface StoredVaultBoxState
 ```
 
 ### `validateVaultFilePath`
@@ -220,6 +388,46 @@ interface SandboxVaultSyncProgress
 
 ```ts
 (workspaceId: string) => void
+```
+
+### `VAULT_BASE64_BODY_MARKER`
+
+`const` — The body prefix of a Vault document whose remainder is base64-encoded binary bytes.
+
+```ts
+"[base64]\n"
+```
+
+### `VAULT_BOX_MUTATION_STALE_MS`
+
+`const` — A mutation in flight longer than this cannot still be running: its request died with the object.
+
+```ts
+number
+```
+
+### `VAULT_BOX_STATE_KEY`
+
+`const` — What the workspace Vault coordinator knows about its box's copy of the Vault.
+
+```ts
+"vaultBoxState"
+```
+
+### `VAULT_BOX_STATE_SCHEMA`
+
+`const`
+
+```ts
+"vault-box-state-v1"
+```
+
+### `VAULT_BOX_SYNC_MAX_SKIPS`
+
+`const` — A hydration that left more files off the box than this records no sync.
+
+```ts
+50
 ```
 
 ### `VAULT_HEAD_SCHEMA`
@@ -300,6 +508,70 @@ interface SandboxVaultSyncProgress
 
 ```ts
 "vault-sandbox-baseline-v3"
+```
+
+### `vaultBinaryDocument`
+
+`function` — The Vault document that stores a binary file the box produced: the product's frontmatter plus the base64 body.
+
+```ts
+(codec: VaultFrontmatterCodec, fields: Record<string, unknown>, base64: string) => string
+```
+
+### `vaultBinaryPayload`
+
+`function` — The base64 payload of a Vault document that stores a binary file, or null for a text document.
+
+```ts
+(codec: VaultFrontmatterCodec, raw: string) => string | null
+```
+
+### `VaultBoxIdentity`
+
+`interface`
+
+```ts
+interface VaultBoxIdentity
+```
+
+### `vaultBoxInSync`
+
+`function` — Whether a complete hydration of this exact box, under this contract, saw the Vault as it is now.
+
+```ts
+(view: VaultBoxStateView | null, box: VaultBoxIdentity, contract: string) => boolean
+```
+
+### `VaultBoxStateView`
+
+`interface` — What a turn reads.
+
+```ts
+interface VaultBoxStateView
+```
+
+### `VaultBoxSync`
+
+`interface` — The box and filesystem whose Vault copy a complete hydration proved current.
+
+```ts
+interface VaultBoxSync
+```
+
+### `VaultBoxSyncRecord`
+
+`interface` — What a complete hydration asks the coordinator to record.
+
+```ts
+interface VaultBoxSyncRecord
+```
+
+### `VaultBoxSyncSkip`
+
+`interface` — A Vault file that hydration left off the box for its size; the agent reads it through the Vault API.
+
+```ts
+interface VaultBoxSyncSkip
 ```
 
 ### `VaultConflictError`
@@ -550,6 +822,14 @@ type VaultHeadReader
 interface VaultHeadState
 ```
 
+### `VaultHydrationBox`
+
+`interface` — The box calls hydration makes; a `@tangle-network/sandbox` instance satisfies it.
+
+```ts
+interface VaultHydrationBox
+```
+
 ### `VaultHydrationError`
 
 `class`
@@ -558,12 +838,36 @@ interface VaultHeadState
 class VaultHydrationError
 ```
 
+### `VaultHydrationFileSystem`
+
+`interface`
+
+```ts
+interface VaultHydrationFileSystem
+```
+
 ### `VaultHydrationIncompleteError`
 
 `class`
 
 ```ts
 class VaultHydrationIncompleteError
+```
+
+### `VaultHydrationOptions`
+
+`interface`
+
+```ts
+interface VaultHydrationOptions
+```
+
+### `VaultHydrationStats`
+
+`interface`
+
+```ts
+interface VaultHydrationStats
 ```
 
 ### `VaultLearningActor`
@@ -710,6 +1014,14 @@ class VaultPrivateRuntimeFileError
 class VaultReadConvergenceError
 ```
 
+### `VaultReconcileBox`
+
+`interface` — The box calls reconciliation makes; a `@tangle-network/sandbox` instance satisfies it.
+
+```ts
+interface VaultReconcileBox
+```
+
 ### `vaultRevisionKey`
 
 `function`
@@ -844,4 +1156,52 @@ interface VaultWriter
 
 ```ts
 type VaultWriterKind
+```
+
+### `viewOfVaultBoxState`
+
+`function`
+
+```ts
+(state: StoredVaultBoxState) => VaultBoxStateView
+```
+
+### `withBootstrap`
+
+`function`
+
+```ts
+(state: StoredVaultBoxState, bootstrap: SandboxBootstrapRecord) => StoredVaultBoxState
+```
+
+### `withMutationFinished`
+
+`function` — Runs whether the mutation applied, conflicted or threw: any of them may have reached KV.
+
+```ts
+(state: StoredVaultBoxState) => StoredVaultBoxState
+```
+
+### `withMutationStarted`
+
+`function`
+
+```ts
+(state: StoredVaultBoxState, operationId: string, now: number) => StoredVaultBoxState
+```
+
+### `withSync`
+
+`function`
+
+```ts
+(state: StoredVaultBoxState, sync: VaultBoxSync) => StoredVaultBoxState
+```
+
+### `withSyncInvalidated`
+
+`function` — A reconcile that left the box and the Vault apart.
+
+```ts
+(state: StoredVaultBoxState) => StoredVaultBoxState
 ```

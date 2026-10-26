@@ -306,6 +306,7 @@ export const TURN_STREAM_PATHS = {
   /** Read the active lock without changing it; also brings the object up before a turn needs it. */
   lockPeek: '/chat-turn-lock/peek',
   lockRelease: '/chat-turn-lock/release',
+  lockPark: '/chat-turn-lock/park',
   lockReleaseInterrupted: '/chat-turn-lock/release-interrupted',
   turnEventsAppend: '/turn-events/append',
   turnEventsRead: '/turn-events/read',
