@@ -32,8 +32,15 @@ const compatibilityDate = productionConfig.match(/^compatibility_date\s*=\s*"([^
 const flags = productionConfig.match(/^compatibility_flags\s*=\s*\[([\s\S]*?)\]/m)?.[1]
 assert(compatibilityDate && flags, 'Consumer Wrangler config must name its compatibility date and flags')
 const compatibilityFlags = [...flags.matchAll(/"([^"]+)"/g)].map(match => match[1]!)
-// The consumer's installed, published agent-app is the older receiver for the park refusal control.
+// The older receiver for the park refusal control is bound explicitly: AGENT_APP_STOP_OLDER_RECEIVER names the exact
+// published package@version, which must be the version installed in the consumer and pinned (with integrity) by its frozen lock.
+const olderReceiver = process.env.AGENT_APP_STOP_OLDER_RECEIVER?.match(/^(@tangle-network\/agent-app)@(\d+\.\d+\.\d+)$/)
+assert(olderReceiver, 'Set AGENT_APP_STOP_OLDER_RECEIVER=@tangle-network/agent-app@<published version without park>')
 const publishedAppRoot = resolve(consumerRoot, 'node_modules/@tangle-network/agent-app')
+const publishedVersion = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as { version: string }).version
+assert.equal(publishedVersion, olderReceiver[2], 'The installed older receiver must be the bound version')
+const olderIntegrity = consumerLock.toString().match(new RegExp(`^  '@tangle-network/agent-app@${olderReceiver[2].replaceAll('.', '\\.')}':\n    resolution: \\{integrity: (sha512-[^}]+)\\}`, 'm'))?.[1]
+assert(olderIntegrity, "The consumer's frozen lock must pin the bound older receiver with its integrity")
 const publishedExport = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as {
   exports: Record<string, { import?: string | { default?: string }; default?: string }> }).exports['./turn-stream']
 const publishedImport = typeof publishedExport?.import === 'string' ? publishedExport.import : publishedExport?.import?.default ?? publishedExport?.default
@@ -364,7 +371,7 @@ try {
     assert.equal(olderLock?.lockId, older.lockId)
     assert.equal(olderLock?.releasePending, undefined)
     assert.deepEqual(await json('/release?published=1', older), { released: true })
-    checks.push('the published pre-park DO refuses park over public HTTP and keeps the lock held')
+    checks.push(`the published pre-park DO ${olderReceiver[0]} (${olderIntegrity}) refuses park over public HTTP and keeps the lock held`)
 
     const abandoned = identity('abandoned')
     await acquire(abandoned)
