@@ -217,15 +217,19 @@ export async function releaseDurableTurnLock(
   return postJsonOk(namespace, key, TURN_STREAM_PATHS.lockRelease, input, auth)
 }
 
-/** Define input parameters to release an interrupted durable turn lock in a workspace or thread */
-export type ReleaseInterruptedDurableTurnLockInput = TurnLockInterruptedReleaseInput
+/** Park the exact lock's release for its durable owner; false (lock still held) unless this DO parked it. */
+export async function parkDurableTurnLock(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth): Promise<boolean> {
+  const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
+  const result = await postJson<{ deferred?: boolean }>(namespace, key, TURN_STREAM_PATHS.lockPark, input, auth)
+  return result.status === 200 && result.body.deferred === true
+}
 
 /** Fenced out-of-band release — the DO refuses a successor lock (started
  *  after `interruptedAt`) and a turnId mismatch. Returns whether any scope
  *  released. */
 export async function releaseInterruptedDurableTurnLock(
   namespace: TurnStreamNamespaceLike,
-  input: ReleaseInterruptedDurableTurnLockInput,
+  input: TurnLockInterruptedReleaseInput,
   auth: TurnStreamAuth,
 ): Promise<boolean> {
   const scopes: readonly TurnLockScope[] = input.scope ? [input.scope] : ['workspace', 'thread']
@@ -377,6 +381,7 @@ function defaultRefusalResponse(
 export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOptions<TContext>): {
   acquire(args: TurnLockSeamArgs<TContext>): Promise<TurnLockSeamResult>
   release(handle: unknown): Promise<void>
+  park(handle: unknown): Promise<boolean>
   warm(target: { tenantId: string; threadId?: string }): Promise<void>
 } {
   const namespace: TurnStreamNamespaceLike = {
@@ -447,6 +452,9 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
       if (!handle) return
       await releaseDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth)
     },
+    async park(handle) {
+      return Boolean(handle) && parkDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth)
+    },
   }
 }
 
@@ -513,9 +521,8 @@ export interface CreateTurnStreamUpgradeHandlerOptions {
 }
 
 /**
- * The worker-entry WebSocket forwarder — WORKSPACE channel only (the
- * per-thread variant went with the deprecated rebroadcast lane; a thread's
- * live turn replay is the sandbox session gateway's job). Call BEFORE the
+ * The worker-entry WebSocket forwarder — WORKSPACE channel only; a thread's
+ * live turn replay is the sandbox session gateway's job. Call BEFORE the
  * app router (a router loader cannot return a 101); returns `null` for
  * requests that are not a WebSocket upgrade on the configured path.
  *

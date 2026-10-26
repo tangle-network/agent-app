@@ -19,7 +19,7 @@ interface OwnershipState {
 /** One transfer of terminal authority, retaining the route only as a live projector. */
 export function createChatTurnOwnership(state: OwnershipState,
   log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: string,
-  options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release'> },
+  options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release' | 'park'> },
 ) {
   const handoffCompletion = (handoff?: NativeCompletionHandoffOptions): Promise<void> => {
     if (!state.completionHandoffPromise) {
@@ -57,8 +57,10 @@ export function createChatTurnOwnership(state: OwnershipState,
   const releaseLock = async (): Promise<void> => {
     if (state.completionHandoff || !state.lockAcquired || state.lockReleased) return
     // Losing the live observation is not evidence that a detached backend stopped.
-    // The exact execution stays fenced until its durable owner reconciles it.
+    // The exact execution stays fenced; a parked intent lets its durable owner release it once proven.
     if (state.producer?.terminalObserved && !state.producer.terminalObserved()) {
+      try { await options.turnLock?.park?.(state.lockHandle) }
+      catch (err) { log('[chat-routes] turnLock.park failed', { turnId: turnStreamId, error: err instanceof Error ? err.message : String(err) }) }
       await state.closeCancellation?.()
       return
     }
