@@ -4,7 +4,7 @@
 
 Source: `src/workspace-react/index.tsx`
 
-28 exports.
+30 exports.
 
 ### `AgentProductIdentity`
 
@@ -36,6 +36,22 @@ interface AgentRailIdentityProps
 
 ```ts
 interface AgentWorkspaceActiveRoute
+```
+
+### `AgentWorkspaceAgentRow`
+
+`interface` — One agent in the workspace roster the rail lists.
+
+```ts
+interface AgentWorkspaceAgentRow
+```
+
+### `AgentWorkspaceAgentsConfig`
+
+`interface` — The workspace's agents under one expandable rail row, like Apps: each row opens the agent's own thread (its direct line and its feed), and an optional create route adds "New agent".
+
+```ts
+interface AgentWorkspaceAgentsConfig
 ```
 
 ### `AgentWorkspaceAppsConfig`
@@ -115,7 +131,7 @@ interface AgentWorkspaceIdentity
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…
+({ children, navItems, sessions, apps, agents, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: A…
 ```
 
 ### `AgentWorkspaceLayoutProps`

@@ -2558,6 +2558,30 @@
           "doc": "Clean up a write whose function threw after the store may have committed."
         },
         {
+          "name": "AGENT_HANDLE_PATTERN",
+          "kind": "const",
+          "signature": "RegExp",
+          "doc": "A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name."
+        },
+        {
+          "name": "agentHandle",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters."
+        },
+        {
+          "name": "AgentMention",
+          "kind": "interface",
+          "signature": "interface AgentMention",
+          "doc": "An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to."
+        },
+        {
+          "name": "agentMentionsOf",
+          "kind": "function",
+          "signature": "(mentions: readonly ChatMention[]) => AgentMention[]",
+          "doc": "The agent mentions of a validated list, in mention order: the turn's responders."
+        },
+        {
           "name": "aggregateNativeCompletionReceipts",
           "kind": "function",
           "signature": "(turns: readonly NativeCompletionTurnReceipt[]) => NativeCompletionReceipt",
@@ -2788,7 +2812,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
+          "signature": "(mentions: readonly (AgentMention | Pick<FileMention, \"name\" | \"path\">)[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
@@ -2820,6 +2844,12 @@
           "kind": "type",
           "signature": "type ChatAttachmentKind",
           "doc": "The image/file split an attachment is rendered and persisted under — the same discriminant as {@link ChatMentionKind}, but a distinct name because an attachment carries content the product uploaded (…"
+        },
+        {
+          "name": "ChatMention",
+          "kind": "type",
+          "signature": "type ChatMention",
+          "doc": "Everything the composer can `@`: a file in the box or an agent in the workspace."
         },
         {
           "name": "ChatMentionKind",
@@ -2862,6 +2892,18 @@
           "kind": "type",
           "signature": "type ChatTurnAfterAuthorizeRelease",
           "doc": "Frees what `afterAuthorize` started, for a turn that ends before `produce` takes it."
+        },
+        {
+          "name": "ChatTurnAgentsOptions",
+          "kind": "interface",
+          "signature": "interface ChatTurnAgentsOptions",
+          "doc": "How a route turns `@agent` mentions into responders."
+        },
+        {
+          "name": "ChatTurnAgentTarget",
+          "kind": "interface",
+          "signature": "interface ChatTurnAgentTarget",
+          "doc": "A workspace agent a turn is addressed to, resolved by the product from an `@` mention."
         },
         {
           "name": "ChatTurnAuthorization",
@@ -3182,6 +3224,12 @@
           "doc": "The official Sandbox methods needed for completed-turn recovery."
         },
         {
+          "name": "composeAgentProducers",
+          "kind": "function",
+          "signature": "<TContext, TResource>(args: ChatTurnProduceArgs<TContext, TResource>, produce: (final: ChatTurnProduceArgs<TContext, TR…",
+          "doc": null
+        },
+        {
           "name": "createAssistantDraftWriter",
           "kind": "function",
           "signature": "(options: AssistantDraftWriterOptions) => AssistantDraftWriter",
@@ -3392,6 +3440,12 @@
           "doc": "A persisted message whose attachment pointers accompany its history text."
         },
         {
+          "name": "DispatchHistoryPov",
+          "kind": "interface",
+          "signature": "interface DispatchHistoryPov",
+          "doc": "Whose eyes the history is read through."
+        },
+        {
           "name": "DispatchPartsOutcome",
           "kind": "type",
           "signature": "type DispatchPartsOutcome",
@@ -3452,9 +3506,15 @@
           "doc": "A file mention resolved from the composer's `@`-picker: the workspace-relative path plus enough metadata to build a prompt part and pointer text."
         },
         {
+          "name": "fileMentionsOf",
+          "kind": "function",
+          "signature": "(mentions: readonly ChatMention[]) => FileMention[]",
+          "doc": "The file mentions of a validated list, for the seams that read the box."
+        },
+        {
           "name": "fileMentionsToParts",
           "kind": "function",
-          "signature": "(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
+          "signature": "(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
           "doc": "Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…"
         },
         {
@@ -3522,6 +3582,12 @@
           "kind": "const",
           "signature": "1500",
           "doc": "A line slower than this shows nothing."
+        },
+        {
+          "name": "isAgentMention",
+          "kind": "function",
+          "signature": "(mention: ChatMention) => mention is AgentMention",
+          "doc": null
         },
         {
           "name": "isCommittingSandboxEvent",
@@ -3785,7 +3851,13 @@
           "name": "parseFileMentions",
           "kind": "function",
           "signature": "(raw: unknown) => FileMention[]",
-          "doc": "Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry."
+          "doc": "The file mentions of the wire list; agent mentions are validated and set aside."
+        },
+        {
+          "name": "parseMentions",
+          "kind": "function",
+          "signature": "(raw: unknown) => ChatMention[]",
+          "doc": "The validated, deduped mention list off the wire: files by path, agents by id, in the order typed."
         },
         {
           "name": "parsePlanFollowUpAttach",
@@ -3922,7 +3994,7 @@
         {
           "name": "projectDispatchHistory",
           "kind": "function",
-          "signature": "(messages: readonly DispatchHistoryMessage[]) => { role: \"user\" | \"assistant\"; content: string; }[]",
+          "signature": "(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: \"user\" | \"assistant\"; content: stri…",
           "doc": "Project persisted rows using the same role and attachment policy as dispatch."
         },
         {
@@ -4054,8 +4126,8 @@
         {
           "name": "routerTurnHistory",
           "kind": "function",
-          "signature": "(priorMessages: readonly Pick<PersistedChatMessageForTurn, \"content\" | \"role\">[], limit?: number) => { role: \"user\" | \"…",
-          "doc": "The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text."
+          "signature": "(priorMessages: readonly (Pick<PersistedChatMessageForTurn, \"content\" | \"role\"> & { parts?: readonly Record<string, unk…",
+          "doc": "The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…"
         },
         {
           "name": "RouterTurnKey",
@@ -4164,6 +4236,18 @@
           "kind": "interface",
           "signature": "interface SniffResult",
           "doc": "Content-based binary/text classification, shared by the attachment upload route (server) and the composer's client-side pre-validation (browser) — both sides must agree on what counts as binary befor…"
+        },
+        {
+          "name": "SPEAKER_EVENT",
+          "kind": "const",
+          "signature": "\"speaker\"",
+          "doc": "The event a viewer receives when the next responder starts."
+        },
+        {
+          "name": "speakerPart",
+          "kind": "function",
+          "signature": "(agent: ChatTurnAgentTarget) => Record<string, unknown>",
+          "doc": null
         },
         {
           "name": "StaleTurnLockOwnerProbeResult",
@@ -4584,6 +4668,12 @@
           "doc": "Define a reasoning part of a chat with text content and optional metadata fields"
         },
         {
+          "name": "ChatSpeakerPart",
+          "kind": "interface",
+          "signature": "interface ChatSpeakerPart",
+          "doc": "Who wrote the parts that follow, when one assistant row holds more than one responder: a turn addressed to `@a"
+        },
+        {
           "name": "ChatStepFinishPart",
           "kind": "interface",
           "signature": "interface ChatStepFinishPart",
@@ -4734,6 +4824,12 @@
           "doc": "Widened to `unknown` — unlike its siblings this guard also runs over raw untyped stored rows (a transcript renderer reads `message.parts` before the typed projection), which is exactly what {@link me…"
         },
         {
+          "name": "isChatSpeakerPart",
+          "kind": "function",
+          "signature": "(part: unknown) => part is ChatSpeakerPart",
+          "doc": null
+        },
+        {
           "name": "ListMessagesOptions",
           "kind": "interface",
           "signature": "interface ListMessagesOptions",
@@ -4754,7 +4850,7 @@
         {
           "name": "mentionInputToPart",
           "kind": "function",
-          "signature": "(input: FileMention) => ChatMentionPart",
+          "signature": "(mention: ChatMention) => ChatMentionPart",
           "doc": "A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists."
         },
         {
@@ -26397,7 +26493,7 @@
           "name": "OtlpSpan",
           "kind": "interface",
           "signature": "interface OtlpSpan",
-          "doc": "One OTLP/JSON span, as Intelligence's ingest reads it."
+          "doc": "One span as an OTLP/HTTP JSON export carries it."
         },
         {
           "name": "otlpTraceId",
@@ -27879,6 +27975,12 @@
           "doc": "A product's limiter bound once to its KV namespace at worker start: `setKV(env.RATE_LIMIT_KV)`, then `check(key, limit, windowSeconds)` anywhere."
         },
         {
+          "name": "expandSpeakerRows",
+          "kind": "function",
+          "signature": "<T extends SpeakerRow>(rows: readonly T[]) => (T & Pick<SpeakerRow, \"author\">)[]",
+          "doc": null
+        },
+        {
           "name": "extractRequestContext",
           "kind": "function",
           "signature": "(request: Request) => RequestContext",
@@ -28113,6 +28215,24 @@
           "doc": "Generic extension → mime for uploads and promoted files."
         },
         {
+          "name": "Speaker",
+          "kind": "interface",
+          "signature": "interface Speaker",
+          "doc": null
+        },
+        {
+          "name": "SPEAKER_ROLE_LABEL",
+          "kind": "const",
+          "signature": "\"Agent\"",
+          "doc": "The role label a split row shows beside the agent's name."
+        },
+        {
+          "name": "SpeakerRow",
+          "kind": "interface",
+          "signature": "interface SpeakerRow",
+          "doc": "A turn addressed to several agents is persisted as ONE assistant row whose parts carry a `speaker` part before each responder's parts."
+        },
+        {
           "name": "STANDARD_SECURITY_HEADERS",
           "kind": "const",
           "signature": "Readonly<{ readonly 'Strict-Transport-Security': \"max-age=31536000; includeSubDomains; preload\"; readonly 'X-Content-Ty…",
@@ -28164,6 +28284,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -28185,6 +28306,12 @@
           "kind": "type",
           "signature": "type ActivityTone",
           "doc": null
+        },
+        {
+          "name": "AGENT_HANDLE_PATTERN",
+          "kind": "const",
+          "signature": "RegExp",
+          "doc": "A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name."
         },
         {
           "name": "AGENT_PROFILE_EDITOR_SECTIONS",
@@ -28215,6 +28342,24 @@
           "kind": "interface",
           "signature": "interface AgentActivityRecord",
           "doc": "A delegation record on the cross-context surface; `missionRef` links a promoted delegation back to the mission/step that spawned it."
+        },
+        {
+          "name": "agentHandle",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters."
+        },
+        {
+          "name": "AgentMention",
+          "kind": "interface",
+          "signature": "interface AgentMention",
+          "doc": "An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to."
+        },
+        {
+          "name": "AgentMentionOption",
+          "kind": "interface",
+          "signature": "interface AgentMentionOption",
+          "doc": "A workspace agent the composer can `@`."
         },
         {
           "name": "AgentProfileChoices",
@@ -28447,7 +28592,7 @@
         {
           "name": "buildMentionPromptBlock",
           "kind": "function",
-          "signature": "(mentions: readonly Pick<FileMention, \"name\" | \"path\">[]) => string",
+          "signature": "(mentions: readonly (AgentMention | Pick<FileMention, \"name\" | \"path\">)[]) => string",
           "doc": "The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`."
         },
         {
@@ -28571,6 +28716,12 @@
           "doc": "Define possible statuses representing the state of a chat interaction"
         },
         {
+          "name": "ChatMention",
+          "kind": "type",
+          "signature": "type ChatMention",
+          "doc": "Everything the composer can `@`: a file in the box or an agent in the workspace."
+        },
+        {
           "name": "ChatMentionKind",
           "kind": "type",
           "signature": "type ChatMentionKind",
@@ -28591,7 +28742,7 @@
         {
           "name": "ChatMessages",
           "kind": "function",
-          "signature": "({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…",
+          "signature": "({ messages: storedMessages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentL…",
           "doc": "The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…"
         },
         {
@@ -29263,7 +29414,7 @@
         {
           "name": "fileMentionsToParts",
           "kind": "function",
-          "signature": "(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
+          "signature": "(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]",
           "doc": "Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…"
         },
         {
@@ -29773,7 +29924,7 @@
         {
           "name": "mentionInputToPart",
           "kind": "function",
-          "signature": "(input: FileMention) => ChatMentionPart",
+          "signature": "(mention: ChatMention) => ChatMentionPart",
           "doc": "A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists."
         },
         {
@@ -30239,6 +30390,12 @@
           "doc": null
         },
         {
+          "name": "rankAgentMentions",
+          "kind": "function",
+          "signature": "(agents: readonly AgentMentionOption[], query: string) => AgentMentionOption[]",
+          "doc": "Agents whose name or handle starts with, then contains, the query; an empty query lists them all."
+        },
+        {
           "name": "rankFileMentions",
           "kind": "function",
           "signature": "(files: readonly FileMention[], query: string, limit: number) => FileMention[]",
@@ -30653,6 +30810,12 @@
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
         },
         {
+          "name": "segmentsFromParts",
+          "kind": "function",
+          "signature": "(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]",
+          "doc": "The ordered text, tool and notice runs of a message, as the transcript interleaves them."
+        },
+        {
           "name": "SessionActionLabels",
           "kind": "interface",
           "signature": "interface SessionActionLabels",
@@ -30837,6 +31000,18 @@
           "kind": "function",
           "signature": "(list: ChatInteraction[], status: \"expired\" | \"answered\") => ChatInteraction[]",
           "doc": "Settles every still-pending ask when the turn ends: `answered` for a turn that completed cleanly, `expired` for one that failed."
+        },
+        {
+          "name": "toolCallFromPart",
+          "kind": "function",
+          "signature": "(part: unknown) => ChatToolCallInfo | null",
+          "doc": "A stored `tool` part as the card the transcript draws."
+        },
+        {
+          "name": "toolCallsFromParts",
+          "kind": "function",
+          "signature": "(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]",
+          "doc": "Every tool call on a message, in stored order."
         },
         {
           "name": "ToolDetailPresentation",
@@ -31346,6 +31521,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -31638,6 +31814,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -31706,6 +31883,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -33085,6 +33263,18 @@
           "doc": "Route data for the shared active-nav resolver."
         },
         {
+          "name": "AgentWorkspaceAgentRow",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceAgentRow",
+          "doc": "One agent in the workspace roster the rail lists."
+        },
+        {
+          "name": "AgentWorkspaceAgentsConfig",
+          "kind": "interface",
+          "signature": "interface AgentWorkspaceAgentsConfig",
+          "doc": "The workspace's agents under one expandable rail row, like Apps: each row opens the agent's own thread (its direct line and its feed), and an optional create route adds \"New agent\"."
+        },
+        {
           "name": "AgentWorkspaceAppsConfig",
           "kind": "interface",
           "signature": "interface AgentWorkspaceAppsConfig",
@@ -33141,7 +33331,7 @@
         {
           "name": "AgentWorkspaceLayout",
           "kind": "function",
-          "signature": "({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…",
+          "signature": "({ children, navItems, sessions, apps, agents, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: A…",
           "doc": "The default agent workspace composition."
         },
         {

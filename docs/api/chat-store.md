@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-63 exports.
+65 exports.
 
 ### `AppendMessageInput`
 
@@ -214,6 +214,14 @@ type ChatPlanPart
 interface ChatReasoningPart
 ```
 
+### `ChatSpeakerPart`
+
+`interface` — Who wrote the parts that follow, when one assistant row holds more than one responder: a turn addressed to `@a
+
+```ts
+interface ChatSpeakerPart
+```
+
 ### `ChatStepFinishPart`
 
 `interface` — Define a chat step finish part indicating completion with optional reason, tokens, and cost
@@ -414,6 +422,14 @@ interface CreateThreadInput
 (part: unknown) => part is ChatMentionPart
 ```
 
+### `isChatSpeakerPart`
+
+`function`
+
+```ts
+(part: unknown) => part is ChatSpeakerPart
+```
+
 ### `ListMessagesOptions`
 
 `interface` — Define options to configure message listing with optional limit and offset parameters
@@ -443,7 +459,7 @@ interface ListThreadsResult
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
 
 ```ts
-(input: FileMention) => ChatMentionPart
+(mention: ChatMention) => ChatMentionPart
 ```
 
 ### `mentionPartsFromMessageParts`

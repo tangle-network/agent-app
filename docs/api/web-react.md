@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-526 exports.
+535 exports.
 
 ### `acceptRejectionReason`
 
@@ -28,6 +28,14 @@ Source: `src/web-react/index.tsx`
 
 ```ts
 type ActivityTone
+```
+
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
 ```
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
@@ -68,6 +76,30 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
+```
+
+### `AgentMentionOption`
+
+`interface` — A workspace agent the composer can `@`.
+
+```ts
+interface AgentMentionOption
 ```
 
 ### `AgentProfileChoices`
@@ -379,7 +411,7 @@ type AttachmentFileResult
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly (AgentMention | Pick<FileMention, "name" | "path">)[]) => string
 ```
 
 ### `buildTurnPhaseEvent`
@@ -542,6 +574,14 @@ type ChatInteractionRestoreMode
 type ChatInteractionStatus
 ```
 
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
+```
+
 ### `ChatMentionKind`
 
 `type` — The image/file split a mention is rendered and persisted under — the composer pill's icon, the dispatched part's `type`, and `ChatMentionPart.mentionKind` are all this one value.
@@ -571,7 +611,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…
+({ messages: storedMessages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentL…
 ```
 
 ### `ChatMessageSegment`
@@ -1467,7 +1507,7 @@ interface FileMention
 `function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
 ### `filterAcceptedFiles`
@@ -2147,7 +2187,7 @@ interface LinkLikeProps
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
 
 ```ts
-(input: FileMention) => ChatMentionPart
+(mention: ChatMention) => ChatMentionPart
 ```
 
 ### `MentionItem`
@@ -2766,6 +2806,14 @@ interface QualityCheckListProps
 interface QuestionOptionListProps
 ```
 
+### `rankAgentMentions`
+
+`function` — Agents whose name or handle starts with, then contains, the query; an empty query lists them all.
+
+```ts
+(agents: readonly AgentMentionOption[], query: string) => AgentMentionOption[]
+```
+
 ### `rankFileMentions`
 
 `function` — Ranks `files` against `query` (case-insensitive), capped to `limit`: name-prefix matches first, then name-substring, then path-substring.
@@ -3318,6 +3366,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `segmentsFromParts`
+
+`function` — The ordered text, tool and notice runs of a message, as the transcript interleaves them.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]
+```
+
 ### `SessionActionLabels`
 
 `interface`
@@ -3564,6 +3620,22 @@ type SubmitInteractionAnswer
 
 ```ts
 (list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
+```
+
+### `toolCallFromPart`
+
+`function` — A stored `tool` part as the card the transcript draws.
+
+```ts
+(part: unknown) => ChatToolCallInfo | null
+```
+
+### `toolCallsFromParts`
+
+`function` — Every tool call on a message, in stored order.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]
 ```
 
 ### `ToolDetailPresentation`

@@ -3223,6 +3223,38 @@ Source: `src/chat-routes/index.ts` · depends on `chat-store`, `harness`, `inter
 type AbortAttachmentWriteFn
 ```
 
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
+```
+
+### `agentMentionsOf`
+
+`function` — The agent mentions of a validated list, in mention order: the turn's responders.
+
+```ts
+(mentions: readonly ChatMention[]) => AgentMention[]
+```
+
 ### `aggregateNativeCompletionReceipts`
 
 `function` — Assemble admitted exact receipts in dispatch order.
@@ -3532,7 +3564,7 @@ interface BuildDispatchPartsInput
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly (AgentMention | Pick<FileMention, "name" | "path">)[]) => string
 ```
 
 ### `buildTurnPhaseEvent`
@@ -3573,6 +3605,14 @@ interface ChatAttachmentInput
 
 ```ts
 type ChatAttachmentKind
+```
+
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
 ```
 
 ### `ChatMentionKind`
@@ -3629,6 +3669,22 @@ interface ChatTurnAfterAuthorizeArgs
 
 ```ts
 type ChatTurnAfterAuthorizeRelease
+```
+
+### `ChatTurnAgentsOptions`
+
+`interface` — How a route turns `@agent` mentions into responders.
+
+```ts
+interface ChatTurnAgentsOptions
+```
+
+### `ChatTurnAgentTarget`
+
+`interface` — A workspace agent a turn is addressed to, resolved by the product from an `@` mention.
+
+```ts
+interface ChatTurnAgentTarget
 ```
 
 ### `ChatTurnAuthorization`
@@ -4055,6 +4111,14 @@ interface ChatTurnUsage
 type CompletedSandboxTurnSource
 ```
 
+### `composeAgentProducers`
+
+`function`
+
+```ts
+<TContext, TResource>(args: ChatTurnProduceArgs<TContext, TResource>, produce: (final: ChatTurnProduceArgs<TContext, TR…
+```
+
 ### `createAssistantDraftWriter`
 
 `function` — Build the coalescing draft writer for one turn.
@@ -4335,6 +4399,14 @@ number
 interface DispatchHistoryMessage
 ```
 
+### `DispatchHistoryPov`
+
+`interface` — Whose eyes the history is read through.
+
+```ts
+interface DispatchHistoryPov
+```
+
 ### `DispatchPartsOutcome`
 
 `type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
@@ -4415,12 +4487,20 @@ interface FileIndexWarmingResponse
 interface FileMention
 ```
 
+### `fileMentionsOf`
+
+`function` — The file mentions of a validated list, for the seams that read the box.
+
+```ts
+(mentions: readonly ChatMention[]) => FileMention[]
+```
+
 ### `fileMentionsToParts`
 
 `function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
 ### `FileMentionsToPartsOptions`
@@ -4509,6 +4589,14 @@ interface HybridTurnProducerOptions
 
 ```ts
 1500
+```
+
+### `isAgentMention`
+
+`function`
+
+```ts
+(mention: ChatMention) => mention is AgentMention
 ```
 
 ### `isCommittingSandboxEvent`
@@ -4857,10 +4945,18 @@ interface ParseChatAttachmentInputsOptions
 
 ### `parseFileMentions`
 
-`function` — Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry.
+`function` — The file mentions of the wire list; agent mentions are validated and set aside.
 
 ```ts
 (raw: unknown) => FileMention[]
+```
+
+### `parseMentions`
+
+`function` — The validated, deduped mention list off the wire: files by path, agents by id, in the order typed.
+
+```ts
+(raw: unknown) => ChatMention[]
 ```
 
 ### `parsePlanFollowUpAttach`
@@ -5044,7 +5140,7 @@ type ProducerWireEvent
 `function` — Project persisted rows using the same role and attachment policy as dispatch.
 
 ```ts
-(messages: readonly DispatchHistoryMessage[]) => { role: "user" | "assistant"; content: string; }[]
+(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: "user" | "assistant"; content: stri…
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
@@ -5217,10 +5313,10 @@ type ResolveChatAttachmentsResult
 
 ### `routerTurnHistory`
 
-`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…
 
 ```ts
-(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+(priorMessages: readonly (Pick<PersistedChatMessageForTurn, "content" | "role"> & { parts?: readonly Record<string, unk…
 ```
 
 ### `RouterTurnKey`
@@ -5365,6 +5461,22 @@ interface SandboxUploadSink
 
 ```ts
 interface SniffResult
+```
+
+### `SPEAKER_EVENT`
+
+`const` — The event a viewer receives when the next responder starts.
+
+```ts
+"speaker"
+```
+
+### `speakerPart`
+
+`function`
+
+```ts
+(agent: ChatTurnAgentTarget) => Record<string, unknown>
 ```
 
 ### `StaleTurnLockOwnerProbeResult`
@@ -5908,6 +6020,14 @@ type ChatPlanPart
 interface ChatReasoningPart
 ```
 
+### `ChatSpeakerPart`
+
+`interface` — Who wrote the parts that follow, when one assistant row holds more than one responder: a turn addressed to `@a
+
+```ts
+interface ChatSpeakerPart
+```
+
 ### `ChatStepFinishPart`
 
 `interface` — Define a chat step finish part indicating completion with optional reason, tokens, and cost
@@ -6108,6 +6228,14 @@ interface CreateThreadInput
 (part: unknown) => part is ChatMentionPart
 ```
 
+### `isChatSpeakerPart`
+
+`function`
+
+```ts
+(part: unknown) => part is ChatSpeakerPart
+```
+
 ### `ListMessagesOptions`
 
 `interface` — Define options to configure message listing with optional limit and offset parameters
@@ -6137,7 +6265,7 @@ interface ListThreadsResult
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
 
 ```ts
-(input: FileMention) => ChatMentionPart
+(mention: ChatMention) => ChatMentionPart
 ```
 
 ### `mentionPartsFromMessageParts`
@@ -34043,7 +34171,7 @@ interface IntelligenceTurnTraceSinkOptions
 
 ### `OtlpSpan`
 
-`interface` — One OTLP/JSON span, as Intelligence's ingest reads it.
+`interface` — One span as an OTLP/HTTP JSON export carries it.
 
 ```ts
 interface OtlpSpan
@@ -35943,6 +36071,14 @@ interface CookieOptions
 (options?: RateLimiterBindingOptions) => { setKV: (kv: KvLike) => void; check: (key: string, limit: number, windowSecon…
 ```
 
+### `expandSpeakerRows`
+
+`function`
+
+```ts
+<T extends SpeakerRow>(rows: readonly T[]) => (T & Pick<SpeakerRow, "author">)[]
+```
+
 ### `extractRequestContext`
 
 `function` — Extract request context for audit trails.
@@ -36255,6 +36391,30 @@ interface SecurityHeaderOptions
 (filename: string) => string
 ```
 
+### `Speaker`
+
+`interface`
+
+```ts
+interface Speaker
+```
+
+### `SPEAKER_ROLE_LABEL`
+
+`const` — The role label a split row shows beside the agent's name.
+
+```ts
+"Agent"
+```
+
+### `SpeakerRow`
+
+`interface` — A turn addressed to several agents is persisted as ONE assistant row whose parts carry a `speaker` part before each responder's parts.
+
+```ts
+interface SpeakerRow
+```
+
 ### `STANDARD_SECURITY_HEADERS`
 
 `const` — Canonical generic response headers used by {@link addSecurityHeaders}.
@@ -36298,7 +36458,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -36322,6 +36482,14 @@ Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes
 
 ```ts
 type ActivityTone
+```
+
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
 ```
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
@@ -36362,6 +36530,30 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
+```
+
+### `AgentMentionOption`
+
+`interface` — A workspace agent the composer can `@`.
+
+```ts
+interface AgentMentionOption
 ```
 
 ### `AgentProfileChoices`
@@ -36673,7 +36865,7 @@ type AttachmentFileResult
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly (AgentMention | Pick<FileMention, "name" | "path">)[]) => string
 ```
 
 ### `buildTurnPhaseEvent`
@@ -36836,6 +37028,14 @@ type ChatInteractionRestoreMode
 type ChatInteractionStatus
 ```
 
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
+```
+
 ### `ChatMentionKind`
 
 `type` — The image/file split a mention is rendered and persisted under — the composer pill's icon, the dispatched part's `type`, and `ChatMentionPart.mentionKind` are all this one value.
@@ -36865,7 +37065,7 @@ interface ChatMessageMetrics
 `function` — The message thread: one centered column; user messages are right-aligned bubbles with a User label; agent messages carry an Agent meta line with model id, tokens/sec, and cost, plus a collapsible thi…
 
 ```ts
-({ messages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentLabel, loading, t…
+({ messages: storedMessages, messageSize, chrome, models, renderMarkdown, renderExtras, durableCards, userLabel, agentL…
 ```
 
 ### `ChatMessageSegment`
@@ -37761,7 +37961,7 @@ interface FileMention
 `function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
 ### `filterAcceptedFiles`
@@ -38441,7 +38641,7 @@ interface LinkLikeProps
 `function` — A validated wire mention (`parseFileMentions` in `/chat-routes`) as the part the turn route persists.
 
 ```ts
-(input: FileMention) => ChatMentionPart
+(mention: ChatMention) => ChatMentionPart
 ```
 
 ### `MentionItem`
@@ -39060,6 +39260,14 @@ interface QualityCheckListProps
 interface QuestionOptionListProps
 ```
 
+### `rankAgentMentions`
+
+`function` — Agents whose name or handle starts with, then contains, the query; an empty query lists them all.
+
+```ts
+(agents: readonly AgentMentionOption[], query: string) => AgentMentionOption[]
+```
+
 ### `rankFileMentions`
 
 `function` — Ranks `files` against `query` (case-insensitive), capped to `limit`: name-prefix matches first, then name-substring, then path-substring.
@@ -39612,6 +39820,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `segmentsFromParts`
+
+`function` — The ordered text, tool and notice runs of a message, as the transcript interleaves them.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]
+```
+
 ### `SessionActionLabels`
 
 `interface`
@@ -39858,6 +40074,22 @@ type SubmitInteractionAnswer
 
 ```ts
 (list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
+```
+
+### `toolCallFromPart`
+
+`function` — A stored `tool` part as the card the transcript draws.
+
+```ts
+(part: unknown) => ChatToolCallInfo | null
+```
+
+### `toolCallsFromParts`
+
+`function` — Every tool call on a message, in stored order.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]
 ```
 
 ### `ToolDetailPresentation`
@@ -40511,7 +40743,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -40865,7 +41097,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/document`
 
-Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
 
 ### `AppDocument`
 
@@ -40926,7 +41158,7 @@ interface AppDocumentProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
 
 ### `SandboxTerminalConnection`
 
@@ -42680,6 +42912,22 @@ interface AgentRailIdentityProps
 interface AgentWorkspaceActiveRoute
 ```
 
+### `AgentWorkspaceAgentRow`
+
+`interface` — One agent in the workspace roster the rail lists.
+
+```ts
+interface AgentWorkspaceAgentRow
+```
+
+### `AgentWorkspaceAgentsConfig`
+
+`interface` — The workspace's agents under one expandable rail row, like Apps: each row opens the agent's own thread (its direct line and its feed), and an optional create route adds "New agent".
+
+```ts
+interface AgentWorkspaceAgentsConfig
+```
+
 ### `AgentWorkspaceAppsConfig`
 
 `interface` — Registered apps shown under one expandable workspace destination.
@@ -42757,7 +43005,7 @@ interface AgentWorkspaceIdentity
 `function` — The default agent workspace composition.
 
 ```ts
-({ children, navItems, sessions, apps, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: AgentWork…
+({ children, navItems, sessions, apps, agents, activeRoute, activeId, product, workspace, prewarm, ...sidebarProps }: A…
 ```
 
 ### `AgentWorkspaceLayoutProps`
