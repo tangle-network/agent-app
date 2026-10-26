@@ -1885,9 +1885,12 @@ describe('runSandboxPrompt text aggregation', () => {
     async function* standalone() {
       for (const e of events) yield e
     }
-    await expect(collectSandboxPromptText(standalone(), 'greet me')).resolves.toBe(
+    const observed: unknown[] = []
+    await expect(collectSandboxPromptText(standalone(), 'greet me', undefined, (event) => observed.push(event))).resolves.toBe(
       await runSandboxPrompt(shell(), boxYielding(events), 'greet me'),
     )
+    // A product streams progress from the same pass: every raw event, in order, echo included.
+    expect(observed).toEqual(events)
   })
 
   it('refuses a stream that ends without a result or terminal confirmation', async () => {
