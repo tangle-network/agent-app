@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.52
+
+- fix(release): allow private workflow receipt reads (#1364)
+
 ## 0.63.51
 
 - chore: adopt Integrations 0.76.2 through maintained peer floors (#1344)
