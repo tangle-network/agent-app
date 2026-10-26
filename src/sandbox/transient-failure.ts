@@ -19,6 +19,8 @@ export type SandboxTransientFailureCode =
   | 'sandbox.dispatch_refused'
   /** A Sandbox API control-plane call failed with a server error. */
   | 'sandbox.control_plane_transient'
+  /** Opt-in (`network`): the request never reached, or never heard back from, a service that could answer. */
+  | 'network.transient'
 
 export interface SandboxTransientFailure {
   code: SandboxTransientFailureCode
@@ -87,8 +89,32 @@ const FILESYSTEM_NOT_READY = /filesystem incarnation is not ready/i
 const RUN_DISPATCH_ENDPOINT = /\/runtime\/agents\/run\/stream(?:[?#]|$)/
 const RUN_DISPATCH_REFUSAL_MESSAGE = /\/runtime\/agents\/run\/stream: error code: (50[234])\b/
 
+const NETWORK_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ECONNREFUSED', 'EPIPE', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT'])
+const NETWORK_MESSAGE = /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|fetch failed|network (error|connection)|platform_unavailable|temporarily unavailable|verification unavailable/i
+
+export interface SandboxTransientClassifyOptions {
+  /**
+   * Also classify transport failures as `network.transient`: a reset, refused or timed-out connection, DNS, `fetch
+   * failed`, a service that answered "temporarily unavailable", and the SDK's pre-stream `TimeoutError` (the server
+   * did not begin responding). A caller's own `AbortError` is deliberate and never transient. Off by default: the
+   * run-dispatch resend acts only on failures the platform reports.
+   */
+  network?: boolean
+}
+
+function networkTransient(chain: Record<string, unknown>[]): SandboxTransientFailure | null {
+  if (chain.some(cause => cause.name === 'AbortError')) return null
+  for (const cause of chain) {
+    const message = typeof cause.message === 'string' ? cause.message : ''
+    if (cause.name === 'TimeoutError' || (typeof cause.code === 'string' && NETWORK_CODES.has(cause.code)) || NETWORK_MESSAGE.test(message)) {
+      return { code: 'network.transient', message: 'The request did not reach a service that could answer' }
+    }
+  }
+  return null
+}
+
 /** The typed transient failure `error` carries anywhere in its cause chain, or null. */
-export function classifySandboxTransientFailure(error: unknown): SandboxTransientFailure | null {
+export function classifySandboxTransientFailure(error: unknown, options: SandboxTransientClassifyOptions = {}): SandboxTransientFailure | null {
   for (const cause of causeChain(error)) {
     const message = typeof cause.message === 'string' ? cause.message : ''
     if (cause.code === 'FILESYSTEM_INCARNATION_NOT_READY' || FILESYSTEM_NOT_READY.test(message)) {
@@ -106,7 +132,7 @@ export function classifySandboxTransientFailure(error: unknown): SandboxTransien
   if (isSandboxApiTransientFailure(serializeSandboxProvisioningError(error))) {
     return { code: 'sandbox.control_plane_transient', message: 'A Sandbox API call failed with a server error' }
   }
-  return null
+  return options.network ? networkTransient(causeChain(error)) : null
 }
 
 /** The error a caller raises when a transient failure outlasted the deadline. */
@@ -126,8 +152,15 @@ export class SandboxTransientDeadlineError extends Error {
 }
 
 export interface SandboxTransientRetryOptions {
-  /** Defaults to {@link SANDBOX_TRANSIENT_DEADLINE_MS}. */
+  /** Defaults to {@link SANDBOX_TRANSIENT_DEADLINE_MS}. Ignored with `delaysMs`. */
   deadlineMs?: number
+  /** Retry also on transport failures; see {@link SandboxTransientClassifyOptions.network}. */
+  network?: boolean
+  /**
+   * Fixed waits, one per retry, instead of the 5 s to 60 s backoff and deadline: for short platform calls whose
+   * blips clear in seconds, such as `[500, 1_000, 2_000]`. When they run out the original error is rethrown.
+   */
+  delaysMs?: readonly number[]
   now?: () => number
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>
   signal?: AbortSignal
@@ -159,12 +192,19 @@ export async function retrySandboxTransient<T>(
     try {
       return await attempt()
     } catch (error) {
-      const failure = classifySandboxTransientFailure(error)
+      const failure = classifySandboxTransientFailure(error, { network: options.network })
       if (!failure) throw error
       const at = now()
       firstSeenAt ??= at
-      const delayMs = sandboxTransientBackoffMs(attempts)
-      if (at + delayMs - firstSeenAt > deadlineMs) throw new SandboxTransientDeadlineError(failure, firstSeenAt, attempts, error)
+      let delayMs: number
+      if (options.delaysMs) {
+        const fixed = options.delaysMs[attempts - 1]
+        if (fixed === undefined) throw error
+        delayMs = fixed
+      } else {
+        delayMs = sandboxTransientBackoffMs(attempts)
+        if (at + delayMs - firstSeenAt > deadlineMs) throw new SandboxTransientDeadlineError(failure, firstSeenAt, attempts, error)
+      }
       options.onRetry?.(failure, attempts, delayMs)
       await sleep(delayMs, options.signal)
     }
