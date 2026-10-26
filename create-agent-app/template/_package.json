@@ -32,7 +32,7 @@
     "@tangle-network/agent-interface": "5.8.1",
     "@tangle-network/agent-knowledge": "22.0.18",
     "@tangle-network/agent-runtime": "0.350.2",
-    "@tangle-network/sandbox": "0.69.10",
+    "@tangle-network/sandbox": "0.69.11",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",
