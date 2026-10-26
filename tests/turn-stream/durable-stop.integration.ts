@@ -39,7 +39,7 @@ assert(olderReceiver, 'Set AGENT_APP_STOP_OLDER_RECEIVER=@tangle-network/agent-a
 const publishedAppRoot = resolve(consumerRoot, 'node_modules/@tangle-network/agent-app')
 const publishedVersion = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as { version: string }).version
 assert.equal(publishedVersion, olderReceiver[2], 'The installed older receiver must be the bound version')
-const olderIntegrity = consumerLock.toString().match(new RegExp(`^  '@tangle-network/agent-app@${olderReceiver[2].replaceAll('.', '\\.')}':\n    resolution: \\{integrity: (sha512-[^}]+)\\}`, 'm'))?.[1]
+const olderIntegrity = consumerLock.toString().match(new RegExp(`^  '@tangle-network/agent-app@${publishedVersion.replaceAll('.', '\\.')}':\n    resolution: \\{integrity: (sha512-[^}]+)\\}`, 'm'))?.[1]
 assert(olderIntegrity, "The consumer's frozen lock must pin the bound older receiver with its integrity")
 const publishedExport = (JSON.parse(readFileSync(resolve(publishedAppRoot, 'package.json'), 'utf8')) as {
   exports: Record<string, { import?: string | { default?: string }; default?: string }> }).exports['./turn-stream']
