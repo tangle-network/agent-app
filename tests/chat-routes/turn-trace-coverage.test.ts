@@ -102,23 +102,20 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     await Promise.all(pending)
 
     expect(snapshot).toBeDefined()
-    const { summary, spans } = snapshot!
-    // One id: the execution id in the Router's header charset, on every model request and on the trace.
+    const { summary, spans, startedAt, endedAt } = snapshot!
+    console.info(JSON.stringify({ event: 'turn_trace_coverage', startedAt, endedAt, summary, spans: spans.map(({ name, kind, startMs, endMs }) => ({ name, kind, startMs, endMs })) }))
     expect(snapshot!.traceId).toBe(turnTraceId(snapshot!.executionId))
     expect(snapshot!.executionId).toMatch(/^trace-app:t-1:\d+$/)
     expect(routerHeaders.length).toBe(2)
     for (const headers of routerHeaders) expect(headers['x-tangle-trace-id']).toBe(snapshot!.traceId)
     expect(snapshot!.traceId).toMatch(/^[\w-]{8,200}$/)
 
-    // The first tool card is visible before the tool finishes and the answer arrives.
     expect(summary.firstVisibleMs).toBeGreaterThanOrEqual(0)
     expect(summary.firstTextMs! - summary.firstVisibleMs!).toBeGreaterThanOrEqual(100)
 
-    // The hill: named child spans cover at least 90% of the turn's wall time.
     expect(summary.coveragePct).toBeGreaterThanOrEqual(90)
     expect(summary.byKind.admission).toBeGreaterThan(0)
     expect(summary.byKind.tool).toBeGreaterThanOrEqual(100)
-    // The Router's Server-Timing splits the wait before the first byte into server and network time.
     expect(summary.byKind.router).toBeGreaterThanOrEqual(30)
     expect(summary.byKind.network).toBeGreaterThan(0)
     expect(Object.values(summary.byKind).reduce((sum, ms) => sum + ms, 0)).toBeCloseTo(summary.coveredMs, 0)
