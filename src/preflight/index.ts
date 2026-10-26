@@ -106,9 +106,11 @@ interface HttpProbeCall {
  *  DNS/connection failure, and any thrown error all become an outcome so the
  *  probe can classify them into an actionable detail. */
 async function runHttp(call: HttpProbeCall): Promise<ProbeOutcome> {
+  // Called as a plain function: workerd refuses its fetch invoked as a method of another object.
+  const { fetchImpl } = call
   let response: Response
   try {
-    response = await call.fetchImpl(call.url, {
+    response = await fetchImpl(call.url, {
       method: call.method,
       headers: call.headers,
       body: call.body,
