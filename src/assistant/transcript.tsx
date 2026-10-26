@@ -23,6 +23,7 @@ import {
   type ChatUiMessage,
   chatToolCallPart,
   ReasoningRow,
+  resolveToolPresentation,
   type ToolDetailRenderers,
 } from "../web-react";
 import type { AssistantState } from "./reducer";
@@ -150,16 +151,18 @@ export function buildAssistantTimeline(
       if (!call) return;
       const renderer = options.toolRenderers?.[call.name];
       const host: ChatUiMessage = { id: message.id, role: "assistant", content: "" };
+      const custom = renderer ? resolveToolPresentation(renderer(call, host)) : undefined;
       items.push({
         id: message.id,
         kind: "custom",
         content: (
           <InlineToolItem
             part={chatToolCallPart(call)}
-            title={toolTitle(call.name)}
+            title={custom?.title ?? toolTitle(call.name)}
+            description={custom?.description}
             // A host renderer returns null for shapes it does not handle; the
             // shared row then falls back to its own input/output detail.
-            renderToolDetail={renderer ? () => renderer(call, host) : undefined}
+            renderToolDetail={renderer ? () => custom?.detail : undefined}
           />
         ),
       });

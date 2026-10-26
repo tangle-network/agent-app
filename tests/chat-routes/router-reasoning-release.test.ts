@@ -54,7 +54,7 @@ function startRouter(bodies: Array<Record<string, any>>): Promise<{ server: Serv
 async function drain(producer: ReturnType<typeof createRouterTurnProducer>, started: number) {
   const arrivals: Array<{ type: string; atMs: number; text: string }> = []
   for await (const event of producer.stream) {
-    arrivals.push({ type: event.type, atMs: Date.now() - started, text: 'text' in event && typeof event.text === 'string' ? event.text : '' })
+    arrivals.push({ type: event.type, atMs: performance.now() - started, text: 'text' in event && typeof event.text === 'string' ? event.text : '' })
   }
   return arrivals
 }
@@ -67,7 +67,7 @@ describe('Router reasoning release', () => {
 
   it('the chat producer asks for it, and the first thought reaches the wire before the answer', async () => {
     bodies.length = 0
-    const started = Date.now()
+    const started = performance.now()
     const producer = createRouterTurnProducer({
       apiKey: 'k', model: 'gemini-3.7-flash', baseUrl: router.url,
       systemPrompt: 's', userMessage: 'How many rooms can take a guest?',
@@ -128,7 +128,7 @@ describe('Router reasoning release', () => {
     const dropsReasoning = await runRouterTurn({ ...base, onEvent: () => {} })
     const noRepeat = await runRouterTurn({ ...base, onEvent: () => {}, showReasoning: true, repeat: false })
     const producerOptOut = createRouterTurnProducer({ ...base, showReasoning: false })
-    await drain(producerOptOut, Date.now())
+    await drain(producerOptOut, performance.now())
     for (const outcome of [quiet, dropsReasoning, noRepeat]) expect(outcome.text).toBe('Four rooms are ready.')
     expect(bodies).toHaveLength(4)
     for (const body of bodies) expect(body.gateway).toBeUndefined()
@@ -140,7 +140,7 @@ describe('Router reasoning release', () => {
       apiKey: 'k', model: 'released-then-empty', fallbackModels: ['gemini-3.7-flash'], baseUrl: router.url,
       systemPrompt: 's', userMessage: 'How many rooms can take a guest?',
     })
-    const arrivals = await drain(producer, Date.now())
+    const arrivals = await drain(producer, performance.now())
 
     expect(bodies.map((body) => body.model)).toEqual(['released-then-empty', 'gemini-3.7-flash'])
     expect(arrivals.filter((event) => event.type === 'text').map((event) => event.text).join('')).toBe('Four rooms are ready.')

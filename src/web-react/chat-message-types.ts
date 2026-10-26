@@ -108,7 +108,7 @@ export interface ChatMessagesProps {
   /** Open a full-transcript view (e.g. {@link RunDrillIn}) from a tool row's
    *  actions slot. */
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
-  /** Per-tool custom detail renderers for the expanded tool row body. */
+  /** Per-tool custom renderers for the row's optional presentation and expanded body. */
   toolRenderers?: ToolDetailRenderers
   /** Stream-error affordance: when the turn failed (a thrown transport error or
    *  a loop-level `onErrorEvent`), pass the message here to render an error row.
@@ -151,9 +151,18 @@ export interface ProposalApprovalHandlers {
   onReject: (proposalId: string, toolCallId: string) => void | Promise<void>
 }
 
-/** Per-tool custom detail renderers for the expanded card body — keyed by
- *  tool name. Return null to fall back to the generic detail view. */
+/** Optional product-owned presentation for an existing shared tool row.
+ *  Missing title/description/detail fields retain the shared defaults. */
+export interface ToolDetailPresentation {
+  title?: string
+  description?: string
+  detail?: ReactNode
+}
+
+/** Per-tool custom renderers, keyed by tool name. A React node customizes only
+ *  the expanded detail; a presentation can also customize the collapsed row.
+ *  Return null to retain every shared default. */
 export type ToolDetailRenderers = Record<
   string,
-  (call: ChatToolCallInfo, message: ChatUiMessage) => ReactNode
+  (call: ChatToolCallInfo, message: ChatUiMessage) => ReactNode | ToolDetailPresentation
 >

@@ -30467,6 +30467,12 @@
           "doc": "This record's own standing, ignoring its inputs."
         },
         {
+          "name": "resolveToolPresentation",
+          "kind": "function",
+          "signature": "(rendered: ReactNode | ToolDetailPresentation) => ToolDetailPresentation",
+          "doc": null
+        },
+        {
           "name": "ResourceFileLimits",
           "kind": "interface",
           "signature": "interface ResourceFileLimits",
@@ -30827,10 +30833,16 @@
           "doc": "Settles every still-pending ask when the turn ends: `answered` for a turn that completed cleanly, `expired` for one that failed."
         },
         {
+          "name": "ToolDetailPresentation",
+          "kind": "interface",
+          "signature": "interface ToolDetailPresentation",
+          "doc": "Optional product-owned presentation for an existing shared tool row."
+        },
+        {
           "name": "ToolDetailRenderers",
           "kind": "type",
           "signature": "type ToolDetailRenderers",
-          "doc": "Per-tool custom detail renderers for the expanded card body — keyed by tool name."
+          "doc": "Per-tool custom renderers, keyed by tool name."
         },
         {
           "name": "ToolRunRecord",

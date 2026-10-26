@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { AssistantTranscript, buildAssistantTimeline } from "./transcript";
 import type {
@@ -79,6 +79,28 @@ describe("buildAssistantTimeline", () => {
         usage: { ...usage, replayed: true },
       }).map((i) => i.id),
     ).not.toContain("turn-cost");
+  });
+});
+
+describe("AssistantTranscript — tool presentation", () => {
+  it("uses product-owned titles, descriptions, and expanded detail", () => {
+    render(
+      <AssistantTranscript
+        view={viewOf([
+          { id: "t1", role: "tool", text: "", tool: { name: "read_record", status: "ok", outcome: { ok: true, result: {} } } },
+        ])}
+        toolRenderers={{
+          read_record: () => ({
+            title: "Read sleep",
+            description: "7 h 24 min",
+            detail: <span>Measured overnight</span>,
+          }),
+        }}
+      />,
+    );
+    const row = screen.getByRole("button", { name: "Read sleep7 h 24 min" });
+    fireEvent.click(row);
+    expect(screen.getByText("Measured overnight")).toBeTruthy();
   });
 });
 
