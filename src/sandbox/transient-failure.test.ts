@@ -83,7 +83,7 @@ describe('transport failures (network: true)', () => {
   })
 
   it('retries on fixed delays, then rethrows the original error', async () => {
-    const sleep = vi.fn(async () => {})
+    const sleep = vi.fn(async (_ms: number) => {})
     let failures = 2
     await expect(retrySandboxTransient(async () => {
       if (failures-- > 0) throw reset()
