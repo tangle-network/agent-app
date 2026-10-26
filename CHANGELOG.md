@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.61
+
+- feat(chat): address workspace agents by @mention; responders answer in turn as one row with speaker parts (#1380)
+
 ## 0.63.60
 
 - chore: align generated sandbox and UI cohorts (#1381)
