@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.47
+
+- fix: restore App verification on the current dependency graph (#1346)
+
 ## 0.63.46
 
 - fix(turn-lock): park an unconfirmed turn's release for its durable owner (#1350)
