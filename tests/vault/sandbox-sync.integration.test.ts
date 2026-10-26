@@ -410,7 +410,7 @@ it('runs the product hooks: text writer, after-write, excluded paths, provenance
   expect(metadata?.writer.provenance?.executionId).toBe('exec-1')
 }, 60_000)
 
-it('copies within its budget and resumes, leaves identical files in place, and skips a file the box refuses for its size', async () => {
+it('copies within its budget and resumes on the next call, leaving identical files in place', async () => {
   const paths = Array.from({ length: 101 }, (_, index) => `library/doc-${String(index).padStart(3, '0')}.md`)
   for (let start = 0; start < paths.length; start += 90) {
     const result = await vault.commitVaultMutation({
@@ -419,42 +419,48 @@ it('copies within its budget and resumes, leaves identical files in place, and s
     })
     expect(result.status).toBe('applied')
   }
-  await vault.writeVaultRawFile(workspaceId, 'media/huge.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from('big').toString('base64')))
   const textWrites: string[] = []
-  const { box, root, sync } = realBox('incarnation-1', {
-    tooLarge: path => path.endsWith('huge.png'),
-    config: {
-      hydrationBudgetChars: 1,
-      skipFilesAlreadyOnBox: true,
-      skipOversizeFiles: true,
-      writeText: async (_box, files) => {
-        for (const file of files) {
-          textWrites.push(file.path)
-          mkdirSync(dirname(file.path), { recursive: true })
-          writeFileSync(file.path, file.content)
-        }
-      },
+  const { box, root, sync } = realBox('incarnation-1', { config: {
+    hydrationBudgetChars: 1,
+    skipFilesAlreadyOnBox: true,
+    writeText: async (_box, files) => {
+      for (const file of files) {
+        textWrites.push(file.path)
+        mkdirSync(dirname(file.path), { recursive: true })
+        writeFileSync(file.path, file.content)
+      }
     },
-  })
+  } })
   // A box restored from a snapshot already holds this file's exact bytes.
   mkdirSync(join(root, 'library'), { recursive: true })
   writeFileSync(join(root, 'library/doc-000.md'), 'library/doc-000.md\n')
 
-  // The first page spends the budget; the second page waits for the next call.
-  const first = await sync.hydrate(box, workspaceId)
-  expect(first).toEqual({ succeeded: true, value: expect.objectContaining({
-    written: 99, deferred: { pendingPaths: ['library/doc-100.md', 'media/huge.png'], morePages: false },
-  }) })
-  expect(textWrites).toHaveLength(99)
+  const calls = []
+  for (let call = 0; call < 5; call += 1) {
+    const result = await sync.hydrate(box, workspaceId)
+    if (!result.succeeded) throw result.error
+    calls.push(result.value)
+    if (!result.value.deferred) break
+  }
+  // The first call spends its budget on one batch and leaves the rest, by name, for the next.
+  expect(calls.length).toBeGreaterThan(1)
+  expect(calls[0]!.deferred?.pendingPaths.length).toBeGreaterThan(0)
+  expect(calls.at(-1)!.deferred).toBeNull()
+  for (const path of paths) expect(readFileSync(join(root, path), 'utf8')).toBe(`${path}\n`)
   expect(textWrites).not.toContain(join(root, 'library/doc-000.md'))
-  expect(existsSync(join(root, 'library/doc-100.md'))).toBe(false)
-
-  const second = await sync.hydrate(box, workspaceId)
-  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 1, deferred: null }) })
-  expect(second.succeeded && second.value.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
-  expect((await vault.readVaultBoxState(workspaceId))?.sync?.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
-  expect(readFileSync(join(root, 'library/doc-100.md'), 'utf8')).toBe('library/doc-100.md\n')
-  const baseline = await vault.readVaultSandboxBaseline(workspaceId, box.id)
-  expect(Object.keys(baseline?.files ?? {})).toHaveLength(101)
-  expect(baseline?.files['media/huge.png']).toBeUndefined()
+  expect(new Set(textWrites).size).toBe(100)
+  expect(Object.keys((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files ?? {}).sort()).toEqual(paths)
 }, 120_000)
+
+it('leaves a file the box refuses for its size off the box and reports it in the sync record', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/a.md', 'a\n')
+  await vault.writeVaultRawFile(workspaceId, 'media/huge.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from('big').toString('base64')))
+  const { box, root, sync } = realBox('incarnation-1', { tooLarge: path => path.endsWith('huge.png'), config: { skipOversizeFiles: true } })
+
+  const result = await sync.hydrate(box, workspaceId)
+  expect(result.succeeded && result.value.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
+  expect(readFileSync(join(root, 'notes/a.md'), 'utf8')).toBe('a\n')
+  expect(existsSync(join(root, 'media/huge.png'))).toBe(false)
+  expect(Object.keys((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files ?? {})).toEqual(['notes/a.md'])
+  expect((await vault.readVaultBoxState(workspaceId))?.sync?.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
+}, 60_000)

@@ -27133,6 +27133,12 @@
           "doc": null
         },
         {
+          "name": "SandboxVaultSyncStageObserver",
+          "kind": "type",
+          "signature": "type SandboxVaultSyncStageObserver",
+          "doc": "A sync stage's timing, for product telemetry."
+        },
+        {
           "name": "SandboxVaultSyncStore",
           "kind": "interface",
           "signature": "interface SandboxVaultSyncStore",

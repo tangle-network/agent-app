@@ -34954,6 +34954,14 @@ interface SandboxVaultSyncProgress
 interface SandboxVaultSyncResult
 ```
 
+### `SandboxVaultSyncStageObserver`
+
+`type` — A sync stage's timing, for product telemetry.
+
+```ts
+type SandboxVaultSyncStageObserver
+```
+
 ### `SandboxVaultSyncStore`
 
 `interface` — The store calls the sync engine makes; `createVaultStore` returns all of them.

@@ -4,7 +4,7 @@
 
 Source: `src/vault/store/index.ts`
 
-150 exports.
+151 exports.
 
 ### `applyVaultMutationBatch`
 
@@ -348,6 +348,14 @@ interface SandboxVaultSyncProgress
 
 ```ts
 interface SandboxVaultSyncResult
+```
+
+### `SandboxVaultSyncStageObserver`
+
+`type` — A sync stage's timing, for product telemetry.
+
+```ts
+type SandboxVaultSyncStageObserver
 ```
 
 ### `SandboxVaultSyncStore`
