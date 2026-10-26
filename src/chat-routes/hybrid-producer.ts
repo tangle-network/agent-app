@@ -82,6 +82,10 @@ export interface HybridTurnBox {
   /** Every computer failure with its cause. The producer already persists the redacted cause chain on the turn's
    *  warning notice (`detail`), and logs it when this is omitted. */
   onFailure?: SandboxRunToolOptions['onFailure']
+  /** What the turn's warning notice keeps as `detail` for a failed call. Members read that notice in the transcript.
+   *  Default: the redacted cause chain ({@link sandboxRunFailureDetail}). Return undefined to keep a cause that holds
+   *  private platform diagnostics off the transcript; `onFailure` still receives the full error. */
+  failureDetail?(error: SandboxRunError): string | undefined
   /** The tool's name and description. Default `sandbox_run` and its shared description. */
   name?: string
   description?: string
@@ -209,10 +213,11 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
       signal: stop,
       ...(box.warm ? { warm: box.warm } : {}),
       onFailure: (error, call) => {
-        const detail = sandboxRunFailureDetail(error)
-        if (call.callId) details.set(call.callId, detail)
+        const detail = box.failureDetail ? box.failureDetail(error) : sandboxRunFailureDetail(error)
+        if (call.callId && detail) details.set(call.callId, detail)
         if (box.onFailure) box.onFailure(error, call)
-        else console.error(JSON.stringify({ event: 'agent_app_sandbox_run_failed', callId: call.callId ?? null, code: error.code, detail }))
+        else console.error(JSON.stringify({ event: 'agent_app_sandbox_run_failed', callId: call.callId ?? null, code: error.code,
+          detail: sandboxRunFailureDetail(error) }))
       },
       ...(box.name ? { name: box.name } : {}),
       ...(box.description ? { description: box.description } : {}),
