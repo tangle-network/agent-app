@@ -149,6 +149,9 @@ it('hydrates text and binary heads byte-exact, records the baseline, and a later
   await vault.writeVaultRawFile(workspaceId, 'notes/next.md', '# Next\n')
   const second = await sync.hydrate(box, workspaceId)
   expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 1, unchanged: 2 }) })
+  // The unchanged binary keeps its on-disk hash, so a reconcile does not read it back as an edit.
+  expect((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files['media/logo.png']?.binary).toBe(true)
+  expect((await sync.reconcile(box, workspaceId)).appliedPaths).toEqual([])
 }, 60_000)
 
 it('commits box edits and new files to the Vault, and refuses a box delete that is not a rename', async () => {
