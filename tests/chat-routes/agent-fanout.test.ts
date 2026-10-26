@@ -20,7 +20,7 @@ function harness(options: { agents?: boolean } = {}) {
   const tables = createChatTables()
   const database = openDatabase([tables.threads, tables.messages])
   const store = createChatStore(database as unknown as ChatDatabase, tables)
-  const produced: Array<{ agent?: string; profile?: string; agents?: string[] }> = []
+  const produced: Array<{ agent?: string; profile?: string; agents?: string[]; executionId?: string }> = []
   const routes = createChatTurnRoutes({
     projectId: 'agent-fanout', store: store as unknown as ChatTurnMessageStore,
     turnStore: createMemoryTurnEventStore(),
@@ -29,7 +29,7 @@ function harness(options: { agents?: boolean } = {}) {
       agents: { resolve: async ({ mentions }) => ROSTER.filter((agent) => mentions.some((m) => m.agentId === agent.id)) },
     }),
     produce: (args) => {
-      produced.push({ agent: args.agent?.id, profile: args.agent?.profile?.name, agents: args.agents?.map((a) => a.id) })
+      produced.push({ agent: args.agent?.id, profile: args.agent?.profile?.name, agents: args.agents?.map((a) => a.id), executionId: args.executionId })
       const text = args.agent ? `${args.agent.name} answers.` : 'The thread agent answers.'
       return {
         stream: (async function* () { yield { type: 'text' as const, text } })(),
@@ -62,10 +62,14 @@ describe('a turn addressed to agents', () => {
       })
       expect(response.status).toBe(200)
       // The order typed, not the roster's order; each producer runs as its agent.
-      expect(h.produced).toEqual([
+      expect(h.produced.map(({ executionId, ...rest }) => rest)).toEqual([
         { agent: 'ap_writer', profile: 'Writer', agents: ['ap_writer', 'ap_research'] },
         { agent: 'ap_research', profile: 'Research Lead', agents: ['ap_writer', 'ap_research'] },
       ])
+      // Each responder ran under its own execution id, derived from the turn's.
+      const ids = h.produced.map((p) => p.executionId!)
+      expect(new Set(ids).size).toBe(2)
+      expect(ids[0]!.endsWith('-1') && ids[1]!.endsWith('-2')).toBe(true)
       // The live stream announces each responder before their text.
       const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
         .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
@@ -115,7 +119,7 @@ describe('a turn addressed to agents', () => {
       expect(JSON.parse(refused.text)).toMatchObject({ code: 'agents_unsupported' })
       const plain = await turn(h.routes, thread.id, { content: 'hi' })
       expect(plain.response.status).toBe(200)
-      expect(h.produced).toEqual([{ agent: undefined, profile: undefined, agents: undefined }])
+      expect(h.produced.map(({ executionId, ...rest }) => rest)).toEqual([{ agent: undefined, profile: undefined, agents: undefined }])
       const assistant = (await h.store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
       expect(assistant.map((row) => row.content)).toEqual(['The thread agent answers.'])
     } finally { h.close() }
