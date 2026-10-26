@@ -928,7 +928,7 @@ interface CreateLegacyAttachmentUploadRouteOptions
 
 ### `createProtectedRuntimeChatProducer`
 
-`function` — Run a profile as one Router turn under a protected model grant (`runProtectedRouterTurn`), projected through the shared chat projection.
+`function` — Project one protected Router turn, publishing usage only from its settled grant.
 
 ```ts
 (options: ProtectedRuntimeChatOptions) => ChatTurnRouteProducer
