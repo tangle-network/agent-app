@@ -9,6 +9,9 @@ Before adding a capability, check whether it belongs to the application shell or
 Execution, evaluation, connector, and sandbox capabilities that make sense without an application's routes or approval queue belong in their owning lower packages.
 Reuse or extend those packages before implementing the same behavior here.
 Explain why existing interfaces cannot meet the requirement when a new primitive is needed.
+Sandbox, computer and workflow name agent-container and Tangle platform primitives.
+Run durability belongs to the sandbox runtime: turn admission, its execution ledger, event replay and deduplicated interactions. This package is a thin client of it and keeps no receipt ledger, dispatch witness or completion owner of its own.
+Agent-authored multi-step automation uses Tangle platform workflows written as AgentGraphs, never Cloudflare Workflows or Durable Objects in this package or a product; a missing guarantee is fixed in agent-container.
 
 Keep product code and domain values out of this package.
 Consumers install engine packages as peers; keep optional dependencies isolated behind the subpaths that use them.
