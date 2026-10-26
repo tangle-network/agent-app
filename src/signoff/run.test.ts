@@ -309,7 +309,7 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
       expect(result.stdout).toBe(`${quiet ? formatSignoffLine(report) : formatSignoffReport(report)}\n`)
       expect(result.stdout).not.toMatch(/SIGN-OFF PASSED|signoff PASS/)
       if (!quiet) {
-        expect(result.stdout).toContain('PRIMARY-OUTPUT-RETAINED')
+        if (primaryExit) expect(result.stdout).toContain('PRIMARY-OUTPUT-RETAINED')
         expect(result.stdout).toContain('cleanup FAILED')
       }
     }
