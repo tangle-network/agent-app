@@ -19,7 +19,7 @@ import { createSidecarRuntimePeer, type RuntimeRun } from './helpers/sidecar-run
 const disk = mkdtempSync(join(tmpdir(), 'computer-step-durability-'))
 const root = join(disk, 'vault')
 mkdirSync(join(root, 'proof'), { recursive: true })
-let mode: 'held' | 'question' = 'held'
+let mode: 'held' | 'question' | 'unasked' = 'held'
 const held: Array<() => void> = []
 const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) => {
   const write = (name: string) => {
@@ -35,6 +35,12 @@ const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) 
     data => peer.finish(run, `The member chose ${String(data?.q0 ?? 'nothing')}. ${write('tone')}`))
     // Without the channel the box agent cannot ask, and decides alone.
     if (!asked) peer.finish(run, `Nobody could be asked, so the agent chose Formal. ${write('tone')}`)
+  }
+  if (mode === 'unasked') {
+    // A backend that asks without the channel: the runtime streams the ask, and nobody can answer it.
+    peer.push(run, { type: 'interaction', data: { request: { id: `ask-${run.executionId.slice(0, 8)}`, kind: 'question',
+      title: 'Which tone do you prefer?', answerSpec: { fields: [] } } } })
+    setTimeout(() => { if (!run.terminal) peer.finish(run, 'Nobody answered, so the agent stopped without a tone.') }, 3_000)
   }
 } })
 let origin = ''
@@ -138,4 +144,11 @@ it('relays the box agent’s question to the member and finishes with the member
   const relayed = result.emitted.find(event => event.kind === 'computer_interaction') as { data?: { data?: { request?: { id?: string } } } } | undefined
   assert.ok(relayed, `the question must stream to the turn: ${JSON.stringify(result.emitted)}`)
   assert.equal(relayed.data?.data?.request?.id, question.id)
+}, 90_000)
+
+it('fails a step without a question channel as soon as its box agent asks anyway', async () => {
+  mode = 'unasked'
+  const result = await step({ callId: 'unasked-call', task: 'Pick a tone and note it.' })
+  assert.equal(result.answer, undefined, `an unanswerable ask must not settle as an answer: ${JSON.stringify(result)}`)
+  assert.match(result.error?.message ?? '', /asked an interactive question during an autonomous run: Which tone do you prefer\?/)
 }, 90_000)
