@@ -234,6 +234,10 @@ it('stores a baseline larger than one Durable Object value as chunks and reads i
   const baseline = await vault.readVaultSandboxBaseline(workspaceId, box.id)
   expect(JSON.stringify(baseline).length).toBeGreaterThan(128 * 1024)
   expect(Object.keys(baseline?.files ?? {}).sort()).toEqual([...paths].sort())
+  const namespace = await runtime.getDurableObjectNamespace('VAULT_COORDINATOR')
+  const stored = await (await namespace.get(namespace.idFromName(workspaceId)).fetch('https://session-stream.internal/test/baseline-values')).json() as Record<string, number>
+  expect(Object.keys(stored).filter(key => key.startsWith('vaultBaselineChunk:')).length).toBeGreaterThan(1)
+  expect(Math.max(...Object.values(stored))).toBeLessThanOrEqual(128 * 1024)
   const reconciled = await sync.reconcile(box, workspaceId)
   expect(reconciled).toEqual(expect.objectContaining({ succeeded: true, complete: true, appliedPaths: [] }))
 }, 600_000)

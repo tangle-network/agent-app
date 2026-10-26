@@ -16,10 +16,17 @@ export class VaultCoordinatorDO {
   }
 
   async fetch(request: Request): Promise<Response> {
+    const { pathname } = new URL(request.url)
     // Test seam: store a box state as a request that died mid-mutation would have left it.
-    if (new URL(request.url).pathname === '/test/box-state') {
+    if (pathname === '/test/box-state') {
       await this.storage.put('vaultBoxState', await request.json())
       return new Response(null, { status: 204 })
+    }
+    // Test seam: the serialized size of each stored baseline value. Miniflare does not
+    // enforce the production per-value limit, so the test reads the layout it stored.
+    if (pathname === '/test/baseline-values') {
+      const values = await this.storage.list<unknown>({ prefix: 'vaultBaseline' })
+      return Response.json(Object.fromEntries([...values].map(([key, value]) => [key, JSON.stringify(value).length])))
     }
     return await this.coordinator.handle(request) ?? new Response('Not found', { status: 404 })
   }
