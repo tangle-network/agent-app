@@ -26033,7 +26033,7 @@
           "name": "createTurnStreamUpgradeHandler",
           "kind": "function",
           "signature": "(options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
-          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job)."
+          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only; a thread's live turn replay is the sandbox session gateway's job."
         },
         {
           "name": "CreateTurnStreamUpgradeHandlerOptions",
@@ -26096,6 +26096,12 @@
           "doc": "Legacy v1 channel capabilities remain unchanged."
         },
         {
+          "name": "parkDurableTurnLock",
+          "kind": "function",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth) => Promise<boolean>",
+          "doc": "Park the exact lock's release for its durable owner; any answer but a parked 200 leaves the lock held."
+        },
+        {
           "name": "peekDurableTurnLock",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: \"workspace\"; threadId?: string | undef…",
@@ -26130,12 +26136,6 @@
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockInterruptedReleaseInput, auth: TurnStreamAuth) => Promise<...>",
           "doc": "Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch."
-        },
-        {
-          "name": "ReleaseInterruptedDurableTurnLockInput",
-          "kind": "type",
-          "signature": "type ReleaseInterruptedDurableTurnLockInput",
-          "doc": "Define input parameters to release an interrupted durable turn lock in a workspace or thread"
         },
         {
           "name": "requestDurableTurnCancellation",
