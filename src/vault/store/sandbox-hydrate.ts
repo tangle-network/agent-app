@@ -76,6 +76,13 @@ export interface VaultHydrationOptions {
   pathsMissingFromBox?: ReadonlySet<string> | Promise<ReadonlySet<string>>
   /** False when the caller makes the warm-path decision and records the sync itself: hydration then neither skips nor records. */
   recordSync?: boolean
+  /**
+   * A copy that may span calls. Hydration spends `remainingChars` (Vault
+   * characters read; past it, it records what it wrote and returns `deferred`)
+   * and appends every Vault path it writes, so a caller that retries on a new
+   * box keeps one budget and can finish what the first attempt wrote.
+   */
+  progress?: { remainingChars: number; writtenPaths: string[] }
   onStage?: SandboxVaultSyncStageObserver
 }
 
@@ -85,8 +92,7 @@ type Snapshot = TextSnapshot | BinarySnapshot
 
 /** What one `hydrate` call carries across its pages. */
 interface HydrationRun {
-  remainingChars: number
-  writtenPaths: string[]
+  progress: NonNullable<VaultHydrationOptions['progress']>
   skipped: VaultBoxSyncSkip[]
 }
 
@@ -135,7 +141,7 @@ export async function hydrateSandboxVault(
     let deleted = 0
     let unchanged = 0
     let processedHeadCount = 0
-    const run: HydrationRun = { remainingChars: config.hydrationBudgetChars ?? Infinity, writtenPaths: [], skipped: [] }
+    const run: HydrationRun = { progress: options.progress ?? { remainingChars: Infinity, writtenPaths: [] }, skipped: [] }
     for (let pageIndex = 0; pageIndex < VAULT_HYDRATION_MAX_PAGES; pageIndex += 1) {
       const page = await hydratePage(config, box, workspaceId, options, vaultDir, run)
       written += page.written
@@ -143,7 +149,6 @@ export async function hydrateSandboxVault(
       unchanged += page.unchanged
       processedHeadCount = page.processedHeadCount
       if (page.complete || page.deferred) {
-        if (run.writtenPaths.length > 0 && config.afterWrite) await config.afterWrite(box, run.writtenPaths)
         const stats = { written, deleted, unchanged, processedHeads: processedHeadCount, skipped: run.skipped, deferred: page.deferred }
         if (page.deferred) return { succeeded: true, value: stats }
         if (identity && view && !view.inFlight && run.skipped.length <= VAULT_BOX_SYNC_MAX_SKIPS) {
@@ -287,7 +292,7 @@ async function hydratePage(
   const liveHeads = changedHeads.filter((entry) => !entry.deleted)
   const headsByPath = new Map(liveHeads.map((entry) => [entry.path, entry]))
   for (let next = 0; next < liveHeads.length;) {
-    if (run.remainingChars <= 0) {
+    if (run.progress.remainingChars <= 0) {
       deferredHeads = liveHeads.slice(next)
       break
     }
@@ -304,7 +309,7 @@ async function hydratePage(
         batchChars += snapshot.kind === 'text' ? snapshot.content.length : snapshot.payload.length
       }
     }
-    run.remainingChars -= batchChars
+    run.progress.remainingChars -= batchChars
     readMs += Date.now() - readStartedAt
     const writeStartedAt = Date.now()
     const present = config.skipFilesAlreadyOnBox
@@ -321,7 +326,7 @@ async function hydratePage(
     for (const snapshot of snapshots) {
       if (snapshot.kind === 'binary' && !skippedPaths.has(snapshot.path)) binaryHashes.set(snapshot.path, snapshot.onDiskHash)
     }
-    for (const snapshot of toWrite) if (!skippedPaths.has(snapshot.path)) run.writtenPaths.push(snapshot.path)
+    for (const snapshot of toWrite) if (!skippedPaths.has(snapshot.path)) run.progress.writtenPaths.push(snapshot.path)
     written += toWrite.length - refused.length
     if (next < liveHeads.length) {
       // Record this batch before the next, so a request that ends early

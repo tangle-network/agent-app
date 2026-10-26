@@ -53,17 +53,10 @@ export interface SandboxVaultSyncConfig {
    * file, or most of a large Vault), which withholds every delete of the pass.
    */
   deletes?: 'rename-only' | { guard: VaultDeletionPolicy }
-  /** Root-relative paths that are not Vault files, such as a private session tree; reconcile ignores them. */
-  exclude?: (path: string) => boolean
+  /** Root-relative directories that hold no Vault files, such as a private session tree; reconcile never scans them. */
+  excludeDirs?: readonly string[]
   /** Writes one request's text files to the box; defaults to `box.fs.writeMany`. */
   writeText?: (box: VaultHydrationBox, files: Array<{ path: string; content: string }>) => Promise<void>
-  /** Runs once a hydration wrote files, with the Vault paths it wrote, such as to set their owner. */
-  afterWrite?: (box: VaultHydrationBox, paths: string[]) => Promise<void>
-  /**
-   * Vault characters one `hydrate` call may copy. Past it, hydration records
-   * what it wrote and returns `deferred`; the next call resumes the copy.
-   */
-  hydrationBudgetChars?: number
   /** Leave a file with no baseline entry in place when the box already holds its exact bytes (a box restored from a snapshot). */
   skipFilesAlreadyOnBox?: boolean
   /** Leave a file the box refuses for its size off the box and report it in `skipped`, instead of failing hydration. */

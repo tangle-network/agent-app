@@ -60,7 +60,7 @@ export interface SandboxVaultSyncResult {
   operationId: string | null
   changes: SandboxVaultSyncChange[]
   /** Box changes the Vault already holds (another path committed the same bytes); recorded without a commit. */
-  convergedChanges: SandboxVaultSyncChange[]
+  convergedChanges?: SandboxVaultSyncChange[]
   appliedPaths: string[]
   conflicts: VaultMutationConflict[]
   progress: SandboxVaultSyncProgress
@@ -206,13 +206,20 @@ function blockedSandboxVaultSync(
   }
 }
 
+/** Whether a root-relative path lies in one of the product's excluded directories. */
+function excluded(config: SandboxVaultSyncConfig, path: string): boolean {
+  return (config.excludeDirs ?? []).some((dir) => path === dir || path.startsWith(`${dir}/`))
+}
+
 async function readSandboxVaultManifest(
   config: SandboxVaultSyncConfig,
   box: VaultReconcileBox,
   workspaceId: string,
   sessionId?: string,
 ): Promise<SandboxVaultManifestResult> {
-  const command = `if [ ! -d ${shellQuote(config.root)} ]; then printf '%s' 'Sandbox Vault directory is missing' >&2; exit 42; fi; find ${shellQuote(config.root)} -mindepth 1 -name '.*' -prune -o -type f -exec sha256sum -z -- {} +`
+  const excludedDirs = (config.excludeDirs ?? []).map((dir) => ` -o -path ${shellQuote(`${config.root}/${dir}`)}`).join('')
+  const pruned = excludedDirs ? `\\( -name '.*'${excludedDirs} \\)` : `-name '.*'`
+  const command = `if [ ! -d ${shellQuote(config.root)} ]; then printf '%s' 'Sandbox Vault directory is missing' >&2; exit 42; fi; find ${shellQuote(config.root)} -mindepth 1 ${pruned} -prune -o -type f -exec sha256sum -z -- {} +`
   let listing: Awaited<ReturnType<VaultReconcileBox['exec']>>
   try {
     listing = sessionId
@@ -251,7 +258,7 @@ async function readSandboxVaultManifest(
       if (!absolutePath.startsWith(rootPrefix)) {
         throw new Error('Sandbox Vault manifest path is outside the Vault root')
       }
-      if (!isWorkspaceFileExportable(path) || config.exclude?.(path)) continue
+      if (!isWorkspaceFileExportable(path)) continue
       validateVaultFilePath(path)
       vaultHeadKey(workspaceId, path)
       if (entries.has(path)) throw new Error('Sandbox Vault manifest contains a duplicate path')
@@ -430,7 +437,7 @@ async function reconcileSandboxVaultFilesToKv(
   }
 
   const liveBaselinePaths = Object.entries(baseline.files)
-    .filter(([path, file]) => !file.deleted && !config.exclude?.(path))
+    .filter(([path, file]) => !file.deleted && !excluded(config, path))
     .map(([path]) => path)
   const wouldDeletePaths = liveBaselinePaths.filter((path) => !manifest.entries.has(path)).sort()
   const deletes = config.deletes ?? 'rename-only'
@@ -606,11 +613,14 @@ async function reconcileSandboxVaultFilesToKv(
     }
   }
 
-  // A pass whose deletes were refused read a manifest it cannot trust, so
-  // nothing it observed becomes the record the next pass diffs against. The
-  // cost is idempotent rework: a put that did commit converges next pass.
+  // Under the deletion guard, a pass whose deletes were refused read a
+  // manifest it cannot trust (a lost or partial mount), so nothing it observed
+  // becomes the record the next pass diffs against; a put that did commit
+  // converges next pass. A rename-only refusal is an ordinary member `rm`:
+  // the pass still records its commits, or every later edit would conflict.
   const recorded = [...appliedFiles, ...plan.convergedFiles, ...plan.supersededFiles]
-  if (refusedDeletionPaths.length === 0 && (recorded.length > 0 || binaryDriftPaths.length > 0)) {
+  const untrustedManifest = deletes !== 'rename-only' && refusedDeletionPaths.length > 0
+  if (!untrustedManifest && (recorded.length > 0 || binaryDriftPaths.length > 0)) {
     // A legacy-sourced baseline keeps every carried head due for rewrite until
     // hydration has materialized binary attachments as decoded bytes.
     const baselineFiles: VaultSandboxBaseline['files'] = legacy

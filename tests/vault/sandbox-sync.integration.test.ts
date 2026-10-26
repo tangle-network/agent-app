@@ -367,20 +367,20 @@ it('records a box copy the Vault already holds, or an earlier revision of it, wi
 
   expect(result.conflicts).toEqual([])
   expect(result.appliedPaths).toEqual([])
-  expect(result.convergedChanges.map(change => change.path)).toEqual(['notes/plan.md'])
+  expect(result.convergedChanges?.map(change => change.path)).toEqual(['notes/plan.md'])
   expect((await vault.readVaultFileState(workspaceId, 'notes/brief.md')).content).toBe('r3\n')
   expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
   expect(readFileSync(join(root, 'notes/brief.md'), 'utf8')).toBe('r3\n')
 }, 60_000)
 
-it('runs the product hooks: text writer, after-write, excluded paths, provenance, phases and the canonical-only refusal', async () => {
+it('runs the product hooks: text writer, written paths, excluded directories, provenance, phases and the canonical-only refusal', async () => {
   await vault.writeVaultRawFile(workspaceId, 'notes/a.md', 'a\n')
   const textWrites: string[] = []
-  const afterWrites: string[][] = []
+  const progress = { remainingChars: Infinity, writtenPaths: [] as string[] }
   const phases: string[] = []
   const stages: string[] = []
   const { box, root, sync } = realBox('incarnation-1', { config: {
-    exclude: path => path.startsWith('workspaces/'),
+    excludeDirs: ['workspaces'],
     writeText: async (_box, files) => {
       for (const file of files) {
         textWrites.push(file.path)
@@ -388,15 +388,16 @@ it('runs the product hooks: text writer, after-write, excluded paths, provenance
         writeFileSync(file.path, file.content)
       }
     },
-    afterWrite: async (_box, paths) => { afterWrites.push(paths) },
   } })
-  expect((await sync.hydrate(box, workspaceId, { onStage: stage => { stages.push(stage) } })).succeeded).toBe(true)
+  expect((await sync.hydrate(box, workspaceId, { progress, onStage: stage => { stages.push(stage) } })).succeeded).toBe(true)
   expect(textWrites).toEqual([join(root, 'notes/a.md')])
-  expect(afterWrites).toEqual([['notes/a.md']])
+  expect(progress.writtenPaths).toEqual(['notes/a.md'])
   expect(stages).toEqual(expect.arrayContaining(['baseline_read', 'head_list', 'kv_read', 'sandbox_write', 'baseline_write']))
 
   mkdirSync(join(root, 'workspaces/session-1'), { recursive: true })
   writeFileSync(join(root, 'workspaces/session-1/scratch.md'), 'private\n')
+  // Unreadable, so a scan that entered the excluded directory would fail the listing.
+  writeFileSync(join(root, 'workspaces/session-1/locked.md'), 'private\n', { mode: 0o000 })
   writeFileSync(join(root, 'notes/b.md'), 'b\n')
   await expect(sync.reconcile(box, workspaceId, { canonicalPathsOnly: true })).rejects.toThrow(/unclassified local files/)
   const result = await sync.reconcile(box, workspaceId, {
@@ -417,7 +418,6 @@ it('copies within its budget and resumes on the next call, leaving identical fil
   for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, content(path))
   const textWrites: string[] = []
   const { box, root, sync } = realBox('incarnation-1', { config: {
-    hydrationBudgetChars: 1,
     skipFilesAlreadyOnBox: true,
     writeText: async (_box, files) => {
       for (const file of files) {
@@ -431,14 +431,18 @@ it('copies within its budget and resumes on the next call, leaving identical fil
   mkdirSync(join(root, 'library'), { recursive: true })
   writeFileSync(join(root, paths[0]!), content(paths[0]!))
 
-  const first = await sync.hydrate(box, workspaceId)
+  // One budget spans both calls of a retry; a fresh call starts a fresh one.
+  const progress = { remainingChars: 1, writtenPaths: [] as string[] }
+  const first = await sync.hydrate(box, workspaceId, { progress })
+  expect(progress.writtenPaths).toHaveLength(7)
   expect(first).toEqual({ succeeded: true, value: expect.objectContaining({
     written: 7, deferred: { pendingPaths: paths.slice(8), morePages: false },
   }) })
   expect(textWrites).not.toContain(join(root, paths[0]!))
   expect(existsSync(join(root, paths[8]!))).toBe(false)
 
-  const second = await sync.hydrate(box, workspaceId)
+  expect((await sync.hydrate(box, workspaceId, { progress })).succeeded && progress.writtenPaths).toHaveLength(7)
+  const second = await sync.hydrate(box, workspaceId, { progress: { remainingChars: 1, writtenPaths: [] } })
   expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 2, deferred: null }) })
   for (const path of paths) expect(readFileSync(join(root, path), 'utf8')).toBe(content(path))
   expect(new Set(textWrites).size).toBe(9)
