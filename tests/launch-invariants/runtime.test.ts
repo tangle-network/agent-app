@@ -131,6 +131,23 @@ describe('one job per scheduled invocation', () => {
     expect(await result.done).toMatchObject({ job: 'digest', ok: true, attempts: 3 })
   })
 
+  it('fails the invocation when a failInvocation job fails, and keeps every other job isolated', async () => {
+    const dispatch = createScheduledDispatch<null>({
+      entries: [{ cron: '0 7 * * *', job: 'digest' }, { cron: '0 8 * * *', job: 'spend' }],
+      jobs: { digest: async () => { throw new Error('digest down') }, spend: async () => { throw new Error('alert reached nobody') } },
+      failInvocation: ['spend'],
+      log: { info: () => {}, error: () => {} },
+    })
+    const isolated = await dispatch.dispatch({ cron: '0 7 * * *', scheduledTime: Date.UTC(2026, 9, 10, 7) }, null)
+    expect(await isolated.done).toMatchObject({ job: 'digest', ok: false })
+    await expect(dispatch.dispatch({ cron: '0 8 * * *', scheduledTime: Date.UTC(2026, 9, 10, 8) }, null)).rejects.toThrow('alert reached nobody')
+    let handed: Promise<unknown> | undefined
+    const background = await dispatch.dispatch({ cron: '0 8 * * *', scheduledTime: Date.UTC(2026, 9, 10, 8) }, null, (promise) => { handed = promise })
+    expect(await background.done).toMatchObject({ job: 'spend', ok: false })
+    await expect(handed).rejects.toThrow('scheduled job spend failed')
+    expect(() => createScheduledDispatch({ entries: [{ cron: '0 7 * * *', job: 'digest' }], jobs, failInvocation: ['nope'] })).toThrow('failInvocation names job "nope"')
+  })
+
   it('refuses a table whose minutes disagree with its cron, or that names an unknown job', () => {
     expect(() => createScheduledDispatch({ entries: [{ cron: '0,1 * * * *', minutes: { 0: 'digest' } }], jobs })).toThrow('lists minutes 0,1 but maps jobs to 0')
     expect(() => createScheduledDispatch({ entries: [{ cron: '0 * * * *', job: 'missing' }], jobs })).toThrow('"missing", which is not defined')

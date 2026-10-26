@@ -42,6 +42,12 @@ export interface ScheduledDispatchOptions<Ctx> {
   jobs: Readonly<Record<string, ScheduledJob<Ctx>>>
   /** Waits before each retry of a failed job; empty (the default) runs a job once. Jobs that retry must be idempotent. */
   retryDelaysMs?: readonly number[]
+  /**
+   * Jobs whose failure fails the scheduled invocation: after the job's last attempt fails, `dispatch` rejects (and the
+   * promise it hands `waitUntil` rejects), so the runtime records the invocation failed. For a job that exists to notice
+   * a problem, such as spend verification, where "it threw" must not settle into a log line. Other jobs stay isolated.
+   */
+  failInvocation?: readonly string[]
   log?: {
     info(message: string, detail?: Record<string, unknown>): void
     error(message: string, detail?: Record<string, unknown>): void
@@ -84,6 +90,9 @@ export interface ScheduledDispatch<Ctx> {
 
 export function createScheduledDispatch<Ctx>(options: ScheduledDispatchOptions<Ctx>): ScheduledDispatch<Ctx> {
   const problems = validateEntries(options.entries, Object.keys(options.jobs))
+  for (const job of options.failInvocation ?? []) {
+    if (!(job in options.jobs)) problems.push(`failInvocation names job "${job}", which is not defined`)
+  }
   if (problems.length) throw new Error(`scheduled dispatch: ${problems.join('; ')}`)
   const byCron = new Map(options.entries.map((entry) => [entry.cron, entry]))
   const retryDelaysMs = options.retryDelaysMs ?? []
@@ -133,8 +142,14 @@ export function createScheduledDispatch<Ctx>(options: ScheduledDispatchOptions<C
         return { handled: false, job: null, done: Promise.resolve(null) }
       }
       const done = runJob(job, event.cron, scheduledTime, context)
-      if (waitUntil) waitUntil(done)
-      else await done
+      const invocation = options.failInvocation?.includes(job)
+        ? done.then((outcome) => {
+          if (!outcome.ok) throw new Error(`scheduled job ${job} failed after ${outcome.attempts} attempt(s): ${outcome.error ?? 'unknown error'}`)
+          return outcome
+        })
+        : done
+      if (waitUntil) waitUntil(invocation)
+      else await invocation
       return { handled: true, job, done }
     },
   }
