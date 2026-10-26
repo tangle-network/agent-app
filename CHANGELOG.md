@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.39
+
+- fix(deps): match Node 24 type declarations to runtime (#1345)
+
 ## 0.63.38
 
 - fix(signoff): retain primary reports when cleanup fails (#1343)
