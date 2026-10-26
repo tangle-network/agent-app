@@ -37,6 +37,20 @@ import {
   type VaultVisibilityFence,
 } from './revisions'
 import type { VaultHeadListEntry } from './store'
+import {
+  healStaleMutation,
+  isSyncedBoxWriter,
+  parseVaultBoxState,
+  parseVaultBoxSyncSkips,
+  viewOfVaultBoxState,
+  VAULT_BOX_STATE_KEY,
+  withBootstrap,
+  withMutationFinished,
+  withMutationStarted,
+  withSync,
+  withSyncInvalidated,
+  type StoredVaultBoxState,
+} from './box-state'
 
 const VAULT_FENCE_STORAGE_PREFIX = 'vaultFence:'
 
@@ -340,8 +354,40 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
       return outcome
     }
 
+    // Every mutation but the synced box's own reconcile moves the box state's
+    // generation. It is marked in flight before KV is written, so a turn reading
+    // the state mid-write, or after a crash between the write and the move,
+    // hydrates in full; the stale-marker heal moves a marker whose request died.
+    const applyWithBoxGeneration = async (): Promise<VaultMutationResult> => {
+      let movesGeneration = false
+      let outcome: VaultMutationResult | undefined
+      let failure: unknown
+      try {
+        movesGeneration = !isSyncedBoxWriter(await readVaultBoxState(), body.writer)
+        if (movesGeneration) await updateVaultBoxState((state) => withMutationStarted(state, body.operationId, Date.now()))
+        outcome = await apply()
+      } catch (error) {
+        failure = error
+      }
+      if (movesGeneration) {
+        try {
+          await updateVaultBoxState(withMutationFinished)
+        } catch (error) {
+          console.error('[vault] box generation did not move after a mutation', {
+            workspaceId: body.workspaceId,
+            operationId: body.operationId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      if (failure === undefined && outcome) return outcome
+      throw failure ?? new Error('Vault mutation produced no result')
+    }
+
     try {
-      const outcome = await exclusive(() => options.aroundMutation ? options.aroundMutation(body, apply) : apply())
+      const outcome = await exclusive(() => options.aroundMutation
+        ? options.aroundMutation(body, applyWithBoxGeneration)
+        : applyWithBoxGeneration())
       return vaultCoordinatorJson(outcome, outcome.status === 'conflict' ? 409 : 200)
     } catch (error) {
       if (error instanceof VaultReadConvergenceError) return vaultConvergenceResponse(error)
@@ -407,7 +453,7 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
   }
 
   async function handleVaultBaselineSet(request: Request): Promise<Response> {
-    const body = await request.json().catch(() => null) as VaultSandboxBaseline | null
+    const body = await request.json().catch(() => null) as (VaultSandboxBaseline & { expectedVaultGeneration?: number }) | null
     const validSchema = body?.schema === 'vault-sandbox-baseline-v2'
       || (body?.schema === 'vault-sandbox-baseline-v3' && Boolean(body.filesystemIncarnationId))
     if (!body || !validSchema || !body.sandboxId || !body.workspaceId) {
@@ -415,12 +461,76 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
     }
     try {
       validateWorkspaceId(body.workspaceId)
-      await writeVaultSandboxBaseline(body)
+      // A baseline read before a mutation must not land after it.
+      if (body.expectedVaultGeneration !== undefined) {
+        const state = await readVaultBoxState()
+        if (state.inFlight || state.generation !== body.expectedVaultGeneration) return vaultCoordinatorJson({ saved: false })
+      }
+      const { expectedVaultGeneration: _expected, ...baseline } = body
+      await writeVaultSandboxBaseline(baseline)
       return vaultCoordinatorJson({ saved: true })
     } catch (error) {
       if (error instanceof VaultPathError) return vaultPathErrorResponse(error)
       throw error
     }
+  }
+
+  // Each read-modify-write below makes only storage calls, so the object's input
+  // gate keeps it whole against concurrent requests.
+  async function readVaultBoxState(): Promise<StoredVaultBoxState> {
+    return parseVaultBoxState(await storage.get<unknown>(VAULT_BOX_STATE_KEY))
+  }
+
+  async function updateVaultBoxState(change: (state: StoredVaultBoxState) => StoredVaultBoxState): Promise<StoredVaultBoxState> {
+    const next = change(await readVaultBoxState())
+    await storage.put(VAULT_BOX_STATE_KEY, next)
+    return next
+  }
+
+  async function handleVaultBoxStateGet(): Promise<Response> {
+    let state = await readVaultBoxState()
+    const healed = healStaleMutation(state, Date.now())
+    if (healed) {
+      await storage.put(VAULT_BOX_STATE_KEY, healed)
+      state = healed
+    }
+    return vaultCoordinatorJson({ state: viewOfVaultBoxState(state) })
+  }
+
+  async function handleVaultBoxStateSync(request: Request): Promise<Response> {
+    const body = await request.json().catch(() => null) as {
+      sandboxId?: unknown; filesystemIncarnationId?: unknown; contract?: unknown; generation?: unknown; skipped?: unknown
+    } | null
+    const text = (value: unknown) => typeof value === 'string' && value ? value : null
+    const sandboxId = text(body?.sandboxId)
+    const filesystemIncarnationId = text(body?.filesystemIncarnationId)
+    const contract = text(body?.contract)
+    const generation = body?.generation
+    const skipped = parseVaultBoxSyncSkips(body?.skipped ?? [])
+    if (!sandboxId || !filesystemIncarnationId || !contract
+      || typeof generation !== 'number' || !Number.isSafeInteger(generation) || !skipped) {
+      return vaultCoordinatorJson({ error: 'Invalid Vault box sync' }, 400)
+    }
+    await updateVaultBoxState((state) => withSync(state, {
+      sandboxId, filesystemIncarnationId, contract, generation, skipped, syncedAt: new Date().toISOString(),
+    }))
+    return vaultCoordinatorJson({ saved: true })
+  }
+
+  async function handleVaultBoxStateInvalidate(): Promise<Response> {
+    await updateVaultBoxState(withSyncInvalidated)
+    return vaultCoordinatorJson({ invalidated: true })
+  }
+
+  async function handleVaultBoxStateBootstrap(request: Request): Promise<Response> {
+    const body = await request.json().catch(() => null) as { sandboxId?: unknown; filesystemIncarnationId?: unknown; marker?: unknown } | null
+    const text = (value: unknown) => typeof value === 'string' && value ? value : null
+    const sandboxId = text(body?.sandboxId)
+    const filesystemIncarnationId = text(body?.filesystemIncarnationId)
+    const marker = text(body?.marker)
+    if (!sandboxId || !filesystemIncarnationId || !marker) return vaultCoordinatorJson({ error: 'Invalid sandbox bootstrap record' }, 400)
+    await updateVaultBoxState((state) => withBootstrap(state, { sandboxId, filesystemIncarnationId, marker, at: new Date().toISOString() }))
+    return vaultCoordinatorJson({ saved: true })
   }
 
   /** The coordinator's `/vault/*` routes, for a Durable Object's fetch; null for any other request. */
@@ -432,6 +542,10 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
       case '/vault/head/list': return handleVaultHeadList(request)
       case '/vault/baseline/get': return handleVaultBaselineGet(request)
       case '/vault/baseline/set': return handleVaultBaselineSet(request)
+      case '/vault/box-state/get': return handleVaultBoxStateGet()
+      case '/vault/box-state/sync': return handleVaultBoxStateSync(request)
+      case '/vault/box-state/invalidate': return handleVaultBoxStateInvalidate()
+      case '/vault/box-state/bootstrap': return handleVaultBoxStateBootstrap(request)
       default: return null
     }
   }
@@ -449,6 +563,8 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
     writeVaultSandboxBaseline,
     handleVaultBaselineGet,
     handleVaultBaselineSet,
+    readVaultBoxState,
+    updateVaultBoxState,
     handle,
   }
 }

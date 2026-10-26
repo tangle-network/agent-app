@@ -10,11 +10,13 @@ import { shellQuote } from '../../sandbox/binary-read'
 import { sha256Hex } from '../../crypto/digest'
 import type { VaultSandboxBaseline } from './revisions'
 import type { VaultHeadListEntry } from './store'
+import { vaultBoxInSync } from './box-state'
 import {
   mapWithConcurrency,
   normalizeVaultSandboxBaseline,
   readReadySandboxFilesystemIncarnation,
   vaultBinaryPayload,
+  SANDBOX_VAULT_SYNC_CONTRACT,
   VAULT_SANDBOX_BASELINE_SCHEMA,
   VaultFilesystemIncarnationError,
   VaultHydrationError,
@@ -56,6 +58,8 @@ export interface VaultHydrationStats {
   deleted: number
   unchanged: number
   processedHeads: number
+  /** True when the coordinator's record proved the box current and nothing was listed or written. */
+  inSync?: boolean
 }
 
 export interface VaultHydrationOptions {
@@ -90,6 +94,22 @@ export async function hydrateSandboxVault(
   options: VaultHydrationOptions = {},
 ): Promise<Outcome<VaultHydrationStats>> {
   try {
+    // The coordinator counts every Vault mutation. A complete hydration of this
+    // exact box under this contract at the current count proves the box holds
+    // the Vault, so a warm turn skips the listing, the diff and the baseline
+    // write. Protected paths (a reconcile's conflicts or commits, a loss probe)
+    // always take the full walk.
+    const contract = config.contract ?? SANDBOX_VAULT_SYNC_CONTRACT
+    const incarnation = readReadySandboxFilesystemIncarnation(box)
+    const identity = box.id && incarnation.succeeded
+      ? { sandboxId: box.id, filesystemIncarnationId: incarnation.value.id }
+      : null
+    const protectedPaths = Boolean(options.conflictPaths?.size || options.appliedPaths?.size)
+      || options.pathsMissingFromBox !== undefined
+    const view = identity ? await config.vault.readVaultBoxState(workspaceId) : null
+    if (identity && !protectedPaths && vaultBoxInSync(view, identity, contract)) {
+      return { succeeded: true, value: { written: 0, deleted: 0, unchanged: 0, processedHeads: 0, inSync: true } }
+    }
     // The Vault directory is needed only before the first box write, so its
     // round trip overlaps the baseline read and the head listing.
     const vaultDir = box.fs.mkdir(config.root, { recursive: true })
@@ -105,6 +125,15 @@ export async function hydrateSandboxVault(
       unchanged += page.unchanged
       processedHeadCount = page.processedHeadCount
       if (page.complete) {
+        if (identity && view && !view.inFlight) {
+          // Recorded against the count read before the listing: a mutation
+          // during this walk moved it, so the record cannot match and the next
+          // turn walks again. A failed record only costs that next walk.
+          await config.vault.recordVaultBoxSync(workspaceId, { ...identity, contract, generation: view.generation, skipped: [] })
+            .catch((error: unknown) => console.warn('[vault] box sync record failed', {
+              workspaceId, error: error instanceof Error ? error.message : String(error),
+            }))
+        }
         return { succeeded: true, value: { written, deleted, unchanged, processedHeads: processedHeadCount } }
       }
       if (page.cursor === null) {

@@ -357,7 +357,15 @@ export async function reconcileSandboxVault(
   )
   vaultReconciliationTasks.set(reconciliationKey, task)
   try {
-    return await task
+    const result = await task
+    // A reconcile that left the box and the Vault apart forgets the box's sync,
+    // so the next turn hydrates in full instead of trusting a stale record.
+    if (!result.succeeded || !result.complete || result.conflicts.length > 0 || result.refusedDeletionPaths.length > 0) {
+      await config.vault.invalidateVaultBoxSync(workspaceId).catch((error: unknown) => console.warn('[vault] box sync invalidation failed', {
+        workspaceId, error: error instanceof Error ? error.message : String(error),
+      }))
+    }
+    return result
   } finally {
     if (vaultReconciliationTasks.get(reconciliationKey) === task) {
       vaultReconciliationTasks.delete(reconciliationKey)

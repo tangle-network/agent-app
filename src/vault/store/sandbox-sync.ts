@@ -15,6 +15,7 @@ import type {
   VaultSandboxBaseline,
 } from './revisions'
 import type { VaultFrontmatterCodec, VaultHeadListOptions, VaultHeadListPage } from './store'
+import type { VaultBoxStateView, VaultBoxSyncRecord } from './box-state'
 
 /** The store calls the sync engine makes; `createVaultStore` returns all of them. */
 export interface SandboxVaultSyncStore {
@@ -24,6 +25,9 @@ export interface SandboxVaultSyncStore {
   commitVaultMutation(request: VaultMutationRequest): Promise<VaultMutationResult>
   readVaultSandboxBaseline(workspaceId: string, sandboxId: string): Promise<VaultSandboxBaseline | null>
   writeVaultSandboxBaseline(baseline: VaultSandboxBaseline): Promise<void>
+  readVaultBoxState(workspaceId: string): Promise<VaultBoxStateView | null>
+  recordVaultBoxSync(workspaceId: string, record: VaultBoxSyncRecord): Promise<void>
+  invalidateVaultBoxSync(workspaceId: string): Promise<void>
 }
 
 export interface SandboxVaultSyncConfig {
@@ -33,7 +37,16 @@ export interface SandboxVaultSyncConfig {
   root: string
   /** Extension to MIME type overrides for binary files the box produces (agent-app's `sniffMime` defaults otherwise). */
   fileTypes?: Readonly<Record<string, string>>
+  /**
+   * Names what hydration writes. A recorded sync is trusted only under the same
+   * contract, so a release that changes what lands on the box bumps it and every
+   * box re-hydrates on its next turn. Defaults to `SANDBOX_VAULT_SYNC_CONTRACT`.
+   */
+  contract?: string
 }
+
+/** The engine's own hydration contract; a product appends its own when its box layout changes. */
+export const SANDBOX_VAULT_SYNC_CONTRACT = 'agent-app-sandbox-vault-sync-v1'
 
 /** The body prefix of a Vault document whose remainder is base64-encoded binary bytes. */
 export const VAULT_BASE64_BODY_MARKER = '[base64]\n'

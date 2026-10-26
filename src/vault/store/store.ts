@@ -42,6 +42,12 @@ import {
   type VaultWriter,
 } from './revisions'
 import { buildTreeFromPaths, type VaultNode } from './tree'
+import {
+  parseVaultBoxStateView,
+  type SandboxBootstrapConfirmation,
+  type VaultBoxStateView,
+  type VaultBoxSyncRecord,
+} from './box-state'
 
 /** The Durable Object namespace surface the store calls; Cloudflare's binding satisfies it. */
 export interface VaultCoordinatorNamespace {
@@ -296,10 +302,57 @@ function createVaultRuntime<Namespace extends VaultCoordinatorNamespace>(config:
     if (!response.ok) await throwVaultCoordinatorError(response, 'Vault baseline write failed')
   }
 
+  /**
+   * What the coordinator knows about the workspace box's Vault copy, or null
+   * when it cannot say (no coordinator bound, or the read failed): a caller then
+   * hydrates in full.
+   */
+  async function readVaultBoxState(workspaceId: string): Promise<VaultBoxStateView | null> {
+    validateWorkspaceId(workspaceId)
+    const namespace = coordinator
+    if (!namespace) return null
+    try {
+      const response = await postVaultCoordinator(namespace, workspaceId, 'box-state/get', { workspaceId })
+      if (!response.ok) return null
+      const body = await response.json() as { state?: unknown }
+      return parseVaultBoxStateView(body.state)
+    } catch {
+      return null
+    }
+  }
+
+  /** Record that a complete hydration left this box's copy current as of `generation`. */
+  async function recordVaultBoxSync(workspaceId: string, record: VaultBoxSyncRecord): Promise<void> {
+    validateWorkspaceId(workspaceId)
+    const namespace = coordinator
+    if (!namespace) return
+    const response = await postVaultCoordinator(namespace, workspaceId, 'box-state/sync', record)
+    if (!response.ok) await throwVaultCoordinatorError(response, 'Vault box sync record failed')
+  }
+
+  /** Forget the box's sync after a reconcile left the box and the Vault apart. */
+  async function invalidateVaultBoxSync(workspaceId: string): Promise<void> {
+    validateWorkspaceId(workspaceId)
+    const namespace = coordinator
+    if (!namespace) return
+    const response = await postVaultCoordinator(namespace, workspaceId, 'box-state/invalidate', { workspaceId })
+    if (!response.ok) await throwVaultCoordinatorError(response, 'Vault box sync invalidation failed')
+  }
+
+  /** Record that this box's filesystem holds the product bootstrap `marker` names. */
+  async function recordSandboxBootstrap(workspaceId: string, confirmation: SandboxBootstrapConfirmation): Promise<void> {
+    validateWorkspaceId(workspaceId)
+    const namespace = coordinator
+    if (!namespace) return
+    const response = await postVaultCoordinator(namespace, workspaceId, 'box-state/bootstrap', confirmation)
+    if (!response.ok) await throwVaultCoordinatorError(response, 'Sandbox bootstrap record failed')
+  }
+
   return {
     setVaultKV, getVaultKV, setVaultCoordinator, getVaultCoordinator, postVaultCoordinator,
     throwVaultCoordinatorError, enqueueLocalVaultMutation, commitVaultMutation, readVaultFileState,
     readVaultSandboxBaseline, writeVaultSandboxBaseline,
+    readVaultBoxState, recordVaultBoxSync, invalidateVaultBoxSync, recordSandboxBootstrap,
     /** The product's frontmatter codec, for engines that read and write whole Vault documents. */
     codec: config.codec,
   }

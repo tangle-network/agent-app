@@ -235,3 +235,56 @@ it('stores a baseline larger than one Durable Object value as chunks and reads i
   const reconciled = await sync.reconcile(box, workspaceId)
   expect(reconciled).toEqual(expect.objectContaining({ succeeded: true, complete: true, appliedPaths: [] }))
 }, 600_000)
+
+async function seedBoxState(state: unknown): Promise<void> {
+  const namespace = await runtime.getDurableObjectNamespace('VAULT_COORDINATOR')
+  const response = await namespace.get(namespace.idFromName(workspaceId)).fetch('https://session-stream.internal/test/box-state', {
+    method: 'POST', body: JSON.stringify(state),
+  })
+  expect(response.status).toBe(204)
+}
+
+it('skips a warm pass over an unchanged Vault and walks again after any other writer changes it', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true, written: 0 }) })
+
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v2 from the app\n')
+  const after = await sync.hydrate(box, workspaceId)
+  expect(after).toEqual({ succeeded: true, value: expect.objectContaining({ written: 1 }) })
+  expect(after.succeeded && after.value.inSync).toBeFalsy()
+  expect(readFileSync(join(root, 'notes/plan.md'), 'utf8')).toBe('v2 from the app\n')
+}, 60_000)
+
+it("keeps the box in sync across its own reconcile, so the next warm pass still skips", async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  writeFileSync(join(root, 'notes/plan.md'), 'v2 from the box\n')
+  expect((await sync.reconcile(box, workspaceId)).appliedPaths).toEqual(['notes/plan.md'])
+
+  expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true }) })
+}, 60_000)
+
+it('walks in full while a mutation is in flight, and heals a marker whose request died', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const { box, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  const view = await vault.readVaultBoxState(workspaceId)
+  expect(view?.sync?.sandboxId).toBe(box.id)
+  const stored = { schema: 'vault-box-state-v1', generation: view!.generation, sync: view!.sync, bootstrap: null }
+
+  await seedBoxState({ ...stored, inFlight: { operationId: 'live-write', startedAt: Date.now() } })
+  const during = await sync.hydrate(box, workspaceId)
+  expect(during.succeeded && during.value.inSync).toBeFalsy()
+
+  await seedBoxState({ ...stored, inFlight: { operationId: 'dead-write', startedAt: Date.now() - 11 * 60_000 } })
+  const healed = await vault.readVaultBoxState(workspaceId)
+  expect(healed).toEqual(expect.objectContaining({ inFlight: false, generation: view!.generation + 1 }))
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true }) })
+}, 60_000)
