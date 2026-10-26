@@ -182,6 +182,10 @@ describe('protected local HTTP terminal ownership', { concurrent: false }, () =>
       expect(events.some(event => event.type === 'error')).toBe(true)
       expect(JSON.stringify(events)).toContain('The model service did not answer.')
       expect(JSON.stringify(events)).not.toContain('FINAL_AFTER_TOOL')
+      expect(producer.finalText()).toBe('')
+      expect(producer.assistantParts?.()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'notice', noticeKind: 'error', code: 'sandbox.stream_failed' }),
+      ]))
       expect(producer.usage?.()).toEqual({ inputTokens: 0, outputTokens: 0, reasoningTokens: 0, costUsd: 0 })
       expect(producer.terminalObserved?.()).toBe(true)
     } finally { await peer.close() }

@@ -108,13 +108,16 @@ function lastNonPromptTextPart(parts: Map<string, string>, promptTexts: string[]
  * @param message the prompt as handed to the stream, so an echo of it is dropped
  * @param history folded into the dispatched prompt by `streamSandboxPrompt`;
  *        pass whatever was passed there, since the echo replays the FOLDED text
+ * @param observe called with each raw event before it is folded
  */
 export async function collectSandboxPromptText(
   events: AsyncIterable<unknown>,
   message: string | PromptInputPart[],
   history?: StreamSandboxPromptOptions['history'],
+  /** Sees every raw event as it arrives, so a product can stream progress without forking the fold. */
+  observe?: (event: unknown) => void,
 ): Promise<string> {
-  const { answer, observation } = await collectSandboxPrompt(events, message, history)
+  const { answer, observation } = await collectSandboxPrompt(events, message, history, observe)
   if (!answer) throw noAnswerError(observation)
   return answer
 }
