@@ -26,7 +26,7 @@ function messageWith(call: ChatToolCallInfo): ChatUiMessage[] {
 /** The canonical row's whole header is the expand toggle (RunRowShell's
  *  Collapsible.Trigger) — there is no separate chevron button. `title` is the
  *  row's humanized title text. */
-function expandOnlyRow(title: string): void {
+function expandOnlyRow(title: string | RegExp): void {
   fireEvent.click(screen.getByRole('button', { name: title }))
 }
 
@@ -71,5 +71,72 @@ describe('DefaultToolDetail — non-envelope tool outputs render without crashin
     }
     render(createElement(ChatMessages, { messages: messageWith(call) }))
     expect(() => expandOnlyRow('Do thing')).not.toThrow()
+  })
+})
+
+describe('ToolDetailRenderers — optional row presentation', () => {
+  it('distinguishes same-named calls by their actual arguments', () => {
+    const calls: ChatToolCallInfo[] = [
+      { id: 'tc-1', name: 'read_record', status: 'done', args: { recordId: 'a1c' } },
+      { id: 'tc-2', name: 'read_record', status: 'done', args: { recordId: 'mood' } },
+    ]
+    render(createElement(ChatMessages, {
+      messages: [{ id: 'm1', role: 'assistant', content: '', toolCalls: calls }],
+      toolRenderers: {
+        read_record: (call) => ({
+          title: `Read ${String(call.args?.recordId)}`,
+          description: 'Synthetic record',
+          detail: createElement('span', { children: `Source ${String(call.args?.recordId)}` }),
+        }),
+      },
+    }))
+
+    expect(screen.getByRole('button', { name: /^Read a1c/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Read mood/ })).toBeTruthy()
+    expect(screen.getAllByText('Synthetic record')).toHaveLength(2)
+    expandOnlyRow(/^Read a1c/)
+    expect(screen.getByText('Source a1c')).toBeTruthy()
+    expect(screen.queryByText('Source mood')).toBeNull()
+  })
+
+  it('keeps React-node, null, command, and generic fallbacks', () => {
+    const calls: ChatToolCallInfo[] = [
+      { id: 'tc-node', name: 'node_detail', status: 'done' },
+      { id: 'tc-null', name: 'fallback_detail', status: 'done', args: { id: 1 }, result: 'raw-result' },
+      { id: 'tc-command', name: 'sandbox_run_command', status: 'done', args: { command: 'pwd' } },
+      { id: 'tc-generic', name: 'other_tool', status: 'done' },
+    ]
+    render(createElement(ChatMessages, {
+      messages: [{ id: 'm1', role: 'assistant', content: '', toolCalls: calls }],
+      toolRenderers: {
+        node_detail: () => createElement('span', { children: 'Existing node detail' }),
+        fallback_detail: () => null,
+      },
+    }))
+
+    expect(screen.getByRole('button', { name: 'Node detail' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Fallback detail' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Ran commandpwd' })).toBeTruthy()
+    expect(screen.getByText('pwd')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Other tool' })).toBeTruthy()
+    expandOnlyRow('Node detail')
+    expect(screen.getByText('Existing node detail')).toBeTruthy()
+    expandOnlyRow('Fallback detail')
+    expect(screen.getByText('raw-result')).toBeTruthy()
+  })
+
+  it('retains shared title and detail defaults for omitted presentation fields', () => {
+    const call: ChatToolCallInfo = {
+      id: 'tc-partial', name: 'partial_detail', status: 'done',
+      args: { id: 'source-1' }, result: { ok: true, result: { value: 'source-value' } },
+    }
+    render(createElement(ChatMessages, {
+      messages: messageWith(call),
+      toolRenderers: { partial_detail: () => ({ description: 'Product description' }) },
+    }))
+    expect(screen.getByRole('button', { name: 'Partial detailProduct description' })).toBeTruthy()
+    expandOnlyRow(/^Partial detail/)
+    expect(screen.getByText('source-value')).toBeTruthy()
+    expect(screen.getByText('source-1')).toBeTruthy()
   })
 })

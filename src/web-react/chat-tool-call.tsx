@@ -5,7 +5,15 @@ import { InlineToolItem } from '@tangle-network/ui/run'
 import type { ToolPart } from '@tangle-network/ui/types'
 import { ChevronDown, usePending } from './controls'
 import { useArrivalStyle } from './motion'
-import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
+import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailPresentation, ToolDetailRenderers } from './chat-message-types'
+
+export function resolveToolPresentation(rendered: ReactNode | ToolDetailPresentation): ToolDetailPresentation {
+  if (typeof rendered === 'object' && rendered !== null) {
+    const presentation = rendered as ToolDetailPresentation
+    if ('title' in presentation || 'description' in presentation || 'detail' in presentation) return presentation
+  }
+  return { detail: rendered as ReactNode }
+}
 
 /** Extract `{proposalId, status}` from a tool outcome when it is a proposal
  *  awaiting human approval; null otherwise. */
@@ -287,7 +295,7 @@ function ProposalCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const { summary, meta, typeSlug } = proposalPreview(call)
-  const custom = renderers?.[call.name]?.(call, message)
+  const custom = resolveToolPresentation(renderers?.[call.name]?.(call, message)).detail
   const { pending: deciding, run: decide } = usePending()
 
   return (
@@ -488,14 +496,14 @@ export function ToolCallCard({
   // terminal ShellDetail for commands, or the generic args/result view — via
   // ui's `renderToolDetail` seam, and `onOpenRun` maps to the row's actions
   // slot, so no agent-app capability is lost to the shared chrome.
-  const custom = renderers?.[call.name]?.(call, message)
+  const custom = resolveToolPresentation(renderers?.[call.name]?.(call, message))
   return arrive(
     <InlineToolItem
       part={chatToolCallPart(call)}
-      title={toolRowTitle(call)}
-      description={toolRowDescription(call)}
+      title={custom.title ?? toolRowTitle(call)}
+      description={custom.description ?? toolRowDescription(call)}
       renderToolDetail={() =>
-        custom ??
+        custom.detail ??
         (call.name === 'sandbox_run_command' ? <ShellDetail call={call} /> : <DefaultToolDetail call={call} />)
       }
       actions={

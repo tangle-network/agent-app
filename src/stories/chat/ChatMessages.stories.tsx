@@ -203,6 +203,39 @@ export const CustomToolRenderer: Story = {
   ),
 }
 
+/** Products can give repeated tool names useful, call-specific identities
+ *  without replacing the shared row geometry or keyboard expansion. */
+export const DistinctToolPresentation: Story = {
+  name: 'Distinct Tool Presentation',
+  args: {
+    messages: [{
+      id: 'distinct-tools',
+      role: 'assistant',
+      content: 'Both source records are shown below.',
+      toolCalls: [
+        { id: 'mood-call', name: 'read_record', status: 'done', args: { recordId: 'mood-042' } },
+        { id: 'sleep-call', name: 'read_record', status: 'done', args: { recordId: 'sleep-018' } },
+      ],
+    }],
+    toolRenderers: {
+      read_record: (call: ChatToolCallInfo) => {
+        const mood = call.args?.recordId === 'mood-042'
+        return {
+          title: mood ? 'Read mood check-in' : 'Read overnight sleep',
+          description: mood ? 'Mood score · 4/5' : 'Sleep duration · 7 h 24 min',
+          detail: (
+            <dl className="grid max-w-full grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+              <dt className="text-muted-foreground">Record</dt><dd className="break-all">{String(call.args?.recordId)}</dd>
+              <dt className="text-muted-foreground">Source</dt><dd>{mood ? 'Manual check-in' : 'Synthetic sleep tracker'}</dd>
+              <dt className="text-muted-foreground">Measured</dt><dd>{mood ? '2026-10-24 08:15 -04:00' : '2026-10-24 06:42 -04:00'}</dd>
+            </dl>
+          ),
+        }
+      },
+    },
+  },
+}
+
 /**
  * The same six-turn thread at 480 / 720 / 960px containers, side by side. The
  * column caps at `max-w-3xl` (768px), so 960px shows the centered ceiling while
