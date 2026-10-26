@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.63.62
+
+- feat(chat): one agent handle spelling, and an execution id per responder (#1389)
+- chore(deps): adopt 2 @tangle-network/* packages (#1388)
+- chore(deps): adopt @tangle-network/brand 1.28.0 (#1386)
+- feat(chat): history names each speaker; split speaker rows draw their own reasoning and tool timeline (#1385)
+- chore(deps): adopt @tangle-network/charts 0.21.14 (#1383)
+- feat(chat): mentioned agents answer at the same time, presented in the order typed (#1384)
+
+## 0.63.61
+
+- feat(chat): address workspace agents by @mention; responders answer in turn as one row with speaker parts (#1380)
+
 ## 0.63.60
 
 - chore: align generated sandbox and UI cohorts (#1381)

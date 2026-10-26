@@ -17,6 +17,9 @@ import type { CatalogModel } from '../runtime/model-catalog'
 import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 import type { ChatMessagesProps } from './chat-message-types'
 import { ChatEmptyState } from './chat-empty-state'
+import { expandSpeakerRows } from '../web/speakers'
+import { chatReasoningFromParts } from './chat-stream'
+import { segmentsFromParts, toolCallsFromParts } from './message-projection'
 import { formatModelCost, formatTokensPerSecond } from './chat-message-metrics'
 import { StreamingCaret, SegmentedBody } from './chat-message-body'
 import { ToolCallCard } from './chat-tool-call'
@@ -358,7 +361,7 @@ function OtherPersonMessage({
  * else's are named, and a named agent replaces the agent label.
  */
 export function ChatMessages({
-  messages,
+  messages: storedMessages,
   messageSize = 'default',
   chrome = 'labeled',
   models = [],
@@ -398,6 +401,21 @@ export function ChatMessages({
     () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
     [renderMarkdown],
   )
+  // A turn answered by several agents is one stored row with a speaker part
+  // before each answer; the transcript draws each under its author.
+  const messages = useMemo(() => expandSpeakerRows(storedMessages).map((row) => {
+    // A split row carries only its speaker's parts; draw that agent's own
+    // reasoning and tool timeline from them. Rows the product already
+    // projected keep their fields.
+    if (!row.author || row.role !== 'assistant' || row.segments !== undefined || row.toolCalls !== undefined) return row
+    const reasoning = chatReasoningFromParts(row.parts)
+    const segments = segmentsFromParts(row.parts)
+    return {
+      ...row,
+      ...(segments.length > 0 ? { segments } : { toolCalls: toolCallsFromParts(row.parts) }),
+      ...(reasoning ? { reasoning: reasoning.text, reasoningStartedAt: reasoning.startedAt, reasoningEndedAt: reasoning.endedAt } : {}),
+    }
+  }), [storedMessages])
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
   const quiet = chrome === 'quiet'
   if (messages.length === 0 && !loading && !error) {

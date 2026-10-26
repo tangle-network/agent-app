@@ -187,7 +187,7 @@ export interface ChatTurnRequestPayload {
    *  persist as their own `ChatMentionPart`s so a retry rebuilds them. The
    *  route validates this field with {@link parseFileMentions} and replaces it
    *  on the payload with the validated, deduped list. */
-  mentions?: FileMention[]
+  mentions?: ChatMention[]
   /** Files uploaded to the product's store ahead of the turn — path
    *  references, NOT inline bytes (those ride `parts`). Validated and
    *  size-re-derived by {@link resolveChatAttachments} into persistable
@@ -351,6 +351,50 @@ export interface FileMention {
   size?: number
 }
 
+/** An agent mention from the composer's `@`-picker: a workspace agent the
+ *  turn is addressed to. `handle` is the `@`-token identity (the pill's
+ *  `MentionItem.id`, what the message text carries as `@<handle>`);
+ *  `agentId` is the stable profile id, so a renamed agent still resolves from
+ *  an old message. A file mention has no `kind`; this one always does. */
+export interface AgentMention {
+  kind: 'agent'
+  agentId: string
+  handle: string
+  name: string
+}
+
+/** Everything the composer can `@`: a file in the box or an agent in the workspace. */
+export type ChatMention = FileMention | AgentMention
+
+export function isAgentMention(mention: ChatMention): mention is AgentMention {
+  return (mention as AgentMention).kind === 'agent'
+}
+
+/** The file mentions of a validated list, for the seams that read the box. */
+export function fileMentionsOf(mentions: readonly ChatMention[]): FileMention[] {
+  return mentions.filter((mention): mention is FileMention => !isAgentMention(mention))
+}
+
+/** The agent mentions of a validated list, in mention order: the turn's responders. */
+export function agentMentionsOf(mentions: readonly ChatMention[]): AgentMention[] {
+  return mentions.filter(isAgentMention)
+}
+
+/** A handle is what a person types after `@`: lowercase letters, digits and
+ *  hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name. */
+export const AGENT_HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/
+
+/** The handle a profile name gets: lowercase, runs of anything else become one
+ *  hyphen, no leading or trailing hyphen, at most 63 characters. "Research
+ *  Lead" is `research-lead`. One spelling for the composer, the route and the
+ *  rail, so a product never derives its own. An empty result (a name with no
+ *  letters or digits) is `agent`. */
+export function agentHandle(name: string): string {
+  const handle = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/, '')
+  return handle || 'agent'
+}
+const AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
+
 const MENTION_IMAGE_MEDIA_TYPES: ReadonlyMap<string, string> = new Map([
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
@@ -379,7 +423,7 @@ export function mediaTypeForMentionPath(path: string): string | undefined {
 /** The image/file split a mention is rendered and persisted under — the
  *  composer pill's icon, the dispatched part's `type`, and
  *  `ChatMentionPart.mentionKind` are all this one value. */
-export type ChatMentionKind = 'image' | 'file'
+export type ChatMentionKind = 'image' | 'file' | 'agent'
 
 /** `image` when the path's extension is in the known image set (the same table
  *  {@link mediaTypeForMentionPath} reads), `file` otherwise. Exported so a
@@ -403,11 +447,12 @@ export interface FileMentionsToPartsOptions {
  *  url/path XOR invariant: a mention is a sandbox path reference, never
  *  inline bytes). */
 export function fileMentionsToParts(
-  mentions: readonly FileMention[],
+  mentions: readonly ChatMention[],
   opts: FileMentionsToPartsOptions = {},
 ): ChatTurnFilePartInput[] {
   const resolvePath = opts.resolvePath ?? ((path: string) => path)
-  return mentions.map((mention) => {
+  // An agent mention addresses a responder; it points at nothing in the box.
+  return fileMentionsOf(mentions).map((mention) => {
     const mediaType = mediaTypeForMentionPath(mention.path)
     const part: ChatTurnFilePartInput = {
       type: mediaType ? 'image' : 'file',
@@ -425,10 +470,11 @@ export function fileMentionsToParts(
  *  turn's dispatch and any history projection built from the same mention
  *  list both route through here, so the two can't drift apart. */
 export function buildMentionPromptBlock(
-  mentions: readonly Pick<FileMention, 'name' | 'path'>[],
+  mentions: readonly (Pick<FileMention, 'name' | 'path'> | AgentMention)[],
 ): string {
-  if (mentions.length === 0) return ''
-  const lines = mentions.map((m) => `- ${m.name} (${m.path})`)
+  const files = mentions.filter((m): m is Pick<FileMention, 'name' | 'path'> => (m as AgentMention).kind !== 'agent')
+  if (files.length === 0) return ''
+  const lines = files.map((m) => `- ${m.name} (${m.path})`)
   return `\n\nMentioned files — read them from these paths:\n${lines.join('\n')}`
 }
 
@@ -533,22 +579,52 @@ function parseFileMention(value: unknown, index: number): FileMention {
  * than rejected: mentioning the same file twice is plausible user input, not
  * an attack.
  */
-export function parseFileMentions(raw: unknown): FileMention[] {
+/** The validated, deduped mention list off the wire: files by path, agents
+ *  by id, in the order typed. One cap covers both kinds. */
+export function parseMentions(raw: unknown): ChatMention[] {
   if (raw === undefined || raw === null) return []
   if (!Array.isArray(raw)) throw new ChatTurnInputError('mentions must be an array')
   if (raw.length > MENTION_MAX_COUNT) {
     throw new ChatTurnInputError(`mentions must not exceed ${MENTION_MAX_COUNT} entries`)
   }
 
-  const mentions: FileMention[] = []
-  const seenPaths = new Set<string>()
+  const mentions: ChatMention[] = []
+  const seen = new Set<string>()
   for (let index = 0; index < raw.length; index += 1) {
-    const mention = parseFileMention(raw[index], index)
-    if (seenPaths.has(mention.path)) continue
-    seenPaths.add(mention.path)
+    const entry = raw[index] as Record<string, unknown> | null
+    const mention = entry && typeof entry === 'object' && entry.kind === 'agent'
+      ? parseAgentMention(entry, index)
+      : parseFileMention(raw[index], index)
+    const key = isAgentMention(mention) ? `agent:${mention.agentId}` : `file:${mention.path}`
+    if (seen.has(key)) continue
+    seen.add(key)
     mentions.push(mention)
   }
   return mentions
+}
+
+/** The file mentions of the wire list; agent mentions are validated and set aside. */
+export function parseFileMentions(raw: unknown): FileMention[] {
+  return fileMentionsOf(parseMentions(raw))
+}
+
+function parseAgentMention(record: Record<string, unknown>, index: number): AgentMention {
+  const agentId = record.agentId
+  if (typeof agentId !== 'string' || !AGENT_ID_PATTERN.test(agentId)) {
+    throw new ChatTurnInputError(`mentions[${index}].agentId must be 1–128 letters, digits, dots, colons, underscores or hyphens`)
+  }
+  const handle = record.handle
+  if (typeof handle !== 'string' || !AGENT_HANDLE_PATTERN.test(handle)) {
+    throw new ChatTurnInputError(`mentions[${index}].handle must be lowercase letters, digits and hyphens`)
+  }
+  const name = record.name
+  if (typeof name !== 'string' || !name.trim()) {
+    throw new ChatTurnInputError(`mentions[${index}].name must be a non-empty string`)
+  }
+  if (name.length > MAX_MENTION_NAME_LENGTH) {
+    throw new ChatTurnInputError(`mentions[${index}].name must not exceed ${MAX_MENTION_NAME_LENGTH} characters`)
+  }
+  return { kind: 'agent', agentId, handle, name: name.trim() }
 }
 
 /** Validates the untyped `parts` array off the wire. Returns the typed parts

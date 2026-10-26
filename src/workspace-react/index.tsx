@@ -80,6 +80,34 @@ export interface AgentWorkspaceAppsConfig {
   prefetch?: RailPrefetch
 }
 
+/** One agent in the workspace roster the rail lists. */
+export interface AgentWorkspaceAgentRow {
+  /** The stable profile id. */
+  id: string
+  name: string
+  /** What the composer's `@` carries; shown beside the name. */
+  handle?: string
+}
+
+/**
+ * The workspace's agents under one expandable rail row, like Apps: each row
+ * opens the agent's own thread (its direct line and its feed), and an optional
+ * create route adds "New agent". Products supply authorized rows and real
+ * routes; the roster comes from the product's agent-profile catalog.
+ */
+export interface AgentWorkspaceAgentsConfig {
+  icon: WorkspaceIcon
+  items: readonly AgentWorkspaceAgentRow[]
+  hrefForAgent: (agentId: string) => string
+  /** Row label. Defaults to `Agents`. */
+  label?: string
+  /** Route that creates an agent; adds a "New agent" row at the end. */
+  createHref?: string
+  /** Label for the create row. Defaults to `New agent`. */
+  createLabel?: string
+  prefetch?: RailPrefetch
+}
+
 /** Route data for the shared active-nav resolver. */
 export interface AgentWorkspaceActiveRoute {
   /** Current browser pathname, including the product's workspace base. */
@@ -111,6 +139,8 @@ export interface AgentWorkspaceLayoutProps
   sessions?: AgentWorkspaceSessionConfig
   /** Authorized app destinations, in the product's persisted order. */
   apps?: AgentWorkspaceAppsConfig
+  /** The workspace's agents, each opening its own thread. */
+  agents?: AgentWorkspaceAgentsConfig
   /** When supplied, active navigation is resolved by the shared route rules. */
   activeRoute?: AgentWorkspaceActiveRoute
   /** Escape hatch for routers that already resolved the active item. */
@@ -144,6 +174,7 @@ export function AgentWorkspaceLayout({
   navItems,
   sessions,
   apps,
+  agents,
   activeRoute,
   activeId,
   product,
@@ -198,6 +229,31 @@ export function AgentWorkspaceLayout({
       prefetch: apps!.prefetch,
     }
   })
+  const agentNavItems: SidebarLayoutNavItem[] = [
+    ...(agents?.items ?? []).map((agent) => {
+      const href = agents!.hrefForAgent(agent.id)
+      if (!href.startsWith('/') || href.startsWith('//') || /[?#\\]/.test(href)) {
+        throw new Error('Workspace agent href must be a local route path')
+      }
+      return {
+        id: 'workspace-agent:' + agent.id,
+        label: agent.handle ? `${agent.name} · @${agent.handle}` : agent.name,
+        icon: agents!.icon,
+        href,
+        prefetch: agents!.prefetch,
+      }
+    }),
+    ...(agents?.createHref
+      ? [{ id: 'workspace-agent:new', label: agents.createLabel ?? 'New agent', icon: agents.icon, href: agents.createHref, prefetch: agents.prefetch }]
+      : []),
+  ]
+  const agentRoutes: NavRouteDef[] = activeRoute
+    ? agentNavItems.map((item) => {
+        const path = routePathFromHref(item.href!, activeRoute.base)
+        if (!path) throw new Error('Workspace agent href must be under the active workspace')
+        return { id: item.id, path }
+      })
+    : []
   const appRoutes: NavRouteDef[] = activeRoute
     ? appNavItems.map((item) => {
         const path = routePathFromHref(item.href!, activeRoute.base)
@@ -216,6 +272,7 @@ export function AgentWorkspaceLayout({
         routes: [
           ...activeRoute.routes,
           ...appRoutes,
+          ...agentRoutes,
           ...(sessionNav && historyRoutePath
             ? [{ id: sessions?.id ?? 'history', path: historyRoutePath }]
             : []),
@@ -243,8 +300,21 @@ export function AgentWorkspaceLayout({
         subActiveIds: activeAppId ? [activeAppId] : undefined,
       }
     : undefined
+  const activeAgentId = agentNavItems.some((item) => item.id === resolvedActiveId) ? resolvedActiveId : undefined
+  const agentGroup: SidebarLayoutNavItem | undefined = agents && agentNavItems.length > 0
+    ? {
+        id: 'workspace-agents',
+        label: agents.label ?? 'Agents',
+        icon: agents.icon,
+        expandable: true,
+        defaultOpen: true,
+        subItems: agentNavItems.map(({ id, label, icon, href, prefetch }) => ({ id, label, icon, href: href!, prefetch })),
+        subActiveIds: activeAgentId ? [activeAgentId] : undefined,
+      }
+    : undefined
   const workspaceNavItems: SidebarLayoutNavItem[] = [
     ...navItems,
+    ...(agentGroup ? [agentGroup] : []),
     ...(appGroup ? [appGroup] : []),
     ...(sessionNav ? [sessionNav] : []),
   ]

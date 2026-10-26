@@ -317,6 +317,46 @@ authenticated raw-bytes download route; `MessageAttachments` is available
 standalone. See [attachment preparation](../src/chat-routes/attachment-store.ts)
 and the [composer hook](../src/web-react/use-composer-attachments.ts).
 
+### Address agents by mention
+
+A thread's own agent answers by default. To let a person pull any workspace
+agent into any thread with `@`, give the composer the roster and the route a
+resolver; nothing else changes, and the thread's binding never moves.
+
+```ts
+// Composer: agents come first in the same @ popover, then the box's files.
+const mentions = useFileMentions({ indexUrl, agents: roster }) // { id, handle, name, description? }[]
+
+// Route: mentions resolve to the profiles they run as, from the product's catalog.
+createChatTurnRoutes({
+  agents: {
+    resolve: async ({ context, mentions }) => rosterFor(context.workspaceId, mentions.map((m) => m.agentId)),
+  },
+  produce: (args) => createSandboxChatProducer({ ...base, profile: args.agent?.profile ?? base.profile }),
+})
+```
+
+The handle is the agent's normalized name (`normalizeProfileName` in
+`/agent-profiles`); the persisted mention part carries the stable
+`agentId`, so a rename never breaks an old message. A turn addressed to
+several agents calls `produce` once per agent, all at the same time, each
+with the thread's history and none seeing another's answer, and persists one
+assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and labels each answer with its
+author (`expandSpeakerRows` in `/web`); the live stream carries the same
+boundary as a `speaker` event (`onSpeaker` in `ChatStreamCallbacks`), so
+a viewer opens a new block as each agent starts. When a product projects history for a
+mentioned agent, it passes the point of view: `projectDispatchHistory(prior,
+{ pov: args.agent?.id, owner })` keeps that agent's own answers as
+`assistant` turns and turns every other agent's answer, including the
+thread's owner, into a `user` turn tagged `[Name] …`, the same rule
+agent-runtime's conversations use. Without a point of view, a multi-speaker
+row projects as tagged `assistant` turns, so the owner still sees who said
+what. Reasoning and tool parts never project. A mention of an agent the
+resolver does not return is refused as `unknown_agent`; a route without
+`agents` refuses any agent mention as `agents_unsupported`. The rail lists
+the roster through `AgentWorkspaceLayout`'s `agents` config, one row per
+agent opening its own thread, plus "New agent" when `createHref` is set.
+
 ## Questions, plans and approvals
 
 Sandbox's `SandboxSession.plan()` owns durable plan authority. `/plans` owns

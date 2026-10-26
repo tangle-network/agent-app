@@ -37,6 +37,7 @@ import type {
 } from './turn-route-contracts'
 import type { TurnRoutePhase } from './turn-progress'
 import { ChatTurnInputError, type ChatTurnPartInput } from './wire'
+import { addressAgents, composeAgentProducers } from './agent-producers'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 import type { AfterAuthorizeWork } from './early-turn-work'
 
@@ -161,8 +162,13 @@ async function runAdmittedTurn<TContext, TResource>({
     ...(intentLine ? { intentLine } : {}), ...(admitted.prefetched ? { prefetched: admitted.prefetched } : {}),
     ...(ctx?.executionLimits ? { executionLimits: ctx.executionLimits } : {}),
   }
+  // Responders named from the product's own catalog, before any lock, row or model call.
+  const addressed = await addressAgents({ options, mentions, identity, context, produceArgs, trace })
+  if (addressed instanceof Response) return addressed
+  produceArgs = addressed
   const selected = selectTurnProducer(options.produce, produceArgs)
-  const dispatched = dispatchFirstFor(selected, produceArgs, trace)
+  // Responders answer one after another, so nothing starts before the lock.
+  const dispatched = produceArgs.agents ? undefined : dispatchFirstFor(selected, produceArgs, trace)
   if (dispatched) early.add(dispatched.refuse)
   const turnLock = options.turnLock
   if (turnLock) {
@@ -715,7 +721,11 @@ function createTurnEngine<TContext, TResource>(
         stream: (async function* () {
           // The product's own admission work: its profile pin, prompt and producer construction.
           const producerStream = async function* () {
-            const started = dispatched ? dispatched.take(produceArgs) : trace.measure('admission.produce', 'admission', () => produce(produceArgs))
+            const started = dispatched
+              ? dispatched.take(produceArgs)
+              : produceArgs.agents
+                ? trace.measure('admission.produce', 'admission', () => composeAgentProducers(produceArgs, produce))
+                : trace.measure('admission.produce', 'admission', () => produce(produceArgs))
             if (!dispatched) {
               const cleanup = started.then(producer => producer.cleanup, () => undefined)
               ctx?.waitUntil?.(cleanup)

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   buildDispatchParts,
   normalizeChatPromptForSandbox,
+  projectDispatchHistory,
   type BuildDispatchPartsInput,
   type ReadSandboxMentionFn,
   type PromptInputPart,
@@ -565,5 +566,47 @@ describe('buildDispatchParts — parts-count cap', () => {
     expect(result.succeeded).toBe(false)
     if (result.succeeded) return
     expect(result.error).toContain('parts')
+  })
+})
+
+describe('projectDispatchHistory with several speakers', () => {
+  const rows = [
+    { role: 'user', content: '@writer @research-lead plan the launch' },
+    {
+      role: 'assistant',
+      content: 'Headline.\n\nThree risks.',
+      parts: [
+        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+        { type: 'reasoning', text: 'private' },
+        { type: 'text', text: 'Headline.' },
+        { type: 'speaker', id: 'ap_research', name: 'Research Lead' },
+        { type: 'tool', toolName: 'search', state: 'completed' },
+        { type: 'text', text: 'Three risks.' },
+      ],
+    },
+    { role: 'assistant', content: 'Owner wraps up.', parts: [{ type: 'text', text: 'Owner wraps up.' }] },
+  ]
+
+  it('names each speaker for a reader with no point of view, and drops reasoning and tools', () => {
+    expect(projectDispatchHistory(rows)).toEqual([
+      { role: 'user', content: '@writer @research-lead plan the launch' },
+      { role: 'assistant', content: '[Writer] Headline.' },
+      { role: 'assistant', content: '[Research Lead] Three risks.' },
+      { role: 'assistant', content: 'Owner wraps up.' },
+    ])
+  })
+
+  it('reads through one agent: its own answers stay assistant, everyone else is a tagged user turn', () => {
+    expect(projectDispatchHistory(rows, { pov: 'ap_research', owner: { id: 'ap_owner', name: 'Concierge' } })).toEqual([
+      { role: 'user', content: '@writer @research-lead plan the launch' },
+      { role: 'user', content: '[Writer] Headline.' },
+      { role: 'assistant', content: 'Three risks.' },
+      { role: 'user', content: '[Concierge] Owner wraps up.' },
+    ])
+  })
+
+  it('leaves an unnamed owner row as assistant when no owner is given', () => {
+    const [, , , last] = projectDispatchHistory(rows, { pov: 'ap_writer' })
+    expect(last).toEqual({ role: 'assistant', content: 'Owner wraps up.' })
   })
 })

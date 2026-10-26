@@ -76,6 +76,7 @@ import {
   mentionKindForPath,
   type ChatAttachmentInput,
   type ChatAttachmentKind,
+  type ChatMention,
   type ChatMentionKind,
   type FileMention,
 } from '../chat-routes/wire'
@@ -243,10 +244,26 @@ export interface ChatNoticePart {
 export interface ChatMentionPart {
   type: 'mention'
   mentionKind: ChatMentionKind
+  /** The `@`-token identity the message text carries: a workspace-relative
+   *  path for a file, the handle for an agent. */
   path: string
   name: string
   size?: number
   turnId?: string
+  /** The stable profile id behind an `agent` mention, so a rename never
+   *  breaks an old message. Absent on file mentions. */
+  agentId?: string
+}
+
+/** Who wrote the parts that follow, when one assistant row holds more than one
+ *  responder: a turn addressed to `@a @b` is one row whose parts read
+ *  speaker a, a's text, speaker b, b's text. A renderer splits the row at
+ *  these (`expandSpeakerRows` in `/web`); a row with none is one speaker. */
+export interface ChatSpeakerPart {
+  type: 'speaker'
+  id: string
+  name: string
+  handle?: string
 }
 
 /** Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions */
@@ -264,6 +281,7 @@ export type ChatMessagePart =
   | ChatPlanPart
   | ChatWorkProductPart
   | ChatMentionPart
+  | ChatSpeakerPart
 
 /** Every canonical harness wire-part kind must be storable — compile-time
  *  guarantee that a new agent-interface part kind cannot silently fall out of
@@ -329,6 +347,8 @@ function toChatMessagePart(part: Record<string, unknown>): ChatMessagePart | nul
       return persistedPartToWorkProduct(part) ? (part as unknown as ChatWorkProductPart) : null
     case 'mention':
       return isChatMentionPart(part) ? part : null
+    case 'speaker':
+      return isChatSpeakerPart(part) ? part : null
     case undefined:
       return null
     default: {
@@ -362,14 +382,23 @@ export function isChatMentionPart(part: unknown): part is ChatMentionPart {
   if (record.size !== undefined && (typeof record.size !== 'number' || !Number.isFinite(record.size))) {
     return false
   }
+  if (record.mentionKind === 'agent' && (typeof record.agentId !== 'string' || record.agentId.length === 0)) return false
   return (
     record.type === 'mention' &&
     typeof record.path === 'string' &&
     record.path.length > 0 &&
     typeof record.name === 'string' &&
     record.name.trim().length > 0 &&
-    (record.mentionKind === 'image' || record.mentionKind === 'file')
+    (record.mentionKind === 'image' || record.mentionKind === 'file' || record.mentionKind === 'agent')
   )
+}
+
+export function isChatSpeakerPart(part: unknown): part is ChatSpeakerPart {
+  if (!part || typeof part !== 'object') return false
+  const record = part as Record<string, unknown>
+  return record.type === 'speaker' && typeof record.id === 'string' && record.id.length > 0 &&
+    typeof record.name === 'string' && record.name.trim().length > 0 &&
+    (record.handle === undefined || typeof record.handle === 'string')
 }
 
 /** Every mention part on one message, in stored order. The projection a
@@ -386,7 +415,11 @@ export function mentionPartsFromMessageParts(
  *  part the turn route persists. An absent/non-finite `size` is DROPPED rather
  *  than stored as `undefined`, so a stored row never carries a key that means
  *  nothing. */
-export function mentionInputToPart(input: FileMention): ChatMentionPart {
+export function mentionInputToPart(mention: ChatMention): ChatMentionPart {
+  if ('kind' in mention && mention.kind === 'agent') {
+    return { type: 'mention', mentionKind: 'agent', path: mention.handle, name: mention.name, agentId: mention.agentId }
+  }
+  const input = mention as FileMention
   const part: ChatMentionPart = {
     type: 'mention',
     mentionKind: mentionKindForPath(input.path),

@@ -168,14 +168,76 @@ export interface DispatchHistoryMessage {
   parts?: ReadonlyArray<Record<string, unknown>> | null
 }
 
-/** Project persisted rows using the same role and attachment policy as dispatch. */
+/** Whose eyes the history is read through. */
+export interface DispatchHistoryPov {
+  /** The agent being prompted (`args.agent?.id` on a mentioned turn). Its
+   *  own answers stay `assistant`; every other agent's answer becomes a
+   *  `user` message tagged `[Name] …`, the same tagging agent-runtime's
+   *  `runConversation` uses, so three or more parties stay unambiguous. */
+  pov?: string
+  /** The thread's own agent, so its untagged answers can be named when the
+   *  history is read by someone else. Omit → untagged rows stay `assistant`. */
+  owner?: { id: string; name: string }
+  /** Append each row's attachment pointers to its text, as dispatch does.
+   *  Default true; a Router turn with no box to read from passes false. */
+  attachments?: boolean
+}
+
+/** Project persisted rows using the same role and attachment policy as dispatch.
+ *  A row written by several agents (a `speaker` part before each answer)
+ *  projects as one message per speaker, each tagged with its name; with a
+ *  point of view, the reader's own answers are untagged `assistant` turns and
+ *  everyone else's are tagged `user` turns. Reasoning and tool parts never
+ *  project: they are the writer's trace, not anyone's context. */
 export function projectDispatchHistory(
   messages: ReadonlyArray<DispatchHistoryMessage>,
+  view: DispatchHistoryPov = {},
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
-  return messages.map((message) => ({
-    role: message.role === 'assistant' ? 'assistant' : 'user',
-    content: historyContentWithAttachments(message),
-  }))
+  const out: Array<{ role: 'user' | 'assistant'; content: string }> = []
+  const textOf = (message: DispatchHistoryMessage) =>
+    view.attachments === false ? message.content : historyContentWithAttachments(message)
+  for (const message of messages) {
+    if (message.role !== 'assistant') {
+      out.push({ role: 'user', content: textOf(message) })
+      continue
+    }
+    const slices = speakerSlices(message)
+    if (slices.length === 0) {
+      const owner = view.owner
+      const foreign = view.pov !== undefined && owner !== undefined && owner.id !== view.pov
+      out.push({
+        role: foreign ? 'user' : 'assistant',
+        content: foreign ? tagged(owner!.name, textOf(message)) : textOf(message),
+      })
+      continue
+    }
+    for (const slice of slices) {
+      const text = textOf({ role: 'assistant', content: slice.text, parts: slice.parts })
+      if (view.pov === undefined) out.push({ role: 'assistant', content: tagged(slice.name, text) })
+      else if (slice.id === view.pov) out.push({ role: 'assistant', content: text })
+      else out.push({ role: 'user', content: tagged(slice.name, text) })
+    }
+  }
+  return out
+}
+
+const tagged = (name: string, text: string) => `[${name}] ${text}`
+
+/** One responder's slice of a multi-speaker row: its text and the parts that follow its speaker part. */
+function speakerSlices(message: DispatchHistoryMessage): Array<{ id: string; name: string; text: string; parts: Record<string, unknown>[] }> {
+  const parts = message.parts ?? []
+  const slices: Array<{ id: string; name: string; text: string; parts: Record<string, unknown>[] }> = []
+  let current: (typeof slices)[number] | null = null
+  for (const part of parts) {
+    if (part.type === 'speaker' && typeof part.id === 'string' && typeof part.name === 'string') {
+      current = { id: part.id, name: part.name, text: '', parts: [] }
+      slices.push(current)
+    } else if (current) {
+      current.parts.push(part)
+      if (part.type === 'text' && typeof part.text === 'string') current.text += part.text
+    }
+  }
+  return slices
 }
 
 /** Build input parameters for dispatching chat message parts including text, attachments, mentions, and history */
@@ -231,7 +293,8 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
   const readMention = input.readSandboxMention ?? readSandboxMention
   const resolveMentionPath = input.resolveMentionPath ?? input.resolveAttachmentPath
   const forcePath = input.forcePath ?? false
-  const mentions = input.mentions ?? []
+  // Agent mentions address a responder; only file mentions are read from the box.
+  const mentions = (input.mentions ?? []).filter((mention) => mention.mentionKind !== 'agent')
   const requestMaxBytes = input.requestMaxBytes ?? DISPATCH_REQUEST_MAX_BYTES
   const structuralReserveBytes = input.structuralReserveBytes ?? DISPATCH_STRUCTURAL_RESERVE_BYTES
   const maxParts = input.maxParts ?? DISPATCH_MAX_PARTS
