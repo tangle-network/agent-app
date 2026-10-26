@@ -25,10 +25,7 @@ import {
   createDurableTurnLock,
   createMemoryTurnStreamHarness,
   mintTurnStreamToken,
-  peekDurableTurnLock,
   reconcileStaleDurableTurnLock,
-  TurnStreamDO,
-  workspaceChannelKey,
 } from '../../src/turn-stream/index'
 import type { ChatMessagePart } from '../../src/chat-store/parts'
 import { parseServerTiming } from '../../src/turn-trace/server-timing'
@@ -279,74 +276,5 @@ describe('turn-stream × createChatTurnRoutes', () => {
     expect(third.status).toBe(200)
     await readLines(third.body!)
     await Promise.all(pending)
-  })
-
-  it('an unconfirmed backend parks its release for the durable owner; a lock without park stays held as before', async () => {
-    class OwnerDO extends TurnStreamDO {
-      complete(executionId: string) { return this.completeDeferredLockRelease(executionId) }
-    }
-    const harness = createMemoryTurnStreamHarness((state, secret) => new OwnerDO(state, undefined, { authSecret: secret }))
-    const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
-    const durable = createDurableTurnLock({ namespace: harness.namespace, auth, scopeOf: () => 'workspace' })
-    const routesWith = (turnLock: Parameters<typeof createChatTurnRoutes>[0]['turnLock']) => createChatTurnRoutes({
-      projectId: 'test-app',
-      authorize: async () => ({ ok: true, tenantId: WS, userId: 'u-1', context: undefined }),
-      store: memoryMessageStore().store,
-      turnStore: createDurableObjectTurnEventStore(harness.namespace, auth),
-      turnLock,
-      produce: (): ChatTurnRouteProducer => ({
-        stream: (async function* () { yield { type: 'text', data: { text: 'detached' } } })(),
-        finalText: () => 'detached',
-        terminalObserved: () => false,
-      }),
-    })
-    const turn = async (routes: ReturnType<typeof createChatTurnRoutes>, content: string) => {
-      const pending: Promise<unknown>[] = []
-      const response = await routes.turn(turnRequest({ threadId: THREAD, content }), { waitUntil: (p) => void pending.push(p) })
-      if (response.body) await readLines(response.body)
-      await Promise.all(pending)
-      return response.status
-    }
-    const held = () => peekDurableTurnLock(harness.namespace, { workspaceId: WS, scope: 'workspace' }, auth)
-
-    // A lock with no park method (a custom adapter) keeps today's behavior: held, nothing parked.
-    expect(await turn(routesWith({ acquire: durable.acquire, release: durable.release }), 'custom')).toBe(200)
-    const customHeld = await held()
-    expect(customHeld?.releasePending).toBeUndefined()
-    expect(await turn(routesWith(durable), 'blocked')).toBe(409)
-    const owner = harness.channel(workspaceChannelKey(WS)).instance as OwnerDO
-    // Only a parked release completes; the custom turn's lock has none to complete.
-    expect(await owner.complete(customHeld!.executionId)).toBe(false)
-    expect(await durable.park({ workspaceId: WS, threadId: THREAD, scope: 'workspace', executionId: customHeld!.executionId, lockId: 'other-lock' })).toBe(false)
-    expect((await held())?.releasePending).toBeUndefined()
-    expect(await durable.park({ workspaceId: WS, threadId: THREAD, scope: 'workspace', executionId: customHeld!.executionId, lockId: customHeld!.lockId })).toBe(true)
-    expect(await owner.complete(customHeld!.executionId)).toBe(true)
-
-    // The durable lock parks on the same unconfirmed end: still held, successor refused, freed only by its owner.
-    expect(await turn(routesWith(durable), 'parked')).toBe(200)
-    const parked = await held()
-    expect(parked?.releasePending).toBe(true)
-    expect(await turn(routesWith(durable), 'successor')).toBe(409)
-    expect(await owner.complete('another-execution')).toBe(false)
-    expect(await owner.complete(parked!.executionId)).toBe(true)
-    expect(await held()).toBeNull()
-  })
-
-  it('an older DO without the park endpoint refuses the intent and the lock stays held', async () => {
-    class OlderDO extends TurnStreamDO {
-      override async fetch(request: Request): Promise<Response> {
-        if (new URL(request.url).pathname === '/chat-turn-lock/park') return new Response('Not found', { status: 404 })
-        return super.fetch(request)
-      }
-    }
-    const harness = createMemoryTurnStreamHarness((state, secret) => new OlderDO(state, undefined, { authSecret: secret }))
-    const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
-    const durable = createDurableTurnLock({ namespace: harness.namespace, auth, scopeOf: () => 'workspace' })
-    const acquired = await durable.acquire({ identity: { tenantId: WS, sessionId: THREAD }, executionId: 'exec-old', body: {} } as never)
-    if (!acquired.acquired) throw new Error('expected acquire')
-    await expect(durable.park(acquired.handle)).rejects.toThrow()
-    const active = await peekDurableTurnLock(harness.namespace, { workspaceId: WS, scope: 'workspace' }, auth)
-    expect(active?.executionId).toBe('exec-old')
-    expect(active?.releasePending).toBeUndefined()
   })
 })

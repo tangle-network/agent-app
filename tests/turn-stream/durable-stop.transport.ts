@@ -1,6 +1,8 @@
 /** Actual workerd transport fixture, shared by the complete route proof and its bounded transport diagnostic. */
 import { TurnStreamDO, type TurnStreamDOState } from '../../src/turn-stream/do'
-import { acquireDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock, createDurableTurnLock,
+// The consumer's installed, published agent-app: an actual DO from before /chat-turn-lock/park (aliased by the integration's Wrangler config).
+import { TurnStreamDO as PublishedTurnStreamDO, TURN_STREAM_PATHS as PUBLISHED_TURN_STREAM_PATHS } from 'agent-app-published-turn-stream'
+import { acquireDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock, parkDurableTurnLock, createDurableTurnLock,
   createDurableObjectTurnEventStore, releaseInterruptedDurableTurnLock, reconcileStaleDurableTurnLock, type TurnStreamNamespaceLike } from '../../src/turn-stream/adapters'
 import { connectDurableTurnCancellation, requestDurableTurnCancellation, type TurnCancellationIdentity } from '../../src/turn-stream/cancellation'
 import { mintTurnStreamToken, TURN_STREAM_PATHS, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, turnLockStorageKey, type TurnStreamTokenClaims } from '../../src/turn-stream/core'
@@ -15,6 +17,7 @@ export interface StopFixtureEnv {
   OUTAGE_TURNS: TurnStreamNamespaceLike
   DEFERRED_TURNS: TurnStreamNamespaceLike
   SHORT_DEFERRED_TURNS: TurnStreamNamespaceLike
+  PUBLISHED_TURNS: TurnStreamNamespaceLike
   BARRIER_TURNS: TurnStreamNamespaceLike
   CHAT: { prepare(sql: string): Statement }
   TURN_STREAM_AUTH_SECRET: string
@@ -29,6 +32,10 @@ export class FixtureTurnStream extends TurnStreamDO {
       for (const socket of this.state.getWebSockets()) socket.close(1011, 'Fixture connection loss')
       return Response.json({ closed: true })
     }
+    if (url.pathname === '/fixture/complete-deferred') {
+      const input = await request.json() as TurnCancellationIdentity
+      return Response.json({ completed: await this.completeDeferredLockRelease(input.executionId) })
+    }
     if (url.pathname === '/fixture/raw-lock') {
       const input = await request.json() as TurnCancellationIdentity
       return Response.json({ active: await this.state.storage.get(turnLockStorageKey(input.scope, input.threadId)) ?? null })
@@ -36,6 +43,7 @@ export class FixtureTurnStream extends TurnStreamDO {
     return super.handleProductRequest(request, url)
   }
 }
+export class PublishedTurnStream extends PublishedTurnStreamDO {}
 export class ShortTurnStream extends FixtureTurnStream {
   constructor(state: TurnStreamDOState, env: StopFixtureEnv) { super(state, env, { lockTtlMs: 1000 }) }
 }
@@ -107,6 +115,7 @@ export async function handleDurableStopTransport(request: Request, env: StopFixt
     // Remaining endpoints expose only isolated integration protocol boundaries.
     if (request.headers.get('Authorization') !== 'Bearer fixture-authorized-member') return new Response('Unauthorized', { status: 401 })
     const namespace = url.searchParams.has('barrier') ? env.BARRIER_TURNS
+      : url.searchParams.has('published') ? env.PUBLISHED_TURNS
       : url.searchParams.get('deferred') === '1' && url.searchParams.get('short') === '1' ? env.SHORT_DEFERRED_TURNS
       : url.searchParams.get('deferred') === '1' ? env.DEFERRED_TURNS
       : url.searchParams.get('short') === '1' ? env.SHORT_TURNS
@@ -153,6 +162,11 @@ export async function handleDurableStopTransport(request: Request, env: StopFixt
     if (url.pathname === '/status') return Response.json({ status: await createDurableObjectTurnEventStore(namespace, auth).getStatus(input.turnStreamId) })
     if (url.pathname === '/stop') return Response.json(await requestDurableTurnCancellation(namespace, input, auth))
     if (url.pathname === '/release') return Response.json(await releaseDurableTurnLock(namespace, input, auth))
+    if (url.pathname === '/park') {
+      try { return Response.json({ parked: await parkDurableTurnLock(namespace, input, auth) }) }
+      catch (error) { return Response.json({ parked: false, refused: error instanceof Error ? error.message : String(error) }) }
+    }
+    if (url.pathname === '/published-paths') return Response.json({ paths: PUBLISHED_TURN_STREAM_PATHS })
     if (url.pathname === '/owner-evidence') {
       await env.CHAT.prepare('INSERT OR REPLACE INTO owner_evidence VALUES (?, ?, ?, ?, ?, ?, ?)')
         .bind(input.workspaceId, input.threadId, input.scope, input.executionId, input.lockId, input.turnStreamId, input.ownerStatus ?? 'unknown').run()
@@ -227,7 +241,7 @@ export async function handleDurableStopTransport(request: Request, env: StopFixt
     const tokenKey = url.pathname === '/cross-channel' ? turnLockChannelKey('another-workspace', input.threadId, input.scope) : key
     const headers: Record<string, string> = url.pathname === '/raw-unauthenticated' ? {} : { [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(tokenKey, auth.secret) }
     const path = url.pathname === '/close' ? '/fixture/close' : url.pathname === '/sockets' ? '/fixture/sockets'
-      : url.pathname === '/raw-lock' ? '/fixture/raw-lock' : '/chat-turn-lock/peek'
+      : url.pathname === '/raw-lock' ? '/fixture/raw-lock' : url.pathname === '/complete-deferred' ? '/fixture/complete-deferred' : '/chat-turn-lock/peek'
     const response = await namespace.get(namespace.idFromName(key)).fetch(`https://fixture.internal${path}`,
       { method: 'POST', headers, body: JSON.stringify(input) })
     return new Response(response.body, { status: response.status, headers: response.headers })
