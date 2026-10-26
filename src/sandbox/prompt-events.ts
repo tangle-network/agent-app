@@ -329,6 +329,12 @@ export function isTerminalPromptEvent(event: unknown): boolean {
   return root?.type === 'result' || (root?.type === 'done' && asPlainRecord(root.data)?.status !== 'failed')
 }
 
+/** A box agent's ask (or its withdrawal) that the member answers: what a computer step relays to the turn. */
+export function isComputerInteractionEvent(event: unknown): boolean {
+  const type = asPlainRecord(event)?.type
+  return type === 'interaction' || type === 'interaction.cancel'
+}
+
 // Interactive-question detector. Returns the question text or null. Used by
 // streamSandboxPrompt when disallowQuestions is set.
 /** Resolve the interactive question text from a structured event or return null if none found */
@@ -340,9 +346,13 @@ export function detectInteractiveQuestion(event: unknown): string | null {
   const props = asPlainRecord(root.properties)
   const body = props ?? data ?? root
   if (type === 'question.asked' || type === 'question') return firstQuestionText(body)
-  // Generic structured-interaction event (BackendConfig.interactions kinds surface as
-  // `interaction` events with a `kind` discriminator); treat kind:"question" as a question.
-  if (type === 'interaction' && body.kind === 'question') return firstQuestionText(body)
+  // The runtime's structured ask: `interaction` carries an InteractionRequest under
+  // `request`, whose `kind` names it and whose `title` is the question.
+  if (type === 'interaction') {
+    const request = asPlainRecord(body.request) ?? body
+    if (request.kind !== 'question') return null
+    return typeof request.title === 'string' && request.title ? request.title : firstQuestionText(request)
+  }
   const part = asPlainRecord(data?.part) ?? asPlainRecord(body.part)
   const tool =
     (typeof part?.tool === 'string' && part.tool) ||

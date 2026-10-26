@@ -9,7 +9,6 @@
  * `unscoped`, so a reviewer sees exactly what the export leaves out.
  */
 
-import { DEFAULT_COMPUTER_STEP_RECEIPT_TABLE } from '../sandbox/computer-receipts'
 import type { ExportDataClass, ExportRow, ExportRowsSource } from './types'
 
 /** The slice of Cloudflare's `D1Database` used here. */
@@ -39,7 +38,7 @@ export interface D1WorkspaceTablesOptions {
    * the workspace id. Example: `{ message: 'thread_id IN (SELECT id FROM thread WHERE workspace_id = ?)' }`.
    */
   scoped?: Readonly<Record<string, string>>
-  /** Tables left out on purpose, with the reason recorded in coverage. agent-app's own operational tables are excluded by default. */
+  /** Tables left out on purpose, with the reason recorded in coverage. */
   exclude?: Readonly<Record<string, string>>
   /** Per-table columns to drop beyond the automatic credential policy. */
   omitColumns?: Readonly<Record<string, readonly string[]>>
@@ -49,14 +48,6 @@ export interface D1WorkspaceTablesOptions {
   classify?: (table: string) => ExportDataClass
   /** Rows per query. Default 500. */
   pageSize?: number
-}
-
-/**
- * Tables agent-app itself creates for runtime bookkeeping, excluded with their reason so a product
- * that adopts the shared lane does not have to classify them. A product's own `exclude` entry wins.
- */
-const AGENT_APP_EXPORT_EXCLUSIONS: Readonly<Record<string, string>> = {
-  [DEFAULT_COMPUTER_STEP_RECEIPT_TABLE]: 'agent-app computer-step idempotency receipts (a step id, its vault listing and answer), operational only',
 }
 
 // Bookkeeping tables of SQLite, D1 and migration runners (drizzle, custom _migrations*).
@@ -75,7 +66,7 @@ export async function d1WorkspaceTables(
   options: D1WorkspaceTablesOptions,
 ): Promise<{ sources: ExportRowsSource[]; coverage: D1TableCoverage[] }> {
   const { db, workspaceId } = options
-  const exclude = { ...AGENT_APP_EXPORT_EXCLUSIONS, ...options.exclude }
+  const exclude = options.exclude ?? {}
   const pageSize = options.pageSize ?? 500
   const tables = (
     await db.prepare(`SELECT name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name`).all<{ name: string; sql: string | null }>()
