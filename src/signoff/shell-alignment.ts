@@ -12,7 +12,7 @@
  * (`judgeShellAlignment`) is a pure function so it is unit-tested without a browser.
  */
 
-import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount } from './browser-budget'
+import { createRequestMeter, createMeteredBrowserPage, QUIET_CHROMIUM_ARGS, type NetworkCount, gotoRoute } from './browser-budget'
 
 /** A horizontal divider: the bottom border of a top-anchored row. Coordinates in CSS px. */
 export interface ShellDivider {
@@ -202,7 +202,7 @@ export async function checkShellAlignment(options: ShellAlignmentOptions): Promi
           // An app that polls never reaches network idle, so wait for the shell to
           // render and give in-flight data a short, capped settle.
           await meter.pace()
-          await page.goto(new URL(route, options.baseUrl).toString(), { waitUntil: 'domcontentloaded' })
+          await gotoRoute(page, new URL(route, options.baseUrl).toString())
           await page.waitForSelector(options.readySelector ?? '[data-shell-header]', { state: 'visible', timeout: 15_000 }).catch(() => undefined)
           await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined)
           await page.evaluate(() => document.fonts?.ready)
