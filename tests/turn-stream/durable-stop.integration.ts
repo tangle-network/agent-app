@@ -333,6 +333,25 @@ try {
     assert.deepEqual(await json('/release', parkedSuccessor), { released: true })
     checks.push('park leaves the exact lock held with releasePending; wrong identity parks or completes nothing; the successor waits for the same execution')
 
+    // The route parks an unconfirmed end only through a lock that has park; a custom lock without park stays held as before.
+    const customHeld = identity('custom-held')
+    await acquire(customHeld)
+    assert.deepEqual(await json('/route-unconfirmed?custom=1', customHeld), { ended: true })
+    const customLock = (await json<{ active: DurableTurnLock }>('/raw-lock', customHeld)).active
+    assert.equal(customLock.lockId, customHeld.lockId)
+    assert.equal(customLock.releasePending, undefined)
+    assert.deepEqual(await json('/complete-deferred', customHeld), { completed: false }, 'A lock without park leaves nothing to complete')
+    assert.equal((await json<{ acquired: boolean }>('/lock', { ...customHeld, executionId: 'execution-custom-successor',
+      lockId: 'lock-custom-successor', turnStreamId: 'stream-custom-successor' })).acquired, false)
+    assert.deepEqual(await json('/release', customHeld), { released: true })
+    const routeParked = identity('route-parked')
+    await acquire(routeParked)
+    assert.deepEqual(await json('/route-unconfirmed', routeParked), { ended: true })
+    assert.equal((await json<{ active: DurableTurnLock }>('/raw-lock', routeParked)).active.releasePending, true)
+    assert.deepEqual(await json('/complete-deferred', routeParked), { completed: true })
+    assert.equal(await peek(routeParked), null)
+    checks.push('the route parks an unconfirmed end only through a lock with park; a custom lock without park stays held with nothing to complete')
+
     // An actual published DO from before park has no /chat-turn-lock/park: the intent is refused and the lock stays held.
     assert.equal('lockPark' in (await json<{ paths: Record<string, string> }>('/published-paths', parked)).paths, false,
       "The consumer's published agent-app must predate park for this control")

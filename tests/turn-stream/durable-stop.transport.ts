@@ -7,6 +7,7 @@ import { acquireDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock, pa
 import { connectDurableTurnCancellation, requestDurableTurnCancellation, type TurnCancellationIdentity } from '../../src/turn-stream/cancellation'
 import { mintTurnStreamToken, TURN_STREAM_PATHS, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, turnLockStorageKey, type TurnStreamTokenClaims } from '../../src/turn-stream/core'
 import type { StaleTurnLockOwnerProbeResult } from '../../src/chat-routes/stale-turn-lock'
+import { createChatTurnOwnership } from '../../src/chat-routes/turn-ownership'
 
 interface Statement {
   bind(...values: unknown[]): { run(): Promise<unknown>; all<T>(): Promise<{ results: T[] }> }
@@ -165,6 +166,16 @@ export async function handleDurableStopTransport(request: Request, env: StopFixt
     if (url.pathname === '/park') {
       try { return Response.json({ parked: await parkDurableTurnLock(namespace, input, auth) }) }
       catch (error) { return Response.json({ parked: false, refused: error instanceof Error ? error.message : String(error) }) }
+    }
+    if (url.pathname === '/route-unconfirmed') {
+      // The route's own end-of-turn release for a producer that never observed its backend stop.
+      const lock = createDurableTurnLock({ namespace, auth, scopeOf: () => input.scope })
+      const handle = { workspaceId: input.workspaceId, threadId: input.threadId, scope: input.scope, executionId: input.executionId, lockId: input.lockId }
+      const { releaseLock } = createChatTurnOwnership({ producer: { terminalObserved: () => false } as never, completionHandoff: false,
+        completionHandoffPromise: undefined, nativeTiming: undefined, tap: undefined, draft: undefined, lockAcquired: true, lockReleased: false,
+        lockHandle: handle }, () => {}, input.turnStreamId, { turnLock: url.searchParams.has('custom') ? { release: lock.release } : lock })
+      await releaseLock()
+      return Response.json({ ended: true })
     }
     if (url.pathname === '/published-paths') return Response.json({ paths: PUBLISHED_TURN_STREAM_PATHS })
     if (url.pathname === '/owner-evidence') {

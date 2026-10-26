@@ -46,6 +46,8 @@ export default {
   // The journeys kit shells out to ffmpeg and ffprobe for its videos; they are host tools, not dependencies.
   ignoreBinaries: ['tsc', 'ffmpeg', 'ffprobe'],
   ignoreDependencies: [
+    // A Wrangler alias in the durable-stop integration bundles the consumer's published turn-stream as an older receiver.
+    'agent-app-published-turn-stream',
     '@anthropic-ai/sdk',
     '@tangle-network/agent-gateway',
     '@tangle-network/agent-profile-materialize',
