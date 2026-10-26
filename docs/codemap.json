@@ -26379,7 +26379,7 @@
           "name": "formatServerTiming",
           "kind": "function",
           "signature": "(entries: readonly ServerTimingEntry[]) => string",
-          "doc": "Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
+          "doc": "Format metrics as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
         },
         {
           "name": "IntelligenceTurnTraceSinkOptions",
@@ -26409,7 +26409,7 @@
           "name": "parseServerTiming",
           "kind": "function",
           "signature": "(header: string | null | undefined) => ServerTimingEntry[]",
-          "doc": "Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it."
+          "doc": "Parse a `Server-Timing` header."
         },
         {
           "name": "resolveIngestKey",
@@ -26427,7 +26427,7 @@
           "name": "ServerTimingEntry",
           "kind": "interface",
           "signature": "interface ServerTimingEntry",
-          "doc": "One entry of a `Server-Timing` response header."
+          "doc": "One metric of a `Server-Timing` header."
         },
         {
           "name": "summarizeTurnSpans",
