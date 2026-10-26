@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.36
+
+- chore(deps): update application shell dependencies (#1338)
+
 ## 0.63.35
 
 - feat(chat): let the hybrid box keep a private failure cause off the transcript (#1341)
