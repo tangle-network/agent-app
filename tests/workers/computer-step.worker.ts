@@ -59,7 +59,7 @@ export default {
         return Response.json({ answer, emitted })
       } catch (error) {
         const failure = error as { code?: unknown; name?: unknown; message?: unknown }
-        return Response.json({ error: { code: failure.code ?? failure.name ?? null, message: String(failure.message ?? error) }, emitted }, 500)
+        return Response.json({ error: { code: failure.code ?? failure.name ?? null, message: String(failure.message ?? error) }, emitted }, { status: 500 })
       } finally {
         calls.delete(body.callId)
       }
