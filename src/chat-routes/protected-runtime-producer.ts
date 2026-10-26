@@ -181,7 +181,7 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
     }
   }
 
-  const producer = createSandboxChatProducer({ events: events(), model: profile.model?.default })
+  const producer = createSandboxChatProducer({ events: events(), model: profile.model?.default, errorNotice: true })
   const stream = producer.stream
   // Even return/throw before the first pull must abort and drain local work.
   const end = stream.return.bind(stream)
