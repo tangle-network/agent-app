@@ -1008,7 +1008,7 @@
     }
   },
   "dependencies": {
-    "@tangle-network/charts": "0.21.13",
+    "@tangle-network/charts": "0.21.14",
     "proper-lockfile": "4.1.2"
   }
 }
