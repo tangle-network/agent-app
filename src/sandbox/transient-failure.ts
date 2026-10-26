@@ -171,6 +171,9 @@ export interface SandboxTransientRetryOptions {
   onRetry?: (failure: SandboxTransientFailure, attempt: number, delayMs: number) => void
 }
 
+/** Short platform calls whose blips clear in seconds: transport failures included, three retries over 3.5 s. */
+export const SANDBOX_PLATFORM_CALL_RETRY: SandboxTransientRetryOptions = { network: true, delaysMs: [500, 1_000, 2_000] }
+
 const defaultSleep = (ms: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
   if (signal?.aborted) return reject(signal.reason)
   const timer = setTimeout(resolve, ms)
