@@ -19,7 +19,10 @@ import { vaultBinaryDocument } from '../../src/vault/store/sandbox-sync'
 
 const require = createRequire(import.meta.url)
 const wrangler = createRequire(require.resolve('wrangler/package.json'))
-const { Miniflare } = wrangler('miniflare') as { Miniflare: new (options: Record<string, unknown>) => Runtime }
+const { Miniflare, convertV4MiniflareOptions } = wrangler('miniflare') as {
+  convertV4MiniflareOptions(options: Record<string, unknown>): Record<string, unknown>
+  Miniflare: new (options: Record<string, unknown>) => Runtime
+}
 interface Runtime {
   getKVNamespace(binding: string): Promise<KVStore>
   getDurableObjectNamespace(binding: string): Promise<VaultCoordinatorNamespace>
@@ -62,11 +65,13 @@ beforeAll(async () => {
   ].join('\n'))
   execFileSync(process.execPath, [require.resolve('wrangler'), 'deploy', '--dry-run', '--config', config, '--outdir', bundle],
     { cwd: scratch, stdio: 'pipe' })
-  runtime = new Miniflare({
-    modules: true, scriptPath: join(bundle, 'sandbox-sync.worker.js'), modulesRoot: bundle,
-    compatibilityDate: '2026-09-01', compatibilityFlags: ['nodejs_compat'],
-    kvNamespaces: ['VAULT_KV'], durableObjects: { VAULT_COORDINATOR: 'VaultCoordinatorDO' },
-  })
+  runtime = new Miniflare(convertV4MiniflareOptions({
+    workers: [{
+      name: 'vault-sync-fixture', modules: true, scriptPath: join(bundle, 'sandbox-sync.worker.js'), modulesRoot: bundle,
+      compatibilityDate: '2026-09-01', compatibilityFlags: ['nodejs_compat'],
+      kvNamespaces: ['VAULT_KV'], durableObjects: { VAULT_COORDINATOR: 'VaultCoordinatorDO' },
+    }],
+  }))
   vault = createVaultStore<VaultCoordinatorNamespace>({ codec })
   vault.setVaultKV(await runtime.getKVNamespace('VAULT_KV'))
   vault.setVaultCoordinator(await runtime.getDurableObjectNamespace('VAULT_COORDINATOR'))
