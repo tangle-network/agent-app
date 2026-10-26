@@ -88,7 +88,12 @@ beforeEach(() => {
 })
 
 /** A box over a real directory and a real bash, recording each write request's JSON size. */
-function realBox(incarnation = 'incarnation-1', options: { rootName?: string; config?: Partial<SandboxVaultSyncConfig> } = {}) {
+function realBox(incarnation = 'incarnation-1', options: {
+  rootName?: string
+  config?: Partial<SandboxVaultSyncConfig>
+  /** The box refuses these uploads for their size, as the sandbox file API does with a 413. */
+  tooLarge?: (path: string) => boolean
+} = {}) {
   const home = mkdtempSync(join(scratch, 'box-'))
   const root = join(home, options.rootName ?? 'vault')
   const writeRequestBytes: number[] = []
@@ -110,6 +115,7 @@ function realBox(incarnation = 'incarnation-1', options: { rootName?: string; co
       delete: async (path: string) => rmSync(path, { recursive: true, force: true }),
       mkdir: async (path: string) => { mkdirSync(path, { recursive: true }) },
       uploadData: async (path: string, data: Uint8Array) => {
+        if (options.tooLarge?.(path)) throw Object.assign(new Error('File exceeds the upload limit'), { status: 413 })
         uploads.push(path)
         mkdirSync(dirname(path), { recursive: true })
         writeFileSync(path, data)
@@ -324,3 +330,131 @@ it('forgets the warm record when the box changed a binary, so the next pass rest
   expect(after.succeeded && after.value.inSync).toBeFalsy()
   expect(new Uint8Array(readFileSync(join(root, 'media/logo.png')))).toEqual(bytes)
 }, 60_000)
+
+it('with the deletion guard, commits a member delete and withholds every delete of a scan that would remove the whole Vault', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/a.md', 'a\n')
+  await vault.writeVaultRawFile(workspaceId, 'notes/b.md', 'b\n')
+  const { box, root, sync } = realBox('incarnation-1', { config: { deletes: { guard: {} } } })
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  rmSync(join(root, 'notes/a.md'))
+  expect((await sync.reconcile(box, workspaceId)).appliedPaths).toEqual(['notes/a.md'])
+  expect((await vault.readVaultFileState(workspaceId, 'notes/a.md')).deleted).toBe(true)
+
+  const before = await vault.readVaultSandboxBaseline(workspaceId, box.id)
+  rmSync(join(root, 'notes/b.md'))
+  writeFileSync(join(root, 'notes/c.md'), 'c\n')
+  const guarded = await sync.reconcile(box, workspaceId)
+  expect(guarded).toEqual(expect.objectContaining({ refusedDeletionPaths: ['notes/b.md'], blockedReason: 'mass_deletion_guard', appliedPaths: ['notes/c.md'] }))
+  expect((await vault.readVaultFileState(workspaceId, 'notes/b.md')).content).toBe('b\n')
+  // The refused pass read a manifest it cannot trust, so its observations do not become the baseline.
+  expect(await vault.readVaultSandboxBaseline(workspaceId, box.id)).toEqual(before)
+}, 60_000)
+
+it('records a box copy the Vault already holds, or an earlier revision of it, without parking a conflict', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const first = await vault.writeVaultRawFile(workspaceId, 'notes/brief.md', 'r1\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  // Another path committed the box's bytes; a server write moved the brief past the copy the box received.
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v2\n')
+  const second = await vault.writeVaultRawFile(workspaceId, 'notes/brief.md', 'r2\n', { expectedRevision: first.revision })
+  await vault.writeVaultRawFile(workspaceId, 'notes/brief.md', 'r3\n', { expectedRevision: second.revision })
+  writeFileSync(join(root, 'notes/plan.md'), 'v2\n')
+  writeFileSync(join(root, 'notes/brief.md'), 'r2\n')
+  const result = await sync.reconcile(box, workspaceId)
+
+  expect(result.conflicts).toEqual([])
+  expect(result.appliedPaths).toEqual([])
+  expect(result.convergedChanges.map(change => change.path)).toEqual(['notes/plan.md'])
+  expect((await vault.readVaultFileState(workspaceId, 'notes/brief.md')).content).toBe('r3\n')
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  expect(readFileSync(join(root, 'notes/brief.md'), 'utf8')).toBe('r3\n')
+}, 60_000)
+
+it('runs the product hooks: text writer, after-write, excluded paths, provenance, phases and the canonical-only refusal', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/a.md', 'a\n')
+  const textWrites: string[] = []
+  const afterWrites: string[][] = []
+  const phases: string[] = []
+  const stages: string[] = []
+  const { box, root, sync } = realBox('incarnation-1', { config: {
+    exclude: path => path.startsWith('workspaces/'),
+    writeText: async (_box, files) => {
+      for (const file of files) {
+        textWrites.push(file.path)
+        mkdirSync(dirname(file.path), { recursive: true })
+        writeFileSync(file.path, file.content)
+      }
+    },
+    afterWrite: async (_box, paths) => { afterWrites.push(paths) },
+  } })
+  expect((await sync.hydrate(box, workspaceId, { onStage: stage => { stages.push(stage) } })).succeeded).toBe(true)
+  expect(textWrites).toEqual([join(root, 'notes/a.md')])
+  expect(afterWrites).toEqual([['notes/a.md']])
+  expect(stages).toEqual(expect.arrayContaining(['baseline_read', 'head_list', 'kv_read', 'sandbox_write', 'baseline_write']))
+
+  mkdirSync(join(root, 'workspaces/session-1'), { recursive: true })
+  writeFileSync(join(root, 'workspaces/session-1/scratch.md'), 'private\n')
+  writeFileSync(join(root, 'notes/b.md'), 'b\n')
+  await expect(sync.reconcile(box, workspaceId, { canonicalPathsOnly: true })).rejects.toThrow(/unclassified local files/)
+  const result = await sync.reconcile(box, workspaceId, {
+    provenance: { actor: 'agent', source: 'sandbox-sync', executionId: 'exec-1' },
+    onPhase: phase => { phases.push(phase) },
+  })
+  expect(result.appliedPaths).toEqual(['notes/b.md'])
+  expect(phases).toEqual(expect.arrayContaining(['baseline-read', 'manifest', 'file-reads', 'head-reads', 'mutate', 'baseline-write']))
+  const head = await vault.readVaultFileState(workspaceId, 'notes/b.md')
+  const metadata = await vault.readVaultRevisionMetadata(workspaceId, 'notes/b.md', head.revision!)
+  expect(metadata?.writer.provenance?.executionId).toBe('exec-1')
+}, 60_000)
+
+it('copies within its budget and resumes, leaves identical files in place, and skips a file the box refuses for its size', async () => {
+  const paths = Array.from({ length: 101 }, (_, index) => `library/doc-${String(index).padStart(3, '0')}.md`)
+  for (let start = 0; start < paths.length; start += 90) {
+    const result = await vault.commitVaultMutation({
+      workspaceId, operationId: `seed-${start}`, writer: { kind: 'system', id: 'test-seed' },
+      changes: paths.slice(start, start + 90).map(path => ({ path, kind: 'put' as const, content: `${path}\n`, expectedRevision: null })),
+    })
+    expect(result.status).toBe('applied')
+  }
+  await vault.writeVaultRawFile(workspaceId, 'media/huge.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from('big').toString('base64')))
+  const textWrites: string[] = []
+  const { box, root, sync } = realBox('incarnation-1', {
+    tooLarge: path => path.endsWith('huge.png'),
+    config: {
+      hydrationBudgetChars: 1,
+      skipFilesAlreadyOnBox: true,
+      skipOversizeFiles: true,
+      writeText: async (_box, files) => {
+        for (const file of files) {
+          textWrites.push(file.path)
+          mkdirSync(dirname(file.path), { recursive: true })
+          writeFileSync(file.path, file.content)
+        }
+      },
+    },
+  })
+  // A box restored from a snapshot already holds this file's exact bytes.
+  mkdirSync(join(root, 'library'), { recursive: true })
+  writeFileSync(join(root, 'library/doc-000.md'), 'library/doc-000.md\n')
+
+  // The first page spends the budget; the second page waits for the next call.
+  const first = await sync.hydrate(box, workspaceId)
+  expect(first).toEqual({ succeeded: true, value: expect.objectContaining({
+    written: 99, deferred: { pendingPaths: ['library/doc-100.md', 'media/huge.png'], morePages: false },
+  }) })
+  expect(textWrites).toHaveLength(99)
+  expect(textWrites).not.toContain(join(root, 'library/doc-000.md'))
+  expect(existsSync(join(root, 'library/doc-100.md'))).toBe(false)
+
+  const second = await sync.hydrate(box, workspaceId)
+  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 1, deferred: null }) })
+  expect(second.succeeded && second.value.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
+  expect((await vault.readVaultBoxState(workspaceId))?.sync?.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
+  expect(readFileSync(join(root, 'library/doc-100.md'), 'utf8')).toBe('library/doc-100.md\n')
+  const baseline = await vault.readVaultSandboxBaseline(workspaceId, box.id)
+  expect(Object.keys(baseline?.files ?? {})).toHaveLength(101)
+  expect(baseline?.files['media/huge.png']).toBeUndefined()
+}, 120_000)

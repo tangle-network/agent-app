@@ -7,7 +7,7 @@
  * (`createSandboxVaultSync`) runs with.
  */
 import { isWorkspaceFileExportable } from '../../web/file-export'
-import { compareIncarnationBaseline, type FilesystemIncarnationLike } from '../server'
+import { compareIncarnationBaseline, type FilesystemIncarnationLike, type VaultDeletionPolicy } from '../server'
 import type {
   VaultHeadState,
   VaultMutationRequest,
@@ -16,6 +16,7 @@ import type {
 } from './revisions'
 import type { VaultFrontmatterCodec, VaultHeadListOptions, VaultHeadListPage } from './store'
 import type { VaultBoxStateView, VaultBoxSyncRecord } from './box-state'
+import type { VaultHydrationBox } from './sandbox-hydrate'
 
 /** The store calls the sync engine makes; `createVaultStore` returns all of them. */
 export interface SandboxVaultSyncStore {
@@ -23,6 +24,8 @@ export interface SandboxVaultSyncStore {
   listVaultHeadPage(workspaceId: string, options?: VaultHeadListOptions): Promise<VaultHeadListPage>
   readVaultFileState(workspaceId: string, filePath: string): Promise<VaultHeadState>
   commitVaultMutation(request: VaultMutationRequest): Promise<VaultMutationResult>
+  /** The committed revision at or before `headRevision` whose content hash is `contentHash`, or null. */
+  findVaultRevisionWithContent(workspaceId: string, path: string, headRevision: string, contentHash: string): Promise<string | null>
   readVaultSandboxBaseline(workspaceId: string, sandboxId: string): Promise<VaultSandboxBaseline | null>
   writeVaultSandboxBaseline(baseline: VaultSandboxBaseline): Promise<void>
   readVaultBoxState(workspaceId: string): Promise<VaultBoxStateView | null>
@@ -43,7 +46,36 @@ export interface SandboxVaultSyncConfig {
    * box re-hydrates on its next turn. Defaults to `SANDBOX_VAULT_SYNC_CONTRACT`.
    */
   contract?: string
+  /**
+   * How a box may delete Vault files. `'rename-only'` (the default) commits a
+   * delete only as half of a same-content rename. `guard` commits any delete
+   * unless the batch trips `assessVaultDeletionBatch` (an empty scan, every
+   * file, or most of a large Vault), which withholds every delete of the pass.
+   */
+  deletes?: 'rename-only' | { guard: VaultDeletionPolicy }
+  /** Root-relative paths that are not Vault files, such as a private session tree; reconcile ignores them. */
+  exclude?: (path: string) => boolean
+  /** Writes one request's text files to the box; defaults to `box.fs.writeMany`. */
+  writeText?: (box: VaultHydrationBox, files: Array<{ path: string; content: string }>) => Promise<void>
+  /** Runs once a hydration wrote files, with the Vault paths it wrote, such as to set their owner. */
+  afterWrite?: (box: VaultHydrationBox, paths: string[]) => Promise<void>
+  /**
+   * Vault characters one `hydrate` call may copy. Past it, hydration records
+   * what it wrote and returns `deferred`; the next call resumes the copy.
+   */
+  hydrationBudgetChars?: number
+  /** Leave a file with no baseline entry in place when the box already holds its exact bytes (a box restored from a snapshot). */
+  skipFilesAlreadyOnBox?: boolean
+  /** Leave a file the box refuses for its size off the box and report it in `skipped`, instead of failing hydration. */
+  skipOversizeFiles?: boolean
 }
+
+/** A sync stage's timing, for product telemetry. */
+export type SandboxVaultSyncStageObserver = (
+  stage: 'baseline_read' | 'head_list' | 'kv_read' | 'sandbox_write' | 'baseline_write' | 'reconcile_scan' | 'reconcile_import',
+  startedAt: number,
+  detail?: Record<string, number>,
+) => void
 
 /** The engine's own hydration contract; a product appends its own when its box layout changes. */
 export const SANDBOX_VAULT_SYNC_CONTRACT = 'agent-app-sandbox-vault-sync-v1'
