@@ -50,8 +50,8 @@ export function admissionServerTiming(trace: TurnTrace): string {
   const steps = trace.spans(now)
     .filter((span) => span.kind === 'admission')
     .sort((a, b) => a.startMs - b.startMs)
-    .map((span) => ({ name: span.name, durMs: span.endMs - span.startMs }))
-  return formatServerTiming([{ name: 'admission', durMs: now - trace.startedAt }, ...steps])
+    .map((span) => ({ name: span.name, dur: span.endMs - span.startMs }))
+  return formatServerTiming([{ name: 'admission', dur: now - trace.startedAt }, ...steps])
 }
 
 /** The admission policy's refusal of the model the turn names, or null when it allows it or names none. */
