@@ -4,7 +4,7 @@
 
 Source: `src/spend/drizzle.ts`
 
-9 exports.
+10 exports.
 
 ### `createDrizzleSpendStore`
 
@@ -12,6 +12,14 @@ Source: `src/spend/drizzle.ts`
 
 ```ts
 (options: SpendLedgerTableOptions) => SpendLedgerStorePort
+```
+
+### `createSpendBoxLedgerTable`
+
+`function` — Build the standard `spend_box_ledger` table.
+
+```ts
+(options?: { workspaceTable?: (AnySQLiteTable & { id: AnySQLiteColumn; }) | undefined; }) => SQLiteTableWithColumns<{ n…
 ```
 
 ### `listLedgerBillingOwnerIds`

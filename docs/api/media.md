@@ -4,7 +4,7 @@
 
 Source: `src/media/index.ts`
 
-42 exports.
+45 exports.
 
 ### `browserUsableSourceUrl`
 
@@ -20,6 +20,22 @@ Source: `src/media/index.ts`
 
 ```ts
 type Checked
+```
+
+### `CheckedGenerateRequest`
+
+`interface` — A direct generation request after every check that runs before access, billing and provider calls.
+
+```ts
+interface CheckedGenerateRequest
+```
+
+### `checkGenerateRequest`
+
+`function` — Check a direct generation request body: its workspace, type, inputs, image count, model and output path.
+
+```ts
+(body: GenerateRequestBody, defaults: Record<GenerationType, string>) => Checked<CheckedGenerateRequest>
 ```
 
 ### `checkMediaModelSelection`
@@ -316,6 +332,14 @@ type SpeechInput
 
 ```ts
 interface SpeechScriptConfig
+```
+
+### `tcloudWebhookCallbackUrl`
+
+`function` — Where the Router posts provider job updates for this deployment, or undefined when webhooks are off.
+
+```ts
+(bindings: object | undefined, requestUrl: string) => string | undefined
 ```
 
 ### `validateGenerateRequest`

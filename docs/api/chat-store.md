@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-61 exports.
+63 exports.
 
 ### `AppendMessageInput`
 
@@ -318,6 +318,14 @@ interface ChatUsageTokens
 type ChatWorkProductPart
 ```
 
+### `createAgentRunsTable`
+
+`function` — Build the `agent_run` table: one row per agent run in a workspace, with the product's run telemetry as JSON `metadata`.
+
+```ts
+<Metadata = Record<string, unknown>>(workspaceTable: ChatParentTable, options?: { indexAgentId?: boolean | undefined; }…
+```
+
 ### `createChatStore`
 
 `function` — Create a chat store managing threads and messages based on the provided database and tables
@@ -340,6 +348,14 @@ type ChatWorkProductPart
 
 ```ts
 interface CreateChatTablesOptions
+```
+
+### `createThreadArtifactLinksTable`
+
+`function` — Build the `thread_artifact_link` table: artifacts a thread mentioned or touched beyond its own scope, inserted once on first reference.
+
+```ts
+<const Kind extends string>(threadTable: ChatParentTable, kinds: readonly [Kind, ...Kind[]]) => SQLiteTableWithColumns<…
 ```
 
 ### `CreateThreadInput`

@@ -4,7 +4,31 @@
 
 Source: `src/alerting/index.ts`
 
-5 exports.
+8 exports.
+
+### `createGithubIssueAlertChannel`
+
+`function`
+
+```ts
+(options: GithubIssueAlertOptions) => GithubIssueAlertChannel
+```
+
+### `GithubIssueAlertChannel`
+
+`interface`
+
+```ts
+interface GithubIssueAlertChannel
+```
+
+### `GithubIssueAlertOptions`
+
+`interface` — A rolling GitHub-issue alert channel: the first alert files an issue under a label, later alerts comment on the open one, so a persistent problem is one thread a human can follow instead of a hundred…
+
+```ts
+interface GithubIssueAlertOptions
+```
 
 ### `postSlackAlert`
 
