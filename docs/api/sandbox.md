@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-312 exports.
+314 exports.
 
 ### `adaptSandboxStream`
 
@@ -147,7 +147,7 @@ interface BuildSandboxToolFileMountsOptions
 `function` — The typed transient failure `error` carries anywhere in its cause chain, or null.
 
 ```ts
-(error: unknown) => SandboxTransientFailure | null
+(error: unknown, options?: SandboxTransientClassifyOptions) => SandboxTransientFailure | null
 ```
 
 ### `classifySeveredStream`
@@ -1302,6 +1302,14 @@ number
 string
 ```
 
+### `SANDBOX_PLATFORM_CALL_RETRY`
+
+`const` — Short platform calls whose blips clear in seconds: transport failures included, three retries over 3.5 s.
+
+```ts
+SandboxTransientRetryOptions
+```
+
 ### `SANDBOX_RUN_DESCRIPTION`
 
 `const`
@@ -1756,6 +1764,14 @@ type SandboxToolSpec
 
 ```ts
 (attempt: number) => number
+```
+
+### `SandboxTransientClassifyOptions`
+
+`interface`
+
+```ts
+interface SandboxTransientClassifyOptions
 ```
 
 ### `SandboxTransientDeadlineError`
