@@ -360,7 +360,7 @@ type Rgba
 
 ### `RunSignoffOptions`
 
-`interface` — The sign-off run: reproduce a clean CI environment, then go further.
+`interface`
 
 ```ts
 interface RunSignoffOptions

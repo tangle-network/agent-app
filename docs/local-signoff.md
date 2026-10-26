@@ -100,8 +100,10 @@ process state and malformed lease markers preserve the cache conservatively.
 Linked trees whose private or common Git metadata has disappeared keep their
 content for the owning lane; their allocated bytes remain in the cache total.
 The CLI reports these orphaned trees separately from reclaimed entries and
-reports any bytes still above the idle cap. Other Git retirement failures
-remain errors rather than being counted as reclaimed space.
+reports any bytes still above the idle cap. Cleanup refusals retain the completed
+step outputs in the JSON and human report, set `ok: false`, and appear separately
+as `cleanupErrors`; all cache sessions still get a close attempt. A refused
+workspace removal is reported as retained and is not retried by the final prune.
 The retained standard linked-tree pointer is evidence for preservation only,
 not proof of historical registration or authority to delete its content.
 Four generations are kept, so moving between a branch and `main` finds both warm.

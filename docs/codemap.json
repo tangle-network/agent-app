@@ -21638,7 +21638,7 @@
           "name": "RunSignoffOptions",
           "kind": "interface",
           "signature": "interface RunSignoffOptions",
-          "doc": "The sign-off run: reproduce a clean CI environment, then go further."
+          "doc": null
         },
         {
           "name": "runSurfaceLadderCli",

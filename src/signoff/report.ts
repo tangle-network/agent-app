@@ -1,19 +1,5 @@
 import type { SignoffReport, SignoffStepResult } from './types'
 
-/**
- * The proof a human reads before merging.
- *
- * A sign-off gate is only worth the CI it replaces if its output answers the
- * question CI's green tick answers and the ones it does not: what bytes were
- * verified, in what environment, under which suite orders, and how to reproduce
- * it. So the report leads with the verdict, states the subject (commit + patch
- * digest) and the environment (clean tree, store cache state), lists every step
- * with its seeds, and ends with the exact command that runs it again.
- *
- * Failure output is printed in full, under the step's name. Naming the step is
- * the difference between "CI is red" and a fix.
- */
-
 const BAR = '─'.repeat(72)
 
 function ms(value: number): string {
@@ -146,6 +132,7 @@ export function formatSignoffReport(report: SignoffReport): string {
     lines.push(`not judged: ${blocked.map((step) => `${step.name} (${step.status})`).join(', ')}`)
     lines.push('')
   }
+  if (report.cleanupErrors?.length) lines.push(BAR, 'cleanup FAILED', BAR, ...report.cleanupErrors, '')
 
   lines.push(`reproduce: ${report.reproduce}`)
   return lines.join('\n')
@@ -159,6 +146,7 @@ export function formatSignoffLine(report: SignoffReport): string {
     `signoff ${scope}${report.ok ? 'PASS' : 'FAIL'} ${report.repo.head.slice(0, 12)} — ` +
     `${passed}/${report.steps.length} steps, ${ms(report.wallClockMs)} wall ` +
     `(${ms(report.serialMs)} serial), seed ${report.seedBase}, ` +
-    `${report.install.cacheHit ? 'warm' : 'cold'} store, clean install`
+    `${report.install.cacheHit ? 'warm' : 'cold'} store, clean install` +
+    (report.cleanupErrors?.length ? `; ${report.cleanupErrors.length} cleanup failure(s)` : '')
   )
 }
