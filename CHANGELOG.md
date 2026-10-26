@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.32
+
+- fix(release): isolate pnpm action bootstrap store (#1335)
+
 ## 0.63.31
 
 - End the receipt DDL with a semicolon and exclude the table from exports by default (#1336)
