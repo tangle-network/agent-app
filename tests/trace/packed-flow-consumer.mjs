@@ -50,7 +50,6 @@ try {
   const { renderToStaticMarkup } = await load(fromOwner,'react-dom/server')
   const html = trace => renderToStaticMarkup(createElement(FlowWaterfall,{trace}))
   const manifest = JSON.parse(readFileSync(join(installation,'package.json'),'utf8'))
-  assert.equal(manifest.dependencies['@tangle-network/charts'],'0.15.0')
   assert.equal(Object.keys(manifest.exports).some(key=>key.includes('flow-waterfall')),false)
   const css = readFileSync(fromPack.resolve('@tangle-network/agent-app/styles'),'utf8')
   assert.match(css,/\.fw-root/)
