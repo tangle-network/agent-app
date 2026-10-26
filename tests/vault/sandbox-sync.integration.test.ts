@@ -457,3 +457,21 @@ it('leaves a file the box refuses for its size off the box and reports it in the
   expect(Object.keys((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files ?? {})).toEqual(['notes/a.md'])
   expect((await vault.readVaultBoxState(workspaceId))?.sync?.skipped.map(skip => skip.path)).toEqual(['media/huge.png'])
 }, 60_000)
+
+it('with rename-only deletes, records an applied edit beside a refused delete, so the next edit commits without a conflict', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  await vault.writeVaultRawFile(workspaceId, 'notes/keep.md', 'keep\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  rmSync(join(root, 'notes/keep.md'))
+  writeFileSync(join(root, 'notes/plan.md'), 'v2 from the box\n')
+  const first = await sync.reconcile(box, workspaceId)
+  expect(first).toEqual(expect.objectContaining({ refusedDeletionPaths: ['notes/keep.md'], appliedPaths: ['notes/plan.md'] }))
+
+  writeFileSync(join(root, 'notes/plan.md'), 'v3 from the box\n')
+  const second = await sync.reconcile(box, workspaceId)
+  expect(second.conflicts).toEqual([])
+  expect(second.appliedPaths).toEqual(['notes/plan.md'])
+  expect((await vault.readVaultFileState(workspaceId, 'notes/plan.md')).content).toBe('v3 from the box\n')
+}, 60_000)
