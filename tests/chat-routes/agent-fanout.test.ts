@@ -158,7 +158,7 @@ describe('mentioned agents answer at the same time', () => {
       const wall = performance.now() - t0
       expect(response.status).toBe(200)
       // The second responder started before the first finished.
-      expect(started.ap_research).toBeLessThan(finished.ap_writer)
+      expect(started.ap_research).toBeLessThan(finished.ap_writer!)
       expect(wall).toBeLessThan(380)
       const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
         .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
