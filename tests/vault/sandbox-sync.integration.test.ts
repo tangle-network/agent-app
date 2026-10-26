@@ -15,7 +15,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import type { KVStore } from '../../src/store'
 import { createVaultStore, type VaultCoordinatorNamespace, type VaultFrontmatterCodec } from '../../src/vault/store/store'
 import { createSandboxVaultSync } from '../../src/vault/store/sandbox-engine'
-import { vaultBinaryDocument } from '../../src/vault/store/sandbox-sync'
+import { vaultBinaryDocument, type SandboxVaultSyncConfig } from '../../src/vault/store/sandbox-sync'
 
 const require = createRequire(import.meta.url)
 const wrangler = createRequire(require.resolve('wrangler/package.json'))
@@ -88,9 +88,9 @@ beforeEach(() => {
 })
 
 /** A box over a real directory and a real bash, recording each write request's JSON size. */
-function realBox(incarnation = 'incarnation-1') {
+function realBox(incarnation = 'incarnation-1', options: { rootName?: string; config?: Partial<SandboxVaultSyncConfig> } = {}) {
   const home = mkdtempSync(join(scratch, 'box-'))
-  const root = join(home, 'vault')
+  const root = join(home, options.rootName ?? 'vault')
   const writeRequestBytes: number[] = []
   const uploads: string[] = []
   const box = {
@@ -128,7 +128,7 @@ function realBox(incarnation = 'incarnation-1') {
       }
     },
   }
-  return { box, root, writeRequestBytes, uploads, sync: createSandboxVaultSync({ vault, root }) }
+  return { box, root, writeRequestBytes, uploads, sync: createSandboxVaultSync({ vault, root, ...options.config }) }
 }
 
 it('hydrates text and binary heads byte-exact, records the baseline, and a later walk writes only what changed', async () => {
@@ -293,4 +293,31 @@ it('walks in full while a mutation is in flight, and heals a marker whose reques
   expect(healed).toEqual(expect.objectContaining({ inFlight: false, generation: view!.generation + 1 }))
   expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
   expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true }) })
+}, 60_000)
+
+it('syncs a box whose Vault root is a hidden directory', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const { box, root, sync } = realBox('incarnation-1', { rootName: '.app-data' })
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  writeFileSync(join(root, 'notes/plan.md'), 'v2 from the box\n')
+  const result = await sync.reconcile(box, workspaceId)
+
+  expect(result).toEqual(expect.objectContaining({ succeeded: true, appliedPaths: ['notes/plan.md'], refusedDeletionPaths: [] }))
+  expect((await vault.readVaultFileState(workspaceId, 'notes/plan.md')).content).toBe('v2 from the box\n')
+}, 60_000)
+
+it('forgets the warm record when the box changed a binary, so the next pass restores its bytes', async () => {
+  const bytes = Uint8Array.from({ length: 2048 }, (_, index) => (index * 7) % 256)
+  await vault.writeVaultRawFile(workspaceId, 'media/logo.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from(bytes).toString('base64')))
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true }) })
+
+  writeFileSync(join(root, 'media/logo.png'), Uint8Array.from([0xff, 0x00, 0xfe]))
+  expect((await sync.reconcile(box, workspaceId)).binaryDriftPaths).toEqual(['media/logo.png'])
+
+  const after = await sync.hydrate(box, workspaceId)
+  expect(after.succeeded && after.value.inSync).toBeFalsy()
+  expect(new Uint8Array(readFileSync(join(root, 'media/logo.png')))).toEqual(bytes)
 }, 60_000)
