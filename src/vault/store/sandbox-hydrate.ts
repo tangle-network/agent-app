@@ -114,7 +114,8 @@ export async function hydrateSandboxVault(
     // the Vault, so a warm turn skips the listing, the diff and the baseline
     // write. Protected paths (a reconcile's conflicts or commits, a loss probe)
     // always take the full walk.
-    const contract = config.contract ?? SANDBOX_VAULT_SYNC_CONTRACT
+    // The record names the directory it hydrated, so a moved Vault directory walks in full.
+    const contract = `${config.contract ?? SANDBOX_VAULT_SYNC_CONTRACT}@${config.root}`
     const incarnation = readReadySandboxFilesystemIncarnation(box)
     const identity = box.id && incarnation.succeeded
       ? { sandboxId: box.id, filesystemIncarnationId: incarnation.value.id }
