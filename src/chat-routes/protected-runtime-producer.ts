@@ -3,7 +3,7 @@ import { runProtectedRouterTurn, type RouterTurnGrant } from '../runtime/protect
 import type { RouterTurnOptions } from '../runtime/router-turn'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
 import { createSandboxChatProducer } from './sandbox-producer'
-import type { ChatRouteEvent, ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
+import type { ChatTurnRouteProducer, ChatTurnUsage } from './turn-routes'
 
 export interface ProtectedRuntimeChatOptions {
   profile: AgentProfile
@@ -17,13 +17,7 @@ export interface ProtectedRuntimeChatOptions {
   signal?: AbortSignal
 }
 
-/**
- * The AgentProfile leaves (agent-interface's materialization axes) a protected turn
- * carries. Identity, `harness` (cli-base only) and `metadata` are control fields;
- * `modelMetadata` is accepted only when empty. A leaf outside this set, including one
- * agent-interface adds later, is refused by name before a grant is reserved: running
- * the turn without it would silently drop what the profile asked for.
- */
+/** Refuse unsupported profile leaves by name instead of silently dropping them. */
 const PROTECTED_TURN_AXES: ReadonlySet<string> = new Set([
   'name', 'description', 'version', 'tags', 'metadata', 'harness', 'tools',
   'systemPrompt', 'instructions',
@@ -31,11 +25,6 @@ const PROTECTED_TURN_AXES: ReadonlySet<string> = new Set([
   'modelMaxTotalOutputTokens', 'modelMetadata',
 ])
 
-/**
- * The parts of a profile a protected turn applies: its prompt text, its model and
- * reasoning effort, and its completion ceilings. Anything else would change the
- * execution without the grant pricing it, so it is refused by name.
- */
 function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<string>): Pick<RouterTurnOptions,
   'model' | 'systemPrompt' | 'reasoningEffort' | 'maxTokens' | 'maxCompletionTokens'> {
   if (profile.harness && profile.harness !== 'cli-base') throw new Error(`Protected chat runs only the cli-base harness, not ${profile.harness}`)
@@ -69,37 +58,22 @@ function protectedTurnSettings(profile: AgentProfile, toolNames: ReadonlySet<str
   }
 }
 
-/** The text a model reads for one tool result: the JSON of its value, or the tool's own error. */
-function protectedToolResultText(outcome: { ok: true; result: unknown } | { ok: false; message: string }): string {
-  if (!outcome.ok) return `error: ${outcome.message}`
-  return JSON.stringify(outcome.result) ?? 'null'
-}
-
-/**
- * Run a profile as one Router turn under a protected model grant
- * (`runProtectedRouterTurn`), projected through the shared chat projection. The
- * usage is published only from the settled grant.
- */
+/** Project one protected Router turn, publishing usage only from its settled grant. */
 export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChatOptions): ChatTurnRouteProducer {
-  if (!Number.isSafeInteger(options.maxToolCalls) || options.maxToolCalls < 0) {
-    throw new Error('maxToolCalls must be a non-negative integer')
-  }
+  if (!Number.isSafeInteger(options.maxToolCalls) || options.maxToolCalls < 0) throw new Error('maxToolCalls must be a non-negative integer')
   options = { ...options,
     grant: { ...options.grant, resolve: structuredClone(options.grant.resolve), reserve: structuredClone(options.grant.reserve) },
     tools: options.tools.map(tool => ({ ...tool, inputSchema: structuredClone(tool.inputSchema) })),
-    // Chat history rows carry storage fields (id, parts, timestamps). The
-    // provider receives exactly role and content; Anthropic rejects extra keys.
+    // Providers reject the storage fields carried by chat history rows.
     priorMessages: options.priorMessages?.map(({ role, content }) => ({ role, content })),
   }
-  const tools = new Map(options.tools.map(tool => [tool.name, tool]))
+  const tools = new Set(options.tools.map(tool => tool.name))
   if (tools.size !== options.tools.length) throw new Error('Duplicate protected tool name')
   const profile = structuredClone(options.profile)
   let toolCalls = 0
   let usage: ChatTurnUsage = {}
   let started = false
   let model: string | undefined
-  let budgetEnforced = false
-  let toolTokens: number | undefined
   const controller = new AbortController()
   const pendingTools = new Set<Promise<unknown>>()
   let execution: Promise<void> | undefined
@@ -108,8 +82,7 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
   let terminalObserved = false
   let closing: Promise<void> | undefined
 
-  // A local execution owns its completion evidence. A projected result can arrive
-  // before cleanup, and Runtime cancellation can finish before a tool's effects.
+  // Local completion requires drained execution and tool effects, not a projected result.
   function close(reason?: unknown): Promise<void> {
     controller.abort(reason)
     closing ??= (async () => {
@@ -132,21 +105,18 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
       controller.signal.throwIfAborted()
       options.signal?.throwIfAborted()
       if (Date.now() >= options.grant.deadlineAtMs) throw new Error('Protected execution deadline expired')
-      const settings = protectedTurnSettings(profile, new Set(tools.keys()))
       const signal = AbortSignal.any([
         controller.signal, AbortSignal.timeout(Math.max(1, options.grant.deadlineAtMs - Date.now())),
         ...(options.signal ? [options.signal] : []),
       ])
       const channel = new TransformStream<unknown, unknown>()
-      const channelWriter = channel.writable.getWriter()
-      const channelReader = channel.readable.getReader()
-      writer = channelWriter
-      reader = channelReader
+      const channelWriter = writer = channel.writable.getWriter()
+      reader = channel.readable.getReader()
       const emit = (event: unknown) => channelWriter.write(event)
       // Each model call's text, by segment. The answer is the last segment the model wrote.
       const segments: string[] = []
       execution = runProtectedRouterTurn({
-        ...settings,
+        ...protectedTurnSettings(profile, tools),
         grant: options.grant,
         userMessage: options.prompt,
         history: [...(options.priorMessages ?? [])],
@@ -154,7 +124,6 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         // The grant's ledger expects one buffered completion per model call.
         stream: false,
         maxToolCalls: options.maxToolCalls,
-        // The grant bounds model calls; the loop must not stop the turn earlier.
         maxToolTurns: options.grant.reserve.limits.maxModelCalls,
         tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
           run: (args: Record<string, unknown>) => {
@@ -179,17 +148,19 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
             return work
           } })),
         toolError: error => ({ code: 'tool_failed', message: error instanceof Error ? error.message : 'Tool failed' }),
-        renderToolResult: (_toolName, outcome) => protectedToolResultText(outcome),
+        renderToolResult: (_toolName, outcome) => outcome.ok ? JSON.stringify(outcome.result) ?? 'null' : `error: ${outcome.message}`,
         onEvent: event => {
           if (event.type === 'text') segments[event.segment - 1] = (segments[event.segment - 1] ?? '') + event.delta
         },
       }).then(async outcome => {
         if (outcome.settlement) {
           usage = { ...outcome.settlement.usage }
-          budgetEnforced = outcome.settlement.budgetEnforced
           model = outcome.settlement.model
           // Tool-result text is billed as input under a grant.
-          toolTokens = 0
+          await emit({ type: 'usage', usage: { promptTokens: usage.inputTokens,
+            completionTokens: usage.outputTokens, providerCostUsd: usage.costUsd,
+            reasoningTokens: usage.reasoningTokens, toolTokens: 0,
+            toolCallCount: toolCalls, budgetEnforced: outcome.settlement.budgetEnforced } })
         }
         // A settlement check fails after the turn answered; the answer stands beside the failure.
         if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
@@ -201,33 +172,18 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         await channelWriter.close()
       }).catch(error => channelWriter.abort(error))
       for (;;) {
-        const next = await channelReader.read()
+        const next = await reader.read()
         if (next.done) break
         yield next.value
       }
-      await execution
     } finally {
       await close()
     }
   }
 
   const producer = createSandboxChatProducer({ events: events(), model: profile.model?.default })
-  const stream = (async function* () {
-    let failure: ChatRouteEvent | undefined
-    for await (const event of producer.stream) {
-      if (event.type === 'error') failure = event
-      else yield event
-    }
-    if (usage.inputTokens !== undefined && usage.outputTokens !== undefined && usage.costUsd !== undefined) {
-      yield { type: 'usage' as const, usage: { promptTokens: usage.inputTokens,
-        completionTokens: usage.outputTokens, providerCostUsd: usage.costUsd,
-        reasoningTokens: usage.reasoningTokens, toolTokens,
-        toolCallCount: toolCalls, budgetEnforced } }
-    }
-    if (failure) yield failure
-  })()
-  // AsyncGenerator.return before its first pull never enters the body/finally.
-  // Abort and drain independently, also waking a pending read before return queues.
+  const stream = producer.stream
+  // Even return/throw before the first pull must abort and drain local work.
   const end = stream.return.bind(stream)
   const fail = stream.throw.bind(stream)
   stream.return = async value => {
