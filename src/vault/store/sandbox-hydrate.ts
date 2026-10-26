@@ -399,7 +399,7 @@ async function pathsAlreadyOnBox(config: SandboxVaultSyncConfig, box: VaultHydra
   }
   const rootPrefix = `${config.root}/`
   const command = `for p in ${[...expected.keys()].map((path) => shellQuote(rootPrefix + path)).join(' ')}; do `
-    + 'r="$(realpath -e -- "$p" 2>/dev/null)" && [ "$r" = "$p" ] && [ -f "$p" ] && sha256sum -z -- "$p"; done 2>/dev/null; exit 0'
+    + 'r="$(cd -P "${p%/*}" 2>/dev/null && printf \'%s/%s\\n\' "$(pwd -P)" "${p##*/}")" && [ "$r" = "$p" ] && [ ! -L "$p" ] && [ -f "$p" ] && sha256sum -z -- "$p"; done 2>/dev/null; exit 0'
   let stdout: string
   try {
     stdout = (await box.exec(command)).stdout
