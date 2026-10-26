@@ -36,7 +36,8 @@ export interface SidecarRuntimePeer {
   push(run: RuntimeRun, event: RuntimeEvent): void
   finish(run: RuntimeRun, answer: string): void
   fail(run: RuntimeRun, message: string): void
-  ask(run: RuntimeRun, question: Record<string, unknown> & { id: string }, onAnswer: (data: Record<string, unknown> | undefined) => void): void
+  /** False, and nothing is asked, when the turn's backend did not enable questions. */
+  ask(run: RuntimeRun, question: Record<string, unknown> & { id: string }, onAnswer: (data: Record<string, unknown> | undefined) => void): boolean
   /** Serves `path` (relative to the runtime URL); false when it is not a runtime route. */
   handle(request: IncomingMessage, response: ServerResponse, path: string, url: URL, body: string): boolean
 }
@@ -70,9 +71,12 @@ export function createSidecarRuntimePeer(options: {
       push(run, { type: 'done', data: { status: 'failed', success: false, message, ...ids(run) } })
     },
     ask(run, question, onAnswer) {
+      // The runtime opens the question channel only when the turn's backend config enables it.
+      if ((run.backend.interactions as { question?: unknown } | undefined)?.question !== true) return false
       run.question = question
       run.onAnswer = onAnswer
       push(run, { type: 'interaction', data: { request: question } })
+      return true
     },
     handle(request, response, path, url, body) {
       const json = (value: unknown, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value)); return true }

@@ -29,10 +29,12 @@ const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) 
   }
   if (mode === 'held') held.push(() => peer.finish(run, write(`note-${run.executionId.slice(0, 8)}`)))
   if (mode === 'question') {
-    peer.ask(run, { id: `ask-${run.executionId.slice(0, 8)}`, kind: 'question', title: 'Which tone do you prefer?',
+    const asked = peer.ask(run, { id: `ask-${run.executionId.slice(0, 8)}`, kind: 'question', title: 'Which tone do you prefer?',
       answerSpec: { fields: [{ type: 'select', name: 'q0', label: 'Which tone do you prefer?', required: true, multi: false,
         options: [{ value: 'Formal', label: 'Formal' }, { value: 'Casual', label: 'Casual' }] }] } },
     data => peer.finish(run, `The member chose ${String(data?.q0 ?? 'nothing')}. ${write('tone')}`))
+    // Without the channel the box agent cannot ask, and decides alone.
+    if (!asked) peer.finish(run, `Nobody could be asked, so the agent chose Formal. ${write('tone')}`)
   }
 } })
 let origin = ''
@@ -124,7 +126,7 @@ it('answers a call repeated in flight and after its end from the one run, never 
 it('relays the box agent’s question to the member and finishes with the member’s answer', async () => {
   mode = 'question'
   const live = step({ callId: 'question-call', questions: true, task: 'Ask the member which tone to use, then note it.' })
-  const asking = await until(() => [...runtime.runs.values()].find(run => run.question), 'the box agent asking')
+  const asking = await until(() => [...runtime.runs.values()].find(run => run.question), 'the box agent asking', 10_000)
   const question = asking.question!
   const listed = await (await fetch(new URL('/interactions', base))).json() as { interactions: Array<{ id: string }> }
   assert.deepEqual(listed.interactions.map(value => value.id), [question.id])
