@@ -148,8 +148,7 @@ function protectedPaths(cacheDir: string): { paths: Set<string>; unknown: boolea
   return { paths, unknown }
 }
 
-/** Old signoff processes have no lease marker. Their PID-named trees still
- * protect both themselves and stores until those processes exit. */
+/** Legacy PID-named trees protect all stores; modern UUID-suffixed trees use leases. */
 function protectLegacyRuns(cacheDir: string, active: { paths: Set<string>; unknown: boolean }): void {
   const trees = join(cacheDir, 'trees')
   if (!existsSync(trees)) return
@@ -157,10 +156,10 @@ function protectLegacyRuns(cacheDir: string, active: { paths: Set<string>; unkno
     if (!entry.isDirectory()) continue
     const tree = join(trees, entry.name)
     if (active.paths.has(tree) || !existsSync(join(tree, '.git'))) continue
-    const match = /-(\d+)$/.exec(entry.name)
+    const modern = /-\d+-[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i.test(entry.name)
+    const match = modern ? null : /-(\d+)$/.exec(entry.name)
     if (!match) continue
-    const pid = Number(match[1])
-    if (alive({ pid, host: hostname(), processStart: null, tree, storeKey: null })) {
+    if (alive({ pid: Number(match[1]), host: hostname(), processStart: null, tree, storeKey: null })) {
       active.paths.add(tree)
       active.unknown = true // a pre-lease run did not record which store it uses
     }
