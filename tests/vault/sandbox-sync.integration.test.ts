@@ -131,7 +131,7 @@ function realBox(incarnation = 'incarnation-1') {
   return { box, root, writeRequestBytes, uploads, sync: createSandboxVaultSync({ vault, root }) }
 }
 
-it('hydrates text and binary heads byte-exact, records the baseline, and a second pass writes nothing', async () => {
+it('hydrates text and binary heads byte-exact, records the baseline, and a later walk writes only what changed', async () => {
   const bytes = Uint8Array.from({ length: 4096 }, (_, index) => (index * 31) % 256)
   await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', '# Plan\n\nShip it.\n')
   await vault.writeVaultRawFile(workspaceId, 'media/logo.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from(bytes).toString('base64')))
@@ -145,8 +145,10 @@ it('hydrates text and binary heads byte-exact, records the baseline, and a secon
   expect(Object.keys(baseline?.files ?? {}).sort()).toEqual(['media/logo.png', 'notes/plan.md'])
   expect(baseline?.files['media/logo.png']?.binary).toBe(true)
 
+  // Another writer moves the Vault generation, so the next pass walks every head instead of skipping.
+  await vault.writeVaultRawFile(workspaceId, 'notes/next.md', '# Next\n')
   const second = await sync.hydrate(box, workspaceId)
-  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 0, unchanged: 2 }) })
+  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ written: 1, unchanged: 2 }) })
 }, 60_000)
 
 it('commits box edits and new files to the Vault, and refuses a box delete that is not a rename', async () => {
