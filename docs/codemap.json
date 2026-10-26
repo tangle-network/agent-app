@@ -17623,12 +17623,6 @@
           "doc": "Appended to the Router model's prompt whenever a computer step copies files into the Vault."
         },
         {
-          "name": "COMPUTER_STEP_RECEIPT_TABLE_DDL",
-          "kind": "const",
-          "signature": "\"CREATE TABLE IF NOT EXISTS computer_step_receipts (\\n step_id TEXT PRIMARY KEY,\\n state TEXT NOT NULL,\\n receipt TEXT…",
-          "doc": "Paste into a product migration; the store never runs DDL."
-        },
-        {
           "name": "computerFileContract",
           "kind": "function",
           "signature": "(root: string, task: string) => string",
@@ -17656,24 +17650,6 @@
           "name": "ComputerStepOptions",
           "kind": "interface",
           "signature": "interface ComputerStepOptions",
-          "doc": null
-        },
-        {
-          "name": "ComputerStepReceipt",
-          "kind": "interface",
-          "signature": "interface ComputerStepReceipt",
-          "doc": null
-        },
-        {
-          "name": "ComputerStepReceiptD1Like",
-          "kind": "interface",
-          "signature": "interface ComputerStepReceiptD1Like",
-          "doc": "The D1 surface the store uses."
-        },
-        {
-          "name": "ComputerStepReceipts",
-          "kind": "interface",
-          "signature": "interface ComputerStepReceipts",
           "doc": null
         },
         {
@@ -17711,12 +17687,6 @@
           "kind": "function",
           "signature": "(options: ComputerStepOptions) => ComputerStep",
           "doc": null
-        },
-        {
-          "name": "createD1ComputerStepReceipts",
-          "kind": "function",
-          "signature": "(db: ComputerStepReceiptD1Like, options?: { table?: string | undefined; retentionMs?: number | undefined; now?: (() =>…",
-          "doc": "Receipts in one D1 table, shared by every isolate."
         },
         {
           "name": "createD1PrewarmClaimStore",
@@ -17819,12 +17789,6 @@
           "kind": "function",
           "signature": "(slots: readonly number[], from: number, at: number) => number[]",
           "doc": "Decay every slot to `at` with a 14-day half-life."
-        },
-        {
-          "name": "DEFAULT_COMPUTER_STEP_RECEIPT_TABLE",
-          "kind": "const",
-          "signature": "\"computer_step_receipts\"",
-          "doc": null
         },
         {
           "name": "DEFAULT_ESCALATION_TOOLS",
@@ -18837,8 +18801,8 @@
         {
           "name": "saveComputerFiles",
           "kind": "function",
-          "signature": "(input: { box: SandboxInstance; vault: ComputerVault; before: ComputerFileListing; executionId: string; }) => Promise<C…",
-          "doc": "Save what the step wrote since `before` into the Vault and return its receipt."
+          "signature": "(input: { box: SandboxInstance; vault: ComputerVault; since: number | undefined; executionId: string; }) => Promise<Com…",
+          "doc": "Save what the step wrote into the Vault and return its receipt."
         },
         {
           "name": "ScopedTokenResult",
@@ -32471,8 +32435,7 @@
       "id": "./workspace-export",
       "source": "src/workspace-export/index.ts",
       "dependsOn": [
-        "object-store",
-        "sandbox"
+        "object-store"
       ],
       "error": null,
       "exports": [
@@ -32746,8 +32709,7 @@
       "id": "./workspace-export/react",
       "source": "src/workspace-export/react.tsx",
       "dependsOn": [
-        "object-store",
-        "sandbox"
+        "object-store"
       ],
       "error": null,
       "exports": [

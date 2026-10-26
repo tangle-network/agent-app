@@ -173,6 +173,7 @@ async function collectSandboxPrompt(
   events: AsyncIterable<unknown>,
   message: string | PromptInputPart[],
   history: StreamSandboxPromptOptions['history'],
+  observe?: (event: unknown) => void,
 ): Promise<{ answer: string; observation: PromptStreamObservation }> {
   let finalText = ''
   const textParts = new Map<string, string>()
@@ -180,6 +181,7 @@ async function collectSandboxPrompt(
   const observation: PromptStreamObservation = { terminal: false, types: new Map() }
 
   for await (const rawEvent of events) {
+    observe?.(rawEvent)
     const event = rawEvent as { type?: string; data?: Record<string, unknown> }
     if (!event.type) continue
     observePromptEvent(observation, event.type, record(event.data))
@@ -208,15 +210,17 @@ async function collectSandboxPrompt(
  * fail-loud come from `streamSandboxPrompt`; the aggregation is
  * `collectSandboxPromptText`, which products driving their own generator should
  * import directly. Unlike that collector, an answer does not excuse a stream
- * that never confirmed its end or that reported a failure.
+ * that never confirmed its end or that reported a failure. `observe` sees every
+ * event as it arrives, for a caller that relays some of them (a box agent's question).
  */
 export async function runSandboxPrompt(
   shell: SandboxRuntimeConfig,
   box: SandboxInstance,
   message: string | PromptInputPart[],
   options?: StreamSandboxPromptOptions,
+  observe?: (event: unknown) => void,
 ): Promise<string> {
-  const { answer, observation } = await collectSandboxPrompt(streamSandboxPrompt(shell, box, message, options), message, options?.history)
+  const { answer, observation } = await collectSandboxPrompt(streamSandboxPrompt(shell, box, message, options), message, options?.history, observe)
   if (!answer || !observation.terminal || observation.failure) throw noAnswerError(observation)
   return answer
 }
