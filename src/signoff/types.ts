@@ -1,16 +1,3 @@
-/**
- * The vocabulary of a local sign-off run: what a repo declares, and what the
- * run produces as proof.
- *
- * A sign-off gate replaces CI as the merge gate, so it has to reproduce what CI
- * does structurally (a pristine dependency tree) and then do more than CI does
- * (randomized suite order, recorded seeds, a dependency graph run in parallel).
- * Both halves are declared here rather than hardcoded, because the three
- * workflows this must express — agent-app, legal-agent, tax-agent — differ in
- * install filter, step list, language (one has a Python step) and repo-specific
- * gates.
- */
-
 import type { AppDefaultsExemptions } from './app-defaults'
 import type { CachePruneResult } from './cache'
 
@@ -219,10 +206,13 @@ export interface SignoffReport {
   readonly phase?: SignoffPhase
   readonly selection?: SignoffSelection
   readonly ok: boolean
+  /** Cleanup refusals retain primary results and make the overall verdict fail. */
+  readonly cleanupErrors?: readonly string[]
   readonly startedAt: string
   readonly repo: SignoffRepoFacts
   readonly configOrigin: SignoffConfigOrigin
   readonly workspace: string
+  /** Kept intentionally, or retirement failed and removal is unconfirmed. */
   readonly workspaceRetained: boolean
   readonly host: SignoffHostFacts
   readonly install: SignoffInstallResult

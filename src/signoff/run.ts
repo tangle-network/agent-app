@@ -33,24 +33,6 @@ import type {
   SignoffStepSpec,
 } from './types'
 
-/**
- * The sign-off run: reproduce a clean CI environment, then go further.
- *
- * Order matters and each stage exists for a failure this fleet actually paid
- * for:
- *  1. a pristine checkout (`workspace.ts`) — no warm `node_modules`, no Vite
- *     cache, because that is the entire mechanical difference between "green
- *     locally" and "red in CI";
- *  2. `--frozen-lockfile` into a store keyed on the lockfile (`store.ts`) — the
- *     clean install CI does, without paying the download twice;
- *  3. the repo's declared steps (`config.ts`), run as a graph rather than a line
- *     (`schedule.ts`), with the suite re-run under randomized file order and
- *     recorded seeds (`seeds.ts`) — the part CI does not do at all.
- *
- * Nothing about a failure is inferred. Every step reports its command, exit
- * code, duration, seed and captured output.
- */
-
 export interface RunSignoffOptions {
   /** Any directory inside the repo. Defaults to the process cwd. */
   readonly repoDir?: string
@@ -147,6 +129,15 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       options.onEvent?.({ kind: 'cache-prune', ...result })
     }
   }
+  let report: SignoffReport | undefined
+  let primaryError: unknown
+  let primaryFailed = false
+  let workspaceRetained = options.keepWorkspace ?? false
+  const cleanupErrors: string[] = []
+  const cleanup = async (operation: string, action: () => unknown | Promise<unknown>): Promise<boolean> => {
+    try { await action(); return true }
+    catch (error) { cleanupErrors.push(`${operation}: ${error instanceof Error ? error.message : String(error)}`); return false }
+  }
   try {
     await prune(cacheDir)
     tree = materializeCleanTree({ repoDir: repoRoot, dest: treePath(), source })
@@ -231,7 +222,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
       // Every step is unrunnable, and saying so is the honest report. A gate
       // that reports "0 failures" because it never ran anything is the failure
       // mode this whole module exists to prevent.
-      return finish({
+      report = finish({
         ok: false,
         startedAt,
         wallStart,
@@ -256,71 +247,81 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
         source,
         options,
       })
-    }
+    } else {
+      assertNodeTypesVersion(tree.path, nodeRequirement)
 
-    assertNodeTypesVersion(tree.path, nodeRequirement)
+      const workerDefaults = checkDefaults ? [runWorkerDefaults(tree.path, config.workerConfigs, options)] : []
 
-    const workerDefaults = checkDefaults ? [runWorkerDefaults(tree.path, config.workerConfigs, options)] : []
-
-    const treeRoot = tree.path
-    const outcomes = await runGraph<SignoffStepSpec, readonly SignoffAttempt[]>({
-      nodes: config.steps,
-      maxParallel: options.maxParallel ?? config.maxParallel ?? availableParallelism(),
-      keepGoing: options.keepGoing ?? false,
-      run: async (step, signal) => {
-        const attempts: SignoffAttempt[] = []
-        for (const plan of planAttempts(step, seedBase, options.shuffleRuns)) {
-          options.onEvent?.({ kind: 'step-start', name: step.name, command: plan.command, seed: plan.seed })
-          const result = await runCommand({
-            command: plan.command,
-            cwd: join(treeRoot, step.cwd ?? '.'),
-            env: buildEnv(sharedEnv, [step.env]),
-            timeoutMs: step.timeoutMs,
-            signal,
-          })
-          const ok = result.exitCode === 0
-          attempts.push(toAttempt(result, plan.seed, ok))
-          // Stop at the first failing order: the remaining seeds would report
-          // the same defect, and the seed that found it is already recorded.
-          if (!ok) {
-            emitStepEnd(options, step.name, 'failed', attempts)
-            return { ok: false, value: attempts }
+      const treeRoot = tree.path
+      const outcomes = await runGraph<SignoffStepSpec, readonly SignoffAttempt[]>({
+        nodes: config.steps,
+        maxParallel: options.maxParallel ?? config.maxParallel ?? availableParallelism(),
+        keepGoing: options.keepGoing ?? false,
+        run: async (step, signal) => {
+          const attempts: SignoffAttempt[] = []
+          for (const plan of planAttempts(step, seedBase, options.shuffleRuns)) {
+            options.onEvent?.({ kind: 'step-start', name: step.name, command: plan.command, seed: plan.seed })
+            const result = await runCommand({
+              command: plan.command,
+              cwd: join(treeRoot, step.cwd ?? '.'),
+              env: buildEnv(sharedEnv, [step.env]),
+              timeoutMs: step.timeoutMs,
+              signal,
+            })
+            const ok = result.exitCode === 0
+            attempts.push(toAttempt(result, plan.seed, ok))
+            // Stop at the first failing order: the remaining seeds would report
+            // the same defect, and the seed that found it is already recorded.
+            if (!ok) {
+              emitStepEnd(options, step.name, 'failed', attempts)
+              return { ok: false, value: attempts }
+            }
           }
-        }
-        emitStepEnd(options, step.name, 'passed', attempts)
-        return { ok: true, value: attempts }
-      },
-    })
+          emitStepEnd(options, step.name, 'passed', attempts)
+          return { ok: true, value: attempts }
+        },
+      })
 
-    // After the graph, so the build the app's steps made is there to measure the Worker upload from.
-    const appDefaults = checkDefaults ? [runAppDefaults(tree.path, config, options)] : []
-    const steps = [...outcomes.map(toStepResult), ...workerDefaults, ...appDefaults]
-    return finish({
-      ok: steps.every((step) => step.status === 'passed'),
-      startedAt,
-      wallStart,
-      tree,
-      origin,
-      selection,
-      host,
-      install,
-      steps,
-      seedBase,
-      keepGoing: options.keepGoing ?? false,
-      workspaceRetained: options.keepWorkspace ?? false,
-      source,
-      options,
-    })
+      // After the graph, so the build the app's steps made is there to measure the Worker upload from.
+      const appDefaults = checkDefaults ? [runAppDefaults(tree.path, config, options)] : []
+      const steps = [...outcomes.map(toStepResult), ...workerDefaults, ...appDefaults]
+      report = finish({
+        ok: steps.every((step) => step.status === 'passed'),
+        startedAt,
+        wallStart,
+        tree,
+        origin,
+        selection,
+        host,
+        install,
+        steps,
+        seedBase,
+        keepGoing: options.keepGoing ?? false,
+        workspaceRetained: options.keepWorkspace ?? false,
+        source,
+        options,
+      })
+    }
+  } catch (error) {
+    primaryFailed = true
+    primaryError = error
   } finally {
-    try {
-      if (tree && !options.keepWorkspace && existsSync(tree.path)) removeCleanTree(tree)
-    } finally {
-      for (const active of sessions) {
-        await active.close()
-        await prune(active.cacheDir, options.keepWorkspace && tree ? [tree.path] : [])
+    if (tree && !options.keepWorkspace && existsSync(tree.path)) {
+      workspaceRetained = !await cleanup('remove workspace', () => removeCleanTree(tree!))
+    }
+    for (const active of sessions) {
+      if (await cleanup(`close cache session ${active.cacheDir}`, () => active.close())) {
+        await cleanup(`prune cache ${active.cacheDir}`, () => prune(active.cacheDir, workspaceRetained && tree ? [tree.path] : []))
       }
     }
   }
+  if (primaryFailed) {
+    if (cleanupErrors.length) throw new AggregateError([primaryError, ...cleanupErrors.map(message => new Error(message))],
+      `${primaryError instanceof Error ? primaryError.message : String(primaryError)}; cleanup failed: ${cleanupErrors.join('; ')}`, { cause: primaryError })
+    throw primaryError
+  }
+  return { ...report!, ok: report!.ok && cleanupErrors.length === 0, workspaceRetained,
+    wallClockMs: Date.now() - wallStart, ...(cleanupErrors.length ? { cleanupErrors } : {}) }
 }
 
 /**

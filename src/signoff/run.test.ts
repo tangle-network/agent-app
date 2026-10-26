@@ -280,6 +280,40 @@ describe('signoff CLI pipes', { timeout: E2E_TIMEOUT_MS }, () => {
     expect(result.stdout).toBe(`${formatSignoffReport(report)}\n`)
   })
 
+  it('delivers primary results and a failing verdict when real Git refuses cleanup', async () => {
+    for (const primaryExit of [17, 0]) for (const quiet of [false, true]) {
+      const repo = fixtureRepo({ steps: `[{name:'primary',phase:'suites',run:'node lock-step.mjs ${primaryExit}'}]` })
+      writeFileSync(join(repo, 'lock-step.mjs'),
+        "import {spawnSync} from 'node:child_process';\n" +
+        "const locked=spawnSync('git',['worktree','lock',process.env.SIGNOFF_TREE],{encoding:'utf8'});\n" +
+        "if(locked.status!==0) throw Error(locked.stderr);\n" +
+        "console.error('PRIMARY-OUTPUT-RETAINED');process.exit(Number(process.argv[2]));\n")
+      git(['add', 'lock-step.mjs'], repo)
+      git(['commit', '--quiet', '-m', 'real cleanup refusal'], repo)
+      const cache = temp('signoff-cleanup-cache-')
+      const json = join(temp('signoff-cleanup-report-'), 'report.json')
+      const result = await runCli([repo, '--source', 'head', '--phase', 'suites',
+        '--cache-dir', cache, '--json', json, ...(quiet ? ['--quiet'] : [])])
+      expect(result.status, result.stderr).toBe(1)
+      const report = JSON.parse(readFileSync(json, 'utf8')) as SignoffReport
+      expect(report.ok).toBe(false)
+      expect(report.steps).toHaveLength(1)
+      expect(report.steps[0]?.status).toBe(primaryExit ? 'failed' : 'passed')
+      expect(report.steps[0]?.attempts[0]?.exitCode).toBe(primaryExit)
+      expect(report.steps[0]?.attempts[0]?.output).toContain('PRIMARY-OUTPUT-RETAINED')
+      expect(report.cleanupErrors?.join('\n')).toMatch(/remove workspace:.*locked/s)
+      expect(report.workspaceRetained).toBe(true)
+      expect(existsSync(join(report.workspace, '.git'))).toBe(true)
+      expect(readdirSync(join(cache, 'active'))).toEqual([])
+      expect(result.stdout).toBe(`${quiet ? formatSignoffLine(report) : formatSignoffReport(report)}\n`)
+      expect(result.stdout).not.toMatch(/SIGN-OFF PASSED|signoff SUITES PASS/)
+      if (!quiet) {
+        expect(result.stdout).toContain('PRIMARY-OUTPUT-RETAINED')
+        expect(result.stdout).toContain('cleanup FAILED')
+      }
+    }
+  })
+
   it('preserves success status and cleanup despite a config timer', async () => {
     const repo = fixtureRepo({
       steps: `[{ name: 'pass', run: 'node -e ""' }]`,
