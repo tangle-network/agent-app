@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.63.41
+
+- Fail a scheduled invocation for a listed job; classify transport failures on request (#1349)
+
+## 0.63.40
+
+- AGENTS: name platform workflows, routines and AgentGraphs separately (#1348)
+- AGENTS: run durability and workflows belong to the sandbox runtime and platform (#1347)
+
+## 0.63.39
+
+- fix(deps): match Node 24 type declarations to runtime (#1345)
+
 ## 0.63.38
 
 - fix(signoff): retain primary reports when cleanup fails (#1343)

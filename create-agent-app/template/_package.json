@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=22.13"
   },
-  "packageManager": "pnpm@11.24.0",
+  "packageManager": "pnpm@11.28.8",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "pnpm run peer-check && wrangler deploy",
