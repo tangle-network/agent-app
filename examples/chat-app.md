@@ -339,9 +339,9 @@ createChatTurnRoutes({
 The handle is the agent's normalized name (`normalizeProfileName` in
 `/agent-profiles`); the persisted mention part carries the stable
 `agentId`, so a rename never breaks an old message. A turn addressed to
-several agents calls `produce` once per agent, one after another in the order
-typed, and persists one assistant row with a `speaker` part before each
-answer. `ChatMessages` splits that row and labels each answer with its
+several agents calls `produce` once per agent, all at the same time, each
+with the thread's history and none seeing another's answer, and persists one
+assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and labels each answer with its
 author (`expandSpeakerRows` in `/web`); the live stream carries the same
 boundary as a `speaker` event (`onSpeaker` in `ChatStreamCallbacks`), so
 a viewer opens a new block as each agent starts. A mention of an agent the

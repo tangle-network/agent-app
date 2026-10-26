@@ -14,8 +14,8 @@ importers:
   .:
     dependencies:
       '@tangle-network/charts':
-        specifier: 0.21.13
-        version: 0.21.13(react@19.3.1)
+        specifier: 0.21.14
+        version: 0.21.14(react@19.3.1)
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -94,7 +94,7 @@ importers:
         version: 0.69.11(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.153(zod@4.6.7))(viem@2.57.11(typescript@7.0.2)(zod@4.6.7))
       '@tangle-network/sandbox-ui':
         specifier: 0.139.1
-        version: 0.139.1(1e42fc5d99e7c0d74d0c51ca870ca17c)
+        version: 0.139.1(c816caf08257a4c370e1a363711940af)
       '@tangle-network/tcloud':
         specifier: 0.8.5
         version: 0.8.5(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.153(zod@4.6.7))(typescript@7.0.2)(zod@4.6.7)
@@ -2904,8 +2904,8 @@ packages:
       '@ai-sdk/google': ^3.0.33
       playwright: ^1.40.0
 
-  '@tangle-network/charts@0.21.13':
-    resolution: {integrity: sha512-IUJil9dU/LkHTGKxYM+ONXAgtCkOMB50GjJ5Xk4LJxuaiwStr5rT2g5OTvKID0jHKOJanKFYOej0FO7qPvOqpA==}
+  '@tangle-network/charts@0.21.14':
+    resolution: {integrity: sha512-+Xv7loGrpDdw48TWY1d5s1k5lQrbEIuTZz7PZR0g17V8bYo6AqZYn+Bi9mORrxEq9+oJuSu5ls0eMnCo+Mud9Q==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
     peerDependenciesMeta:
@@ -8769,7 +8769,7 @@ snapshots:
       - ws
       - zod
 
-  '@tangle-network/charts@0.21.13(react@19.3.1)':
+  '@tangle-network/charts@0.21.14(react@19.3.1)':
     optionalDependencies:
       react: 19.3.1
 
@@ -8787,7 +8787,7 @@ snapshots:
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/sandbox-ui@0.139.1(1e42fc5d99e7c0d74d0c51ca870ca17c)':
+  '@tangle-network/sandbox-ui@0.139.1(c816caf08257a4c370e1a363711940af)':
     dependencies:
       '@lobehub/icons-static-svg': 1.98.0
       '@pierre/diffs': 1.6.1(@shikijs/themes@4.5.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -8808,7 +8808,7 @@ snapshots:
     optionalDependencies:
       '@hocuspocus/provider': 4.7.1(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@nanostores/react': 1.1.0(nanostores@1.5.5)(react@19.3.1)
-      '@tangle-network/charts': 0.21.13(react@19.3.1)
+      '@tangle-network/charts': 0.21.14(react@19.3.1)
       '@tiptap/core': 3.32.0(@tiptap/pm@3.32.0)
       '@tiptap/react': 3.32.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.32.0(@tiptap/pm@3.32.0))(@tiptap/pm@3.32.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tiptap/starter-kit': 3.32.0
