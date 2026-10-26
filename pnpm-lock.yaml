@@ -66,8 +66,8 @@ importers:
         specifier: 0.11.5
         version: 0.11.5(hono@4.13.13)
       '@tangle-network/agent-integrations':
-        specifier: 0.75.4
-        version: 0.75.4(@opentelemetry/api@1.10.0)(@types/node@26.6.5)
+        specifier: 0.76.1
+        version: 0.76.1(@opentelemetry/api@1.10.0)(@types/node@26.6.5)
       '@tangle-network/agent-interface':
         specifier: 5.7.1
         version: 5.7.1
@@ -2838,8 +2838,8 @@ packages:
     peerDependencies:
       hono: ^4.13.5
 
-  '@tangle-network/agent-integrations@0.75.4':
-    resolution: {integrity: sha512-GBBz6MW3fk630ZHFYLO76im5WA4Lxyewv2QeBht+jBsNgYEDXv7qomfmr/jzfubJUxL8XJf5G/WtmqDro7riZg==}
+  '@tangle-network/agent-integrations@0.76.1':
+    resolution: {integrity: sha512-IyMPP1XNnRa3sZwz/7teLEmjna+favPhcjP232ekr+hCxvPY8mQbb8EJZ2/LQJ7q88U1iJDAig+PGlo06g2PgQ==}
     engines: {node: '>=20.19.0'}
 
   '@tangle-network/agent-interface@2.20.1':
@@ -8617,7 +8617,7 @@ snapshots:
     dependencies:
       hono: 4.13.13
 
-  '@tangle-network/agent-integrations@0.75.4(@opentelemetry/api@1.10.0)(@types/node@26.6.5)':
+  '@tangle-network/agent-integrations@0.76.1(@opentelemetry/api@1.10.0)(@types/node@26.6.5)':
     dependencies:
       '@duckdb/node-api': 1.5.5-r.5
       '@ph0ny/sdk': 0.1.3
