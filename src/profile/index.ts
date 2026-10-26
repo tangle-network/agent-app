@@ -38,7 +38,7 @@ import type {
   AgentProfileMcpServer,
   AgentProfileResourceRef,
 } from '@tangle-network/agent-interface'
-import { mergeAgentProfiles } from '@tangle-network/agent-interface'
+import { mergeAgentProfiles } from '@tangle-network/agent-interface/profile'
 import { profile } from '@tangle-network/agent-eval'
 import {
   composeShellResources,

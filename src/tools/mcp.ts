@@ -35,12 +35,9 @@
  * referenced safely; {@link unresolvableSurfaceCredential} names that blocker
  * instead of emitting a reference that resolves to nothing.
  */
-import {
-  agentProfileMcpServerSchema,
-  defineAgentProfilePublicConfig,
-  defineAgentProfileSecretRef,
-  type AgentProfileConfigValue,
-} from '@tangle-network/agent-interface'
+import type { AgentProfileConfigValue } from '@tangle-network/agent-interface'
+import { defineAgentProfilePublicConfig, defineAgentProfileSecretRef } from '@tangle-network/agent-interface/profile'
+import { agentProfileMcpServerSchema } from '@tangle-network/agent-interface/profile-schema'
 import type { AppToolContext } from './types'
 import type { AppToolName } from './openai'
 import type { AppToolDefinition } from './registry'

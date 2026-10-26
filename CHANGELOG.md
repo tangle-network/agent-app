@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.53
+
+- Keep the agent-interface root and Runtime candidate execution off the Worker startup path (#1365)
+
 ## 0.63.52
 
 - fix(release): allow private workflow receipt reads (#1364)
