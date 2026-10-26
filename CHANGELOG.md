@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.37
+
+- docs(chat): refresh protected producer docs and retire shape checks (#1342)
+
 ## 0.63.36
 
 - chore(deps): update application shell dependencies (#1338)
