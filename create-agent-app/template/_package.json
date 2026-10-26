@@ -22,13 +22,13 @@
   },
   "peerDependencies": {
     "@tangle-network/agent-eval": "0.221.7",
-    "@tangle-network/agent-integrations": "0.76.1",
+    "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.1",
     "@tangle-network/agent-runtime": "0.349.0"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "0.221.7",
-    "@tangle-network/agent-integrations": "0.76.1",
+    "@tangle-network/agent-integrations": "0.75.4",
     "@tangle-network/agent-interface": "5.7.1",
     "@tangle-network/agent-knowledge": "22.0.16",
     "@tangle-network/agent-runtime": "0.349.0",
