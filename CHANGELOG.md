@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.38
+
+- fix(signoff): retain primary reports when cleanup fails (#1343)
+
 ## 0.63.37
 
 - docs(chat): refresh protected producer docs and retire shape checks (#1342)
