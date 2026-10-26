@@ -1008,6 +1008,7 @@
     }
   },
   "dependencies": {
+    "@tangle-network/agent-core": "^0.15.0",
     "@tangle-network/charts": "0.21.11",
     "proper-lockfile": "4.1.2"
   }
