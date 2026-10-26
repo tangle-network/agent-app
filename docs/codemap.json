@@ -26009,7 +26009,7 @@
           "name": "createTurnStreamUpgradeHandler",
           "kind": "function",
           "signature": "(options: CreateTurnStreamUpgradeHandlerOptions) => (request: Request) => Promise<Response | null>",
-          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only (the per-thread variant went with the deprecated rebroadcast lane; a thread's live turn replay is the sandbox session gateway's job)."
+          "doc": "The worker-entry WebSocket forwarder — WORKSPACE channel only; a thread's live turn replay is the sandbox session gateway's job."
         },
         {
           "name": "CreateTurnStreamUpgradeHandlerOptions",
@@ -26072,6 +26072,12 @@
           "doc": "Legacy v1 channel capabilities remain unchanged."
         },
         {
+          "name": "parkDurableTurnLock",
+          "kind": "function",
+          "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockReleaseInput, auth: TurnStreamAuth) => Promise<boolean>",
+          "doc": "Park the exact lock's release for its durable owner; any answer but a parked 200 leaves the lock held."
+        },
+        {
           "name": "peekDurableTurnLock",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: { workspaceId: string; } & ({ scope: \"workspace\"; threadId?: string | undef…",
@@ -26106,12 +26112,6 @@
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, input: TurnLockInterruptedReleaseInput, auth: TurnStreamAuth) => Promise<...>",
           "doc": "Fenced out-of-band release — the DO refuses a successor lock (started after `interruptedAt`) and a turnId mismatch."
-        },
-        {
-          "name": "ReleaseInterruptedDurableTurnLockInput",
-          "kind": "type",
-          "signature": "type ReleaseInterruptedDurableTurnLockInput",
-          "doc": "Define input parameters to release an interrupted durable turn lock in a workspace or thread"
         },
         {
           "name": "requestDurableTurnCancellation",
@@ -26526,6 +26526,7 @@
       "source": "src/vault/index.ts",
       "dependsOn": [
         "crypto",
+        "sandbox",
         "store",
         "teams",
         "web",
@@ -26678,6 +26679,7 @@
       "source": "src/vault/collaboration.ts",
       "dependsOn": [
         "crypto",
+        "sandbox",
         "store",
         "teams",
         "web",
@@ -26770,6 +26772,7 @@
       "source": "src/vault/lazy.tsx",
       "dependsOn": [
         "crypto",
+        "sandbox",
         "store",
         "teams",
         "web",
@@ -26802,6 +26805,7 @@
       "source": "src/vault/server.ts",
       "dependsOn": [
         "crypto",
+        "sandbox",
         "store",
         "teams",
         "web",
@@ -26864,6 +26868,7 @@
       "source": "src/vault/store/index.ts",
       "dependsOn": [
         "crypto",
+        "sandbox",
         "store",
         "web"
       ],
@@ -26874,6 +26879,12 @@
           "kind": "function",
           "signature": "(kv: KVStore, request: VaultMutationRequest, readHead?: VaultHeadReader, policy?: VaultMutationPolicy) => Promise<...>",
           "doc": "Apply a batch of path changes against their expected revisions."
+        },
+        {
+          "name": "assertSandboxVaultReconciliation",
+          "kind": "function",
+          "signature": "(workspaceId: string, reconciliation: SandboxVaultSyncResult) => void",
+          "doc": "Fail the caller when reconciliation could not establish what the box holds, and report a divergence it deliberately parked."
         },
         {
           "name": "buildSandboxVaultRenameUnits",
@@ -26888,6 +26899,12 @@
           "doc": "Nest flat file paths into a tree: directories first, then names in locale order."
         },
         {
+          "name": "createSandboxVaultSync",
+          "kind": "function",
+          "signature": "(config: SandboxVaultSyncConfig) => { root: string; hydrate: (box: VaultHydrationBox, workspaceId: string, options?: Va…",
+          "doc": "Bind the sync engine to a product's Vault store and box directory."
+        },
+        {
           "name": "createVaultCoordinator",
           "kind": "function",
           "signature": "(options: VaultCoordinatorOptions) => { exclusive: <T>(work: () => Promise<T>) => Promise<T>; settled: () => Promise<vo…",
@@ -26898,6 +26915,12 @@
           "kind": "function",
           "signature": "<Namespace extends VaultCoordinatorNamespace = VaultCoordinatorNamespace>(config: VaultStoreConfig) => { findVaultRevis…",
           "doc": "Create a Vault store bound per request with `setVaultKV` and `setVaultCoordinator`."
+        },
+        {
+          "name": "emptyVaultBoxState",
+          "kind": "function",
+          "signature": "() => StoredVaultBoxState",
+          "doc": null
         },
         {
           "name": "flattenVaultTreePaths",
@@ -26912,10 +26935,28 @@
           "doc": "Changes packed into mutation groups of at most `groupSize`, never splitting a rename."
         },
         {
+          "name": "healStaleMutation",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState, now: number) => StoredVaultBoxState | null",
+          "doc": "Clears an in-flight marker whose request cannot still be running, moving the generation."
+        },
+        {
+          "name": "hydrateSandboxVault",
+          "kind": "function",
+          "signature": "(config: SandboxVaultSyncConfig, box: VaultHydrationBox, workspaceId: string, options?: VaultHydrationOptions) => Promi…",
+          "doc": "Hydrate every live Vault head into the box, page by page, until the listing ends."
+        },
+        {
           "name": "isHiddenVaultFilePath",
           "kind": "function",
           "signature": "(filePath: string) => boolean",
           "doc": "Whether any segment of `filePath` is hidden (starts with a dot)."
+        },
+        {
+          "name": "isSyncedBoxWriter",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState, writer: { kind?: unknown; id?: unknown; } | undefined) => boolean",
+          "doc": "Whether a mutation leaves the synced box's copy current without moving the generation: only the reconcile of that same box writes what the box already holds."
         },
         {
           "name": "mapWithConcurrency",
@@ -26942,6 +26983,24 @@
           "doc": "Attribution recorded at the writer, without prompt text or inferred execution identities."
         },
         {
+          "name": "parseVaultBoxState",
+          "kind": "function",
+          "signature": "(value: unknown) => StoredVaultBoxState",
+          "doc": "The stored state, or a fresh one."
+        },
+        {
+          "name": "parseVaultBoxStateView",
+          "kind": "function",
+          "signature": "(value: unknown) => VaultBoxStateView | null",
+          "doc": "Parses a view returned by the coordinator; anything else is unknown (null)."
+        },
+        {
+          "name": "parseVaultBoxSyncSkips",
+          "kind": "function",
+          "signature": "(value: unknown) => VaultBoxSyncSkip[] | null",
+          "doc": "The skips a sync may carry, or null when the value is not a bounded list of them."
+        },
+        {
           "name": "parseVaultHeadMetadata",
           "kind": "function",
           "signature": "(value: unknown) => VaultHeadMetadata | null",
@@ -26952,6 +27011,12 @@
           "kind": "function",
           "signature": "(value: unknown) => VaultPathError | null",
           "doc": "The typed path error a coordinator response carries, or null when it carries none."
+        },
+        {
+          "name": "probeSandboxVaultLoss",
+          "kind": "function",
+          "signature": "(config: SandboxVaultSyncConfig, box: VaultReconcileBox, workspaceId: string) => Promise<string[]>",
+          "doc": "The live baseline paths when the box's Vault directory holds no file at all: a box that lost its disk would otherwise read as a member deleting every file."
         },
         {
           "name": "readReadySandboxFilesystemIncarnation",
@@ -26984,6 +27049,36 @@
           "doc": null
         },
         {
+          "name": "reconcileSandboxVault",
+          "kind": "function",
+          "signature": "(config: SandboxVaultSyncConfig, box: VaultReconcileBox, workspaceId: string, options?: SandboxVaultSyncOptions) => Pro…",
+          "doc": null
+        },
+        {
+          "name": "SANDBOX_VAULT_SYNC_CONTRACT",
+          "kind": "const",
+          "signature": "\"agent-app-sandbox-vault-sync-v1\"",
+          "doc": "The engine's own hydration contract; a product appends its own when its box layout changes."
+        },
+        {
+          "name": "SandboxBootstrapConfirmation",
+          "kind": "interface",
+          "signature": "interface SandboxBootstrapConfirmation",
+          "doc": "What a confirmed bootstrap asks the coordinator to record."
+        },
+        {
+          "name": "SandboxBootstrapRecord",
+          "kind": "interface",
+          "signature": "interface SandboxBootstrapRecord",
+          "doc": "The box and filesystem whose product bootstrap marker was confirmed."
+        },
+        {
+          "name": "sandboxBootstrapRecorded",
+          "kind": "function",
+          "signature": "(view: VaultBoxStateView | null, box: VaultBoxIdentity, marker: string) => boolean",
+          "doc": "Whether this exact box's filesystem already holds the product bootstrap this marker names."
+        },
+        {
           "name": "SandboxVaultPathRejection",
           "kind": "interface",
           "signature": "interface SandboxVaultPathRejection",
@@ -27002,15 +27097,51 @@
           "doc": null
         },
         {
+          "name": "SandboxVaultSync",
+          "kind": "type",
+          "signature": "type SandboxVaultSync",
+          "doc": null
+        },
+        {
           "name": "SandboxVaultSyncChange",
           "kind": "interface",
           "signature": "interface SandboxVaultSyncChange",
           "doc": null
         },
         {
+          "name": "SandboxVaultSyncConfig",
+          "kind": "interface",
+          "signature": "interface SandboxVaultSyncConfig",
+          "doc": null
+        },
+        {
+          "name": "SandboxVaultSyncOptions",
+          "kind": "interface",
+          "signature": "interface SandboxVaultSyncOptions",
+          "doc": null
+        },
+        {
           "name": "SandboxVaultSyncProgress",
           "kind": "interface",
           "signature": "interface SandboxVaultSyncProgress",
+          "doc": null
+        },
+        {
+          "name": "SandboxVaultSyncResult",
+          "kind": "interface",
+          "signature": "interface SandboxVaultSyncResult",
+          "doc": null
+        },
+        {
+          "name": "SandboxVaultSyncStore",
+          "kind": "interface",
+          "signature": "interface SandboxVaultSyncStore",
+          "doc": "The store calls the sync engine makes; `createVaultStore` returns all of them."
+        },
+        {
+          "name": "StoredVaultBoxState",
+          "kind": "interface",
+          "signature": "interface StoredVaultBoxState",
           "doc": null
         },
         {
@@ -27030,6 +27161,36 @@
           "kind": "function",
           "signature": "(workspaceId: string) => void",
           "doc": null
+        },
+        {
+          "name": "VAULT_BASE64_BODY_MARKER",
+          "kind": "const",
+          "signature": "\"[base64]\\n\"",
+          "doc": "The body prefix of a Vault document whose remainder is base64-encoded binary bytes."
+        },
+        {
+          "name": "VAULT_BOX_MUTATION_STALE_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "A mutation in flight longer than this cannot still be running: its request died with the object."
+        },
+        {
+          "name": "VAULT_BOX_STATE_KEY",
+          "kind": "const",
+          "signature": "\"vaultBoxState\"",
+          "doc": "What the workspace Vault coordinator knows about its box's copy of the Vault."
+        },
+        {
+          "name": "VAULT_BOX_STATE_SCHEMA",
+          "kind": "const",
+          "signature": "\"vault-box-state-v1\"",
+          "doc": null
+        },
+        {
+          "name": "VAULT_BOX_SYNC_MAX_SKIPS",
+          "kind": "const",
+          "signature": "50",
+          "doc": "A hydration that left more files off the box than this records no sync."
         },
         {
           "name": "VAULT_HEAD_SCHEMA",
@@ -27090,6 +27251,54 @@
           "kind": "const",
           "signature": "\"vault-sandbox-baseline-v3\"",
           "doc": null
+        },
+        {
+          "name": "vaultBinaryDocument",
+          "kind": "function",
+          "signature": "(codec: VaultFrontmatterCodec, fields: Record<string, unknown>, base64: string) => string",
+          "doc": "The Vault document that stores a binary file the box produced: the product's frontmatter plus the base64 body."
+        },
+        {
+          "name": "vaultBinaryPayload",
+          "kind": "function",
+          "signature": "(codec: VaultFrontmatterCodec, raw: string) => string | null",
+          "doc": "The base64 payload of a Vault document that stores a binary file, or null for a text document."
+        },
+        {
+          "name": "VaultBoxIdentity",
+          "kind": "interface",
+          "signature": "interface VaultBoxIdentity",
+          "doc": null
+        },
+        {
+          "name": "vaultBoxInSync",
+          "kind": "function",
+          "signature": "(view: VaultBoxStateView | null, box: VaultBoxIdentity, contract: string) => boolean",
+          "doc": "Whether a complete hydration of this exact box, under this contract, saw the Vault as it is now."
+        },
+        {
+          "name": "VaultBoxStateView",
+          "kind": "interface",
+          "signature": "interface VaultBoxStateView",
+          "doc": "What a turn reads."
+        },
+        {
+          "name": "VaultBoxSync",
+          "kind": "interface",
+          "signature": "interface VaultBoxSync",
+          "doc": "The box and filesystem whose Vault copy a complete hydration proved current."
+        },
+        {
+          "name": "VaultBoxSyncRecord",
+          "kind": "interface",
+          "signature": "interface VaultBoxSyncRecord",
+          "doc": "What a complete hydration asks the coordinator to record."
+        },
+        {
+          "name": "VaultBoxSyncSkip",
+          "kind": "interface",
+          "signature": "interface VaultBoxSyncSkip",
+          "doc": "A Vault file that hydration left off the box for its size; the agent reads it through the Vault API."
         },
         {
           "name": "VaultConflictError",
@@ -27278,15 +27487,39 @@
           "doc": null
         },
         {
+          "name": "VaultHydrationBox",
+          "kind": "interface",
+          "signature": "interface VaultHydrationBox",
+          "doc": "The box calls hydration makes; a `@tangle-network/sandbox` instance satisfies it."
+        },
+        {
           "name": "VaultHydrationError",
           "kind": "class",
           "signature": "class VaultHydrationError",
           "doc": null
         },
         {
+          "name": "VaultHydrationFileSystem",
+          "kind": "interface",
+          "signature": "interface VaultHydrationFileSystem",
+          "doc": null
+        },
+        {
           "name": "VaultHydrationIncompleteError",
           "kind": "class",
           "signature": "class VaultHydrationIncompleteError",
+          "doc": null
+        },
+        {
+          "name": "VaultHydrationOptions",
+          "kind": "interface",
+          "signature": "interface VaultHydrationOptions",
+          "doc": null
+        },
+        {
+          "name": "VaultHydrationStats",
+          "kind": "interface",
+          "signature": "interface VaultHydrationStats",
           "doc": null
         },
         {
@@ -27398,6 +27631,12 @@
           "doc": null
         },
         {
+          "name": "VaultReconcileBox",
+          "kind": "interface",
+          "signature": "interface VaultReconcileBox",
+          "doc": "The box calls reconciliation makes; a `@tangle-network/sandbox` instance satisfies it."
+        },
+        {
           "name": "vaultRevisionKey",
           "kind": "function",
           "signature": "(workspaceId: string, revision: string, path?: string | undefined) => string",
@@ -27498,6 +27737,42 @@
           "kind": "type",
           "signature": "type VaultWriterKind",
           "doc": null
+        },
+        {
+          "name": "viewOfVaultBoxState",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState) => VaultBoxStateView",
+          "doc": null
+        },
+        {
+          "name": "withBootstrap",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState, bootstrap: SandboxBootstrapRecord) => StoredVaultBoxState",
+          "doc": null
+        },
+        {
+          "name": "withMutationFinished",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState) => StoredVaultBoxState",
+          "doc": "Runs whether the mutation applied, conflicted or threw: any of them may have reached KV."
+        },
+        {
+          "name": "withMutationStarted",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState, operationId: string, now: number) => StoredVaultBoxState",
+          "doc": null
+        },
+        {
+          "name": "withSync",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState, sync: VaultBoxSync) => StoredVaultBoxState",
+          "doc": null
+        },
+        {
+          "name": "withSyncInvalidated",
+          "kind": "function",
+          "signature": "(state: StoredVaultBoxState) => StoredVaultBoxState",
+          "doc": "A reconcile that left the box and the Vault apart."
         }
       ]
     },
