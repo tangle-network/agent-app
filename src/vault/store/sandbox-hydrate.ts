@@ -10,7 +10,7 @@ import { shellQuote } from '../../sandbox/binary-read'
 import { sha256Hex } from '../../crypto/digest'
 import type { VaultSandboxBaseline } from './revisions'
 import type { VaultHeadListEntry } from './store'
-import { vaultBoxInSync } from './box-state'
+import { vaultBoxInSync, VAULT_BOX_SYNC_MAX_SKIPS, type VaultBoxSyncSkip } from './box-state'
 import {
   mapWithConcurrency,
   normalizeVaultSandboxBaseline,
@@ -22,6 +22,7 @@ import {
   VaultHydrationError,
   VaultHydrationIncompleteError,
   type SandboxVaultSyncConfig,
+  type SandboxVaultSyncStageObserver,
 } from './sandbox-sync'
 
 const VAULT_IO_CONCURRENCY = 8
@@ -60,6 +61,10 @@ export interface VaultHydrationStats {
   processedHeads: number
   /** True when the coordinator's record proved the box current and nothing was listed or written. */
   inSync?: boolean
+  /** Files the box refused for their size (`skipOversizeFiles`): absent from the box and its baseline. */
+  skipped: VaultBoxSyncSkip[]
+  /** Set when the copy budget ran out: heads not on the box yet, and whether later pages were not examined. */
+  deferred: { pendingPaths: string[]; morePages: boolean } | null
 }
 
 export interface VaultHydrationOptions {
@@ -69,13 +74,30 @@ export interface VaultHydrationOptions {
   appliedPaths?: ReadonlySet<string>
   /** May still be in flight (the Vault-loss probe): hydrate awaits it only to compare heads. */
   pathsMissingFromBox?: ReadonlySet<string> | Promise<ReadonlySet<string>>
+  /** False when the caller makes the warm-path decision and records the sync itself: hydration then neither skips nor records. */
+  recordSync?: boolean
+  /**
+   * A copy that may span calls. Hydration spends `remainingChars` (Vault
+   * characters read; past it, it records what it wrote and returns `deferred`)
+   * and appends every Vault path it writes, so a caller that retries on a new
+   * box keeps one budget and can finish what the first attempt wrote.
+   */
+  progress?: { remainingChars: number; writtenPaths: string[] }
+  onStage?: SandboxVaultSyncStageObserver
 }
 
 interface TextSnapshot { kind: 'text'; path: string; content: string }
 interface BinarySnapshot { kind: 'binary'; path: string; payload: string; onDiskHash: string }
 type Snapshot = TextSnapshot | BinarySnapshot
 
+/** What one `hydrate` call carries across its pages. */
+interface HydrationRun {
+  progress: NonNullable<VaultHydrationOptions['progress']>
+  skipped: VaultBoxSyncSkip[]
+}
+
 interface PageResult {
+  deferred: VaultHydrationStats['deferred']
   complete: boolean
   cursor: string | null
   processedHeadCount: number
@@ -106,9 +128,10 @@ export async function hydrateSandboxVault(
       : null
     const protectedPaths = Boolean(options.conflictPaths?.size || options.appliedPaths?.size)
       || options.pathsMissingFromBox !== undefined
-    const view = identity ? await config.vault.readVaultBoxState(workspaceId) : null
+    const ownsSync = options.recordSync !== false
+    const view = identity && ownsSync ? await config.vault.readVaultBoxState(workspaceId) : null
     if (identity && !protectedPaths && vaultBoxInSync(view, identity, contract)) {
-      return { succeeded: true, value: { written: 0, deleted: 0, unchanged: 0, processedHeads: 0, inSync: true } }
+      return { succeeded: true, value: { written: 0, deleted: 0, unchanged: 0, processedHeads: 0, inSync: true, skipped: [], deferred: null } }
     }
     // The Vault directory is needed only before the first box write, so its
     // round trip overlaps the baseline read and the head listing.
@@ -118,23 +141,26 @@ export async function hydrateSandboxVault(
     let deleted = 0
     let unchanged = 0
     let processedHeadCount = 0
+    const run: HydrationRun = { progress: options.progress ?? { remainingChars: Infinity, writtenPaths: [] }, skipped: [] }
     for (let pageIndex = 0; pageIndex < VAULT_HYDRATION_MAX_PAGES; pageIndex += 1) {
-      const page = await hydratePage(config, box, workspaceId, options, vaultDir)
+      const page = await hydratePage(config, box, workspaceId, options, vaultDir, run)
       written += page.written
       deleted += page.deleted
       unchanged += page.unchanged
       processedHeadCount = page.processedHeadCount
-      if (page.complete) {
-        if (identity && view && !view.inFlight) {
+      if (page.complete || page.deferred) {
+        const stats = { written, deleted, unchanged, processedHeads: processedHeadCount, skipped: run.skipped, deferred: page.deferred }
+        if (page.deferred) return { succeeded: true, value: stats }
+        if (identity && view && !view.inFlight && run.skipped.length <= VAULT_BOX_SYNC_MAX_SKIPS) {
           // Recorded against the count read before the listing: a mutation
           // during this walk moved it, so the record cannot match and the next
           // turn walks again. A failed record only costs that next walk.
-          await config.vault.recordVaultBoxSync(workspaceId, { ...identity, contract, generation: view.generation, skipped: [] })
+          await config.vault.recordVaultBoxSync(workspaceId, { ...identity, contract, generation: view.generation, skipped: run.skipped })
             .catch((error: unknown) => console.warn('[vault] box sync record failed', {
               workspaceId, error: error instanceof Error ? error.message : String(error),
             }))
         }
-        return { succeeded: true, value: { written, deleted, unchanged, processedHeads: processedHeadCount } }
+        return { succeeded: true, value: stats }
       }
       if (page.cursor === null) {
         throw new VaultHydrationIncompleteError({
@@ -161,20 +187,32 @@ async function hydratePage(
   workspaceId: string,
   options: VaultHydrationOptions,
   vaultDir: Promise<void>,
+  run: HydrationRun,
 ): Promise<PageResult> {
   const { vault } = config
+  const stage = options.onStage ?? (() => {})
   if (!box.id) throw new Error(`Cannot hydrate Vault for ${workspaceId}: sandbox id is missing`)
+  const sandboxId = box.id
   const incarnation = readReadySandboxFilesystemIncarnation(box)
   if (!incarnation.succeeded) throw incarnation.error
 
-  const normalized = normalizeVaultSandboxBaseline(await vault.readVaultSandboxBaseline(workspaceId, box.id))
+  let startedAt = Date.now()
+  const normalized = normalizeVaultSandboxBaseline(await vault.readVaultSandboxBaseline(workspaceId, sandboxId))
+  stage('baseline_read', startedAt)
   const baselineMatchesIncarnation = normalized.baseline?.schema === VAULT_SANDBOX_BASELINE_SCHEMA
     && normalized.baseline.filesystemIncarnationId === incarnation.value.id
   const previousBaseline = baselineMatchesIncarnation ? normalized.baseline : null
   const legacyBaseline = baselineMatchesIncarnation ? normalized.legacy : false
   const cursor = previousBaseline?.progress?.operation === 'hydrate' ? previousBaseline.progress.cursor : undefined
+  startedAt = Date.now()
   const page = await vault.listVaultHeadPage(workspaceId, { cursor, limit: VAULT_HYDRATION_HEAD_PAGE_SIZE })
-  const baselineFiles: VaultSandboxBaseline['files'] = { ...(previousBaseline?.files ?? {}) }
+  stage('head_list', startedAt, { entries: page.entries.length })
+  // A legacy baseline cannot prove a binary head holds decoded bytes, and this
+  // pass may commit a current-schema baseline before it reaches every head, so
+  // carried entries lose their revision and stay due for rewrite.
+  const baselineFiles: VaultSandboxBaseline['files'] = legacyBaseline
+    ? Object.fromEntries(Object.entries(previousBaseline?.files ?? {}).map(([path, file]) => [path, file.deleted ? file : { ...file, revision: null }]))
+    : { ...(previousBaseline?.files ?? {}) }
   const conflictPaths = options.conflictPaths ?? new Set<string>()
   const appliedPaths = options.appliedPaths ?? new Set<string>()
   const pathsMissingFromBox = await options.pathsMissingFromBox ?? new Set<string>()
@@ -216,19 +254,54 @@ async function hydratePage(
     deleted += 1
   }
 
+  const binaryHashes = new Map<string, string>()
+  const recordEntry = (entry: VaultHeadListEntry) => {
+    const previous = baselineFiles[entry.path]
+    const onDiskHash = binaryHashes.get(entry.path)
+    if (onDiskHash !== undefined) {
+      baselineFiles[entry.path] = { revision: entry.revision, contentHash: entry.contentHash, deleted: entry.deleted, binary: true, onDiskHash }
+    } else if (
+      previous?.binary
+      && previous.revision === entry.revision && previous.contentHash === entry.contentHash && previous.deleted === entry.deleted
+    ) {
+      baselineFiles[entry.path] = previous
+    } else {
+      baselineFiles[entry.path] = { revision: entry.revision, contentHash: entry.contentHash, deleted: entry.deleted }
+    }
+  }
+  const writeBaseline = async (progress: VaultSandboxBaseline['progress']) => {
+    const writeStartedAt = Date.now()
+    await vault.writeVaultSandboxBaseline({
+      schema: VAULT_SANDBOX_BASELINE_SCHEMA,
+      workspaceId,
+      sandboxId,
+      filesystemIncarnationId: incarnation.value.id,
+      files: baselineFiles,
+      ...(progress ? { progress } : {}),
+      updatedAt: new Date().toISOString(),
+    })
+    stage('baseline_write', writeStartedAt)
+  }
+
   // Read and write the changed heads in bounded batches, so a page of large
   // files never sits in memory at once.
-  const binaryHashes = new Map<string, string>()
   let written = 0
+  let readMs = 0
+  let writeMs = 0
+  let deferredHeads: VaultHeadListEntry[] = []
   const liveHeads = changedHeads.filter((entry) => !entry.deleted)
+  const headsByPath = new Map(liveHeads.map((entry) => [entry.path, entry]))
   for (let next = 0; next < liveHeads.length;) {
-    const batch: VaultHeadListEntry[] = []
+    if (run.progress.remainingChars <= 0) {
+      deferredHeads = liveHeads.slice(next)
+      break
+    }
     const snapshots: Snapshot[] = []
     let batchChars = 0
+    const readStartedAt = Date.now()
     while (next < liveHeads.length && batchChars < VAULT_HYDRATION_BATCH_CHARS) {
       const slice = liveHeads.slice(next, next + VAULT_IO_CONCURRENCY)
       next += slice.length
-      batch.push(...slice)
       const read = await mapWithConcurrency(slice, VAULT_IO_CONCURRENCY, async (entry) => readSnapshot(config, workspaceId, entry, skippedPaths))
       for (const snapshot of read) {
         if (!snapshot) continue
@@ -236,11 +309,53 @@ async function hydratePage(
         batchChars += snapshot.kind === 'text' ? snapshot.content.length : snapshot.payload.length
       }
     }
-    await writeTextSnapshots(config, box, snapshots.filter((snapshot): snapshot is TextSnapshot => snapshot.kind === 'text'))
-    const binaries = snapshots.filter((snapshot): snapshot is BinarySnapshot => snapshot.kind === 'binary')
-    await writeBinaries(config, box, workspaceId, binaries)
-    for (const binary of binaries) binaryHashes.set(binary.path, binary.onDiskHash)
-    written += snapshots.length
+    run.progress.remainingChars -= batchChars
+    readMs += Date.now() - readStartedAt
+    const writeStartedAt = Date.now()
+    const present = config.skipFilesAlreadyOnBox
+      ? await pathsAlreadyOnBox(config, box, snapshots.filter((snapshot) => !baselineFiles[snapshot.path] && !pathsMissingFromBox.has(snapshot.path)))
+      : new Set<string>()
+    const toWrite = snapshots.filter((snapshot) => !present.has(snapshot.path))
+    const refused = [
+      ...await writeTextSnapshots(config, box, toWrite.filter((snapshot): snapshot is TextSnapshot => snapshot.kind === 'text')),
+      ...await writeBinaries(config, box, workspaceId, toWrite.filter((snapshot): snapshot is BinarySnapshot => snapshot.kind === 'binary')),
+    ]
+    writeMs += Date.now() - writeStartedAt
+    for (const skip of refused) skippedPaths.add(skip.path)
+    run.skipped.push(...refused)
+    for (const snapshot of snapshots) {
+      if (snapshot.kind === 'binary' && !skippedPaths.has(snapshot.path)) binaryHashes.set(snapshot.path, snapshot.onDiskHash)
+    }
+    for (const snapshot of toWrite) if (!skippedPaths.has(snapshot.path)) run.progress.writtenPaths.push(snapshot.path)
+    written += toWrite.length - refused.length
+    if (next < liveHeads.length) {
+      // Record this batch before the next, so a request that ends early
+      // resumes from here rather than from the start of the page.
+      for (const snapshot of snapshots) {
+        const entry = headsByPath.get(snapshot.path)
+        if (entry && !skippedPaths.has(snapshot.path)) recordEntry(entry)
+      }
+      await writeBaseline(previousBaseline?.progress)
+    }
+  }
+  stage('kv_read', Date.now() - readMs, { heads: liveHeads.length - deferredHeads.length, deferred: deferredHeads.length })
+  stage('sandbox_write', Date.now() - writeMs, { files: written })
+
+  const previousProcessedHeadCount = previousBaseline?.progress?.operation === 'hydrate' ? previousBaseline.progress.processedHeadCount : 0
+  const protectedInPage = page.entries.filter((entry) => conflictPaths.has(entry.path) || appliedPaths.has(entry.path)).length
+  const unchanged = Math.max(0, page.entries.length - changedHeads.length - protectedInPage)
+  if (deferredHeads.length > 0) {
+    // The baseline holds every batch written above and keeps the previous
+    // resume point, so the next call re-lists this page and copies the rest.
+    return {
+      deferred: { pendingPaths: deferredHeads.map((entry) => entry.path), morePages: !page.complete },
+      complete: false,
+      cursor: cursor ?? null,
+      processedHeadCount: previousProcessedHeadCount,
+      written,
+      deleted,
+      unchanged,
+    }
   }
 
   const appliedBinaryHashes = await mapWithConcurrency(
@@ -256,59 +371,48 @@ async function hydratePage(
   for (const entry of appliedBinaryHashes) if (entry) binaryHashes.set(entry[0], entry[1])
   for (const entry of page.entries) {
     if (conflictPaths.has(entry.path) || skippedPaths.has(entry.path)) continue
-    const previous = baselineFiles[entry.path]
-    const onDiskHash = binaryHashes.get(entry.path)
-    if (onDiskHash !== undefined) {
-      baselineFiles[entry.path] = { revision: entry.revision, contentHash: entry.contentHash, deleted: entry.deleted, binary: true, onDiskHash }
-    } else if (
-      appliedPaths.has(entry.path) && previous?.binary
-      && previous.revision === entry.revision && previous.contentHash === entry.contentHash && previous.deleted === entry.deleted
-    ) {
-      baselineFiles[entry.path] = previous
-    } else {
-      baselineFiles[entry.path] = { revision: entry.revision, contentHash: entry.contentHash, deleted: entry.deleted }
-    }
+    recordEntry(entry)
   }
   for (const path of missingBaselinePaths) delete baselineFiles[path]
 
-  const processedHeadCount = (
-    previousBaseline?.progress?.operation === 'hydrate' ? previousBaseline.progress.processedHeadCount : 0
-  ) + page.entries.length
+  const processedHeadCount = previousProcessedHeadCount + page.entries.length
   // A current-schema baseline for this incarnation that already records every
   // head exactly as listed stays as it is: rewriting it cost a Durable Object
   // round trip on every turn of a running box (167-332 ms on staging).
   const baselineUnchanged = page.complete && previousBaseline !== null && !legacyBaseline
     && !previousBaseline.progress && sameBaselineFiles(previousBaseline.files, baselineFiles)
   if (!baselineUnchanged) {
-    await vault.writeVaultSandboxBaseline({
-      schema: VAULT_SANDBOX_BASELINE_SCHEMA,
-      workspaceId,
-      sandboxId: box.id,
-      filesystemIncarnationId: incarnation.value.id,
-      files: baselineFiles,
-      ...(page.complete || page.cursor === null
-        ? {}
-        : {
-            progress: {
-              operation: 'hydrate' as const,
-              cursor: page.cursor,
-              processedHeadCount,
-              unseenBaselinePaths: [...unseenBaselinePaths].sort(),
-            },
-          }),
-      updatedAt: new Date().toISOString(),
-    })
+    await writeBaseline(page.complete || page.cursor === null
+      ? undefined
+      : { operation: 'hydrate' as const, cursor: page.cursor, processedHeadCount, unseenBaselinePaths: [...unseenBaselinePaths].sort() })
   }
+  return { deferred: null, complete: page.complete, cursor: page.cursor, processedHeadCount, written, deleted, unchanged }
+}
 
-  const protectedInPage = page.entries.filter((entry) => conflictPaths.has(entry.path) || appliedPaths.has(entry.path)).length
-  return {
-    complete: page.complete,
-    cursor: page.cursor,
-    processedHeadCount,
-    written,
-    deleted,
-    unchanged: Math.max(0, page.entries.length - changedHeads.length - protectedInPage),
+/** Snapshots whose exact bytes the box already holds as a regular file reached without a symlink. A failed check proves nothing. */
+async function pathsAlreadyOnBox(config: SandboxVaultSyncConfig, box: VaultHydrationBox, snapshots: Snapshot[]): Promise<Set<string>> {
+  const present = new Set<string>()
+  if (snapshots.length === 0) return present
+  const expected = new Map<string, string>()
+  for (const snapshot of snapshots) {
+    expected.set(snapshot.path, snapshot.kind === 'binary' ? snapshot.onDiskHash : await sha256Hex(snapshot.content))
   }
+  const rootPrefix = `${config.root}/`
+  const command = `for p in ${[...expected.keys()].map((path) => shellQuote(rootPrefix + path)).join(' ')}; do `
+    + 'r="$(realpath -e -- "$p" 2>/dev/null)" && [ "$r" = "$p" ] && [ -f "$p" ] && sha256sum -z -- "$p"; done 2>/dev/null; exit 0'
+  let stdout: string
+  try {
+    stdout = (await box.exec(command)).stdout
+  } catch {
+    return present
+  }
+  for (const record of stdout.split('\0').filter(Boolean)) {
+    const parsed = /^([a-f0-9]{64}) [ *]([\s\S]+)$/.exec(record)
+    if (!parsed) continue
+    const path = parsed[2]!.startsWith(rootPrefix) ? parsed[2]!.slice(rootPrefix.length) : parsed[2]!
+    if (expected.get(path) === parsed[1]) present.add(path)
+  }
+  return present
 }
 
 async function readSnapshot(
@@ -337,12 +441,13 @@ async function readSnapshot(
 }
 
 /** Text files go in JSON requests under the proxy's body cap; one too large for any request goes as bytes. */
-async function writeTextSnapshots(config: SandboxVaultSyncConfig, box: VaultHydrationBox, texts: TextSnapshot[]): Promise<void> {
+async function writeTextSnapshots(config: SandboxVaultSyncConfig, box: VaultHydrationBox, texts: TextSnapshot[]): Promise<VaultBoxSyncSkip[]> {
+  const skipped: VaultBoxSyncSkip[] = []
   let request: Array<{ path: string; content: string }> = []
   let requestBytes = 0
   const flush = async () => {
     if (request.length === 0) return
-    await box.fs.writeMany(request)
+    await (config.writeText ? config.writeText(box, request) : box.fs.writeMany(request))
     request = []
     requestBytes = 0
   }
@@ -350,12 +455,8 @@ async function writeTextSnapshots(config: SandboxVaultSyncConfig, box: VaultHydr
     const path = boxPath(config, text.path)
     const bytes = encoder.encode(JSON.stringify({ path, content: text.content })).byteLength
     if (bytes > VAULT_TEXT_WRITE_MAX_JSON_BYTES) {
-      const data = encoder.encode(text.content)
-      const result = await box.fs.uploadData(path, data)
-      const size = (result as { size?: unknown } | undefined)?.size
-      if (typeof size === 'number' && size !== data.byteLength) {
-        throw new VaultHydrationError(`Failed to upload Vault file ${text.path}`, new Error(`expected ${data.byteLength} uploaded bytes, received ${size}`))
-      }
+      const skip = await uploadFile(config, box, text.path, encoder.encode(text.content))
+      if (skip) skipped.push(skip)
       continue
     }
     if (requestBytes + bytes > VAULT_TEXT_WRITE_MAX_JSON_BYTES) await flush()
@@ -363,27 +464,39 @@ async function writeTextSnapshots(config: SandboxVaultSyncConfig, box: VaultHydr
     requestBytes += bytes
   }
   await flush()
+  return skipped
+}
+
+/** Upload bytes to the box, or the skip when the box refuses them for their size and the product leaves such files off. */
+async function uploadFile(config: SandboxVaultSyncConfig, box: VaultHydrationBox, vaultPath: string, data: Uint8Array): Promise<VaultBoxSyncSkip | null> {
+  let result: unknown
+  try {
+    result = await box.fs.uploadData(boxPath(config, vaultPath), data)
+  } catch (error) {
+    const { code, status } = (error ?? {}) as { code?: unknown; status?: unknown }
+    if (config.skipOversizeFiles && error instanceof Error && (code === 'PAYLOAD_TOO_LARGE' || code === 'FILE_TOO_LARGE' || status === 413)) {
+      console.warn('[vault] file is too large to hydrate; the agent reads it through the Vault API', { path: vaultPath, detail: error.message })
+      return { path: vaultPath, reason: 'too_large', detail: error.message }
+    }
+    throw new VaultHydrationError(`Failed to upload Vault file ${vaultPath}`, error)
+  }
+  const size = (result as { size?: unknown } | undefined)?.size
+  if (typeof size === 'number' && size !== data.byteLength) {
+    throw new VaultHydrationError(`Failed to upload Vault file ${vaultPath}`, new Error(`expected ${data.byteLength} uploaded bytes, received ${size}`))
+  }
+  return null
 }
 
 async function writeBinaries(
   config: SandboxVaultSyncConfig,
   box: VaultHydrationBox,
   workspaceId: string,
-  binaries: BinarySnapshot[],
-): Promise<void> {
-  await mapWithConcurrency(binaries, BINARY_HYDRATION_CONCURRENCY, async (binary) => {
-    try {
-      const bytes = base64ToBytes(binary.payload)
-      const result = await box.fs.uploadData(boxPath(config, binary.path), bytes)
-      const size = (result as { size?: unknown } | undefined)?.size
-      if (typeof size === 'number' && size !== bytes.byteLength) {
-        throw new Error(`expected ${bytes.byteLength} uploaded bytes, received ${size}`)
-      }
-    } catch (error) {
-      throw new VaultHydrationError(`Failed to upload binary Vault file ${binary.path} for ${workspaceId}`, error)
-    }
-  })
-  if (binaries.length === 0) return
+  snapshots: BinarySnapshot[],
+): Promise<VaultBoxSyncSkip[]> {
+  const skips = await mapWithConcurrency(snapshots, BINARY_HYDRATION_CONCURRENCY, (binary) => uploadFile(config, box, binary.path, base64ToBytes(binary.payload)))
+  const skipped = skips.filter((skip): skip is VaultBoxSyncSkip => skip !== null)
+  const binaries = snapshots.filter((binary) => !skipped.some((skip) => skip.path === binary.path))
+  if (binaries.length === 0) return skipped
 
   const verification = await box.exec(`sha256sum -z -- ${binaries.map((binary) => shellQuote(boxPath(config, binary.path))).join(' ')}`)
   if (verification.exitCode !== 0) {
@@ -410,6 +523,7 @@ async function writeBinaries(
       )
     }
   }
+  return skipped
 }
 
 function sameBaselineFiles(previous: VaultSandboxBaseline['files'], next: VaultSandboxBaseline['files']): boolean {
