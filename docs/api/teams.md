@@ -4,7 +4,7 @@
 
 Source: `src/teams/index.ts`
 
-35 exports.
+37 exports.
 
 ### `ASSIGNABLE_WORKSPACE_ROLES`
 
@@ -28,6 +28,14 @@ type AssignableWorkspaceRole
 
 ```ts
 (actorRole: "owner" | "viewer" | "editor" | "admin", targetRole: "owner" | "viewer" | "editor" | "admin") => boolean
+```
+
+### `createThreadAccessCheck`
+
+`function` — Bind the thread check to a product's thread table and workspace access.
+
+```ts
+<Role extends string = "owner" | "viewer" | "editor" | "admin">(options: ThreadAccessOptions<Role>) => (threadId: strin…
 ```
 
 ### `generateInvitationToken`
@@ -228,6 +236,14 @@ type OrganizationRole
 
 ```ts
 type SandboxWorkspaceRole
+```
+
+### `ThreadAccessOptions`
+
+`interface`
+
+```ts
+interface ThreadAccessOptions
 ```
 
 ### `validateInviteToken`

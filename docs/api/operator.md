@@ -4,7 +4,7 @@
 
 Source: `src/operator/index.ts`
 
-57 exports.
+62 exports.
 
 ### `ChatOperatorAdapterOptions`
 
@@ -62,6 +62,14 @@ interface ChatOperatorWorkspace
 <Identity>(options: ChatOperatorAdapterOptions<Identity>) => OperatorAdapter<Identity>
 ```
 
+### `createGatewayOperatorKeys`
+
+`function`
+
+```ts
+<Identity>(options: GatewayOperatorKeysOptions<Identity>) => OperatorKeyStore<PlatformAgentOperatorKey | GatewayOperato…
+```
+
 ### `createOperatorApi`
 
 `function` — Mount the standard operator API.
@@ -76,6 +84,38 @@ interface ChatOperatorWorkspace
 
 ```ts
 (options: OperatorClientOptions) => OperatorClient
+```
+
+### `GatewayOperatorKey`
+
+`type` — An app key admitted to the operator API.
+
+```ts
+type GatewayOperatorKey
+```
+
+### `GatewayOperatorKeysOptions`
+
+`interface`
+
+```ts
+interface GatewayOperatorKeysOptions
+```
+
+### `GatewayRequestClaim`
+
+`interface` — The gateway key store's answer to counting one request.
+
+```ts
+interface GatewayRequestClaim
+```
+
+### `GatewayVerifiedApiKey`
+
+`interface` — An app key as the gateway's `verifyApiKeyFromStore` returns it.
+
+```ts
+interface GatewayVerifiedApiKey
 ```
 
 ### `matchOperatorRoute`

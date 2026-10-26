@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-142 exports.
+144 exports.
 
 ### `AdminGuardOptions`
 
@@ -371,7 +371,7 @@ type DelegatedKeyCode
 `function` — A fetch for one turn that sends a pre-minted key.
 
 ```ts
-(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: Request…
+(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: URL | R…
 ```
 
 ### `DelegatedKeyMissingError`
@@ -718,12 +718,28 @@ interface PlatformAgentSpend
 interface PlatformAgentSpendOptions
 ```
 
+### `platformAuthClientOptionsFromEnv`
+
+`function` — Options for the platform's cross-site SSO client: the base URL, the app id registered in the platform's trusted-apps registry (`TANGLE_PLATFORM_APP_ID`, else the product's own), and a fetch the clien…
+
+```ts
+(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: ((input: URL…
+```
+
 ### `PlatformBalanceSnapshot`
 
 `interface` — Describe the platform balance and lifetime spending with an optional update timestamp
 
 ```ts
 interface PlatformBalanceSnapshot
+```
+
+### `platformBaseUrlFromEnv`
+
+`function`
+
+```ts
+() => string
 ```
 
 ### `PlatformBillingConsent`

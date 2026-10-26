@@ -143,7 +143,7 @@ export async function runSignoff(options: RunSignoffOptions = {}): Promise<Signo
   cacheDir = session.cacheDir
   const prune = async (root: string, keepPaths: readonly string[] = []): Promise<void> => {
     const result = await pruneSignoffCache(root, { keepPaths })
-    if (result.removed.length || result.overBudgetBytes) {
+    if (result.removed.length || result.orphaned.length || result.overBudgetBytes) {
       options.onEvent?.({ kind: 'cache-prune', ...result })
     }
   }

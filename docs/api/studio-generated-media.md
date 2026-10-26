@@ -4,7 +4,15 @@
 
 Source: `src/studio/generated-media/index.ts`
 
-26 exports.
+39 exports.
+
+### `createGeneratedMediaFlows`
+
+`function` — Bind the provider-side generation steps to a product's store and Router client.
+
+```ts
+<Context>(config: GeneratedMediaFlowsConfig<Context>) => { mediaFields: (media: Omit<PersistedGeneratedMedia, "url"> |…
+```
 
 ### `createGeneratedMediaStore`
 
@@ -36,6 +44,14 @@ type DeleteGeneratedMediaResult
 
 ```ts
 (type: GeneratedMediaType, mimeType: string) => string
+```
+
+### `GENERATED_MEDIA_INGEST_TIMEOUT_MS`
+
+`const` — How long ingesting a provider result into the workspace may take.
+
+```ts
+30000
 ```
 
 ### `GENERATED_MEDIA_MISSING_FILE_METADATA`
@@ -94,12 +110,36 @@ interface GeneratedMediaBucket
 type GeneratedMediaDatabase
 ```
 
+### `GeneratedMediaFlows`
+
+`type`
+
+```ts
+type GeneratedMediaFlows
+```
+
+### `GeneratedMediaFlowsConfig`
+
+`interface`
+
+```ts
+interface GeneratedMediaFlowsConfig
+```
+
 ### `GeneratedMediaGenerationTable`
 
 `type` — The product's `generation` table.
 
 ```ts
 type GeneratedMediaGenerationTable
+```
+
+### `GeneratedMediaIngestion`
+
+`interface` — A provider result ingested into the workspace, or the reason it was not.
+
+```ts
+interface GeneratedMediaIngestion
 ```
 
 ### `generatedMediaLabel`
@@ -198,12 +238,76 @@ type GeneratedOutputType
 interface PersistedGeneratedMedia
 ```
 
+### `PersistedMediaFields`
+
+`type` — The stored-metadata fields that describe one persisted media file.
+
+```ts
+type PersistedMediaFields
+```
+
+### `PersistedProviderImage`
+
+`type` — A persisted provider image: its workspace file, or the provider URL kept as the result.
+
+```ts
+type PersistedProviderImage
+```
+
+### `PolledGenerationRow`
+
+`interface` — The generation row fields a provider-job poll reads.
+
+```ts
+interface PolledGenerationRow
+```
+
+### `ProviderJobMediaType`
+
+`type` — The generation types whose provider returns a job that may finish later.
+
+```ts
+type ProviderJobMediaType
+```
+
+### `ProviderJobRefresh`
+
+`type` — What a poll decided for a generation row; the product writes the row.
+
+```ts
+type ProviderJobRefresh
+```
+
+### `ProviderMediaJobResponse`
+
+`interface` — A video or avatar provider's submit response.
+
+```ts
+interface ProviderMediaJobResponse
+```
+
 ### `resolveGeneratedVaultPath`
 
 `function` — The Vault path of a generated file: the output path itself when it names a file, else `fileName` under it.
 
 ```ts
 (input: { type: GeneratedOutputType; outputPath: string | null | undefined; fileName: string; }) => string
+```
+
+### `SettledProviderJob`
+
+`interface` — The settled state of a video or avatar job and the metadata fields it adds to the row.
+
+```ts
+interface SettledProviderJob
+```
+
+### `STALE_PENDING_GENERATION_MS`
+
+`const` — How long a pending generation may wait for a provider job id before polling fails it.
+
+```ts
+number
 ```
 
 ### `validateGeneratedMediaSourceUrl`
