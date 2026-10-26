@@ -17,6 +17,7 @@ import type { CatalogModel } from '../runtime/model-catalog'
 import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 import type { ChatMessagesProps } from './chat-message-types'
 import { ChatEmptyState } from './chat-empty-state'
+import { expandSpeakerRows } from '../web/speakers'
 import { formatModelCost, formatTokensPerSecond } from './chat-message-metrics'
 import { StreamingCaret, SegmentedBody } from './chat-message-body'
 import { ToolCallCard } from './chat-tool-call'
@@ -358,7 +359,7 @@ function OtherPersonMessage({
  * else's are named, and a named agent replaces the agent label.
  */
 export function ChatMessages({
-  messages,
+  messages: storedMessages,
   messageSize = 'default',
   chrome = 'labeled',
   models = [],
@@ -398,6 +399,9 @@ export function ChatMessages({
     () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
     [renderMarkdown],
   )
+  // A turn answered by several agents is one stored row with a speaker part
+  // before each answer; the transcript draws each under its author.
+  const messages = useMemo(() => expandSpeakerRows(storedMessages), [storedMessages])
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
   const quiet = chrome === 'quiet'
   if (messages.length === 0 && !loading && !error) {

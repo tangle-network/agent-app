@@ -231,7 +231,8 @@ export async function buildDispatchParts(input: BuildDispatchPartsInput): Promis
   const readMention = input.readSandboxMention ?? readSandboxMention
   const resolveMentionPath = input.resolveMentionPath ?? input.resolveAttachmentPath
   const forcePath = input.forcePath ?? false
-  const mentions = input.mentions ?? []
+  // Agent mentions address a responder; only file mentions are read from the box.
+  const mentions = (input.mentions ?? []).filter((mention) => mention.mentionKind !== 'agent')
   const requestMaxBytes = input.requestMaxBytes ?? DISPATCH_REQUEST_MAX_BYTES
   const structuralReserveBytes = input.structuralReserveBytes ?? DISPATCH_STRUCTURAL_RESERVE_BYTES
   const maxParts = input.maxParts ?? DISPATCH_MAX_PARTS

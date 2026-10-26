@@ -8,6 +8,7 @@
  */
 
 export * from './wire'
+export { composeAgentProducers, SPEAKER_EVENT, speakerPart } from './agent-producers'
 export * from './binary-sniff'
 export * from './attachment-validation'
 export * from './turn-routes'

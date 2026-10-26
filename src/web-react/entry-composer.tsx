@@ -3,7 +3,7 @@ import { ChatComposer } from './chat-composer'
 import { ATTACHMENT_ACCEPT, useComposerAttachments } from './use-composer-attachments'
 import type { ComposerFileRejection } from './composer-file-accept'
 import type { UseFileMentionsResult } from './use-file-mentions'
-import type { ChatAttachmentInput, FileMention } from '../chat-routes/wire'
+import type { ChatAttachmentInput, ChatMention } from '../chat-routes/wire'
 import {
   AgentSessionControls,
   type AgentSessionControlsProps,
@@ -69,7 +69,7 @@ export interface EntryComposerProps {
   onSubmit: (
     prompt: string,
     attachments: ChatAttachmentInput[],
-    mentions: FileMention[],
+    mentions: ChatMention[],
   ) => void
   className?: string
   composerClassName?: string
