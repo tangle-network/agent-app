@@ -1,13 +1,56 @@
 /**
  * Shared vocabulary and mechanics of syncing a sandbox's Vault copy with KV:
  * the baseline schema, the typed failures a sync reports, the filesystem
- * incarnation a baseline is bound to, and how changed paths are grouped into
+ * incarnation a baseline is bound to, how changed paths are grouped into
  * mutation batches so a rename (a delete and a put of the same bytes) always
- * commits together. Products own the scan, the reads and the hydration walk.
+ * commits together, and the configuration the sync engine
+ * (`createSandboxVaultSync`) runs with.
  */
 import { isWorkspaceFileExportable } from '../../web/file-export'
 import { compareIncarnationBaseline, type FilesystemIncarnationLike } from '../server'
-import type { VaultSandboxBaseline } from './revisions'
+import type {
+  VaultHeadState,
+  VaultMutationRequest,
+  VaultMutationResult,
+  VaultSandboxBaseline,
+} from './revisions'
+import type { VaultFrontmatterCodec, VaultHeadListOptions, VaultHeadListPage } from './store'
+
+/** The store calls the sync engine makes; `createVaultStore` returns all of them. */
+export interface SandboxVaultSyncStore {
+  codec: VaultFrontmatterCodec
+  listVaultHeadPage(workspaceId: string, options?: VaultHeadListOptions): Promise<VaultHeadListPage>
+  readVaultFileState(workspaceId: string, filePath: string): Promise<VaultHeadState>
+  commitVaultMutation(request: VaultMutationRequest): Promise<VaultMutationResult>
+  readVaultSandboxBaseline(workspaceId: string, sandboxId: string): Promise<VaultSandboxBaseline | null>
+  writeVaultSandboxBaseline(baseline: VaultSandboxBaseline): Promise<void>
+}
+
+export interface SandboxVaultSyncConfig {
+  /** The product's Vault store, bound for this request. */
+  vault: SandboxVaultSyncStore
+  /** Absolute box directory that holds the workspace's Vault files, such as `/home/agent/vault`. */
+  root: string
+  /** Extension to MIME type overrides for binary files the box produces (agent-app's `sniffMime` defaults otherwise). */
+  fileTypes?: Readonly<Record<string, string>>
+}
+
+/** The body prefix of a Vault document whose remainder is base64-encoded binary bytes. */
+export const VAULT_BASE64_BODY_MARKER = '[base64]\n'
+
+/** The base64 payload of a Vault document that stores a binary file, or null for a text document. */
+export function vaultBinaryPayload(codec: VaultFrontmatterCodec, raw: string): string | null {
+  const parsed = codec.parse(raw)
+  if (!parsed.succeeded || parsed.frontmatter.encoding !== 'base64' || !parsed.body.startsWith(VAULT_BASE64_BODY_MARKER)) {
+    return null
+  }
+  return parsed.body.slice(VAULT_BASE64_BODY_MARKER.length).trim()
+}
+
+/** The Vault document that stores a binary file the box produced: the product's frontmatter plus the base64 body. */
+export function vaultBinaryDocument(codec: VaultFrontmatterCodec, fields: Record<string, unknown>, base64: string): string {
+  return codec.serialize({ ...fields, encoding: 'base64' }, `${VAULT_BASE64_BODY_MARKER}${base64}`)
+}
 
 export const VAULT_SANDBOX_BASELINE_SCHEMA = 'vault-sandbox-baseline-v3' as const
 const VAULT_SANDBOX_BASELINE_V2_SCHEMA = 'vault-sandbox-baseline-v2'

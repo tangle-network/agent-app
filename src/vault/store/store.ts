@@ -38,6 +38,7 @@ import {
   type VaultMutationRequest,
   type VaultMutationResult,
   type VaultRevisionMetadata,
+  type VaultSandboxBaseline,
   type VaultWriter,
 } from './revisions'
 import { buildTreeFromPaths, type VaultNode } from './tree'
@@ -268,9 +269,39 @@ function createVaultRuntime<Namespace extends VaultCoordinatorNamespace>(config:
     return body.state
   }
 
+  // Baselines without a coordinator live for the isolate, as the local mutation queue does.
+  const localSandboxBaselines = new Map<string, VaultSandboxBaseline>()
+
+  /** The Vault files a box last matched, or null when it has never been synced. */
+  async function readVaultSandboxBaseline(workspaceId: string, sandboxId: string): Promise<VaultSandboxBaseline | null> {
+    validateWorkspaceId(workspaceId)
+    if (!sandboxId) throw new Error('Sandbox ID is required for Vault baseline reads')
+    const namespace = coordinator
+    if (!namespace) return localSandboxBaselines.get(`${workspaceId}:${sandboxId}`) ?? null
+    const response = await postVaultCoordinator(namespace, workspaceId, 'baseline/get', { workspaceId, sandboxId })
+    if (!response.ok) await throwVaultCoordinatorError(response, 'Vault baseline read failed')
+    const body = await response.json() as { baseline: VaultSandboxBaseline | null }
+    return body.baseline
+  }
+
+  async function writeVaultSandboxBaseline(baseline: VaultSandboxBaseline): Promise<void> {
+    validateWorkspaceId(baseline.workspaceId)
+    if (!baseline.sandboxId) throw new Error('Sandbox ID is required for Vault baseline writes')
+    const namespace = coordinator
+    if (!namespace) {
+      localSandboxBaselines.set(`${baseline.workspaceId}:${baseline.sandboxId}`, baseline)
+      return
+    }
+    const response = await postVaultCoordinator(namespace, baseline.workspaceId, 'baseline/set', baseline)
+    if (!response.ok) await throwVaultCoordinatorError(response, 'Vault baseline write failed')
+  }
+
   return {
     setVaultKV, getVaultKV, setVaultCoordinator, getVaultCoordinator, postVaultCoordinator,
     throwVaultCoordinatorError, enqueueLocalVaultMutation, commitVaultMutation, readVaultFileState,
+    readVaultSandboxBaseline, writeVaultSandboxBaseline,
+    /** The product's frontmatter codec, for engines that read and write whole Vault documents. */
+    codec: config.codec,
   }
 }
 

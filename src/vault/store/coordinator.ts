@@ -33,11 +33,42 @@ import {
   type VaultMutationPolicy,
   type VaultMutationRequest,
   type VaultMutationResult,
+  type VaultSandboxBaseline,
   type VaultVisibilityFence,
 } from './revisions'
 import type { VaultHeadListEntry } from './store'
 
 const VAULT_FENCE_STORAGE_PREFIX = 'vaultFence:'
+
+/**
+ * Durable Object storage refuses a value over 128 KiB, and a baseline names
+ * every Vault file, so a large Vault's baseline is stored as a head plus string
+ * chunks. A chunk of 32,000 UTF-16 code units serializes to at most 64 KB even
+ * when every character takes two bytes. The keys are the ones GTM and Creative
+ * stored before this owner existed, so their baselines read unchanged.
+ */
+const VAULT_BASELINE_CHUNK_CHARS = 32_000
+const VAULT_BASELINE_CHUNKED_SCHEMA = 'vault-sandbox-baseline-chunked-v1'
+
+interface ChunkedVaultBaselineHead {
+  schema: typeof VAULT_BASELINE_CHUNKED_SCHEMA
+  chunks: number
+  updatedAt: string
+}
+
+function isChunkedVaultBaselineHead(value: unknown): value is ChunkedVaultBaselineHead {
+  return Boolean(value) && typeof value === 'object'
+    && (value as { schema?: unknown }).schema === VAULT_BASELINE_CHUNKED_SCHEMA
+    && Number.isInteger((value as { chunks?: unknown }).chunks)
+}
+
+function vaultBaselineKey(sandboxId: string): string {
+  return `vaultBaseline:${sandboxId}`
+}
+
+function vaultBaselineChunkKey(sandboxId: string, index: number): string {
+  return `vaultBaselineChunk:${sandboxId}:${index}`
+}
 
 /** The Durable Object storage calls the coordinator makes; Cloudflare's storage satisfies it. */
 export interface VaultCoordinatorStorage {
@@ -319,6 +350,92 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
     }
   }
 
+  /** A missing chunk fails the read: a partial baseline would misreport which files changed. */
+  async function readVaultSandboxBaseline(sandboxId: string): Promise<VaultSandboxBaseline | null> {
+    const stored = await storage.get<VaultSandboxBaseline | ChunkedVaultBaselineHead>(vaultBaselineKey(sandboxId))
+    if (!stored) return null
+    if (!isChunkedVaultBaselineHead(stored)) return stored
+    const chunks: string[] = []
+    for (let index = 0; index < stored.chunks; index++) {
+      const chunk = await storage.get<string>(vaultBaselineChunkKey(sandboxId, index))
+      if (typeof chunk !== 'string') throw new Error(`Vault baseline for sandbox ${sandboxId} is missing chunk ${index} of ${stored.chunks}`)
+      chunks.push(chunk)
+    }
+    return JSON.parse(chunks.join('')) as VaultSandboxBaseline
+  }
+
+  /**
+   * Writes the baseline whole when it fits one value, else as chunks under a
+   * head, then deletes the previous write's surplus chunks. The writes run in
+   * one request with no other I/O between them, so the object commits them
+   * together.
+   */
+  async function writeVaultSandboxBaseline(baseline: VaultSandboxBaseline): Promise<void> {
+    const key = vaultBaselineKey(baseline.sandboxId)
+    const previous = await storage.get<unknown>(key)
+    const previousChunks = isChunkedVaultBaselineHead(previous) ? previous.chunks : 0
+    const serialized = JSON.stringify(baseline)
+    let chunks = 0
+    if (serialized.length <= VAULT_BASELINE_CHUNK_CHARS) {
+      await storage.put(key, baseline)
+    } else {
+      chunks = Math.ceil(serialized.length / VAULT_BASELINE_CHUNK_CHARS)
+      for (let index = 0; index < chunks; index++) {
+        const start = index * VAULT_BASELINE_CHUNK_CHARS
+        await storage.put(vaultBaselineChunkKey(baseline.sandboxId, index), serialized.slice(start, start + VAULT_BASELINE_CHUNK_CHARS))
+      }
+      const head: ChunkedVaultBaselineHead = { schema: VAULT_BASELINE_CHUNKED_SCHEMA, chunks, updatedAt: baseline.updatedAt }
+      await storage.put(key, head)
+    }
+    for (let index = chunks; index < previousChunks; index++) {
+      await storage.delete(vaultBaselineChunkKey(baseline.sandboxId, index))
+    }
+  }
+
+  async function handleVaultBaselineGet(request: Request): Promise<Response> {
+    const body = await request.json().catch(() => null) as { workspaceId?: unknown; sandboxId?: unknown } | null
+    const workspaceId = typeof body?.workspaceId === 'string' ? body.workspaceId : ''
+    const sandboxId = typeof body?.sandboxId === 'string' ? body.sandboxId : ''
+    if (!workspaceId || !sandboxId) return vaultCoordinatorJson({ error: 'Missing workspaceId or sandboxId' }, 400)
+    try {
+      validateWorkspaceId(workspaceId)
+      return vaultCoordinatorJson({ baseline: await readVaultSandboxBaseline(sandboxId) })
+    } catch (error) {
+      if (error instanceof VaultPathError) return vaultPathErrorResponse(error)
+      throw error
+    }
+  }
+
+  async function handleVaultBaselineSet(request: Request): Promise<Response> {
+    const body = await request.json().catch(() => null) as VaultSandboxBaseline | null
+    const validSchema = body?.schema === 'vault-sandbox-baseline-v2'
+      || (body?.schema === 'vault-sandbox-baseline-v3' && Boolean(body.filesystemIncarnationId))
+    if (!body || !validSchema || !body.sandboxId || !body.workspaceId) {
+      return vaultCoordinatorJson({ error: 'Invalid Vault sandbox baseline' }, 400)
+    }
+    try {
+      validateWorkspaceId(body.workspaceId)
+      await writeVaultSandboxBaseline(body)
+      return vaultCoordinatorJson({ saved: true })
+    } catch (error) {
+      if (error instanceof VaultPathError) return vaultPathErrorResponse(error)
+      throw error
+    }
+  }
+
+  /** The coordinator's `/vault/*` routes, for a Durable Object's fetch; null for any other request. */
+  async function handle(request: Request): Promise<Response | null> {
+    if (request.method !== 'POST') return null
+    switch (new URL(request.url).pathname) {
+      case '/vault/mutate': return handleVaultMutation(request)
+      case '/vault/head/get': return handleVaultHeadGet(request)
+      case '/vault/head/list': return handleVaultHeadList(request)
+      case '/vault/baseline/get': return handleVaultBaselineGet(request)
+      case '/vault/baseline/set': return handleVaultBaselineSet(request)
+      default: return null
+    }
+  }
+
   return {
     exclusive,
     settled,
@@ -328,6 +445,11 @@ export function createVaultCoordinator(options: VaultCoordinatorOptions) {
     handleVaultHeadGet,
     handleVaultHeadList,
     handleVaultMutation,
+    readVaultSandboxBaseline,
+    writeVaultSandboxBaseline,
+    handleVaultBaselineGet,
+    handleVaultBaselineSet,
+    handle,
   }
 }
 
