@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.54
+
+- chore(deps): adopt agent-runtime 0.350.2 and sandbox 0.69.2 (#1366)
+
 ## 0.63.53
 
 - Keep the agent-interface root and Runtime candidate execution off the Worker startup path (#1365)
