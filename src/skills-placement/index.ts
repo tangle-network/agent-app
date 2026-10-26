@@ -18,11 +18,8 @@
  * works without it, falling back to `inline` delivery.
  */
 
-import {
-  defineInlineResource,
-  type AgentProfile,
-  type AgentProfileFileMount,
-} from '@tangle-network/agent-interface'
+import type { AgentProfile, AgentProfileFileMount } from '@tangle-network/agent-interface'
+import { defineInlineResource } from '@tangle-network/agent-interface/profile'
 import { KNOWN_HARNESSES, type Harness } from '../harness/index'
 import { skillDirForHarness, type HarnessId } from '@tangle-network/agent-profile-materialize'
 import { composeSkills, renderInlineSkills, type ComposedSkills, type SkillEntry } from '../skills/index'

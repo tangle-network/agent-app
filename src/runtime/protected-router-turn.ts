@@ -23,10 +23,7 @@
  * - Anything else is the turn's own failure (`turn_aborted`, `turn_tool_limit`,
  *   `model_http_<status>`, ...), settled as `failed`.
  */
-import {
-  runProtectedAgentCandidateModelGrant,
-  type RunProtectedAgentCandidateModelGrantOptions,
-} from '@tangle-network/agent-runtime/candidate-execution'
+import type { RunProtectedAgentCandidateModelGrantOptions } from '@tangle-network/agent-runtime/candidate-execution'
 import { ProtectedModelSettlementError } from './protected-model'
 import { runRouterTurn, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome } from './router-turn'
 
@@ -99,6 +96,7 @@ export async function runProtectedRouterTurn(options: ProtectedRouterTurnOptions
   if (options.signal?.aborted) return result({ code: 'turn_aborted', message: 'The turn was cancelled.' })
   if (Date.now() >= grant.deadlineAtMs) return result({ code: 'grant_deadline', message: 'Protected execution deadline expired' })
   try {
+    const { runProtectedAgentCandidateModelGrant } = await import('@tangle-network/agent-runtime/candidate-execution')
     await runProtectedAgentCandidateModelGrant({
       ...grant,
       port: {

@@ -1,5 +1,5 @@
 /** Atomic D1 adapter for `/agent-profiles`. Products apply the SQL in their own migration. */
-import { snapshotAgentProfile } from '@tangle-network/agent-interface'
+import { snapshotAgentProfile } from '@tangle-network/agent-interface/profile-snapshot'
 import {
   parseProfileRevisionDiff,
   ProfileConflictError,

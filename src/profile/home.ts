@@ -1,5 +1,5 @@
 import type { AgentProfile, AgentProfileFileMount } from '@tangle-network/agent-interface'
-import { defineInlineResource, mergeAgentProfiles } from '@tangle-network/agent-interface'
+import { defineInlineResource, mergeAgentProfiles } from '@tangle-network/agent-interface/profile'
 
 /** Unicode code-point budgets. The installed writer also bounds UTF-8 bytes. */
 export const DEFAULT_HOME_LIMITS = {
