@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-524 exports.
+526 exports.
 
 ### `acceptRejectionReason`
 
@@ -3078,6 +3078,14 @@ type RecordGridWriteOutcome
 (record: ProvenanceRecord, policy?: ProvenanceConfidencePolicy) => ProvenanceStanding
 ```
 
+### `resolveToolPresentation`
+
+`function`
+
+```ts
+(rendered: ReactNode | ToolDetailPresentation) => ToolDetailPresentation
+```
+
 ### `ResourceFileLimits`
 
 `interface`
@@ -3558,9 +3566,17 @@ type SubmitInteractionAnswer
 (list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
 ```
 
+### `ToolDetailPresentation`
+
+`interface` — Optional product-owned presentation for an existing shared tool row.
+
+```ts
+interface ToolDetailPresentation
+```
+
 ### `ToolDetailRenderers`
 
-`type` — Per-tool custom detail renderers for the expanded card body — keyed by tool name.
+`type` — Per-tool custom renderers, keyed by tool name.
 
 ```ts
 type ToolDetailRenderers

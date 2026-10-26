@@ -7,7 +7,7 @@ import { openSignoffCacheSession, pruneSignoffCache } from './cache'
 
 const roots: string[] = []
 function root(): string {
-  const path = mkdtempSync(join(tmpdir(), 'signoff-cache-cap-'))
+  const path = realpathSync(mkdtempSync(join(tmpdir(), 'signoff-cache-cap-')))
   roots.push(path)
   return path
 }
