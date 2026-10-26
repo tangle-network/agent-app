@@ -35,6 +35,20 @@ export interface SandboxVaultSyncConfig {
   vault: SandboxVaultSyncStore
   /** Absolute box directory that holds the workspace's Vault files, such as `/home/agent/vault`. */
   root: string
+  /**
+   * The box directory a stored baseline without `mirrorRoot` describes, for a
+   * product that moved its Vault directory (default: `root`). Reconciliation
+   * reads the directory a baseline describes; hydration trusts only a baseline
+   * of `root`.
+   */
+  legacyRoot?: string
+  /**
+   * How a file missing from the box reaches the Vault. `rename-only` (default)
+   * commits a box delete only as half of a same-content rename; every other
+   * delete goes through the Vault API. `guarded` commits box deletes unless one
+   * scan would remove most of the baseline (agent-app's deletion guard).
+   */
+  deletes?: 'rename-only' | 'guarded'
   /** Extension to MIME type overrides for binary files the box produces (agent-app's `sniffMime` defaults otherwise). */
   fileTypes?: Readonly<Record<string, string>>
   /**
@@ -280,4 +294,9 @@ export async function mapWithConcurrency<T, R>(
   })
   await Promise.all(workers)
   return results
+}
+
+/** A baseline without `mirrorRoot` describes the product's `legacyRoot`, else its `root`. */
+export function baselineDescribesRoot(baseline: VaultSandboxBaseline, root: string, legacyRoot?: string): boolean {
+  return (baseline.mirrorRoot ?? legacyRoot ?? root) === root
 }

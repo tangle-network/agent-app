@@ -6,7 +6,7 @@
  * so that removing the mechanism it names makes it fail.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -15,7 +15,7 @@ import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest'
 import type { KVStore } from '../../src/store'
 import { createVaultStore, type VaultCoordinatorNamespace, type VaultFrontmatterCodec } from '../../src/vault/store/store'
 import { createSandboxVaultSync } from '../../src/vault/store/sandbox-engine'
-import { vaultBinaryDocument } from '../../src/vault/store/sandbox-sync'
+import { vaultBinaryDocument, type SandboxVaultSyncConfig } from '../../src/vault/store/sandbox-sync'
 
 const require = createRequire(import.meta.url)
 const wrangler = createRequire(require.resolve('wrangler/package.json'))
@@ -87,10 +87,19 @@ beforeEach(() => {
   workspaceId = `ws-${workspace}`
 })
 
+interface RealBoxOptions {
+  /** The box's own upload cap: a larger upload is refused with 413, as the sandbox refuses it. */
+  uploadLimitBytes?: number
+  /** Reuse another box's disk, as a restored box or a moved Vault directory does. */
+  home?: string
+  vaultDir?: string
+  sync?: Partial<Omit<SandboxVaultSyncConfig, 'vault' | 'root'>>
+}
+
 /** A box over a real directory and a real bash, recording each write request's JSON size. */
-function realBox(incarnation = 'incarnation-1') {
-  const home = mkdtempSync(join(scratch, 'box-'))
-  const root = join(home, 'vault')
+function realBox(incarnation = 'incarnation-1', options: RealBoxOptions = {}) {
+  const home = options.home ?? mkdtempSync(join(scratch, 'box-'))
+  const root = join(home, options.vaultDir ?? 'vault')
   const writeRequestBytes: number[] = []
   const uploads: string[] = []
   const box = {
@@ -110,6 +119,9 @@ function realBox(incarnation = 'incarnation-1') {
       delete: async (path: string) => rmSync(path, { recursive: true, force: true }),
       mkdir: async (path: string) => { mkdirSync(path, { recursive: true }) },
       uploadData: async (path: string, data: Uint8Array) => {
+        if (options.uploadLimitBytes !== undefined && data.byteLength > options.uploadLimitBytes) {
+          throw Object.assign(new Error(`upload of ${data.byteLength} bytes exceeds the box limit`), { status: 413, code: 'PAYLOAD_TOO_LARGE' })
+        }
         uploads.push(path)
         mkdirSync(dirname(path), { recursive: true })
         writeFileSync(path, data)
@@ -128,7 +140,7 @@ function realBox(incarnation = 'incarnation-1') {
       }
     },
   }
-  return { box, root, writeRequestBytes, uploads, sync: createSandboxVaultSync({ vault, root }) }
+  return { box, home, root, writeRequestBytes, uploads, sync: createSandboxVaultSync({ vault, root, ...options.sync }) }
 }
 
 it('hydrates text and binary heads byte-exact, records the baseline, and a later walk writes only what changed', async () => {
@@ -293,4 +305,118 @@ it('walks in full while a mutation is in flight, and heals a marker whose reques
   expect(healed).toEqual(expect.objectContaining({ inFlight: false, generation: view!.generation + 1 }))
   expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
   expect(await sync.hydrate(box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ inSync: true }) })
+}, 60_000)
+
+it('leaves files a restored box already holds in place, even one it could not overwrite, and records them', async () => {
+  const bytes = Uint8Array.from({ length: 2048 }, (_, index) => (index * 7) % 256)
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', '# Plan\n')
+  await vault.writeVaultRawFile(workspaceId, 'media/logo.png', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from(bytes).toString('base64')))
+  const { box, root, writeRequestBytes, uploads, sync } = realBox()
+  // A box restored from a snapshot holds every file it had, one under an owner the file API cannot overwrite.
+  mkdirSync(join(root, 'notes'), { recursive: true })
+  mkdirSync(join(root, 'media'), { recursive: true })
+  writeFileSync(join(root, 'notes/plan.md'), '# Plan\n')
+  chmodSync(join(root, 'notes/plan.md'), 0o444)
+  writeFileSync(join(root, 'media/logo.png'), bytes)
+
+  expect(await sync.hydrate(box, workspaceId)).toEqual({
+    succeeded: true, value: expect.objectContaining({ written: 0, unchanged: 2, writtenPaths: [] }),
+  })
+  expect(writeRequestBytes).toEqual([])
+  expect(uploads).toEqual([])
+  const baseline = await vault.readVaultSandboxBaseline(workspaceId, box.id)
+  expect(Object.keys(baseline?.files ?? {}).sort()).toEqual(['media/logo.png', 'notes/plan.md'])
+  expect(baseline?.files['media/logo.png']?.binary).toBe(true)
+}, 60_000)
+
+it('keeps a file the box refuses for size off the box and out of the baseline, and tells the next warm pass', async () => {
+  const film = Uint8Array.from({ length: 96 * 1024 }, (_, index) => index % 251)
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', '# Plan\n')
+  await vault.writeVaultRawFile(workspaceId, 'media/film.mp4', vaultBinaryDocument(codec, { type: 'upload' }, Buffer.from(film).toString('base64')))
+  const { box, root, sync } = realBox('incarnation-1', { uploadLimitBytes: 64 * 1024 })
+
+  expect(await sync.hydrate(box, workspaceId)).toEqual({
+    succeeded: true,
+    value: expect.objectContaining({
+      writtenPaths: ['notes/plan.md'],
+      skipped: [expect.objectContaining({ path: 'media/film.mp4', reason: 'too_large' })],
+    }),
+  })
+  expect(existsSync(join(root, 'media/film.mp4'))).toBe(false)
+  expect(Object.keys((await vault.readVaultSandboxBaseline(workspaceId, box.id))?.files ?? {})).toEqual(['notes/plan.md'])
+  expect(await sync.hydrate(box, workspaceId)).toEqual({
+    succeeded: true, value: expect.objectContaining({ inSync: true, skipped: [expect.objectContaining({ path: 'media/film.mp4' })] }),
+  })
+}, 60_000)
+
+it('defers what passes its copy budget and resumes without rewriting what it already copied', async () => {
+  // Eight 300,000-character files fill one read batch, so the budget stops the call after it.
+  const paths = Array.from({ length: 16 }, (_, index) => `library/chapter-${String(index).padStart(2, '0')}.md`)
+  for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, `${path}\n${'x'.repeat(300_000)}\n`)
+  const { box, root, sync } = realBox()
+
+  const first = await sync.hydrate(box, workspaceId, { maxChars: 1 })
+  expect(first).toEqual({
+    succeeded: true,
+    value: expect.objectContaining({ writtenPaths: paths.slice(0, 8), deferred: { pendingPaths: paths.slice(8), morePages: false } }),
+  })
+  const second = await sync.hydrate(box, workspaceId)
+  expect(second).toEqual({ succeeded: true, value: expect.objectContaining({ writtenPaths: paths.slice(8), unchanged: 8, deferred: null }) })
+  for (const path of paths) expect(readFileSync(join(root, path), 'utf8').startsWith(`${path}\n`)).toBe(true)
+}, 120_000)
+
+it('trusts a baseline only for the directory it describes, and reconciles the old directory until the new one is hydrated', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  await vault.writeVaultRawFile(workspaceId, 'notes/keep.md', 'keep\n')
+  const old = realBox()
+  expect((await old.sync.hydrate(old.box, workspaceId)).succeeded).toBe(true)
+  writeFileSync(join(old.root, 'notes/plan.md'), 'v2 in the old directory\n')
+
+  // The product moved its Vault directory; the box keeps its disk and its baseline of the old one.
+  const moved = realBox('incarnation-1', { home: old.home, vaultDir: 'data/vault', sync: { legacyRoot: old.root } })
+  expect((await moved.sync.reconcile(moved.box, workspaceId)).appliedPaths).toEqual(['notes/plan.md'])
+  expect(await moved.sync.hydrate(moved.box, workspaceId)).toEqual({ succeeded: true, value: expect.objectContaining({ written: 2 }) })
+  expect(readFileSync(join(moved.root, 'notes/plan.md'), 'utf8')).toBe('v2 in the old directory\n')
+}, 60_000)
+
+it('records a box edit the Vault already holds without parking a conflict', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'brief.md', 'v1\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  // The agent saved the same edit through the Vault API and on the box.
+  await vault.writeVaultRawFile(workspaceId, 'brief.md', 'v2\n')
+  writeFileSync(join(root, 'brief.md'), 'v2\n')
+
+  expect(await sync.reconcile(box, workspaceId)).toEqual(expect.objectContaining({
+    conflicts: [], changes: [], convergedChanges: [expect.objectContaining({ path: 'brief.md', kind: 'put' })],
+  }))
+  expect((await sync.reconcile(box, workspaceId)).convergedChanges).toEqual([])
+}, 60_000)
+
+it('commits a box delete under guarded deletes, and refuses a scan that would remove most of the baseline', async () => {
+  const paths = Array.from({ length: 12 }, (_, index) => `notes/note-${String(index).padStart(2, '0')}.md`)
+  for (const path of paths) await vault.writeVaultRawFile(workspaceId, path, `${path}\n`)
+  const { box, root, sync } = realBox('incarnation-1', { sync: { deletes: 'guarded' } })
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+
+  rmSync(join(root, paths[0]!))
+  expect(await sync.reconcile(box, workspaceId)).toEqual(expect.objectContaining({ succeeded: true, refusedDeletionPaths: [] }))
+  expect((await vault.readVaultFileState(workspaceId, paths[0]!)).deleted).toBe(true)
+
+  rmSync(join(root, 'notes'), { recursive: true, force: true })
+  expect(await sync.reconcile(box, workspaceId)).toEqual(expect.objectContaining({
+    blockedReason: 'mass_deletion_guard', refusedDeletionPaths: paths.slice(1),
+  }))
+  expect((await vault.readVaultFileState(workspaceId, paths[1]!)).content).toBe(`${paths[1]}\n`)
+}, 60_000)
+
+it('refuses to promote a file the Vault never held while reconciling a retained directory', async () => {
+  await vault.writeVaultRawFile(workspaceId, 'notes/plan.md', 'v1\n')
+  const { box, root, sync } = realBox()
+  expect((await sync.hydrate(box, workspaceId)).succeeded).toBe(true)
+  writeFileSync(join(root, 'notes/stray.md'), 'local only\n')
+
+  await expect(sync.reconcile(box, workspaceId, { existingHeadsOnly: true })).rejects.toThrow(/never held/)
+  const stray = await vault.readVaultFileState(workspaceId, 'notes/stray.md')
+  expect(stray.content === null || stray.deleted).toBe(true)
 }, 60_000)

@@ -7,12 +7,14 @@
  * rename; every other durable delete belongs to the authenticated Vault API.
  */
 import { isWorkspaceFileExportable } from '../../web/file-export'
+import { assessVaultDeletionBatch } from '../server'
 import { sniffMime } from '../../web/mime'
 import { readSandboxBinaryBytes, shellQuote, statSandboxFileSize, type SandboxExecChannel } from '../../sandbox/binary-read'
 import { sha256Hex } from '../../crypto/digest'
 import { validateVaultFilePath, vaultHeadKey, VaultStorageKeyError } from './paths'
 import type { VaultMutationConflict, VaultSandboxBaseline } from './revisions'
 import {
+  baselineDescribesRoot,
   buildSandboxVaultRenameUnits,
   groupSandboxVaultChanges,
   mapWithConcurrency,
@@ -56,6 +58,8 @@ export interface SandboxVaultSyncResult {
   pathsMissingFromBox: string[]
   operationId: string | null
   changes: SandboxVaultSyncChange[]
+  /** Box changes the Vault already held, committed through another path; recorded without a second commit. */
+  convergedChanges: SandboxVaultSyncChange[]
   appliedPaths: string[]
   conflicts: VaultMutationConflict[]
   progress: SandboxVaultSyncProgress
@@ -64,6 +68,7 @@ export interface SandboxVaultSyncResult {
     | 'filesystem_incarnation_not_ready'
     | 'vault_directory_missing'
     | 'sandbox_deletion_denied'
+    | 'mass_deletion_guard'
   baselineResetReason?: 'baseline_missing' | 'filesystem_incarnation_changed'
 }
 
@@ -130,6 +135,8 @@ export function assertSandboxVaultReconciliation(
 export interface SandboxVaultSyncOptions {
   sessionId?: string
   operationId?: string
+  /** Refuse to promote a box file the Vault never held, for a retained directory about to be replaced. */
+  existingHeadsOnly?: boolean
   onStaged?: (checkpoint: {
     operationId: string
     changes: SandboxVaultSyncChange[]
@@ -180,6 +187,7 @@ function blockedSandboxVaultSync(
     pathsMissingFromBox: [],
     operationId: null,
     changes: [],
+    convergedChanges: [],
     appliedPaths: [],
     conflicts: [],
     progress: {
@@ -395,6 +403,7 @@ async function reconcileSandboxVaultFilesToKv(
       pathsMissingFromBox: [],
       operationId: options.operationId ?? null,
       changes: [],
+      convergedChanges: [],
       appliedPaths: [],
       conflicts: [],
       progress: {
@@ -410,6 +419,10 @@ async function reconcileSandboxVaultFilesToKv(
     }
   }
 
+  // Reconciliation reads the directory the baseline describes, which is the
+  // product's old directory until a hydration of the new one replaces it.
+  const root = baseline.mirrorRoot ?? config.legacyRoot ?? config.root
+  if (root !== config.root) config = { ...config, root }
   const manifest = await readSandboxVaultManifest(config, box, workspaceId, options.sessionId)
   if (!manifest.directoryPresent) {
     return blockedSandboxVaultSync(
@@ -419,6 +432,19 @@ async function reconcileSandboxVaultFilesToKv(
       Object.keys(baseline.files).length,
     )
   }
+  if (options.existingHeadsOnly) {
+    const unclassified = await mapWithConcurrency(
+      [...manifest.entries.keys()].filter((path) => !baseline.files[path]),
+      VAULT_IO_CONCURRENCY,
+      async (path) => {
+        const head = await config.vault.readVaultFileState(workspaceId, path)
+        return head.deleted || !head.revision ? path : null
+      },
+    )
+    if (unclassified.some(Boolean)) {
+      throw new Error('The retained Vault directory holds files the Vault never held; preserve them for Vault recovery')
+    }
+  }
 
   const liveBaselinePaths = Object.entries(baseline.files)
     .filter(([, file]) => !file.deleted)
@@ -426,21 +452,32 @@ async function reconcileSandboxVaultFilesToKv(
   const wouldDeletePaths = liveBaselinePaths
     .filter((path) => !manifest.entries.has(path))
     .sort()
-  // A missing box path can remove a KV head only as an atomic, same-content
-  // rename. The authenticated Vault API owns all other durable deletes.
+  const guardedDeletes = config.deletes === 'guarded'
+  // Under `rename-only`, a missing box path can remove a KV head only as an
+  // atomic, same-content rename, and the authenticated Vault API owns every
+  // other durable delete. Under `guarded`, box deletes commit unless the scan
+  // would remove most of the baseline, which reads as a lost disk, not a member.
   const renameTargets = new Map<string, number>()
   for (const [path, entry] of manifest.entries) {
     const base = baseline.files[path]
     if (base && !base.deleted) continue
     renameTargets.set(entry.contentHash, (renameTargets.get(entry.contentHash) ?? 0) + 1)
   }
-  const refusedDeletionPaths = wouldDeletePaths.filter((path) => {
-    const hash = baseline.files[path]?.contentHash
-    const available = hash ? renameTargets.get(hash) ?? 0 : 0
-    if (available === 0) return true
-    renameTargets.set(hash!, available - 1)
-    return false
-  })
+  const massDeletion = guardedDeletes && !assessVaultDeletionBatch({
+    baselinePaths: liveBaselinePaths,
+    proposedDeletions: wouldDeletePaths,
+    manifestEmpty: manifest.entries.size === 0,
+  }).allowed
+  const refusedDeletionPaths = guardedDeletes
+    ? (massDeletion ? [...wouldDeletePaths] : [])
+    : wouldDeletePaths.filter((path) => {
+        const hash = baseline.files[path]?.contentHash
+        const available = hash ? renameTargets.get(hash) ?? 0 : 0
+        if (available === 0) return true
+        renameTargets.set(hash!, available - 1)
+        return false
+      })
+  const deletionRefusal = massDeletion ? 'mass_deletion_guard' as const : 'sandbox_deletion_denied' as const
 
   if (baseline.progress?.operation === 'hydrate') {
     return {
@@ -452,6 +489,7 @@ async function reconcileSandboxVaultFilesToKv(
       pathsMissingFromBox: wouldDeletePaths,
       operationId: options.operationId ?? null,
       changes: [],
+      convergedChanges: [],
       appliedPaths: [],
       conflicts: [],
       progress: {
@@ -461,9 +499,7 @@ async function reconcileSandboxVaultFilesToKv(
         remainingPaths: 0,
         committedGroups: 0,
       },
-      ...(refusedDeletionPaths.length > 0
-        ? { blockedReason: 'sandbox_deletion_denied' as const }
-        : {}),
+      ...(refusedDeletionPaths.length > 0 ? { blockedReason: deletionRefusal } : {}),
     }
   }
 
@@ -540,13 +576,22 @@ async function reconcileSandboxVaultFilesToKv(
     async (path) => [path, await config.vault.readVaultFileState(workspaceId, path)] as const,
   ))
   const changes: SandboxVaultPendingChange[] = []
+  // A box change the Vault already holds (written through the Vault API, or a
+  // commit whose baseline write was lost) is recorded, not committed again
+  // against a revision it would conflict with.
+  const convergedChanges: SandboxVaultSyncChange[] = []
+  const convergedFiles: Array<{ path: string; revision: string | null; contentHash: string | null; deleted: boolean }> = []
   for (const path of readableCandidates.sort()) {
     const snapshot = snapshots.get(path)
     const current = currentStates.get(path)
     if (!current) throw new Error(`Vault state missing for ${path}`)
     const base = baseline.files[path]
+    const holdsSnapshot = snapshot !== undefined && !current.deleted && current.contentHash === snapshot.contentHash
     if (!base) {
-      if (!snapshot || (!current.deleted && current.contentHash === snapshot.contentHash)) {
+      if (!snapshot) continue
+      if (holdsSnapshot) {
+        convergedChanges.push({ path, kind: 'put', contentHash: snapshot.contentHash, expectedRevision: null })
+        convergedFiles.push({ path, revision: current.revision, contentHash: current.contentHash, deleted: false })
         continue
       }
       changes.push({
@@ -560,6 +605,11 @@ async function reconcileSandboxVaultFilesToKv(
     }
     if (snapshot) {
       if (!base.deleted && base.contentHash === snapshot.contentHash) continue
+      if (holdsSnapshot) {
+        convergedChanges.push({ path, kind: 'put', contentHash: snapshot.contentHash, expectedRevision: base.revision })
+        convergedFiles.push({ path, revision: current.revision, contentHash: current.contentHash, deleted: false })
+        continue
+      }
       changes.push({
         path,
         kind: 'put',
@@ -567,6 +617,9 @@ async function reconcileSandboxVaultFilesToKv(
         contentHash: snapshot.contentHash,
         expectedRevision: base.revision,
       })
+    } else if (!base.deleted && current.deleted) {
+      convergedChanges.push({ path, kind: 'delete', contentHash: null, expectedRevision: base.revision })
+      convergedFiles.push({ path, revision: current.revision, contentHash: null, deleted: true })
     } else if (!base.deleted) {
       changes.push({
         path,
@@ -583,7 +636,7 @@ async function reconcileSandboxVaultFilesToKv(
     pendingPutsByHash.set(change.contentHash, (pendingPutsByHash.get(change.contentHash) ?? 0) + 1)
   }
   const authorizedChanges = changes.filter((change) => {
-    if (change.kind !== 'delete') return true
+    if (change.kind !== 'delete' || guardedDeletes) return true
     const hash = change.contentHash
     const available = hash ? pendingPutsByHash.get(hash) ?? 0 : 0
     if (!hash || available === 0) {
@@ -651,7 +704,7 @@ async function reconcileSandboxVaultFilesToKv(
     }
   }
 
-  if (appliedFiles.length > 0 || binaryDriftPaths.length > 0) {
+  if (appliedFiles.length > 0 || binaryDriftPaths.length > 0 || convergedFiles.length > 0) {
     const baselineFiles: VaultSandboxBaseline['files'] = legacy
       ? Object.fromEntries(Object.entries(baseline.files).map(([path, file]) => [
           path,
@@ -674,6 +727,12 @@ async function reconcileSandboxVaultFilesToKv(
             deleted: file.deleted,
           }
     }
+    for (const file of convergedFiles) {
+      const snapshot = snapshots.get(file.path)
+      baselineFiles[file.path] = snapshot?.binary
+        ? { ...file, binary: true, onDiskHash: snapshot.onDiskHash ?? null }
+        : file
+    }
     for (const path of binaryDriftPaths) {
       baselineFiles[path] = {
         revision: null,
@@ -688,6 +747,7 @@ async function reconcileSandboxVaultFilesToKv(
       workspaceId,
       sandboxId,
       filesystemIncarnationId: incarnation.id,
+      mirrorRoot: config.root,
       files: baselineFiles,
       updatedAt: new Date().toISOString(),
     })
@@ -702,11 +762,10 @@ async function reconcileSandboxVaultFilesToKv(
     binaryDriftPaths,
     refusedDeletionPaths,
     pathsMissingFromBox: wouldDeletePaths,
-    ...(refusedDeletionPaths.length > 0
-      ? { blockedReason: 'sandbox_deletion_denied' as const }
-      : {}),
+    ...(refusedDeletionPaths.length > 0 ? { blockedReason: deletionRefusal } : {}),
     operationId,
     changes: stagedChanges,
+    convergedChanges,
     appliedPaths,
     conflicts,
     progress: {
@@ -739,6 +798,7 @@ export async function probeSandboxVaultLoss(
     !baseline
     || baseline.schema !== VAULT_SANDBOX_BASELINE_SCHEMA
     || baseline.filesystemIncarnationId !== incarnation.value.id
+    || !baselineDescribesRoot(baseline, config.root, config.legacyRoot)
   ) {
     return []
   }
