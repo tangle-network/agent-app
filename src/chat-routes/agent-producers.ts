@@ -63,7 +63,7 @@ export function speakerPart(agent: ChatTurnAgentTarget): Record<string, unknown>
  * who else is answering, so each agent answers its own part instead of
  * playing every role (both did, GTM production 2026-10-27).
  */
-export function addressedTurnText(content: string, agent: ChatTurnAgentTarget, agents: readonly ChatTurnAgentTarget[]): string {
+function addressedTurnText(content: string, agent: ChatTurnAgentTarget, agents: readonly ChatTurnAgentTarget[]): string {
   let text = content
   for (const target of agents) {
     text = text.replace(new RegExp(`(^|\\s)@${escapeRegExp(target.handle)}(?=\\s|$|[.,;:!?])`, 'g'), '$1')
