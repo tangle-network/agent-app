@@ -46,7 +46,6 @@ on:
       deployed: {value: '${{ jobs.release.outputs.deployed }}'}
       qualified-served-sha: {value: '${{ jobs.release.outputs.qualified-served-sha }}'}
       release-result: {value: '${{ jobs.release.outputs.result }}'}
-      suites-result: {value: '${{ jobs.suites.result }}'}
 permissions:
   contents: read
 jobs:

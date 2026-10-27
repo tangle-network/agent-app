@@ -67,7 +67,7 @@ The shared workflow validates `qualified-served-sha` against the immutable candi
 
 Existing commands must adapt these output semantics explicitly before switching their caller. A wrapper that unconditionally echoes `deployed=true` or a candidate SHA after running an old command is not a qualified adapter.
 
-The workflow returns source, deployment, qualified served SHA and separate release/suite phase results. Its sanitized artifact preserves physical deployment, native served time, recovery and qualification independently. It does not collect credentials, reconstruct billing or infer served time from job completion. `qualifiedAt` is a later qualification observation, never an alias for `servedAt`.
+The workflow returns source, deployment, qualified served SHA and the release phase result; the suite phase reports through its own jobs and the rolling issue, because a sharded matrix has no single job output. Its sanitized artifact preserves physical deployment, native served time, recovery and qualification independently. It does not collect credentials, reconstruct billing or infer served time from job completion. `qualifiedAt` is a later qualification observation, never an alias for `servedAt`.
 
 Keep each app's existing sanitized native canary diagnostics and release receipt, written under `RELEASE_EVIDENCE_DIR` so the workflow uploads them with its receipt: a release runner's home does not outlive its job. The generic receipt supplements their provenance; it must not replace native evidence or silently erase a partial mutation.
 
