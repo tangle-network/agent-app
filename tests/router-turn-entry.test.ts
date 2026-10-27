@@ -9,13 +9,15 @@ import { describe, expect, it } from 'vitest'
  * SDK and `viem`; a Worker bundle importing the barrel fails to build
  * (hospitality-agent #353, 2026-10-11: `Could not resolve "viem"`). This walks
  * the entry's import graph and allows only relative files, the tool loop, placement
- * (a pure decision module with no imports) and agent-trace-contract's OTLP encoding
- * (a package with no dependencies) that turn tracing uses.
+ * (a pure decision module with no imports), and the two import-free modules turn
+ * tracing uses: agent-trace-contract's OTLP encoding and agent-core's Server-Timing
+ * codec.
  */
 const ALLOWED_PACKAGES = new Set([
   '@tangle-network/agent-runtime/tool-loop',
   '@tangle-network/agent-runtime/placement',
   '@tangle-network/agent-trace-contract/otlp',
+  '@tangle-network/agent-core/server-timing',
 ])
 
 const SRC = new URL('../src/', import.meta.url).pathname
