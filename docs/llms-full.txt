@@ -5473,10 +5473,10 @@ interface SniffResult
 
 ### `speakerPart`
 
-`function`
+`function` — A responder's speaker part; `state` once it ended.
 
 ```ts
-(agent: ChatTurnAgentTarget) => Record<string, unknown>
+(agent: ChatTurnAgentTarget, state?: "done" | "failed" | undefined) => Record<string, unknown>
 ```
 
 ### `StaleTurnLockOwnerProbeResult`
@@ -36079,14 +36079,6 @@ interface CookieOptions
 (options?: RateLimiterBindingOptions) => { setKV: (kv: KvLike) => void; check: (key: string, limit: number, windowSecon…
 ```
 
-### `expandSpeakerRows`
-
-`function`
-
-```ts
-<T extends SpeakerRow>(rows: readonly T[]) => (T & Pick<SpeakerRow, "author">)[]
-```
-
 ### `extractRequestContext`
 
 `function` — Extract request context for audit trails.
@@ -36399,30 +36391,6 @@ interface SecurityHeaderOptions
 (filename: string) => string
 ```
 
-### `Speaker`
-
-`interface`
-
-```ts
-interface Speaker
-```
-
-### `SPEAKER_ROLE_LABEL`
-
-`const` — The role label a split row shows beside the agent's name.
-
-```ts
-"Agent"
-```
-
-### `SpeakerRow`
-
-`interface` — A turn addressed to several agents is persisted as ONE assistant row whose parts carry a `speaker` part before each responder's parts.
-
-```ts
-interface SpeakerRow
-```
-
 ### `STANDARD_SECURITY_HEADERS`
 
 `const` — Canonical generic response headers used by {@link addSecurityHeaders}.
@@ -36466,7 +36434,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -40751,7 +40719,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -41105,7 +41073,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/document`
 
-Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `AppDocument`
 
@@ -41166,7 +41134,7 @@ interface AppDocumentProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `work-product`
 
 ### `SandboxTerminalConnection`
 

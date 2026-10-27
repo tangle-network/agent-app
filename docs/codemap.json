@@ -4246,8 +4246,8 @@
         {
           "name": "speakerPart",
           "kind": "function",
-          "signature": "(agent: ChatTurnAgentTarget) => Record<string, unknown>",
-          "doc": null
+          "signature": "(agent: ChatTurnAgentTarget, state?: \"done\" | \"failed\" | undefined) => Record<string, unknown>",
+          "doc": "A responder's speaker part; `state` once it ended."
         },
         {
           "name": "StaleTurnLockOwnerProbeResult",
@@ -27981,12 +27981,6 @@
           "doc": "A product's limiter bound once to its KV namespace at worker start: `setKV(env.RATE_LIMIT_KV)`, then `check(key, limit, windowSeconds)` anywhere."
         },
         {
-          "name": "expandSpeakerRows",
-          "kind": "function",
-          "signature": "<T extends SpeakerRow>(rows: readonly T[]) => (T & Pick<SpeakerRow, \"author\">)[]",
-          "doc": null
-        },
-        {
           "name": "extractRequestContext",
           "kind": "function",
           "signature": "(request: Request) => RequestContext",
@@ -28221,24 +28215,6 @@
           "doc": "Generic extension → mime for uploads and promoted files."
         },
         {
-          "name": "Speaker",
-          "kind": "interface",
-          "signature": "interface Speaker",
-          "doc": null
-        },
-        {
-          "name": "SPEAKER_ROLE_LABEL",
-          "kind": "const",
-          "signature": "\"Agent\"",
-          "doc": "The role label a split row shows beside the agent's name."
-        },
-        {
-          "name": "SpeakerRow",
-          "kind": "interface",
-          "signature": "interface SpeakerRow",
-          "doc": "A turn addressed to several agents is persisted as ONE assistant row whose parts carry a `speaker` part before each responder's parts."
-        },
-        {
           "name": "STANDARD_SECURITY_HEADERS",
           "kind": "const",
           "signature": "Readonly<{ readonly 'Strict-Transport-Security': \"max-age=31536000; includeSubDomains; preload\"; readonly 'X-Content-Ty…",
@@ -28290,7 +28266,6 @@
         "session-shell",
         "theme",
         "trace",
-        "web",
         "work-product"
       ],
       "error": null,
@@ -31527,7 +31502,6 @@
         "session-shell",
         "theme",
         "trace",
-        "web",
         "work-product"
       ],
       "error": null,
@@ -31820,7 +31794,6 @@
         "session-shell",
         "theme",
         "trace",
-        "web",
         "work-product"
       ],
       "error": null,
@@ -31889,7 +31862,6 @@
         "session-shell",
         "theme",
         "trace",
-        "web",
         "work-product"
       ],
       "error": null,
