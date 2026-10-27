@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.63.77
+
+- Run adopt-stack daily from agent-eval 9509f8a8 (#1434)
+- feat(chat): ChatMessages draws responders with ui's SpeakerHeader; each responder's end state is stored and announced (#1433)
+- chore(deps): adopt @tangle-network/ui 11.48.0 (#1431)
+
 ## 0.63.76
 
 - fix(release): post-release suites default to any ci-deploy runner again (#1432)
