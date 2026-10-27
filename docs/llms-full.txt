@@ -34147,7 +34147,7 @@ interface CreateTurnTraceOptions
 
 ### `formatServerTiming`
 
-`function` — Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
+`function` — Format metrics as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
 
 ```ts
 (entries: readonly ServerTimingEntry[]) => string
@@ -34187,7 +34187,7 @@ interface OtlpSpan
 
 ### `parseServerTiming`
 
-`function` — Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it.
+`function` — Parse a `Server-Timing` header.
 
 ```ts
 (header: string | null | undefined) => ServerTimingEntry[]
@@ -34211,7 +34211,7 @@ interface OtlpSpan
 
 ### `ServerTimingEntry`
 
-`interface` — One entry of a `Server-Timing` response header.
+`interface` — One metric of a `Server-Timing` header.
 
 ```ts
 interface ServerTimingEntry

@@ -171,7 +171,7 @@ async function requestIntent(request: Request): Promise<{ reason: WorkspacePrewa
 function reply(body: WorkspacePrewarmResponse, status = 200): Response {
   const headers: Record<string, string> = { 'Cache-Control': 'private, no-store' }
   if (body.steps?.length) {
-    headers['Server-Timing'] = formatServerTiming(body.steps.map((step) => ({ name: `warm.${step.name}`, durMs: step.ms, desc: step.outcome })))
+    headers['Server-Timing'] = formatServerTiming(body.steps.map((step) => ({ name: `warm.${step.name}`, dur: step.ms, desc: step.outcome })))
   }
   return Response.json(body, { status, headers })
 }

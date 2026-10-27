@@ -259,7 +259,7 @@ describe('turn-stream × createChatTurnRoutes', () => {
     expect(steps.map((step) => step.name)).toEqual(expect.arrayContaining([
       'admission.authorize', 'admission.lock_warm', 'admission.history', 'admission.lock', 'admission.history_recheck', 'admission.persist_user',
     ]))
-    for (const step of steps) expect(step.durMs).toBeGreaterThanOrEqual(0)
+    for (const step of steps) expect(step.dur).toBeGreaterThanOrEqual(0)
 
     const second = await routes.turn(turnRequest({ threadId: THREAD, content: 'two' }), {
       waitUntil: (p) => void pending.push(p),

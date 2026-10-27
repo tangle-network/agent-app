@@ -94,10 +94,10 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
       throw error
     }
     const headersAt = Date.now()
-    const timing = parseServerTiming(response.headers.get('server-timing'))
+    const timing = parseServerTiming(response.headers.get('server-timing')?.slice(0, 4096))
     // The last entry: a fallback chain repeats a step, and the response is the last provider's.
     const stamp = (name: string) => {
-      for (let i = timing.length - 1; i >= 0; i--) if (timing[i]!.name === name && timing[i]!.durMs !== undefined) return timing[i]!.durMs
+      for (let i = timing.length - 1; i >= 0; i--) if (timing[i]!.name === name && timing[i]!.dur !== undefined && timing[i]!.dur! >= 0) return timing[i]!.dur
       return undefined
     }
     const preUpstreamMs = stamp('upstream_start')
