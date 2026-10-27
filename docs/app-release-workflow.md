@@ -18,7 +18,7 @@ GTM's [release phase split](https://github.com/tangle-network/gtm-agent/pull/189
 
 `environment` names the caller's existing protected environment. Preserve its allowed branches, required reviewers and existing deployment identity checks. Do not create a replacement environment to avoid a restriction.
 
-`release-runs-on` and `suites-runs-on` are JSON GitHub runner specifications. They accept either a label array or a runner-group object. A private runner group, native SQLite/browser prerequisites, QA leases and host credential capabilities remain app-owned admission requirements. The suite runner also hosts the light failure-reporting job; the shared workflow never selects a hosted runner for a private app.
+`release-runs-on` and optional `suites-runs-on` are JSON GitHub runner specifications, accepting a label array or runner-group object. Omit `suites-runs-on` to use the workflow's deployment-runner default; reserve `ci-ops` for short API and observation jobs. Native SQLite/browser prerequisites, QA leases and host credential capabilities remain app-owned admission requirements. The suite runner also hosts the light failure-reporting job; the shared workflow never selects a hosted runner for a private app.
 
 The native preflight retains the app's package manager. pnpm setup runs only for a caller with its root `pnpm-lock.yaml`; npm callers keep their existing frozen npm commands.
 
