@@ -6,8 +6,7 @@ on:
     inputs:
       environment: {type: string, required: true}
       release-runs-on: {type: string, required: true}
-      # ci-suites marks the deploy runners that also take post-release suites; the rest only release.
-      suites-runs-on: {type: string, default: '{"group":"app-production","labels":["ci-deploy","ci-suites"]}'}
+      suites-runs-on: {type: string, default: '{"group":"app-production","labels":["ci-deploy"]}'}
       report-runs-on: {type: string, default: '{"group":"app-production","labels":["ci-ops"]}'}
       preflight-command: {type: string, required: true}
       release-command: {type: string, required: true}
