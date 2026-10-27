@@ -47,6 +47,28 @@ Cloudflare caps a Worker's source maps at 15 MB gzipped.
 gtm-agent's server maps measured 13.3 MB with embedded sources and 2.6 MB without; mappings and names are all that symbolizing stack traces and profiles needs.
 After a build, `build/server` holds `.map` files and `build/client` holds none.
 
+## Keep the Worker's chunks out of cycles
+
+Cloudflare evaluates a Worker's chunks in import order.
+When two chunks import each other, one runs before the chunk it reads: the Worker either crashes at startup (`Cannot read properties of undefined (reading 'optional')`) or survives only because of the order its chunks happen to load in.
+Rolldown splits `@tangle-network/agent-interface` across chunks, and a chunk size limit makes it worse: gtm-agent's 450 KB limit cut the package into 7 chunks that imported each other.
+
+Add `workerChunkGraph()` to the plugins of every app whose Worker the Vite plugin builds:
+
+```ts
+import { workerChunkGraph } from '@tangle-network/agent-app/worker-build'
+
+plugins: [cloudflare({ viteEnvironment: { name: 'ssr' } }), reactRouter(), workerChunkGraph()],
+```
+
+In the `ssr` environment it puts every agent-interface module in one chunk (`maxSize: Infinity`, so the app's own `codeSplitting.maxSize` cannot split it), and after the bundle is generated it fails the build when any chunk imports another that imports it back.
+The check runs inside `vite build`, so the adopt gate, the deploy build and a local build all stop at the same error, naming the chunks in the cycle.
+Measured on gtm-agent: one chunk cycle (`dist` and `supervisor`, 23 agent-interface modules) before, none after, median startup within noise (163.7 ms against 159.1 ms) and a bundle 201 KiB smaller.
+
+An app-local group that matches agent-interface (priority above 90) captures those modules first; remove agent-interface from it.
+A rolldown `manualChunks` option is ignored once `codeSplitting` is set, so express an app's own chunk pins as `codeSplitting.groups`.
+A Worker that Wrangler bundles itself (`main` in `wrangler.toml`, no Vite Worker environment) is one file and has no chunk graph.
+
 ## Smart placement is not a default
 
 Smart placement moves a Worker toward the back end it calls most when that is measurably faster.
