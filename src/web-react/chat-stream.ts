@@ -115,9 +115,16 @@ export interface ChatStreamCallbacks {
   /** The turn's intent line (`session.run.intent`): show it as a labeled status line until the first `onText`. */
   onIntent?: (intent: TurnIntentData) => void
   onText?: (delta: string) => void
-  /** The next responder of a turn addressed to several agents starts: open a
-   *  new assistant block under this author; text that follows is theirs. */
+  /** A responder of a turn addressed to several agents, announced before any
+   *  output; every responder is announced up front, in mention order. Open one
+   *  live block per responder. */
   onSpeaker?: (speaker: { id: string; name: string; handle?: string }) => void
+  /** Fires before the callback of every event that carries `speaker` (the
+   *  responder's agent id): responders answer at the same time, so the text,
+   *  reasoning and tool events of several interleave and this says whose
+   *  block each belongs to. A consumer that applies raw events reads
+   *  `event.speaker` itself. */
+  onSpeakerEvent?: (speaker: string) => void
   onReasoning?: (delta: string) => void
   /** The message's reasoning so far, when it started and when it ended, after every reasoning delta and once
    *  when thinking ends. Spread it onto `ReasoningRow`. `consumeChatStream` and `streamChatTurn` keep it;
@@ -304,6 +311,7 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
 
   const evt = (parsed.kind === 'event' ? parsed.event : parsed) as Record<string, unknown>
   if (!evt || typeof evt !== 'object') return { receivedContent }
+  if (evt.type !== 'speaker' && typeof evt.speaker === 'string') cb.onSpeakerEvent?.(evt.speaker)
 
   switch (evt.type) {
     case 'turn':
