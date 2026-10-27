@@ -26,8 +26,9 @@ runs:
           case "$store" in /*) ;; *) echo '::error::Provision the runner canonical pnpm store before releasing.'; exit 1 ;; esac
           [[ "$store" != *$'\n'* && "$store" != *$'\r'* ]]
           test -d "$store" && test -w "$store"
-          # pnpm 9/10 and 11+ use different environment namespaces.
-          printf 'NPM_CONFIG_STORE_DIR=%s\nPNPM_CONFIG_STORE_DIR=%s\n' "$store" "$store" >> "$GITHUB_ENV"
+          # Provisioning owns both pnpm namespaces; verify rather than replace them.
+          resolved=$(pnpm store path --silent)
+          case "$resolved/" in "$store/"*) ;; *) echo '::error::pnpm ignored the runner canonical store.'; exit 1 ;; esac
         fi
         browsers="${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
         [[ "$browsers" = /* && "$browsers" != *$'\n'* && "$browsers" != *$'\r'* ]]
