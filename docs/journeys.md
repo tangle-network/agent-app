@@ -53,6 +53,9 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
      // t: { outcome, error, failures, firstProgressS, firstTextS, completeS, replyChars, stages, threadId, replyFile }
      await j.wait('Waiting for the file list', () => page.getByText('knowledge').waitFor({ timeout: 60_000 }), page)
      await j.sendInThread(page, 'Cut it to one page.', { stopAfter: 'first-text' }) // presses Stop like a person
+     // Pills staged first (an `@agent`, a file) survive only with keepDraft: sendNew and
+     // sendInThread otherwise replace the draft before typing.
+     await j.sendNew(page, 'name three risks', { keepDraft: true })
    } finally {
      await j.finish()                                             // always: videos, captions, scrubbed trace, timings
    }
