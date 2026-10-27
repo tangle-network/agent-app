@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.66
+
+- journeys: sendNew and sendInThread keep a staged draft with keepDraft (#1392)
+
+## 0.63.65
+
+- fix(workspace-react): a rail row's bad href drops the row and is reported; query strings are local (#1391)
+
 ## 0.63.64
 
 - ci(release): accept a database URL and release-host SSH key (#1390)

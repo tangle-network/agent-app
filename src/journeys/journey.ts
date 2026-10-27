@@ -108,6 +108,10 @@ export interface SendOptions {
   delay?: number
   /** Press Stop at first text, or this many seconds after Send. */
   stopAfter?: 'first-text' | number
+  /** Type after what the composer already holds (mention pills, attachments)
+   *  instead of replacing it. The default select-all-and-delete erased the
+   *  `@agent` pills of GTM's first agent-mentions runs (2026-10-27). */
+  keepDraft?: boolean
 }
 
 /** What the page shows right now, read in one evaluate. */
@@ -259,7 +263,7 @@ export class Journey {
    * Shift+Enter, because Enter sends. Retries fast when hydration dropped
    * keystrokes. Never `fill()` a rich-text composer.
    */
-  async typePrompt(page: Page, prompt: string, opts: { delay?: number } = {}): Promise<void> {
+  async typePrompt(page: Page, prompt: string, opts: { delay?: number; keepDraft?: boolean } = {}): Promise<void> {
     const box = this.composerInput(page)
     await box.waitFor({ state: 'visible', timeout: 30_000 })
     await sleep(1_200)
@@ -267,8 +271,12 @@ export class Journey {
     const want = prompt.replace(/\s+/g, ' ').trim().slice(0, 80)
     for (let attempt = 0; attempt < 4; attempt += 1) {
       await this.click(box, { pauseAfter: 150 })
-      await box.press('ControlOrMeta+a')
-      await box.press('Backspace')
+      if (opts.keepDraft) {
+        await box.press('ControlOrMeta+End')
+      } else {
+        await box.press('ControlOrMeta+a')
+        await box.press('Backspace')
+      }
       const lines = prompt.split('\n')
       for (let i = 0; i < lines.length; i += 1) {
         if (i > 0) await box.press('Shift+Enter')
@@ -345,7 +353,7 @@ export class Journey {
   async sendNew(page: Page, prompt: string, opts: SendOptions & { from?: string } = {}): Promise<TurnRecord> {
     this.budgetTurn()
     if (opts.from && !page.url().startsWith(new URL(opts.from, this.config.baseUrl).href)) await page.goto(opts.from)
-    await this.typePrompt(page, prompt, { delay: opts.delay })
+    await this.typePrompt(page, prompt, { delay: opts.delay, keepDraft: opts.keepDraft })
     const send = this.composerButton(page, this.config.chat.sendName)
     await send.waitFor({ state: 'visible' })
     const box = await send.boundingBox()
@@ -381,7 +389,7 @@ export class Journey {
   /** A follow-up in the open thread: type, one Send press, measure. */
   async sendInThread(page: Page, prompt: string, opts: SendOptions = {}): Promise<TurnRecord> {
     this.budgetTurn()
-    await this.typePrompt(page, prompt, { delay: opts.delay })
+    await this.typePrompt(page, prompt, { delay: opts.delay, keepDraft: opts.keepDraft })
     const send = this.composerButton(page, this.config.chat.sendName)
     const before = await this.read(page, prompt)
     const evidence = new TurnEvidence(this.patterns(), prompt)
