@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.70
+
+- stories(chat): two agents answering at once (#1398)
+
 ## 0.63.69
 
 - fix(chat): preserve scroll intent during transcript growth (#1396)
