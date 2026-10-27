@@ -1,0 +1,34 @@
+name: Set up an app release
+description: Use the runner's dependency caches without sharing mutable package-manager installs.
+inputs:
+  node-version-file:
+    description: The caller's existing Node version file.
+    default: .nvmrc
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+      if: ${{ hashFiles('pnpm-lock.yaml') != '' }}
+      # Self-update mutates its tool graph; it must not use the project store.
+      env:
+        PNPM_CONFIG_STORE_DIR: ${{ runner.temp }}/pnpm-bootstrap-store
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+    - name: Use the runner's canonical dependency caches
+      shell: bash
+      env:
+        PNPM_LOCK: ${{ hashFiles('pnpm-lock.yaml') }}
+      run: |
+        set -euo pipefail
+        if [[ -n "$PNPM_LOCK" ]]; then
+          store="${pnpm_config_store_dir:-${npm_config_store_dir:-}}"
+          case "$store" in /*) ;; *) echo '::error::Provision the runner canonical pnpm store before releasing.'; exit 1 ;; esac
+          [[ "$store" != *$'\n'* && "$store" != *$'\r'* ]]
+          test -d "$store" && test -w "$store"
+          # pnpm 9/10 and 11+ use different environment namespaces.
+          printf 'NPM_CONFIG_STORE_DIR=%s\nPNPM_CONFIG_STORE_DIR=%s\n' "$store" "$store" >> "$GITHUB_ENV"
+        fi
+        browsers="${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
+        [[ "$browsers" = /* && "$browsers" != *$'\n'* && "$browsers" != *$'\r'* ]]
+        printf 'PLAYWRIGHT_BROWSERS_PATH=%s\n' "$browsers" >> "$GITHUB_ENV"
