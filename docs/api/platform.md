@@ -371,7 +371,7 @@ type DelegatedKeyCode
 `function` — A fetch for one turn that sends a pre-minted key.
 
 ```ts
-(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: URL | R…
+(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: { (input: URL |…
 ```
 
 ### `DelegatedKeyMissingError`
@@ -723,7 +723,7 @@ interface PlatformAgentSpendOptions
 `function` — Options for the platform's cross-site SSO client: the base URL, the app id registered in the platform's trusted-apps registry (`TANGLE_PLATFORM_APP_ID`, else the product's own), and a fetch the clien…
 
 ```ts
-(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: ((input: URL…
+(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: { (input: UR…
 ```
 
 ### `PlatformBalanceSnapshot`

@@ -251,7 +251,7 @@ interface JourneySummaryEntry
 `function` — `JOURNEYS_CONFIG`, else the first config file in `dir`.
 
 ```ts
-(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>
+(dir?: string, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>
 ```
 
 ### `MAX_HIGHLIGHTS_S`
