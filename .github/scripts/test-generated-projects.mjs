@@ -483,7 +483,8 @@ sweepStaleScratch()
 if (process.argv.includes('--sweep')) process.exit(0)
 
 /** A detached process that outlives this one: it polls the owner pid and removes the scratch after it
- *  dies, retrying while an orphaned child still writes there. */
+ *  dies, retrying every 5 s for up to 20 minutes while an orphaned child (an install the dead run
+ *  started) still writes there; the orphan ends with its one command, the scratch ends with it. */
 const JANITOR = `
 const [dir, pid] = [process.argv[1], Number(process.argv[2])]
 const { rmSync, existsSync } = require('node:fs')
@@ -491,7 +492,7 @@ const alive = () => { try { process.kill(pid, 0); return true } catch (error) { 
 let tries = 0
 const sweep = () => {
   rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 200 })
-  if (existsSync(dir) && ++tries < 30) return setTimeout(sweep, 2000)
+  if (existsSync(dir) && ++tries < 240) return setTimeout(sweep, 5000)
   process.exit(0)
 }
 const tick = () => (alive() ? setTimeout(tick, 2000) : sweep())
