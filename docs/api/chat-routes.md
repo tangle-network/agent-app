@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-310 exports.
+324 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -12,6 +12,38 @@ Source: `src/chat-routes/index.ts`
 
 ```ts
 type AbortAttachmentWriteFn
+```
+
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
+```
+
+### `agentMentionsOf`
+
+`function` — The agent mentions of a validated list, in mention order: the turn's responders.
+
+```ts
+(mentions: readonly ChatMention[]) => AgentMention[]
 ```
 
 ### `aggregateNativeCompletionReceipts`
@@ -323,7 +355,7 @@ interface BuildDispatchPartsInput
 `function` — The agent-facing pointer block appended to the dispatched prompt — never persisted in message `content`.
 
 ```ts
-(mentions: readonly Pick<FileMention, "name" | "path">[]) => string
+(mentions: readonly (AgentMention | Pick<FileMention, "name" | "path">)[]) => string
 ```
 
 ### `buildTurnPhaseEvent`
@@ -364,6 +396,14 @@ interface ChatAttachmentInput
 
 ```ts
 type ChatAttachmentKind
+```
+
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
 ```
 
 ### `ChatMentionKind`
@@ -420,6 +460,22 @@ interface ChatTurnAfterAuthorizeArgs
 
 ```ts
 type ChatTurnAfterAuthorizeRelease
+```
+
+### `ChatTurnAgentsOptions`
+
+`interface` — How a route turns `@agent` mentions into responders.
+
+```ts
+interface ChatTurnAgentsOptions
+```
+
+### `ChatTurnAgentTarget`
+
+`interface` — A workspace agent a turn is addressed to, resolved by the product from an `@` mention.
+
+```ts
+interface ChatTurnAgentTarget
 ```
 
 ### `ChatTurnAuthorization`
@@ -846,6 +902,14 @@ interface ChatTurnUsage
 type CompletedSandboxTurnSource
 ```
 
+### `composeAgentProducers`
+
+`function`
+
+```ts
+<TContext, TResource>(args: ChatTurnProduceArgs<TContext, TResource>, produce: (final: ChatTurnProduceArgs<TContext, TR…
+```
+
 ### `createAssistantDraftWriter`
 
 `function` — Build the coalescing draft writer for one turn.
@@ -1126,6 +1190,14 @@ number
 interface DispatchHistoryMessage
 ```
 
+### `DispatchHistoryPov`
+
+`interface` — Whose eyes the history is read through.
+
+```ts
+interface DispatchHistoryPov
+```
+
 ### `DispatchPartsOutcome`
 
 `type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
@@ -1206,12 +1278,20 @@ interface FileIndexWarmingResponse
 interface FileMention
 ```
 
+### `fileMentionsOf`
+
+`function` — The file mentions of a validated list, for the seams that read the box.
+
+```ts
+(mentions: readonly ChatMention[]) => FileMention[]
+```
+
 ### `fileMentionsToParts`
 
 `function` — Maps resolved file mentions to path-only `ChatTurnFilePartInput`s — `image` vs `file` by extension, and always a `path`, never a `url` (the url/path XOR invariant: a mention is a sandbox path referen…
 
 ```ts
-(mentions: readonly FileMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
+(mentions: readonly ChatMention[], opts?: FileMentionsToPartsOptions) => ChatTurnFilePartInput[]
 ```
 
 ### `FileMentionsToPartsOptions`
@@ -1300,6 +1380,14 @@ interface HybridTurnProducerOptions
 
 ```ts
 1500
+```
+
+### `isAgentMention`
+
+`function`
+
+```ts
+(mention: ChatMention) => mention is AgentMention
 ```
 
 ### `isCommittingSandboxEvent`
@@ -1648,10 +1736,18 @@ interface ParseChatAttachmentInputsOptions
 
 ### `parseFileMentions`
 
-`function` — Validates the untyped `mentions` array off the wire, mirroring {@link parseChatTurnParts}: the typed list, or `ChatTurnInputError` (400) naming the offending entry.
+`function` — The file mentions of the wire list; agent mentions are validated and set aside.
 
 ```ts
 (raw: unknown) => FileMention[]
+```
+
+### `parseMentions`
+
+`function` — The validated, deduped mention list off the wire: files by path, agents by id, in the order typed.
+
+```ts
+(raw: unknown) => ChatMention[]
 ```
 
 ### `parsePlanFollowUpAttach`
@@ -1835,7 +1931,7 @@ type ProducerWireEvent
 `function` — Project persisted rows using the same role and attachment policy as dispatch.
 
 ```ts
-(messages: readonly DispatchHistoryMessage[]) => { role: "user" | "assistant"; content: string; }[]
+(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: "user" | "assistant"; content: stri…
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
@@ -2008,10 +2104,10 @@ type ResolveChatAttachmentsResult
 
 ### `routerTurnHistory`
 
-`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…
 
 ```ts
-(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+(priorMessages: readonly (Pick<PersistedChatMessageForTurn, "content" | "role"> & { parts?: readonly Record<string, unk…
 ```
 
 ### `RouterTurnKey`
@@ -2156,6 +2252,22 @@ interface SandboxUploadSink
 
 ```ts
 interface SniffResult
+```
+
+### `SPEAKER_EVENT`
+
+`const` — The event a viewer receives when the next responder starts.
+
+```ts
+"speaker"
+```
+
+### `speakerPart`
+
+`function`
+
+```ts
+(agent: ChatTurnAgentTarget) => Record<string, unknown>
 ```
 
 ### `StaleTurnLockOwnerProbeResult`
