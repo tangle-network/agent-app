@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.63.69
+
+- fix(chat): preserve scroll intent during transcript growth (#1396)
+- chore(deps): adopt 3 @tangle-network/* packages (#1397)
+- chore(deps): adopt 2 @tangle-network/* packages (#1395)
+- feat(chat-routes): responders stream at the same time, tagged by speaker, addressed as themselves (#1394)
+
 ## 0.63.68
 
 - fix(chat): preserve reader scroll intent while transcript content grows
