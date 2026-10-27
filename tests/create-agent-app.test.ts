@@ -59,6 +59,11 @@ function linkDeps(projectDir: string) {
     }
     symlinkSync(realpathSync(src), join(scope, short), 'dir')
   }
+  // agent-app's own runtime dependencies arrive with it in a registry install.
+  const own = Object.keys((JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as { dependencies?: Record<string, string> }).dependencies ?? {})
+  for (const name of own) {
+    if (!existsSync(join(nm, name))) link(join(nm, name), join(REPO, 'node_modules', name))
+  }
   // tsc + its lib, node types, and vitest (a generated-project devDependency) —
   // resolved to their real pnpm paths so transitive types resolve offline.
   link(join(nm, 'typescript'), join(REPO, 'node_modules', 'typescript'))
