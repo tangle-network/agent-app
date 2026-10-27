@@ -342,9 +342,15 @@ The handle is the agent's normalized name (`normalizeProfileName` in
 several agents calls `produce` once per agent, all at the same time, each
 with the thread's history and none seeing another's answer, and persists one
 assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and labels each answer with its
-author (`expandSpeakerRows` in `/web`); the live stream carries the same
-boundary as a `speaker` event (`onSpeaker` in `ChatStreamCallbacks`), so
-a viewer opens a new block as each agent starts. When a product projects history for a
+author (`expandSpeakerRows` in `/web`). Live, every responder is announced
+first as a `speaker` event (`onSpeaker`), then every event carries
+`speaker`, the responder's agent id (`onSpeakerEvent`, or `event.speaker`
+for a raw-event consumer), so a viewer keeps one live block per responder
+and draws them answering at the same time. A responder that fails leaves a
+`notice` under its own name; the turn fails only when every responder did.
+Each responder's `prompt` and `body.content` arrive addressed
+(`addressedTurnText`): the `@handles` are gone and one line names who it
+answers as and who else is answering, so it does its part and not every role. When a product projects history for a
 mentioned agent, it passes the point of view: `projectDispatchHistory(prior,
 { pov: args.agent?.id, owner })` keeps that agent's own answers as
 `assistant` turns and turns every other agent's answer, including the

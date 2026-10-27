@@ -16,11 +16,12 @@ const ROSTER: ChatTurnAgentTarget[] = [
 ]
 const mention = (agent: ChatTurnAgentTarget) => ({ kind: 'agent', agentId: agent.id, handle: agent.handle, name: agent.name })
 
-function harness(options: { agents?: boolean } = {}) {
+function harness(options: { agents?: boolean; fail?: string } = {}) {
   const tables = createChatTables()
   const database = openDatabase([tables.threads, tables.messages])
   const store = createChatStore(database as unknown as ChatDatabase, tables)
   const produced: Array<{ agent?: string; profile?: string; agents?: string[]; executionId?: string }> = []
+  const prompts: string[] = []
   const routes = createChatTurnRoutes({
     projectId: 'agent-fanout', store: store as unknown as ChatTurnMessageStore,
     turnStore: createMemoryTurnEventStore(),
@@ -30,16 +31,21 @@ function harness(options: { agents?: boolean } = {}) {
     }),
     produce: (args) => {
       produced.push({ agent: args.agent?.id, profile: args.agent?.profile?.name, agents: args.agents?.map((a) => a.id), executionId: args.executionId })
+      if (args.agent && typeof args.prompt === 'string') prompts.push(args.prompt)
       const text = args.agent ? `${args.agent.name} answers.` : 'The thread agent answers.'
+      const failing = options.fail !== undefined && args.agent?.id === options.fail
       return {
-        stream: (async function* () { yield { type: 'text' as const, text } })(),
+        stream: (async function* () {
+          if (failing) { yield { type: 'error' as const, data: { message: 'the model service did not answer' } }; return }
+          yield { type: 'text' as const, text }
+        })(),
         finalText: () => text,
         assistantParts: () => [{ type: 'text', text }],
         usage: () => ({ inputTokens: 10, outputTokens: 5 }),
       }
     },
   })
-  return { routes, store, produced, close: () => database.$client.close() }
+  return { routes, store, produced, prompts, close: () => database.$client.close() }
 }
 
 async function turn(routes: ReturnType<typeof harness>['routes'], threadId: string, body: Record<string, unknown>) {
@@ -70,11 +76,19 @@ describe('a turn addressed to agents', () => {
       const ids = h.produced.map((p) => p.executionId!)
       expect(new Set(ids).size).toBe(2)
       expect(ids[0]!.endsWith('-1') && ids[1]!.endsWith('-2')).toBe(true)
-      // The live stream announces each responder before their text.
+      // The live stream announces every responder up front, in the order typed, then
+      // tags each event with its speaker so a viewer draws one block per responder.
       const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
         .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
-      const order = events.filter((e) => e.type === 'speaker' || e.type === 'text').map((e) => e.type === 'speaker' ? `speaker:${e.id}` : `text:${e.text}`)
-      expect(order).toEqual(['speaker:ap_writer', 'text:Writer answers.', 'speaker:ap_research', 'text:Research Lead answers.'])
+      expect(events.filter((e) => e.type === 'speaker').map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
+      const texts = events.filter((e) => e.type === 'text').map((e) => `${e.speaker}:${e.text}`).sort()
+      expect(texts).toEqual(['ap_research:Research Lead answers.', 'ap_writer:Writer answers.'])
+      expect(events.findIndex((e) => e.type === 'text')).toBeGreaterThan(events.findLastIndex((e) => e.type === 'speaker'))
+      // Each responder read the message addressed to it: handles gone, its own name first.
+      expect(h.prompts).toEqual([
+        'You answer this message as Writer (@writer). Research Lead (@research-lead) answers it separately at the same time; do your part and leave theirs to them.\n\nplan the launch',
+        'You answer this message as Research Lead (@research-lead). Writer (@writer) answers it separately at the same time; do your part and leave theirs to them.\n\nplan the launch',
+      ])
       const rows = await h.store.listMessages(thread.id)
       const assistant = rows.filter((row) => row.role === 'assistant')
       expect(assistant).toHaveLength(1)
@@ -127,6 +141,33 @@ describe('a turn addressed to agents', () => {
 })
 
 describe('mentioned agents answer at the same time', () => {
+  it('keeps the other answers when one responder fails, and fails the turn only when all do', async () => {
+    const h = harness({ fail: 'ap_research' })
+    try {
+      const thread = await h.store.createThread({ workspaceId: 'workspace', title: 'One fails' })
+      const { response, text } = await turn(h.routes, thread.id, {
+        content: '@writer @research-lead go', mentions: [mention(ROSTER[1]!), mention(ROSTER[0]!)],
+      })
+      expect(response.status).toBe(200)
+      const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
+        .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
+      // The failure reached the viewer as a notice under its speaker, never as the turn's error.
+      expect(events.some((e) => e.type === 'error' || e.type === 'session.run.failed')).toBe(false)
+      expect(events.find((e) => e.type === 'notice')).toMatchObject({ speaker: 'ap_research', noticeKind: 'error', text: expect.stringContaining('Research Lead could not answer') })
+      const assistant = (await h.store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
+      expect(assistant).toHaveLength(1)
+      expect(assistant[0]!.content).toBe('Writer answers.')
+    } finally { h.close() }
+    const all = harness({ fail: 'ap_writer' })
+    try {
+      const thread = await all.store.createThread({ workspaceId: 'workspace', title: 'All fail' })
+      const { text } = await turn(all.routes, thread.id, { content: '@writer go', mentions: [mention(ROSTER[1]!)] })
+      const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
+        .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
+      expect(events.some((e) => e.type === 'error')).toBe(true)
+    } finally { all.close() }
+  })
+
   it('runs every responder at once and still presents them in the order typed', async () => {
     const tables = createChatTables()
     const database = openDatabase([tables.threads, tables.messages])
