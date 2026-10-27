@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.78
+
+- ci(release): reuse runner dependency caches through shared setup
+
 ## 0.63.77
 
 - Run adopt-stack daily from agent-eval 9509f8a8 (#1434)
