@@ -28,7 +28,7 @@ The native preflight retains the app's package manager. pnpm setup runs only for
 
 GitHub environment secrets remain authoritative: a same-name secret in the selected environment takes precedence over a passed secret. Missing optional secret variables are removed from the native subprocess environment, preserving native file, Worker-secret and other supported fallback behavior. Their values are never logged by the wrapper.
 
-The caller must allow `contents: read` and `issues: write`. The release job reduces this to content and issue reads, suites have only content reads, and only the failure-reporting job receives issue writes. No deployment, package, pull-request or administration write permission is required by the shared workflow. An app command needing more authority needs explicit owner review rather than a broader inherited token.
+The caller must allow `contents: read`, `actions: read` and `issues: write`. The release job uses content, action and issue reads to inspect private release receipts; suites have only content reads, and only the failure-reporting job receives issue writes. No deployment, package, pull-request or administration write permission is required by the shared workflow. An app command needing more authority needs explicit owner review rather than a broader inherited token.
 
 Keep caller triggers and runtime path filters in the thin caller. This workflow accepts only default-branch production pushes/manual requests and explicit `v*` tags whose source is merged into the default branch. It does not implement a preview or generic dry-run surface. Preserve an existing native dry-run contract explicitly before replacing a caller that has one; a command that ignores a dry-run flag cannot be made safe by setting that flag here.
 
