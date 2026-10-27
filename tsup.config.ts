@@ -168,9 +168,9 @@ export default defineConfig({
   // the whole of `src` in ~1 GB, and `dist/<entry>.d.ts` still answers every
   // `types` path in `exports`.
   //
-  // tsc preserves authored relative specifiers in declarations. Public barrels
-  // used by NodeNext consumers need explicit `.js` specifiers; other modules
-  // still have extensionless paths that require bundler resolution.
+  // tsc preserves authored relative specifiers in declarations;
+  // scripts/explicit-declaration-specifiers.mjs gives each one its `.js` path
+  // after tsc so NodeNext consumers resolve every subpath.
   dts: false,
   sourcemap: true,
   clean: true,
