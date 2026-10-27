@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.68
+
+- fix(chat): preserve reader scroll intent while transcript content grows
+- chore(chat): keep the addressed-turn helper internal
+
 ## 0.63.67
 
 - Peer the 1.0 stack with one caret each; NodeNext-resolvable declarations (#1393)
