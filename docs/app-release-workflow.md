@@ -24,7 +24,11 @@ GTM's [release phase split](https://github.com/tangle-network/gtm-agent/pull/189
 
 Suites for one repository share a concurrency group per shard with cancel-in-progress. A newer release's suites cover an older commit's changes, so the older run is cancelled whether it is queued or running. That run's suite phase reports `cancelled`, which files no issue and is neither a pass nor a failure; its release phase result is unaffected.
 
-The native preflight retains the app's package manager. pnpm setup runs only for a caller with its root `pnpm-lock.yaml`; npm callers keep their existing frozen npm commands.
+[setup-release](../.github/actions/setup-release/action.yml) owns tool setup and cache selection for both jobs. Its immutable action pin binds the reviewed setup implementation; it does not check out or install a second copy of the app. pnpm setup runs only with a root `pnpm-lock.yaml`, preserving the caller's package-manager version; npm callers retain their frozen npm commands. Native preflight and suites still own their existing frozen installs, lifecycle permissions, filters and browser requirements; setup adds no extra install.
+
+The maintained tangle-devops runner role owns the canonical per-Unix-user store through `npm_config_store_dir` and `pnpm_config_store_dir`. Setup inherits those values without writing another store setting, verifies the selected pnpm store, and refuses a pnpm release if the configured store is absent, unwritable or ignored. Remove caller command exports that select `$RUNNER_TEMP/pnpm-*`; they override the older pnpm namespace. No package payload is shared across Unix users. Mutable `pnpm/action-setup` self-management retains its private bootstrap store; it must never self-update inside the shared project store.
+
+Playwright uses `$XDG_CACHE_HOME/ms-playwright` (or the runner HOME cache when XDG is unset) for installation and execution. Keep native `playwright install` commands: the installed version decides which browser revision is required and reuses it when present. Setup does not skip a required browser, disable its lifecycle, move existing caches, change host permissions or mutate provisioned runner configuration.
 
 `node-version-file` defaults to the app's `.nvmrc`. Preserve that owner rather than migrating its runtime during adoption. The YAML owns timeout defaults; use overrides only for the existing app's measured bounds.
 
