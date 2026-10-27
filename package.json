@@ -215,6 +215,11 @@
       "import": "./dist/preset-cloudflare/index.js",
       "default": "./dist/preset-cloudflare/index.js"
     },
+    "./worker-build": {
+      "types": "./dist/worker-build/index.d.ts",
+      "import": "./dist/worker-build/index.js",
+      "default": "./dist/worker-build/index.js"
+    },
     "./billing": {
       "types": "./dist/billing/index.d.ts",
       "import": "./dist/billing/index.js",

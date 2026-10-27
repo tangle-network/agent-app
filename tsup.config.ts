@@ -50,6 +50,7 @@ export default defineConfig({
     'harness/index': 'src/harness/index.ts',
     'config/index': 'src/config/index.ts',
     'preset-cloudflare/index': 'src/preset-cloudflare/index.ts',
+    'worker-build/index': 'src/worker-build/index.ts',
     'billing/index': 'src/billing/index.ts',
     'alerting/index': 'src/alerting/index.ts',
     'preflight/index': 'src/preflight/index.ts',

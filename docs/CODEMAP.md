@@ -2,7 +2,7 @@
 
 # agent-app code map
 
-_154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
+_155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 
 | Entry | Exports | Depends on |
 |---|---|---|
@@ -154,6 +154,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./web/entry-server`](api/web-entry-server.md) | 1 | — |
 | [`./work-product`](api/work-product.md) | 90 | `eval-campaign`, `tools` |
 | [`./work-product-react`](api/work-product-react.md) | 3 | `web-react`, `work-product` |
+| [`./worker-build`](api/worker-build.md) | 1 | — |
 | [`./workspace-apps`](api/workspace-apps.md) | 54 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
 | [`./workspace-apps/react`](api/workspace-apps-react.md) | 5 | `crypto`, `object-store`, `teams`, `tools`, `web-react` |
 | [`./workspace-export`](api/workspace-export.md) | 44 | `object-store` |
@@ -1536,6 +1537,14 @@ Depends on: `web-react`, `work-product`
 `WorkProductPane`, `WorkProductPaneProps`, `WorkProductPaneTab`
 
 [Full API →](api/work-product-react.md)
+
+## `./worker-build`
+
+Source: `src/worker-build/index.ts` · 1 exports
+
+`workerChunkGraph`
+
+[Full API →](api/worker-build.md)
 
 ## `./workspace-apps`
 
