@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.63
+
+- refactor(turn-trace): OTLP ids and encoding from agent-trace-contract (#1387)
+
 ## 0.63.62
 
 - feat(chat): one agent handle spelling, and an execution id per responder (#1389)
