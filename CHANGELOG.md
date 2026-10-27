@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.63.73
+
+- refactor(turn-trace): import Server-Timing parse and format from agent-core (#1375)
+- chore(deps): adopt @tangle-network/sandbox 1.0.20 (#1405)
+- chore(deps): adopt 3 @tangle-network/* packages (#1404)
+- chore(deps): adopt 2 @tangle-network/* packages (#1403)
+- chore(deps): adopt 3 @tangle-network/* packages (#1402)
+
 ## 0.63.72
 
 - ci(release): upload native canary evidence; give post-release checks the release host (#1401)
