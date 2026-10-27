@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.63.74
+
+- fix(release): default post-release suites to deploy runners (#1411)
+- chore(deps): adopt @tangle-network/agent-profile-materialize 1.1.0 (#1410)
+- chore(deps): adopt 3 @tangle-network/* packages (#1409)
+- chore(deps): adopt 2 @tangle-network/* packages (#1408)
+- chore(deps): adopt @tangle-network/sandbox 1.0.23 (#1407)
+- chore(deps): adopt 2 @tangle-network/* packages (#1406)
+
 ## 0.63.73
 
 - refactor(turn-trace): import Server-Timing parse and format from agent-core (#1375)
