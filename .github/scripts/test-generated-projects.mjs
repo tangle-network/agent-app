@@ -491,7 +491,8 @@ const { rmSync, existsSync } = require('node:fs')
 const alive = () => { try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' } }
 let tries = 0
 const sweep = () => {
-  rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 200 })
+  // An orphaned install may still write here; a failed removal is retried, never fatal.
+  try { rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 200 }) } catch {}
   if (existsSync(dir) && ++tries < 240) return setTimeout(sweep, 5000)
   process.exit(0)
 }
