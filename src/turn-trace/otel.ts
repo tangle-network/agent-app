@@ -13,32 +13,10 @@
  * and its exporter keeps a timer a Worker refuses at module scope. One OTLP
  * POST per finished turn needs neither.
  */
+import { msToUnixNano, type OtlpSpan, otlpTraceExport, readOtlpPartialSuccess, toOtlpAttributes, toW3CTraceId } from '@tangle-network/agent-trace-contract/otlp'
 import { TURN_SPAN_KINDS, type TurnSpanAttrs, type TurnSpanKind, type TurnTraceSink, type TurnTraceSnapshot } from './recorder'
 
-/** One OTLP/JSON span, as Intelligence's ingest reads it. */
-export interface OtlpSpan {
-  traceId: string
-  spanId: string
-  parentSpanId?: string
-  name: string
-  kind: number
-  startTimeUnixNano: string
-  endTimeUnixNano: string
-  attributes: Array<{ key: string; value: { stringValue?: string; intValue?: string; doubleValue?: number; boolValue?: boolean } }>
-  status: { code: number; message?: string }
-}
-
-/** `doubles` names measurements that stay `doubleValue` when they land on a whole number, so a reader sees one type per key. */
-function attributes(record: Record<string, string | number | boolean>, doubles: ReadonlySet<string> = new Set()): OtlpSpan['attributes'] {
-  return Object.entries(record).flatMap(([key, value]) => {
-    if (typeof value === 'number' && !Number.isFinite(value)) return []
-    return [{
-      key,
-      value: typeof value === 'number' ? (Number.isInteger(value) && !doubles.has(key) ? { intValue: value.toString() } : { doubleValue: value })
-        : typeof value === 'boolean' ? { boolValue: value } : { stringValue: value },
-    }]
-  })
-}
+export type { OtlpSpan } from '@tangle-network/agent-trace-contract/otlp'
 
 /** The root span's measured numbers: one decimal, so each is always a `doubleValue`. */
 const ROOT_MEASUREMENTS: ReadonlySet<string> = new Set([
@@ -54,27 +32,12 @@ const ROOT_MEASUREMENTS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * A Tangle trace id as the 32-hex OTLP trace id. The mapping is the Sandbox SDK's `otelTraceIdForTangleTrace`, so a
- * Sandbox trace export of the same turn lands in the same OTLP trace. An id that is already 32 hex, or a UUID, is used as it is.
+ * A Tangle trace id as the 32-hex OTLP trace id. The rule is agent-trace-contract's `toW3CTraceId`, the one the Sandbox
+ * SDK, agent-eval and agent-runtime use too, so every export of the same turn lands in the same OTLP trace.
  */
 export function otlpTraceId(traceId: string): string {
-  if (/^[0-9a-f]{32}$/.test(traceId)) return traceId
-  const dashless = traceId.replace(/-/g, '')
-  if (/^[0-9a-f]{32}$/.test(dashless)) return dashless
-  return hexId(traceId, 32)
+  return toW3CTraceId(traceId)
 }
-
-function hexId(input: string, length: number): string {
-  const hashes = [2166136261, 2654435769, 2246822507, 3266489909]
-  for (const byte of new TextEncoder().encode(input)) {
-    for (let lane = 0; lane < hashes.length; lane += 1) hashes[lane] = Math.imul((hashes[lane] as number) ^ (byte + lane), 16777619)
-  }
-  let out = hashes.map((hash) => (hash >>> 0).toString(16).padStart(8, '0')).join('')
-  while (out.length < length) out += hexId(`${input}:${out.length}`, 32)
-  return out.slice(0, length)
-}
-
-const msToNs = (ms: number) => (BigInt(Math.floor(ms)) * 1_000_000n).toString()
 
 /** OpenInference span kind per turn span: model calls read as LLM, tool calls as TOOL. */
 const SPAN_KIND: Partial<Record<string, 'LLM' | 'TOOL'>> = { 'model.call': 'LLM', 'tool.call': 'TOOL' }
@@ -115,9 +78,9 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
     spanId: root,
     name: 'agent_app.turn',
     kind: 1,
-    startTimeUnixNano: msToNs(snapshot.startedAt),
-    endTimeUnixNano: msToNs(snapshot.endedAt),
-    attributes: attributes(rootAttrs, ROOT_MEASUREMENTS),
+    startTimeUnixNano: msToUnixNano(snapshot.startedAt),
+    endTimeUnixNano: msToUnixNano(snapshot.endedAt),
+    attributes: toOtlpAttributes(rootAttrs, { doubles: ROOT_MEASUREMENTS }),
     status: snapshot.status === 'ok' ? { code: 1 } : { code: 2, ...(snapshot.error ? { message: snapshot.error } : {}) },
   }]
   for (const span of snapshot.spans) {
@@ -136,9 +99,9 @@ export function buildTurnTraceOtelSpans(snapshot: TurnTraceSnapshot, labels: Tur
       parentSpanId: span.parentSpanId,
       name: span.name,
       kind: 1,
-      startTimeUnixNano: msToNs(span.startMs),
-      endTimeUnixNano: msToNs(span.endMs),
-      attributes: attributes(attrs),
+      startTimeUnixNano: msToUnixNano(span.startMs),
+      endTimeUnixNano: msToUnixNano(span.endMs),
+      attributes: toOtlpAttributes(attrs),
       status: span.error ? { code: 2, message: span.error } : { code: 1 },
     })
   }
@@ -195,12 +158,11 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
       return
     }
     try {
-      const body = {
-        resourceSpans: [{
-          resource: { attributes: attributes({ 'service.name': options.project, 'tangle.project': options.project }) },
-          scopeSpans: [{ scope: SCOPE, spans: buildTurnTraceOtelSpans(snapshot, { project: options.project, ...labels }) }],
-        }],
-      }
+      const body = otlpTraceExport(
+        toOtlpAttributes({ 'service.name': options.project, 'tangle.project': options.project }),
+        SCOPE,
+        buildTurnTraceOtelSpans(snapshot, { project: options.project, ...labels }),
+      )
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
@@ -210,8 +172,8 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
       const text = await response.text()
       if (!response.ok) return fail(`HTTP ${response.status} from the OTLP ingest`)
       // A 2xx can still refuse part of a batch (`partialSuccess.rejectedSpans`).
-      const rejected = Number((JSON.parse(text || '{}') as { partialSuccess?: { rejectedSpans?: unknown } }).partialSuccess?.rejectedSpans ?? 0)
-      if (rejected > 0) fail(`the OTLP ingest rejected ${rejected} spans`)
+      const { rejectedSpans } = readOtlpPartialSuccess(text)
+      if (rejectedSpans > 0) fail(`the OTLP ingest rejected ${rejectedSpans} spans`)
     } catch (error) {
       fail(error instanceof Error ? error.message : 'turn trace export failed')
     }

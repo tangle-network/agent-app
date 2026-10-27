@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AGENT_HANDLE_PATTERN,
+  agentHandle,
   agentMentionsOf,
   buildMentionPromptBlock,
   ChatTurnInputError,
@@ -280,5 +282,16 @@ describe('agent mentions never reach the box', () => {
     expect(buildMentionPromptBlock(mentions)).toContain('notes.md')
     expect(buildMentionPromptBlock(mentions)).not.toContain('research-lead')
     expect(buildMentionPromptBlock([{ kind: 'agent', agentId: 'ap_x', handle: 'x', name: 'X' }])).toBe('')
+  })
+})
+
+describe('agentHandle', () => {
+  it('spells one handle for a name', () => {
+    expect(agentHandle('Research Lead')).toBe('research-lead')
+    expect(agentHandle('  GTM Agent (v2) ')).toBe('gtm-agent-v2')
+    expect(agentHandle('Ünïcode name!')).toBe('n-code-name')
+    expect(agentHandle('***')).toBe('agent')
+    expect(agentHandle('x'.repeat(80))).toHaveLength(63)
+    expect(AGENT_HANDLE_PATTERN.test(agentHandle('Research Lead'))).toBe(true)
   })
 })

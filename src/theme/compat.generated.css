@@ -1,5 +1,5 @@
 /* GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: 33e13702150c34d3a1350846ce3dae2c6c7ef17e1632fbae5d3479a1b43f55f3
+ * SHA-256: f89457b3f243a69b9934010b2def4febe4408eff0be5e69d8847502ee33dbea4
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 :where(:root),
 [data-sandbox-ui],
@@ -23,11 +23,11 @@
 .dark {
     --agent-app-accent-hsl: 229.6552 93.5484% 81.7647%;
     --agent-app-accent-foreground-hsl: 0 0% 0%;
-    --agent-app-success-hsl: 154.7107 60.199% 60.5882%;
+    --agent-app-success-hsl: 154.7 60.2% 60.6%;
     --agent-app-success-foreground-hsl: 0 0% 0%;
-    --agent-app-danger-hsl: 2.7907 100% 83.1373%;
+    --agent-app-danger-hsl: 2.8 100% 83.1%;
     --agent-app-danger-foreground-hsl: 0 0% 0%;
-    --agent-app-warning-text-hsl: 41.4545 88.2353% 63.3333%;
+    --agent-app-warning-text-hsl: 41.5 88.2% 63.3%;
     --agent-app-warning-foreground-hsl: 0 0% 0%;
     --agent-app-radius-lg: 10px;
     --agent-app-radius-sm-factor: 0.6;
@@ -48,16 +48,7 @@
 :where(:root) {
     --agent-app-accent-hsl: 243.2787 80.6167% 55.4902%;
     --agent-app-accent-foreground-hsl: 0 0% 100%;
-    --agent-app-success-hsl: 162.931 93.5484% 24.3137%;
-    --agent-app-success-foreground-hsl: 0 0% 100%;
-    --agent-app-danger-hsl: 0 73.7089% 41.7647%;
-    --agent-app-danger-foreground-hsl: 0 0% 100%;
-    --agent-app-warning-text-hsl: 25.9259 90% 35.2941%;
-    --agent-app-warning-foreground-hsl: 0 0% 0%;
-    --agent-app-radius-lg: 10px;
-    --agent-app-radius-sm-factor: 0.6;
-    --agent-app-radius-md-factor: 0.8;
-    --agent-app-radius-xl-factor: 1.2
+    --agent-app-warning-foreground-hsl: 0 0% 100%
 }
 [data-theme="aubergine"] {
     --agent-app-accent-hsl: 255.1899 100% 84.5098%;
@@ -82,10 +73,6 @@
 [data-theme="super-light"] {
     --agent-app-accent-hsl: 148.2353 39.5349% 25.2941%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
-}
-[data-theme="tangle-dark"] {
-    --agent-app-accent-hsl: 229.6552 93.5484% 81.7647%;
-    --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="tangle-light"] {
     --agent-app-accent-hsl: 243.5714 75% 56.0784%;

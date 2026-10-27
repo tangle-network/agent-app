@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-528 exports.
+535 exports.
 
 ### `acceptRejectionReason`
 
@@ -28,6 +28,14 @@ Source: `src/web-react/index.tsx`
 
 ```ts
 type ActivityTone
+```
+
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
 ```
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
@@ -68,6 +76,22 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
 ```
 
 ### `AgentMentionOption`
@@ -548,6 +572,14 @@ type ChatInteractionRestoreMode
 
 ```ts
 type ChatInteractionStatus
+```
+
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
 ```
 
 ### `ChatMentionKind`
@@ -3334,6 +3366,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `segmentsFromParts`
+
+`function` — The ordered text, tool and notice runs of a message, as the transcript interleaves them.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]
+```
+
 ### `SessionActionLabels`
 
 `interface`
@@ -3580,6 +3620,22 @@ type SubmitInteractionAnswer
 
 ```ts
 (list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
+```
+
+### `toolCallFromPart`
+
+`function` — A stored `tool` part as the card the transcript draws.
+
+```ts
+(part: unknown) => ChatToolCallInfo | null
+```
+
+### `toolCallsFromParts`
+
+`function` — Every tool call on a message, in stored order.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]
 ```
 
 ### `ToolDetailPresentation`

@@ -1,8 +1,9 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -429,11 +430,92 @@ function main(scratch) {
   }
 }
 
+// ── The scratch store: 1.5 to 3 GB per run, gone on every exit ──────────────
+//
+// `finally` covers completion and throws. This runner blocks in synchronous
+// child spawns, so a signal cannot run a handler until the child ends, and a
+// killed parent orphans the install: 12 stores (about 30 GB) were left on one
+// Mac between 2026-10-24 and 10-27. So each run marks its scratch with its pid
+// and starts a detached janitor that removes the scratch once this process is
+// gone, however it went; signal handlers cover the case where the child ends
+// first; and every start sweeps sibling stores whose owner is gone. `--sweep`
+// runs only the sweep.
+const SCRATCH_PREFIX = 'agent-app-generated-'
+const OWNER_FILE = 'owner.pid'
+const removeScratch = (dir) => rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 })
+
+function ownerAlive(dir) {
+  let pid
+  try {
+    pid = Number(readFileSync(join(dir, OWNER_FILE), 'utf8').trim())
+  } catch {
+    // No marker: a store from before markers, or one still being created. Keep it for two hours.
+    try {
+      return Date.now() - statSync(dir).mtimeMs < 2 * 60 * 60 * 1000
+    } catch {
+      return false
+    }
+  }
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+function sweepStaleScratch() {
+  const root = tmpdir()
+  const swept = []
+  for (const name of readdirSync(root)) {
+    if (!name.startsWith(SCRATCH_PREFIX)) continue
+    const dir = join(root, name)
+    if (ownerAlive(dir)) continue
+    removeScratch(dir)
+    swept.push(dir)
+  }
+  if (swept.length) process.stdout.write(`Removed ${swept.length} stale generated store(s): ${swept.join(', ')}\n`)
+  return swept
+}
+
+sweepStaleScratch()
+if (process.argv.includes('--sweep')) process.exit(0)
+
+/** A detached process that outlives this one: it polls the owner pid and removes the scratch after it
+ *  dies, retrying every 5 s for up to 20 minutes while an orphaned child (an install the dead run
+ *  started) still writes there; the orphan ends with its one command, the scratch ends with it. */
+const JANITOR = `
+const [dir, pid] = [process.argv[1], Number(process.argv[2])]
+const { rmSync, existsSync } = require('node:fs')
+const alive = () => { try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' } }
+let tries = 0
+const sweep = () => {
+  // An orphaned install may still write here; a failed removal is retried, never fatal.
+  try { rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 200 }) } catch {}
+  if (existsSync(dir) && ++tries < 240) return setTimeout(sweep, 5000)
+  process.exit(0)
+}
+const tick = () => (alive() ? setTimeout(tick, 2000) : sweep())
+tick()
+`
+function startJanitor(dir) {
+  const child = spawn(process.execPath, ['-e', JANITOR, dir, String(process.pid)], { detached: true, stdio: 'ignore' })
+  child.unref()
+}
+
 let scratch
+const leave = (signal) => {
+  if (scratch) removeScratch(scratch)
+  process.exit(128 + (signal === 'SIGINT' ? 2 : signal === 'SIGHUP' ? 1 : 15))
+}
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, leave)
 try {
-  scratch = mkdtempSync(join(tmpdir(), 'agent-app-generated-'))
+  scratch = mkdtempSync(join(tmpdir(), SCRATCH_PREFIX))
   chmodSync(scratch, 0o700)
+  writeFileSync(join(scratch, OWNER_FILE), String(process.pid))
+  startJanitor(scratch)
   main(scratch)
 } finally {
-  if (scratch) rmSync(scratch, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 })
+  if (scratch) removeScratch(scratch)
 }

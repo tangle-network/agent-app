@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.63.72
+
+- ci(release): upload native canary evidence; give post-release checks the release host (#1401)
+
+## 0.63.71
+
+- test:generated: the scratch store is gone on every exit, and stale stores are swept at start (#1399)
+- chore(deps): adopt 4 @tangle-network/* packages (#1400)
+
+## 0.63.70
+
+- stories(chat): two agents answering at once (#1398)
+
+## 0.63.69
+
+- fix(chat): preserve scroll intent during transcript growth (#1396)
+- chore(deps): adopt 3 @tangle-network/* packages (#1397)
+- chore(deps): adopt 2 @tangle-network/* packages (#1395)
+- feat(chat-routes): responders stream at the same time, tagged by speaker, addressed as themselves (#1394)
+
+## 0.63.68
+
+- fix(chat): preserve reader scroll intent while transcript content grows
+- chore(chat): keep the addressed-turn helper internal
+
+## 0.63.67
+
+- Peer the 1.0 stack with one caret each; NodeNext-resolvable declarations (#1393)
+
+## 0.63.66
+
+- journeys: sendNew and sendInThread keep a staged draft with keepDraft (#1392)
+
+## 0.63.65
+
+- fix(workspace-react): a rail row's bad href drops the row and is reported; query strings are local (#1391)
+
+## 0.63.64
+
+- ci(release): accept a database URL and release-host SSH key (#1390)
+
+## 0.63.63
+
+- refactor(turn-trace): OTLP ids and encoding from agent-trace-contract (#1387)
+
+## 0.63.62
+
+- feat(chat): one agent handle spelling, and an execution id per responder (#1389)
+- chore(deps): adopt 2 @tangle-network/* packages (#1388)
+- chore(deps): adopt @tangle-network/brand 1.28.0 (#1386)
+- feat(chat): history names each speaker; split speaker rows draw their own reasoning and tool timeline (#1385)
+- chore(deps): adopt @tangle-network/charts 0.21.14 (#1383)
+- feat(chat): mentioned agents answer at the same time, presented in the order typed (#1384)
+
 ## 0.63.61
 
 - feat(chat): address workspace agents by @mention; responders answer in turn as one row with speaker parts (#1380)

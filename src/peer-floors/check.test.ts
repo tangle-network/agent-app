@@ -136,29 +136,6 @@ describe('checkAllPeerFloors', () => {
 })
 
 describe('this package audits itself', () => {
-  it('declares support for the current Interface line without claiming the next one', async () => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.['@tangle-network/agent-interface']
-
-    // Preserve the previously verified Interface lines and admit the Interface 5.2
-    // cohort exercised through Runtime, profile materialization and Hub consumers.
-    expect(range).toBeDefined()
-    expect(satisfiesRange('1.9.0', range!)).toBe(false)
-    expect(satisfiesRange('2.1.1', range!)).toBe(false)
-    expect(satisfiesRange('2.10.999', range!)).toBe(false)
-    expect(satisfiesRange('2.11.0', range!)).toBe(false)
-    expect(satisfiesRange('2.12.0', range!)).toBe(false)
-    expect(satisfiesRange('2.13.0', range!)).toBe(true)
-    expect(satisfiesRange('3.0.0', range!)).toBe(true)
-    expect(satisfiesRange('4.0.0', range!)).toBe(false)
-    expect(satisfiesRange('5.1.999', range!)).toBe(false)
-    expect(satisfiesRange('5.2.0', range!)).toBe(true)
-    expect(satisfiesRange('6.0.0', range!)).toBe(false)
-  })
-
   it('admits the tcloud line used by the Sandbox 0.59 consumer', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
@@ -175,46 +152,6 @@ describe('this package audits itself', () => {
     expect(satisfiesRange('0.9.0', range!)).toBe(false)
   })
 
-  it('admits the tested Hub SDK lines without claiming untested minors', async () => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string>; devDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.['@tangle-network/hub-sdk']
-
-    expect(range).toBeDefined()
-    expect(satisfiesRange('0.19.3', range!)).toBe(true)
-    expect(satisfiesRange('0.21.0', range!)).toBe(true)
-    expect(satisfiesRange('0.22.0', range!)).toBe(false)
-    expect(satisfiesRange('0.22.1', range!)).toBe(true)
-    expect(satisfiesRange('0.22.999', range!)).toBe(true)
-    expect(satisfiesRange('0.23.0', range!)).toBe(true)
-    expect(satisfiesRange('0.23.999', range!)).toBe(true)
-    expect(satisfiesRange('0.24.0', range!)).toBe(true)
-    expect(satisfiesRange('0.24.999', range!)).toBe(true)
-    expect(satisfiesRange('0.25.0', range!)).toBe(false)
-    expect(satisfiesRange('0.26.0', range!)).toBe(false)
-    expect(satisfiesRange('0.27.0', range!)).toBe(true)
-    expect(satisfiesRange('0.28.0', range!)).toBe(true)
-    expect(satisfiesRange('0.28.999', range!)).toBe(true)
-    expect(satisfiesRange('0.29.0', range!)).toBe(false)
-    expect(satisfiesRange('0.29.4', range!)).toBe(false)
-    expect(satisfiesRange('0.29.5', range!)).toBe(true)
-    expect(satisfiesRange('0.29.999', range!)).toBe(true)
-    expect(satisfiesRange('0.30.0', range!)).toBe(false)
-  })
-
-  it('admits the installed Materialize cohort without untested intermediate minors', async () => {
-    const own = JSON.parse(await readFile(join(here, '..', '..', 'package.json'), 'utf8'))
-    const range = own.peerDependencies['@tangle-network/agent-profile-materialize']
-    for (const admitted of ['0.20.1', '0.21.0', '0.22.0', '0.25.2', '0.25.999']) {
-      expect(satisfiesRange(admitted, range)).toBe(true)
-    }
-    for (const unqualified of ['0.20.0', '0.23.0', '0.24.0', '0.25.0', '0.25.1', '0.26.0']) {
-      expect(satisfiesRange(unqualified, range)).toBe(false)
-    }
-  })
-
   it('admits the tested Integrations lines without admitting 0.58', async () => {
     const root = join(here, '..', '..')
     const own = JSON.parse(
@@ -229,26 +166,6 @@ describe('this package audits itself', () => {
     for (const version of ['0.54.2', '0.57.0', '0.59.0', '0.59.999', '0.60.0', '0.60.999', '0.68.0', '0.69.0', '0.69.999', '0.70.0', '0.70.999', '0.75.0', '0.75.999']) {
       expect(satisfiesRange(version, range!)).toBe(true)
     }
-  })
-
-  it('admits the tested Knowledge lines without claiming the next major', async () => {
-    const root = join(here, '..', '..')
-    const own = JSON.parse(
-      await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> }
-    const range = own.peerDependencies?.['@tangle-network/agent-knowledge']
-
-    expect(range).toBeDefined()
-    expect(satisfiesRange('17.1.10', range!)).toBe(true)
-    expect(satisfiesRange('18.0.0', range!)).toBe(true)
-    expect(satisfiesRange('19.0.0', range!)).toBe(false)
-    expect(satisfiesRange('19.0.1', range!)).toBe(true)
-    expect(satisfiesRange('19.999.0', range!)).toBe(true)
-    expect(satisfiesRange('20.0.0', range!)).toBe(true)
-    expect(satisfiesRange('21.0.0', range!)).toBe(false)
-    expect(satisfiesRange('22.0.0', range!)).toBe(false)
-    expect(satisfiesRange('22.0.1', range!)).toBe(true)
-    expect(satisfiesRange('23.0.0', range!)).toBe(false)
   })
 
   // The engine peers whose installed development version must satisfy the installed Runtime's own peer range.

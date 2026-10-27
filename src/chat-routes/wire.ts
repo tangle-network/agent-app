@@ -383,6 +383,16 @@ export function agentMentionsOf(mentions: readonly ChatMention[]): AgentMention[
 /** A handle is what a person types after `@`: lowercase letters, digits and
  *  hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name. */
 export const AGENT_HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/
+
+/** The handle a profile name gets: lowercase, runs of anything else become one
+ *  hyphen, no leading or trailing hyphen, at most 63 characters. "Research
+ *  Lead" is `research-lead`. One spelling for the composer, the route and the
+ *  rail, so a product never derives its own. An empty result (a name with no
+ *  letters or digits) is `agent`. */
+export function agentHandle(name: string): string {
+  const handle = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63).replace(/-+$/, '')
+  return handle || 'agent'
+}
 const AGENT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 
 const MENTION_IMAGE_MEDIA_TYPES: ReadonlyMap<string, string> = new Map([

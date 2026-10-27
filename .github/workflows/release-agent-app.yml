@@ -35,6 +35,9 @@ on:
       GTM_CHAT_SMOKE_PASSWORD: {required: false}
       PLATFORM_WORKFLOW_SMOKE_EMAIL: {required: false}
       PLATFORM_WORKFLOW_SMOKE_PASSWORD: {required: false}
+      # A native release that migrates an external database, or reaches its release host over SSH.
+      DATABASE_URL: {required: false}
+      RELEASE_SSH_KEY: {required: false}
     outputs:
       source-sha: {value: '${{ jobs.release.outputs.source-sha }}'}
       deployed: {value: '${{ jobs.release.outputs.deployed }}'}
@@ -172,6 +175,10 @@ jobs:
           GTM_CHAT_SMOKE_PASSWORD: ${{ secrets.GTM_CHAT_SMOKE_PASSWORD }}
           PLATFORM_WORKFLOW_SMOKE_EMAIL: ${{ secrets.PLATFORM_WORKFLOW_SMOKE_EMAIL }}
           PLATFORM_WORKFLOW_SMOKE_PASSWORD: ${{ secrets.PLATFORM_WORKFLOW_SMOKE_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
+          # The native release writes its sanitized canary receipts here; they upload with the release receipt.
+          RELEASE_EVIDENCE_DIR: ${{ runner.temp }}/agent-app-release-evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -190,7 +197,8 @@ jobs:
             'APP_TOOL_SECRET', 'SANDBOX_API_KEY', 'SANDBOX_PRODUCTION_API_KEY', 'SANDBOX_PREVIOUS_API_KEY',
             'TANGLE_API_KEY', 'TAX_PLATFORM_SERVICE_TOKEN', 'SMOKE_PLATFORM_EMAIL', 'SMOKE_PLATFORM_PASSWORD',
             'GTM_AGENT_SERVICE_TOKEN', 'CRON_SECRET', 'GTM_OWNER_ASK_CLIENT_ID', 'GTM_OWNER_ASK_CLIENT_SECRET',
-            'GTM_CHAT_SMOKE_EMAIL', 'GTM_CHAT_SMOKE_PASSWORD', 'PLATFORM_WORKFLOW_SMOKE_EMAIL', 'PLATFORM_WORKFLOW_SMOKE_PASSWORD']
+            'GTM_CHAT_SMOKE_EMAIL', 'GTM_CHAT_SMOKE_PASSWORD', 'PLATFORM_WORKFLOW_SMOKE_EMAIL', 'PLATFORM_WORKFLOW_SMOKE_PASSWORD',
+            'DATABASE_URL', 'RELEASE_SSH_KEY']
           for (const name of secretNames) if (!nativeEnv[name]) delete nativeEnv[name]
           const result = spawnSync('bash', ['-euo', 'pipefail', '-c', process.env.RELEASE_COMMAND], {
             stdio: 'inherit', env: nativeEnv, cwd: process.env.ARTIFACT_WORKSPACE,
@@ -259,7 +267,9 @@ jobs:
         if: always()
         with:
           name: agent-app-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/agent-app-release.json
+          path: |
+            ${{ runner.temp }}/agent-app-release.json
+            ${{ runner.temp }}/agent-app-release-evidence/
           if-no-files-found: warn
           retention-days: 30
   suites:
@@ -290,6 +300,8 @@ jobs:
       - name: Full post-release suites from the native owner
         env:
           SUITES_COMMAND: ${{ inputs.suites-command }}
+          # A post-release check that drives the served app from its release host (QA leases and browsers).
+          RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
         shell: bash
         run: |
           set -euo pipefail

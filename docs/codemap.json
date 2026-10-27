@@ -2564,6 +2564,12 @@
           "doc": "A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name."
         },
         {
+          "name": "agentHandle",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters."
+        },
+        {
           "name": "AgentMention",
           "kind": "interface",
           "signature": "interface AgentMention",
@@ -3434,6 +3440,12 @@
           "doc": "A persisted message whose attachment pointers accompany its history text."
         },
         {
+          "name": "DispatchHistoryPov",
+          "kind": "interface",
+          "signature": "interface DispatchHistoryPov",
+          "doc": "Whose eyes the history is read through."
+        },
+        {
           "name": "DispatchPartsOutcome",
           "kind": "type",
           "signature": "type DispatchPartsOutcome",
@@ -3982,7 +3994,7 @@
         {
           "name": "projectDispatchHistory",
           "kind": "function",
-          "signature": "(messages: readonly DispatchHistoryMessage[]) => { role: \"user\" | \"assistant\"; content: string; }[]",
+          "signature": "(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: \"user\" | \"assistant\"; content: stri…",
           "doc": "Project persisted rows using the same role and attachment policy as dispatch."
         },
         {
@@ -4114,8 +4126,8 @@
         {
           "name": "routerTurnHistory",
           "kind": "function",
-          "signature": "(priorMessages: readonly Pick<PersistedChatMessageForTurn, \"content\" | \"role\">[], limit?: number) => { role: \"user\" | \"…",
-          "doc": "The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text."
+          "signature": "(priorMessages: readonly (Pick<PersistedChatMessageForTurn, \"content\" | \"role\"> & { parts?: readonly Record<string, unk…",
+          "doc": "The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…"
         },
         {
           "name": "RouterTurnKey",
@@ -26463,7 +26475,7 @@
           "name": "formatServerTiming",
           "kind": "function",
           "signature": "(entries: readonly ServerTimingEntry[]) => string",
-          "doc": "Format metrics as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
+          "doc": "Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}."
         },
         {
           "name": "IntelligenceTurnTraceSinkOptions",
@@ -26481,7 +26493,7 @@
           "name": "OtlpSpan",
           "kind": "interface",
           "signature": "interface OtlpSpan",
-          "doc": "One OTLP/JSON span, as Intelligence's ingest reads it."
+          "doc": "One span as an OTLP/HTTP JSON export carries it."
         },
         {
           "name": "otlpTraceId",
@@ -26493,7 +26505,7 @@
           "name": "parseServerTiming",
           "kind": "function",
           "signature": "(header: string | null | undefined) => ServerTimingEntry[]",
-          "doc": "Parse a `Server-Timing` header."
+          "doc": "Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it."
         },
         {
           "name": "resolveIngestKey",
@@ -26511,7 +26523,7 @@
           "name": "ServerTimingEntry",
           "kind": "interface",
           "signature": "interface ServerTimingEntry",
-          "doc": "One metric of a `Server-Timing` header."
+          "doc": "One entry of a `Server-Timing` response header."
         },
         {
           "name": "summarizeTurnSpans",
@@ -26735,7 +26747,7 @@
         {
           "name": "VaultTree",
           "kind": "function",
-          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, className…",
+          "signature": "({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, status, cl…",
           "doc": null
         },
         {
@@ -28296,6 +28308,12 @@
           "doc": null
         },
         {
+          "name": "AGENT_HANDLE_PATTERN",
+          "kind": "const",
+          "signature": "RegExp",
+          "doc": "A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name."
+        },
+        {
           "name": "AGENT_PROFILE_EDITOR_SECTIONS",
           "kind": "const",
           "signature": "readonly AgentProfileEditorSection[]",
@@ -28324,6 +28342,18 @@
           "kind": "interface",
           "signature": "interface AgentActivityRecord",
           "doc": "A delegation record on the cross-context surface; `missionRef` links a promoted delegation back to the mission/step that spawned it."
+        },
+        {
+          "name": "agentHandle",
+          "kind": "function",
+          "signature": "(name: string) => string",
+          "doc": "The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters."
+        },
+        {
+          "name": "AgentMention",
+          "kind": "interface",
+          "signature": "interface AgentMention",
+          "doc": "An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to."
         },
         {
           "name": "AgentMentionOption",
@@ -28684,6 +28714,12 @@
           "kind": "type",
           "signature": "type ChatInteractionStatus",
           "doc": "Define possible statuses representing the state of a chat interaction"
+        },
+        {
+          "name": "ChatMention",
+          "kind": "type",
+          "signature": "type ChatMention",
+          "doc": "Everything the composer can `@`: a file in the box or an agent in the workspace."
         },
         {
           "name": "ChatMentionKind",
@@ -30774,6 +30810,12 @@
           "doc": "Split a message's text into plain-text and mention segments by matching `@<path>` runs against that message's own mention parts."
         },
         {
+          "name": "segmentsFromParts",
+          "kind": "function",
+          "signature": "(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]",
+          "doc": "The ordered text, tool and notice runs of a message, as the transcript interleaves them."
+        },
+        {
           "name": "SessionActionLabels",
           "kind": "interface",
           "signature": "interface SessionActionLabels",
@@ -30958,6 +31000,18 @@
           "kind": "function",
           "signature": "(list: ChatInteraction[], status: \"expired\" | \"answered\") => ChatInteraction[]",
           "doc": "Settles every still-pending ask when the turn ends: `answered` for a turn that completed cleanly, `expired` for one that failed."
+        },
+        {
+          "name": "toolCallFromPart",
+          "kind": "function",
+          "signature": "(part: unknown) => ChatToolCallInfo | null",
+          "doc": "A stored `tool` part as the card the transcript draws."
+        },
+        {
+          "name": "toolCallsFromParts",
+          "kind": "function",
+          "signature": "(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]",
+          "doc": "Every tool call on a message, in stored order."
         },
         {
           "name": "ToolDetailPresentation",

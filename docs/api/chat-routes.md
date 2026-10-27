@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-322 exports.
+324 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -20,6 +20,14 @@ type AbortAttachmentWriteFn
 
 ```ts
 RegExp
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
 ```
 
 ### `AgentMention`
@@ -1182,6 +1190,14 @@ number
 interface DispatchHistoryMessage
 ```
 
+### `DispatchHistoryPov`
+
+`interface` — Whose eyes the history is read through.
+
+```ts
+interface DispatchHistoryPov
+```
+
 ### `DispatchPartsOutcome`
 
 `type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
@@ -1915,7 +1931,7 @@ type ProducerWireEvent
 `function` — Project persisted rows using the same role and attachment policy as dispatch.
 
 ```ts
-(messages: readonly DispatchHistoryMessage[]) => { role: "user" | "assistant"; content: string; }[]
+(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: "user" | "assistant"; content: stri…
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
@@ -2088,10 +2104,10 @@ type ResolveChatAttachmentsResult
 
 ### `routerTurnHistory`
 
-`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…
 
 ```ts
-(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+(priorMessages: readonly (Pick<PersistedChatMessageForTurn, "content" | "role"> & { parts?: readonly Record<string, unk…
 ```
 
 ### `RouterTurnKey`

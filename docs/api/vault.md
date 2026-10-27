@@ -163,7 +163,7 @@ type VaultRichParts
 `function`
 
 ```ts
-({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, className…
+({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, status, cl…
 ```
 
 ### `VaultTreeNode`

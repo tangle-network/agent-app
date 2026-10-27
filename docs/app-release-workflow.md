@@ -8,7 +8,7 @@ The workflow separates three existing command boundaries:
 | --- | --- |
 | `preflight-command` | Frozen lifecycle install, types, lint, build, bundle checks and applicable non-credentialed invariants. This command prepares the artifact that the release consumes. |
 | `release-command` | Credentialed startup qualification, additive migrations, native deployment, exact served identity, bounded smoke/canary and compatible artifact recovery. It consumes the already built artifact. |
-| `suites-command` | Its own frozen install and the app's complete post-release non-credentialed test population. This job runs on the same source commit after the release job. |
+| `suites-command` | Its own frozen install and the app's complete post-release test population, plus any post-release check of the served app through its release host (`RELEASE_SSH_KEY` is its only credential). This job runs on the same source commit after the release job. |
 
 These are command inputs to the existing native surfaces, not additional CLIs. Release-only and suite-only modes must leave the normal full merge gate unchanged. A named suite with excluded cases is not proof of full coverage: account for every moved case before adopting the split.
 
@@ -65,7 +65,7 @@ Existing commands must adapt these output semantics explicitly before switching 
 
 The workflow returns source, deployment, qualified served SHA and separate release/suite phase results. Its sanitized artifact preserves physical deployment, native served time, recovery and qualification independently. It does not collect credentials, reconstruct billing or infer served time from job completion. `qualifiedAt` is a later qualification observation, never an alias for `servedAt`.
 
-Keep each app's existing sanitized native canary diagnostics and release receipt. The generic receipt supplements their provenance; it must not replace native evidence or silently erase a partial mutation.
+Keep each app's existing sanitized native canary diagnostics and release receipt, written under `RELEASE_EVIDENCE_DIR` so the workflow uploads them with its receipt: a release runner's home does not outlive its job. The generic receipt supplements their provenance; it must not replace native evidence or silently erase a partial mutation.
 
 ## Failure reporting and measurements
 

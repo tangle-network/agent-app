@@ -13,7 +13,7 @@ export function routerRouteProducer<TContext, TResource>(value: ChatTurnRouterBa
   const options = {
     ...value,
     userMessage: value.userMessage ?? turnPromptText(args.prompt),
-    history: value.history ?? routerTurnHistory(args.priorMessages),
+    history: value.history ?? routerTurnHistory(args.priorMessages, undefined, { pov: args.agent?.id }),
     trace: args.trace,
     traceId: args.trace?.traceId,
     signal: args.admissionSignal,

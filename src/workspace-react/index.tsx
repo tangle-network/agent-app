@@ -26,6 +26,18 @@ function routePathFromHref(href: string, base: string): string | null {
   return path.slice(root.length)
 }
 
+/**
+ * A rail row's href must be a local route path; its query and fragment are
+ * allowed (`routePathFromHref` drops them for active matching). A bad href
+ * drops that row and reports it, since throwing here renders the product's
+ * error page for the whole workspace.
+ */
+function localRailHref(kind: 'app' | 'agent', id: string, href: string): string | null {
+  if (href.startsWith('/') && !href.startsWith('//') && !href.includes('\\')) return href
+  console.error(`Workspace ${kind} href must be a local route path; dropped ${kind} ${id}: ${href}`)
+  return null
+}
+
 /** The session data and product-owned URLs needed by the default workspace. */
 export interface AgentWorkspaceSessionConfig {
   /** Icon shown beside the expandable History row. */
@@ -216,32 +228,21 @@ export function AgentWorkspaceLayout({
       })()
     : undefined
 
-  const appNavItems: SidebarLayoutNavItem[] = (apps?.items ?? []).map((app) => {
-    const href = apps!.hrefForApp(app.id)
-    if (!href.startsWith('/') || href.startsWith('//') || /[?#\\]/.test(href)) {
-      throw new Error('Workspace app href must be a local route path')
-    }
-    return {
-      id: 'workspace-app:' + app.id,
-      label: app.name,
-      icon: apps!.icon,
-      href,
-      prefetch: apps!.prefetch,
-    }
+  const appNavItems: SidebarLayoutNavItem[] = (apps?.items ?? []).flatMap((app) => {
+    const href = localRailHref('app', app.id, apps!.hrefForApp(app.id))
+    return href ? [{ id: 'workspace-app:' + app.id, label: app.name, icon: apps!.icon, href, prefetch: apps!.prefetch }] : []
   })
   const agentNavItems: SidebarLayoutNavItem[] = [
-    ...(agents?.items ?? []).map((agent) => {
-      const href = agents!.hrefForAgent(agent.id)
-      if (!href.startsWith('/') || href.startsWith('//') || /[?#\\]/.test(href)) {
-        throw new Error('Workspace agent href must be a local route path')
-      }
-      return {
+    ...(agents?.items ?? []).flatMap((agent) => {
+      const href = localRailHref('agent', agent.id, agents!.hrefForAgent(agent.id))
+      if (!href) return []
+      return [{
         id: 'workspace-agent:' + agent.id,
         label: agent.handle ? `${agent.name} · @${agent.handle}` : agent.name,
         icon: agents!.icon,
         href,
         prefetch: agents!.prefetch,
-      }
+      }]
     }),
     ...(agents?.createHref
       ? [{ id: 'workspace-agent:new', label: agents.createLabel ?? 'New agent', icon: agents.icon, href: agents.createHref, prefetch: agents.prefetch }]

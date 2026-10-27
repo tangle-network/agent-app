@@ -3231,6 +3231,14 @@ type AbortAttachmentWriteFn
 RegExp
 ```
 
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
 ### `AgentMention`
 
 `interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
@@ -4391,6 +4399,14 @@ number
 interface DispatchHistoryMessage
 ```
 
+### `DispatchHistoryPov`
+
+`interface` — Whose eyes the history is read through.
+
+```ts
+interface DispatchHistoryPov
+```
+
 ### `DispatchPartsOutcome`
 
 `type` — Resolve the outcome of dispatching parts with success status and corresponding value or error message
@@ -5124,7 +5140,7 @@ type ProducerWireEvent
 `function` — Project persisted rows using the same role and attachment policy as dispatch.
 
 ```ts
-(messages: readonly DispatchHistoryMessage[]) => { role: "user" | "assistant"; content: string; }[]
+(messages: readonly DispatchHistoryMessage[], view?: DispatchHistoryPov) => { role: "user" | "assistant"; content: stri…
 ```
 
 ### `PROMOTE_MAX_FILE_BYTES`
@@ -5297,10 +5313,10 @@ type ResolveChatAttachmentsResult
 
 ### `routerTurnHistory`
 
-`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text.
+`function` — The conversation so far as the plain text history a Router turn replays: the last `limit` user and assistant messages that have text, read through the responder's point of view when the turn was addr…
 
 ```ts
-(priorMessages: readonly Pick<PersistedChatMessageForTurn, "content" | "role">[], limit?: number) => { role: "user" | "…
+(priorMessages: readonly (Pick<PersistedChatMessageForTurn, "content" | "role"> & { parts?: readonly Record<string, unk…
 ```
 
 ### `RouterTurnKey`
@@ -34131,7 +34147,7 @@ interface CreateTurnTraceOptions
 
 ### `formatServerTiming`
 
-`function` — Format metrics as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
+`function` — Format entries as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
 
 ```ts
 (entries: readonly ServerTimingEntry[]) => string
@@ -34155,7 +34171,7 @@ interface IntelligenceTurnTraceSinkOptions
 
 ### `OtlpSpan`
 
-`interface` — One OTLP/JSON span, as Intelligence's ingest reads it.
+`interface` — One span as an OTLP/HTTP JSON export carries it.
 
 ```ts
 interface OtlpSpan
@@ -34171,7 +34187,7 @@ interface OtlpSpan
 
 ### `parseServerTiming`
 
-`function` — Parse a `Server-Timing` header.
+`function` — Parse a `Server-Timing` header, as the Router and the Sandbox orchestrator send it.
 
 ```ts
 (header: string | null | undefined) => ServerTimingEntry[]
@@ -34195,7 +34211,7 @@ interface OtlpSpan
 
 ### `ServerTimingEntry`
 
-`interface` — One metric of a `Server-Timing` header.
+`interface` — One entry of a `Server-Timing` response header.
 
 ```ts
 interface ServerTimingEntry
@@ -34483,7 +34499,7 @@ type VaultRichParts
 `function`
 
 ```ts
-({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, className…
+({ root, selectedPath, activeFolder, onSelect, onFolderToggle, onFolderSelect, storageKey, expandAll, label, status, cl…
 ```
 
 ### `VaultTreeNode`
@@ -36468,6 +36484,14 @@ Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes
 type ActivityTone
 ```
 
+### `AGENT_HANDLE_PATTERN`
+
+`const` — A handle is what a person types after `@`: lowercase letters, digits and hyphens, as `normalizeProfileName` in `/agent-profiles` spells a name.
+
+```ts
+RegExp
+```
+
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
 `const`
@@ -36506,6 +36530,22 @@ interface AgentActivityPanelProps
 
 ```ts
 interface AgentActivityRecord
+```
+
+### `agentHandle`
+
+`function` — The handle a profile name gets: lowercase, runs of anything else become one hyphen, no leading or trailing hyphen, at most 63 characters.
+
+```ts
+(name: string) => string
+```
+
+### `AgentMention`
+
+`interface` — An agent mention from the composer's `@`-picker: a workspace agent the turn is addressed to.
+
+```ts
+interface AgentMention
 ```
 
 ### `AgentMentionOption`
@@ -36986,6 +37026,14 @@ type ChatInteractionRestoreMode
 
 ```ts
 type ChatInteractionStatus
+```
+
+### `ChatMention`
+
+`type` — Everything the composer can `@`: a file in the box or an agent in the workspace.
+
+```ts
+type ChatMention
 ```
 
 ### `ChatMentionKind`
@@ -39772,6 +39820,14 @@ interface SeatPaywallProps
 (content: string, parts: readonly ChatMentionPart[]) => { segments: MentionTextSegment[]; matched: Set<ChatMentionPart>…
 ```
 
+### `segmentsFromParts`
+
+`function` — The ordered text, tool and notice runs of a message, as the transcript interleaves them.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatMessageSegment[]
+```
+
 ### `SessionActionLabels`
 
 `interface`
@@ -40018,6 +40074,22 @@ type SubmitInteractionAnswer
 
 ```ts
 (list: ChatInteraction[], status: "expired" | "answered") => ChatInteraction[]
+```
+
+### `toolCallFromPart`
+
+`function` — A stored `tool` part as the card the transcript draws.
+
+```ts
+(part: unknown) => ChatToolCallInfo | null
+```
+
+### `toolCallsFromParts`
+
+`function` — Every tool call on a message, in stored order.
+
+```ts
+(parts: readonly unknown[] | null | undefined) => ChatToolCallInfo[]
 ```
 
 ### `ToolDetailPresentation`

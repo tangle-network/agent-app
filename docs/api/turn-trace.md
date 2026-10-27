@@ -64,7 +64,7 @@ interface IntelligenceTurnTraceSinkOptions
 
 ### `OtlpSpan`
 
-`interface` — One OTLP/JSON span, as Intelligence's ingest reads it.
+`interface` — One span as an OTLP/HTTP JSON export carries it.
 
 ```ts
 interface OtlpSpan
