@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.64
+
+- ci(release): accept a database URL and release-host SSH key (#1390)
+
 ## 0.63.63
 
 - refactor(turn-trace): OTLP ids and encoding from agent-trace-contract (#1387)
