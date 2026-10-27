@@ -93,7 +93,7 @@ jobs:
           git merge-base --is-ancestor HEAD "refs/remotes/origin/$DEFAULT_BRANCH"
           test -z "$(git status --porcelain)"
           echo "validated=true" >> "$GITHUB_OUTPUT"
-      - uses: tangle-network/agent-app/.github/actions/setup-release@997df579248912d2ee5fcbcdbf225fb65a23cc33
+      - uses: tangle-network/agent-app/.github/actions/setup-release@4e3fc29cb0e7d1bf6e767c08e637d8b9b65e83f6
         with:
           node-version-file: ${{ inputs.node-version-file }}
       - name: Record release start
@@ -294,7 +294,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: tangle-network/agent-app/.github/actions/setup-release@997df579248912d2ee5fcbcdbf225fb65a23cc33
+      - uses: tangle-network/agent-app/.github/actions/setup-release@4e3fc29cb0e7d1bf6e767c08e637d8b9b65e83f6
         with:
           node-version-file: ${{ inputs.node-version-file }}
       - name: Full post-release suites from the native owner
