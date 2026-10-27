@@ -31,8 +31,8 @@ interface ChunkNode {
  *
  * The group sets `maxSize: Infinity` so an app's global `codeSplitting.maxSize`
  * cannot split the package again: measured on gtm-agent, a 450 KB global limit
- * cut it into 7 chunks that imported each other. Its priority sits under the
- * 100 that apps give to polyfill groups, so those keep their modules.
+ * cut it into 7 chunks that imported each other. Priority 90 leaves the modules
+ * of an app's own higher-priority groups (a polyfill group at 100, say) to them.
  */
 export function workerChunkGraph(): Plugin {
   return {
