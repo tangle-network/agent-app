@@ -13,9 +13,11 @@
  *
  * Handlers return a discriminated `InvitationOutcome` (not a `Response`) so the
  * route adapter maps `{ status }` to its own framework's response. Three seams:
- *   - `sendInvitationEmail` (REQUIRED) — the app's mail transport. Returns a
+ *   - `sendInvitationEmail` (OPTIONAL) — the app's mail transport. Returns a
  *     typed outcome; a failed send never blocks invitation creation (emailStatus
- *     is recorded as 'failed' and the invite link is still returned).
+ *     is recorded as 'failed' and the invite link is still returned). Without
+ *     it the product is link-only: nothing is sent, the row stays `not_sent`,
+ *     and resend is refused.
  *   - `enforceSeat` (OPTIONAL) — billing/seat-limit gate, called at create time
  *     only when the invite would consume a NEW seat. Reused from members-api.
  *   - `memberSyncSeam.add` (OPTIONAL) — fire-and-forget propagation of the new
@@ -88,8 +90,8 @@ export interface InvitationsApiOptions {
   userTable: TeamParentTable & InvitationUserTable
   workspaceTable: TeamParentTable & InvitationWorkspaceTable
   access: WorkspaceAccessReader
-  /** REQUIRED — the app's mail transport (e.g. Resend + `inviteEmail` from `./email`). */
-  sendInvitationEmail: SendInvitationEmailSeam
+  /** The app's mail transport (e.g. Resend + `inviteEmail` from `./email`). Leave it out for link-only invitations. */
+  sendInvitationEmail?: SendInvitationEmailSeam
   /** OPTIONAL — seat-limit gate at create time; mirrors members-api. */
   enforceSeat?: EnforceSeatSeam
   /** OPTIONAL — fire-and-forget member propagation on accept. */
@@ -254,6 +256,7 @@ export function createInvitationsApi(opts: InvitationsApiOptions) {
     const accessRow = await access.getWorkspaceAccess(row.invitation.workspaceId, input.userId, 'admin')
     if (!accessRow) return { succeeded: false, status: 404, error: 'Workspace not found' }
 
+    if (!sendInvitationEmail) return { succeeded: false, status: 409, error: 'Invitations here are links. Copy the link and share it instead.' }
     const now = input.now ?? new Date()
     if (row.invitation.status !== 'pending') {
       return { succeeded: false, status: 409, error: 'Only pending invitations can be resent' }
@@ -676,6 +679,7 @@ function createInvitationIssuer(
     }).returning()
 
     const inviteUrl = inviteUrlForToken(input.origin, token)
+    if (!sendInvitationEmail) return { succeeded: true, value: { invitation: toInvitationView(created!, accountCheck.inviterEmail), inviteUrl } }
     const emailResult = await sendInvitationEmail({
       to: email,
       workspaceName,

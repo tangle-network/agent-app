@@ -10289,7 +10289,7 @@
         {
           "name": "loadJourneysConfig",
           "kind": "function",
-          "signature": "(dir?: any, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
+          "signature": "(dir?: string, env?: Record<string, string | undefined>) => Promise<ResolvedJourneysConfig>",
           "doc": "`JOURNEYS_CONFIG`, else the first config file in `dir`."
         },
         {
@@ -13884,7 +13884,7 @@
         {
           "name": "delegatedKeyFallbackFetch",
           "kind": "function",
-          "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: ((input: URL | R…",
+          "signature": "(input: { key: DelegatedTurnKey; remint: () => Promise<DelegatedKeyOutcome<DelegatedTurnKey>>; fetch?: { (input: URL |…",
           "doc": "A fetch for one turn that sends a pre-minted key."
         },
         {
@@ -14148,7 +14148,7 @@
         {
           "name": "platformAuthClientOptionsFromEnv",
           "kind": "function",
-          "signature": "(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: ((input: URL…",
+          "signature": "(defaultAppId: string, overrides?: { baseUrl?: string | undefined; appId?: string | undefined; fetchImpl?: { (input: UR…",
           "doc": "Options for the platform's cross-site SSO client: the base URL, the app id registered in the platform's trusted-apps registry (`TANGLE_PLATFORM_APP_ID`, else the product's own), and a fetch the clien…"
         },
         {
@@ -21291,7 +21291,7 @@
         {
           "name": "InvitationsSection",
           "kind": "function",
-          "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, }: InvitationsSectionProps) => Element",
+          "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, delivery, }: InvitationsSectionProps) => Element",
           "doc": null
         },
         {
@@ -21303,7 +21303,7 @@
         {
           "name": "MembersSection",
           "kind": "function",
-          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…",
+          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, delivery, plans…",
           "doc": null
         },
         {
@@ -24535,6 +24535,12 @@
           "doc": "Define the number of days before an invitation expires"
         },
         {
+          "name": "InvitationDelivery",
+          "kind": "type",
+          "signature": "type InvitationDelivery",
+          "doc": "How an invitation reaches the person: `email` sends them the link; `link` sends nothing, and the inviter shares it."
+        },
+        {
           "name": "InvitationEmailStatus",
           "kind": "type",
           "signature": "type InvitationEmailStatus",
@@ -26534,7 +26540,7 @@
         {
           "name": "tracedModelFetch",
           "kind": "function",
-          "signature": "(trace: TurnTrace, inner: (input: URL | RequestInfo, init?: RequestInit | undefined) => Promise<Response>, options?: Tr…",
+          "signature": "(trace: TurnTrace, inner: { (input: URL | RequestInfo, init?: RequestInit | undefined): Promise<Response>; (input: stri…",
           "doc": "`fetch` for a model request, recording one `model.call` span per send: the wall time from the request to the end of its body, the time to the first byte, and the Router's own `Server-Timing` so the w…"
         },
         {
@@ -31846,7 +31852,7 @@
         {
           "name": "installFetchResponseObserver",
           "kind": "function",
-          "signature": "(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…",
+          "signature": "(onResponse: (response: Response, args: [input: string | Request | URL, init?: RequestInit | undefined]) => void | Prom…",
           "doc": "Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response."
         },
         {
@@ -32529,6 +32535,20 @@
           "kind": "type",
           "signature": "type WorkProductPaneTab",
           "doc": null
+        }
+      ]
+    },
+    {
+      "id": "./worker-build",
+      "source": "src/worker-build/index.ts",
+      "dependsOn": [],
+      "error": null,
+      "exports": [
+        {
+          "name": "workerChunkGraph",
+          "kind": "function",
+          "signature": "() => Plugin<any>",
+          "doc": "Put every `@tangle-network/agent-interface` module of the Worker bundle in one chunk, and fail the build when the bundle has a static chunk cycle."
         }
       ]
     },

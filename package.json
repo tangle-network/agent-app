@@ -1,6 +1,6 @@
 {
   "name": "@tangle-network/agent-app",
-  "version": "0.63.75",
+  "version": "0.63.76",
   "packageManager": "pnpm@11.28.8",
   "description": "Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.",
   "keywords": [
@@ -214,6 +214,11 @@
       "types": "./dist/preset-cloudflare/index.d.ts",
       "import": "./dist/preset-cloudflare/index.js",
       "default": "./dist/preset-cloudflare/index.js"
+    },
+    "./worker-build": {
+      "types": "./dist/worker-build/index.d.ts",
+      "import": "./dist/worker-build/index.js",
+      "default": "./dist/worker-build/index.js"
     },
     "./billing": {
       "types": "./dist/billing/index.d.ts",
@@ -801,14 +806,14 @@
     "@tangle-network/agent-interface": "5.10.2",
     "@tangle-network/agent-knowledge": "23.0.0",
     "@tangle-network/agent-profile-materialize": "1.1.2",
-    "@tangle-network/agent-runtime": "2.0.2",
+    "@tangle-network/agent-runtime": "2.0.3",
     "@tangle-network/brand": "1.29.0",
     "@tangle-network/browser-agent-driver": "0.37.0",
     "@tangle-network/hub-sdk": "1.0.4",
-    "@tangle-network/sandbox": "1.0.39",
+    "@tangle-network/sandbox": "1.0.40",
     "@tangle-network/sandbox-ui": "1.1.5",
     "@tangle-network/tcloud": "0.8.6",
-    "@tangle-network/ui": "11.47.0",
+    "@tangle-network/ui": "11.48.0",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",

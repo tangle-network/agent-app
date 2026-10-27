@@ -18,7 +18,11 @@ GTM's [release phase split](https://github.com/tangle-network/gtm-agent/pull/189
 
 `environment` names the caller's existing protected environment. Preserve its allowed branches, required reviewers and existing deployment identity checks. Do not create a replacement environment to avoid a restriction.
 
-`release-runs-on` and optional `suites-runs-on` are JSON GitHub runner specifications, accepting a label array or runner-group object. Omit `suites-runs-on` to use the workflow's deployment-runner default; reserve `ci-ops` for short API and observation jobs. Native SQLite/browser prerequisites, QA leases and host credential capabilities remain app-owned admission requirements. The suite runner also hosts the light failure-reporting job; the shared workflow never selects a hosted runner for a private app.
+`release-runs-on`, `suites-runs-on` and `report-runs-on` are JSON GitHub runner specifications, accepting a label array or runner-group object. Omit the optional two to use the workflow's defaults. Releases and post-release suites share the `ci-deploy` runners (the operator's decision on 2026-10-27: no separate suite pool; release wait is managed by deploy-runner capacity in tangle-devops), and the light failure-reporting job and the update bots take `ci-ops`. Native SQLite/browser prerequisites, QA leases and host credential capabilities remain app-owned admission requirements. The shared workflow never selects a hosted runner for a private app.
+
+`suites-shards` (1 to 4, default 1) runs `suites-command` once per shard in parallel, each with `SUITES_SHARD_INDEX` (1-based) and `SUITES_SHARD_TOTAL` in its environment. The command owns the split: it passes `--shard=$SUITES_SHARD_INDEX/$SUITES_SHARD_TOTAL` to its test runner and places any step that cannot be sharded on one shard, so the shards together run the full population. A command that ignores these variables runs everything on every shard, so leave the input at 1 until the command splits. Shards run to completion independently, and any red shard makes the suite phase red. Size the count to the `ci-deploy` runners available; shards beyond them queue.
+
+Suites for one repository share a concurrency group per shard with cancel-in-progress. A newer release's suites cover an older commit's changes, so the older run is cancelled whether it is queued or running. That run's suite phase reports `cancelled`, which files no issue and is neither a pass nor a failure; its release phase result is unaffected.
 
 The native preflight retains the app's package manager. pnpm setup runs only for a caller with its root `pnpm-lock.yaml`; npm callers keep their existing frozen npm commands.
 
@@ -63,7 +67,7 @@ The shared workflow validates `qualified-served-sha` against the immutable candi
 
 Existing commands must adapt these output semantics explicitly before switching their caller. A wrapper that unconditionally echoes `deployed=true` or a candidate SHA after running an old command is not a qualified adapter.
 
-The workflow returns source, deployment, qualified served SHA and separate release/suite phase results. Its sanitized artifact preserves physical deployment, native served time, recovery and qualification independently. It does not collect credentials, reconstruct billing or infer served time from job completion. `qualifiedAt` is a later qualification observation, never an alias for `servedAt`.
+The workflow returns source, deployment, qualified served SHA and the release phase result; the suite phase reports through its own jobs and the rolling issue, because a sharded matrix has no single job output. Its sanitized artifact preserves physical deployment, native served time, recovery and qualification independently. It does not collect credentials, reconstruct billing or infer served time from job completion. `qualifiedAt` is a later qualification observation, never an alias for `servedAt`.
 
 Keep each app's existing sanitized native canary diagnostics and release receipt, written under `RELEASE_EVIDENCE_DIR` so the workflow uploads them with its receipt: a release runner's home does not outlive its job. The generic receipt supplements their provenance; it must not replace native evidence or silently erase a partial mutation.
 

@@ -43,7 +43,7 @@ interface AppDocumentProps
 `function` — Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response.
 
 ```ts
-(onResponse: (response: Response, args: [input: URL | RequestInfo, init?: RequestInit | undefined]) => void | Promise<v…
+(onResponse: (response: Response, args: [input: string | Request | URL, init?: RequestInit | undefined]) => void | Prom…
 ```
 
 ### `svgFaviconHref`

@@ -14,6 +14,8 @@ export type InvitationPermission = AssignableWorkspaceRole
 export type InvitationStatus = 'pending' | 'accepted' | 'expired' | 'revoked'
 /** Define possible statuses for the sending state of an invitation email */
 export type InvitationEmailStatus = 'not_sent' | 'sent' | 'failed'
+/** How an invitation reaches the person: `email` sends them the link; `link` sends nothing, and the inviter shares it. */
+export type InvitationDelivery = 'email' | 'link'
 
 /** Define the number of days before an invitation expires */
 export const INVITATION_EXPIRY_DAYS = 7
