@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.71
+
+- test:generated: the scratch store is gone on every exit, and stale stores are swept at start (#1399)
+- chore(deps): adopt 4 @tangle-network/* packages (#1400)
+
 ## 0.63.70
 
 - stories(chat): two agents answering at once (#1398)
