@@ -660,7 +660,7 @@ function AssistantPanelHeader({ layout, onClose, toggleRef, effectiveBalance, fo
         )}
         <div className="flex min-w-0 flex-1 flex-col justify-center">
           <div className="flex min-w-0 items-baseline gap-2">
-            <h2 className="truncate font-semibold text-[length:var(--font-size-base)] text-foreground leading-tight">
+            <h2 className="truncate font-semibold text-[length:var(--font-size-sm)] text-foreground leading-tight">
               Assistant
             </h2>
             {effectiveBalance != null && (

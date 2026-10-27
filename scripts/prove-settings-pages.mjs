@@ -46,7 +46,7 @@ createRoot(document.getElementById('root')).render(view === 'team-panels'
   ? <TeamPanelsDemo viewer={viewer} />
   : view === 'save-group'
   ? <SaveGroupDemo />
-  : <SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} />)`
+  : <SettingsDemo backend={backend} viewer={viewer} initialSection={params.get('section') ?? 'general'} delivery={params.get('delivery') === 'link' ? 'link' : 'email'} />)`
 
 // The demo imports the package's source paths; the proof runs the built package.
 const distPackage = {
@@ -128,6 +128,7 @@ try {
         colorScheme: theme,
         ...(tag === '1280-dark' || tag === '390-light' ? { recordVideo: { dir: output, size: { width, height: phone ? 844 : 900 } } } : {}),
       })
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
       const page = await context.newPage()
       page.on('pageerror', (error) => browserErrors.push(`${tag}: ${error.message}`))
       const shot = async (name) => {
@@ -466,6 +467,41 @@ try {
       })
       await invite.getByRole('button', { name: 'Cancel' }).click()
       await expect(invite).toHaveCount(0)
+
+      // A product that emails no invitations: Invite mints a link to copy, and no row mentions email.
+      await open('section=team&delivery=link')
+      const linkMembers = page.locator('#members')
+      await linkMembers.getByRole('button', { name: 'Invite', exact: true }).click()
+      const linkInvite = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
+      await check(`${tag}: a link-only Invite promises a link, not an email`, async () => {
+        await expect(linkInvite).toContainText('No email is sent')
+        await expect(linkInvite.locator('[data-confirm-action]')).toHaveText('Create invite link')
+      })
+      await linkInvite.getByLabel('Email').fill('dana@fieldnote.example')
+      await shot('invite-link-dialog')
+      await linkInvite.locator('[data-confirm-action]').click()
+      const mintedField = linkMembers.getByLabel('Invite link for dana@fieldnote.example')
+      await check(`${tag}: the server's link shows in the card and Copy link copies it`, async () => {
+        await expect(mintedField).toHaveValue('https://app.example/invite/i6')
+        await linkMembers.getByRole('button', { name: 'Copy link' }).click()
+        await expect(linkMembers).toContainText('Link copied')
+        assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'https://app.example/invite/i6')
+        assert.ok(await page.evaluate((opened) => document.documentElement.scrollWidth <= opened, width), 'the page scrolls sideways')
+        assert.deepEqual(await tinyText(page), [])
+      })
+      await mintedField.scrollIntoViewIfNeeded()
+      await shot('invite-link-minted')
+      const linkInvitations = page.locator('#invitations')
+      await check(`${tag}: link-only invitations never mention email and offer no Resend email`, async () => {
+        await expect(linkInvitations.locator('[aria-label="Pending invitations"]')).toContainText('dana@fieldnote.example')
+        await expect(linkInvitations.locator('[aria-label="Pending invitations"]')).not.toContainText(/email/i)
+        await linkInvitations.getByRole('button', { name: /^More actions.*ops@fieldnote/ }).click()
+        await expect(page.getByRole('menuitem', { name: 'Revoke…' })).toBeVisible()
+        await expect(page.getByRole('menuitem', { name: 'Resend email' })).toHaveCount(0)
+        await page.keyboard.press('Escape')
+      })
+      await linkInvitations.scrollIntoViewIfNeeded()
+      await shot('invitations-link')
 
       // What an admin cannot change is locked with the reason.
       await open('viewer=admin&section=limits')

@@ -5,7 +5,8 @@
  * named by capability. A role change saves at once and says so in its row;
  * removing a person or revoking an invitation asks first and stays open on a
  * refusal. On a narrow card the role picker takes its own full-width line
- * under the name.
+ * under the name. With `delivery="link"` nothing promises an email: Invite
+ * creates a link the server mints and shows it with Copy link.
  */
 
 import {
@@ -25,7 +26,7 @@ import {
 } from '@tangle-network/ui/primitives'
 import { ChevronDown } from 'lucide-react'
 import { Fragment, useEffect, useId, useState, type ReactNode } from 'react'
-import { INVITATION_EMAIL_HINT, INVITATION_EXPIRY_DAYS, isInvitationEmail } from '../teams/invitations'
+import { INVITATION_EMAIL_HINT, INVITATION_EXPIRY_DAYS, isInvitationEmail, type InvitationDelivery } from '../teams/invitations'
 import { hasWorkspaceRole, type WorkspaceRole } from '../teams/roles'
 import type { InvitationView, MemberView } from '../teams-react/contracts'
 import { invitationDetail } from '../teams-react/components/invitation-detail'
@@ -53,8 +54,13 @@ export interface MembersSectionProps {
   noun?: string
   onChangeRole(input: { memberId: string; role: WorkspaceRole }): Promise<MutationOutcome<unknown>>
   onRemove(input: { memberId: string }): Promise<MutationOutcome<unknown>>
-  /** Adds the Invite action. A refusal (a seat limit, a failed email) stays in the dialog with its sentence. */
+  /**
+   * Adds the Invite action. A refusal (a seat limit, a failed email) stays in the dialog with its sentence.
+   * With `delivery="link"` it resolves with the server's `{ inviteUrl }`, which the card then shows.
+   */
   onInvite?(input: { email: string; role: WorkspaceRole }): Promise<MutationOutcome<unknown>>
+  /** `link` when the product sends no invitation email and the inviter shares the link. Defaults to `email`. */
+  delivery?: InvitationDelivery
   /** The plans page. A `plan_limit` refusal on Invite links to it as View plans. */
   plansHref?: string
   /** Renders View plans: pass the router's link, as to `SettingsLayout`. Defaults to a plain anchor. */
@@ -155,8 +161,20 @@ function plansAction(href: string | undefined, Link: SettingsLinkComponent) {
     : null
 }
 
-function InviteDialog({ onInvite, plansHref, LinkComponent, open, onOpenChange }: {
+const INVITE_DIALOG: Record<InvitationDelivery, { consequence: string; confirmLabel: string }> = {
+  email: { consequence: `They get an email with a link to join. The link works for ${INVITATION_EXPIRY_DAYS} days.`, confirmLabel: 'Send invite' },
+  link: { consequence: `No email is sent. You get a link to share with them, and it works for ${INVITATION_EXPIRY_DAYS} days.`, confirmLabel: 'Create invite link' },
+}
+
+interface MintedLink {
+  email: string
+  inviteUrl: string
+}
+
+function InviteDialog({ onInvite, delivery, onMinted, plansHref, LinkComponent, open, onOpenChange }: {
   onInvite: NonNullable<MembersSectionProps['onInvite']>
+  delivery: InvitationDelivery
+  onMinted: (link: MintedLink) => void
   plansHref?: string
   LinkComponent: SettingsLinkComponent
   open: boolean
@@ -179,10 +197,13 @@ function InviteDialog({ onInvite, plansHref, LinkComponent, open, onOpenChange }
       open={open}
       onOpenChange={onOpenChange}
       title="Invite people"
-      consequence={`They get an email with a link to join. The link works for ${INVITATION_EXPIRY_DAYS} days.`}
-      confirmLabel="Send invite"
+      {...INVITE_DIALOG[delivery]}
       canConfirm={valid}
       onConfirm={() => onInvite({ email: email.trim(), role })}
+      onConfirmed={(value) => {
+        const inviteUrl = (value as { inviteUrl?: unknown } | null)?.inviteUrl
+        if (delivery === 'link' && typeof inviteUrl === 'string') onMinted({ email: email.trim(), inviteUrl })
+      }}
       refusalAction={plansAction(plansHref, LinkComponent)}
     >
       <div className="grid gap-2">
@@ -208,6 +229,27 @@ function InviteDialog({ onInvite, plansHref, LinkComponent, open, onOpenChange }
   )
 }
 
+/** The link a link-only invite just minted, ready to copy. */
+function MintedLinkRow({ email, inviteUrl }: MintedLink) {
+  const id = useId()
+  const { note, error, copy } = useCopyLink()
+  return (
+    <SettingsRow
+      label={`Invite link for ${email}`}
+      htmlFor={id}
+      description={`Share it with them yourself. It works for ${INVITATION_EXPIRY_DAYS} days.`}
+      status={note}
+      error={error ?? undefined}
+      layout="stacked"
+    >
+      <div className="flex min-w-0 gap-2">
+        <Input id={id} readOnly value={inviteUrl} className="min-w-0 flex-1" onFocus={(event) => event.currentTarget.select()} />
+        <Button type="button" variant="outline" onClick={() => void copy(inviteUrl)}>Copy link</Button>
+      </div>
+    </SettingsRow>
+  )
+}
+
 export function MembersSection({
   id = 'members',
   title = 'Members',
@@ -219,11 +261,13 @@ export function MembersSection({
   onChangeRole,
   onRemove,
   onInvite,
+  delivery = 'email',
   plansHref,
   LinkComponent = PlainLink,
   menuItems,
 }: MembersSectionProps) {
   const [inviting, setInviting] = useState(false)
+  const [minted, setMinted] = useState<MintedLink | null>(null)
   const canManage = hasWorkspaceRole(currentRole, 'admin')
   return (
     <SettingsSection
@@ -253,7 +297,8 @@ export function MembersSection({
             })}
           </SettingsList>
         )}
-      {onInvite && <InviteDialog onInvite={onInvite} plansHref={plansHref} LinkComponent={LinkComponent} open={inviting} onOpenChange={setInviting} />}
+      {minted && <MintedLinkRow key={minted.inviteUrl} {...minted} />}
+      {onInvite && <InviteDialog onInvite={onInvite} delivery={delivery} onMinted={setMinted} plansHref={plansHref} LinkComponent={LinkComponent} open={inviting} onOpenChange={setInviting} />}
     </SettingsSection>
   )
 }
@@ -264,58 +309,66 @@ export interface InvitationsSectionProps {
   invitations: InvitationView[]
   /** The viewer's effective role: admins copy, resend and revoke. */
   currentRole: WorkspaceRole
-  onResend(input: { invitationId: string }): Promise<MutationOutcome<unknown>>
+  /** Adds Resend email. A `link` delivery offers none. */
+  onResend?(input: { invitationId: string }): Promise<MutationOutcome<unknown>>
   onRevoke(input: { invitationId: string }): Promise<MutationOutcome<unknown>>
   /** Copies the invite link; defaults to `navigator.clipboard.writeText`. */
   onCopy?(input: { inviteUrl: string }): void | Promise<void>
+  /** `link` when the product sends no invitation email: rows never mention email. Defaults to `email`. */
+  delivery?: InvitationDelivery
 }
 
 const INVITATION_COLUMNS = { action: '8rem', menu: '36px' }
 
-function useFlash(): [string | null, (message: string) => void] {
-  const [message, setMessage] = useState<string | null>(null)
+/**
+ * Copies an invite link and says so for a moment. When the browser refuses,
+ * the sentence carries the link itself, so the person can select it.
+ */
+function useCopyLink(onCopy?: InvitationsSectionProps['onCopy']) {
+  const [note, setNote] = useState<string | null>(null)
+  const [error, setError] = useState<ReactNode>(null)
   useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(() => setMessage(null), SAVED_VISIBLE_MS)
+    if (!note) return
+    const timer = setTimeout(() => setNote(null), SAVED_VISIBLE_MS)
     return () => clearTimeout(timer)
-  }, [message])
-  return [message, setMessage]
-}
-
-function PendingInvitation({ invitation, canManage, onResend, onRevoke, onCopy }: {
-  invitation: InvitationView
-  canManage: boolean
-} & Pick<InvitationsSectionProps, 'onResend' | 'onRevoke' | 'onCopy'>) {
-  const [revoking, setRevoking] = useState(false)
-  const [note, flash] = useFlash()
-  const [error, setError] = useState<string | null>(null)
-  const copy = async () => {
+  }, [note])
+  const copy = async (inviteUrl: string) => {
     try {
-      if (onCopy) await onCopy({ inviteUrl: invitation.inviteUrl })
-      else await navigator.clipboard.writeText(invitation.inviteUrl)
+      if (onCopy) await onCopy({ inviteUrl })
+      else await navigator.clipboard.writeText(inviteUrl)
       setError(null)
-      flash('Link copied')
+      setNote('Link copied')
     } catch {
-      setError("Couldn't copy the link. Select it from the invitation email instead.")
+      setError(<>Couldn’t copy the link. Select it here instead: {breakable(inviteUrl)}</>)
     }
   }
-  const resend = async () => {
+  return { note, flash: setNote, error, setError, copy }
+}
+
+function PendingInvitation({ invitation, canManage, delivery, onResend, onRevoke, onCopy }: {
+  invitation: InvitationView
+  canManage: boolean
+  delivery: InvitationDelivery
+} & Pick<InvitationsSectionProps, 'onResend' | 'onRevoke' | 'onCopy'>) {
+  const [revoking, setRevoking] = useState(false)
+  const { note, flash, error, setError, copy } = useCopyLink(onCopy)
+  const resend = onResend && delivery === 'email' ? async () => {
     const outcome = await onResend({ invitationId: invitation.id })
     if (outcome.succeeded) {
       setError(null)
       flash('Sent again')
     } else setError(outcome.message)
-  }
-  const undelivered = invitation.emailStatus === 'failed' ? 'The email wasn’t delivered. Copy the link and send it yourself.' : null
+  } : null
+  const undelivered = delivery === 'email' && invitation.emailStatus === 'failed' ? 'The email wasn’t delivered. Copy the link and send it yourself.' : null
   return (
     <>
       <SettingsListItem
         title={breakable(invitation.email)}
-        meta={<span className="inline-flex flex-wrap items-center gap-x-2">{invitationDetail(invitation)}{note && <span className="text-[var(--surface-success-text)]">{note}</span>}</span>}
+        meta={<span className="inline-flex flex-wrap items-center gap-x-2">{invitationDetail(invitation, delivery)}{note && <span className="text-[var(--surface-success-text)]">{note}</span>}</span>}
         error={error ?? undelivered ?? undefined}
-        action={canManage ? { label: 'Copy link', onSelect: () => void copy() } : undefined}
+        action={canManage ? { label: 'Copy link', onSelect: () => void copy(invitation.inviteUrl) } : undefined}
         menu={canManage ? [
-          { label: 'Resend email', onSelect: () => void resend() },
+          ...(resend ? [{ label: 'Resend email', onSelect: () => void resend() }] : []),
           { label: 'Revoke…', tone: 'danger', onSelect: () => setRevoking(true) },
         ] : undefined}
       />
@@ -342,6 +395,7 @@ export function InvitationsSection({
   onResend,
   onRevoke,
   onCopy,
+  delivery = 'email',
 }: InvitationsSectionProps) {
   const [showPast, setShowPast] = useState(false)
   const canManage = hasWorkspaceRole(currentRole, 'admin')
@@ -354,7 +408,7 @@ export function InvitationsSection({
         : (
           <SettingsList aria-label="Pending invitations" columns={INVITATION_COLUMNS}>
             {pending.map((invitation) => (
-              <PendingInvitation key={invitation.id} invitation={invitation} canManage={canManage} onResend={onResend} onRevoke={onRevoke} onCopy={onCopy} />
+              <PendingInvitation key={invitation.id} invitation={invitation} canManage={canManage} delivery={delivery} onResend={onResend} onRevoke={onRevoke} onCopy={onCopy} />
             ))}
           </SettingsList>
         )}

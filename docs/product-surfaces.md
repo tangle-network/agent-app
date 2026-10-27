@@ -154,7 +154,10 @@ narrow card the role picker takes its own full-width line. The lists offer no
 role change or removal for an owner, an inherited organization admin or the
 viewer's own row. A past invitation says in words that it was joined, expired or
 revoked. A seat-limit refusal on Invite links to `plansHref` as View plans,
-through the app's `LinkComponent`. The `teams-react` `MembersPanel` and
+through the app's `LinkComponent`. A product that emails no invitations passes
+`delivery="link"` to both sections and leaves `sendInvitationEmail` out of
+`createInvitationsApi`: Invite then shows the link the server returned, with
+Copy link, and nothing on the page mentions email. The `teams-react` `MembersPanel` and
 `InvitationsPanel` follow the same rules (`MembersPanel` takes
 `currentUserId`). They stay for the pages that render them today, and they
 retire once Tax, Legal and GTM adopt the sections
