@@ -341,12 +341,15 @@ The handle is the agent's normalized name (`normalizeProfileName` in
 `agentId`, so a rename never breaks an old message. A turn addressed to
 several agents calls `produce` once per agent, all at the same time, each
 with the thread's history and none seeing another's answer, and persists one
-assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and labels each answer with its
-author (`expandSpeakerRows` in `/web`). Live, every responder is announced
+assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and draws each answer under a
+`SpeakerHeader` (`partitionBySpeaker` and `SpeakerHeader` in
+`@tangle-network/ui/chat`). Live, every responder is announced
 first as a `speaker` event (`onSpeaker`), then every event carries
 `speaker`, the responder's agent id (`onSpeakerEvent`, or `event.speaker`
 for a raw-event consumer), so a viewer keeps one live block per responder
-and draws them answering at the same time. A responder that fails leaves a
+and draws them answering at the same time. When a responder ends, its
+`speaker` event comes again with `state` (`done` or `failed`), and the stored
+speaker part keeps that state. A responder that fails also leaves a
 `notice` under its own name; the turn fails only when every responder did.
 Each responder's `prompt` and `body.content` arrive addressed
 (`addressedTurnText`): the `@handles` are gone and one line names who it

@@ -1,8 +1,8 @@
 /**
  * One projection from a message's stored parts to what the transcript draws:
  * the ordered text and tool segments, the tool calls, and the reasoning. A
- * product's history loader and a split speaker row (`expandSpeakerRows`)
- * read the same parts the same way, so an agent's tool timeline renders
+ * product's history loader and one responder's share of a row answered by
+ * several agents read the same parts the same way, so an agent's tool timeline renders
  * under that agent whether the row was written by one responder or several.
  * Pure: no React, no DOM.
  */

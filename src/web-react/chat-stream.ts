@@ -117,8 +117,9 @@ export interface ChatStreamCallbacks {
   onText?: (delta: string) => void
   /** A responder of a turn addressed to several agents, announced before any
    *  output; every responder is announced up front, in mention order. Open one
-   *  live block per responder. */
-  onSpeaker?: (speaker: { id: string; name: string; handle?: string }) => void
+   *  live block per responder. A responder that ended is announced again with
+   *  its `state`; update its block by `id`. */
+  onSpeaker?: (speaker: { id: string; name: string; handle?: string; state?: 'done' | 'failed' }) => void
   /** Fires before the callback of every event that carries `speaker` (the
    *  responder's agent id): responders answer at the same time, so the text,
    *  reasoning and tool events of several interleave and this says whose
@@ -331,7 +332,11 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       break
     case 'speaker':
       if (typeof evt.id === 'string' && typeof evt.name === 'string') {
-        cb.onSpeaker?.({ id: evt.id, name: evt.name, ...(typeof evt.handle === 'string' ? { handle: evt.handle } : {}) })
+        cb.onSpeaker?.({
+          id: evt.id, name: evt.name,
+          ...(typeof evt.handle === 'string' ? { handle: evt.handle } : {}),
+          ...(evt.state === 'done' || evt.state === 'failed' ? { state: evt.state } : {}),
+        })
       }
       break
     case 'reasoning':
