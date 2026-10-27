@@ -2264,10 +2264,10 @@ interface SniffResult
 
 ### `speakerPart`
 
-`function`
+`function` — A responder's speaker part; `state` once it ended.
 
 ```ts
-(agent: ChatTurnAgentTarget) => Record<string, unknown>
+(agent: ChatTurnAgentTarget, state?: "done" | "failed" | undefined) => Record<string, unknown>
 ```
 
 ### `StaleTurnLockOwnerProbeResult`

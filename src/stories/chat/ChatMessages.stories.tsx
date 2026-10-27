@@ -98,8 +98,8 @@ export const Short: Story = {
 
 /**
  * A turn addressed to two agents. The store holds one assistant row; the
- * transcript splits it at its speaker parts and labels each answer with the
- * agent that wrote it, in the order the mentions were typed.
+ * transcript splits it at its speaker parts and draws each answer under a
+ * `SpeakerHeader`, in the order the mentions were typed.
  */
 export const TwoAgentsAnswer: Story = {
   name: 'Two agents answer one message',
@@ -109,7 +109,8 @@ export const TwoAgentsAnswer: Story = {
 /**
  * The same turn while it runs: the route announced both responders up front and
  * tags every event with its speaker, so each block streams on its own. The
- * Writer's text is mid-sentence while the Research Lead's tool call still runs.
+ * Writer has reported its end; the Research Lead's tool call still runs, so
+ * only its header says Answering.
  */
 export const TwoAgentsAnswering: Story = {
   name: 'Two agents answering at once',

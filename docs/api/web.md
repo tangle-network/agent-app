@@ -4,7 +4,7 @@
 
 Source: `src/web/index.ts`
 
-63 exports.
+59 exports.
 
 ### `acquisitionFromRequest`
 
@@ -124,14 +124,6 @@ interface CookieOptions
 
 ```ts
 (options?: RateLimiterBindingOptions) => { setKV: (kv: KvLike) => void; check: (key: string, limit: number, windowSecon…
-```
-
-### `expandSpeakerRows`
-
-`function`
-
-```ts
-<T extends SpeakerRow>(rows: readonly T[]) => (T & Pick<SpeakerRow, "author">)[]
 ```
 
 ### `extractRequestContext`
@@ -444,30 +436,6 @@ interface SecurityHeaderOptions
 
 ```ts
 (filename: string) => string
-```
-
-### `Speaker`
-
-`interface`
-
-```ts
-interface Speaker
-```
-
-### `SPEAKER_ROLE_LABEL`
-
-`const` — The role label a split row shows beside the agent's name.
-
-```ts
-"Agent"
-```
-
-### `SpeakerRow`
-
-`interface` — A turn addressed to several agents is persisted as ONE assistant row whose parts carry a `speaker` part before each responder's parts.
-
-```ts
-interface SpeakerRow
 ```
 
 ### `STANDARD_SECURITY_HEADERS`

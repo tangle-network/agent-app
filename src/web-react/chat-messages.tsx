@@ -1,6 +1,6 @@
 /** Message-thread composition and per-message presentation. */
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
-import { isViewerMessage, MessageAuthor, TRANSCRIPT_TEXT } from '@tangle-network/ui/chat'
+import { isViewerMessage, MessageAuthor, partitionBySpeaker, SpeakerHeader, TRANSCRIPT_TEXT, type SpeakerPart } from '@tangle-network/ui/chat'
 import type { ChatAuthor } from '@tangle-network/ui/types'
 import { useSmoothText } from './smooth-text'
 import { POPOVER_OPTION_FOCUS } from './controls'
@@ -17,12 +17,43 @@ import type { CatalogModel } from '../runtime/model-catalog'
 import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
 import type { ChatMessagesProps } from './chat-message-types'
 import { ChatEmptyState } from './chat-empty-state'
-import { expandSpeakerRows } from '../web/speakers'
 import { chatReasoningFromParts } from './chat-stream'
 import { segmentsFromParts, toolCallsFromParts } from './message-projection'
 import { formatModelCost, formatTokensPerSecond } from './chat-message-metrics'
 import { StreamingCaret, SegmentedBody } from './chat-message-body'
 import { ToolCallCard } from './chat-tool-call'
+
+/** One answer of a turn answered by several agents: its responder and the stored row it was split from. */
+type SpokenMessage = ChatUiMessage & { speaker?: SpeakerPart; splitFrom?: string }
+
+/** A turn addressed to several agents is one stored row with a speaker part
+ *  before each answer; the transcript draws each answer as its own row under
+ *  its responder, in stored order. A split row holds only its responder's
+ *  parts, so its reasoning and tool timeline are rebuilt from them; the whole
+ *  row's views never apply to one share. Other rows pass through untouched. */
+function splitBySpeaker(rows: readonly ChatUiMessage[]): SpokenMessage[] {
+  return rows.flatMap((row): SpokenMessage[] => {
+    const sections = row.role === 'assistant' && row.parts ? partitionBySpeaker(row.parts) : []
+    if (!sections.some((section) => section.speaker)) return [row]
+    return sections.map(({ speaker, parts }, index) => {
+      const reasoning = chatReasoningFromParts(parts)
+      const segments = segmentsFromParts(parts)
+      return {
+        ...row,
+        id: `${row.id}#${index}:${speaker?.id ?? ''}`,
+        splitFrom: row.id,
+        ...(speaker ? { speaker } : {}),
+        content: parts.flatMap((part) => (part.type === 'text' && typeof part.text === 'string' ? [part.text] : [])).join(''),
+        parts,
+        segments: segments.length > 0 ? segments : undefined,
+        toolCalls: segments.length > 0 ? undefined : toolCallsFromParts(parts),
+        reasoning: reasoning?.text,
+        reasoningStartedAt: reasoning?.startedAt,
+        reasoningEndedAt: reasoning?.endedAt,
+      }
+    })
+  })
+}
 
 // ── Quiet chrome ────────────────────────────────────────────────────────────
 
@@ -104,7 +135,7 @@ function AssistantMessageImpl({
   messageClassName,
   chrome,
 }: {
-  msg: ChatUiMessage
+  msg: SpokenMessage
   streaming: boolean
   models: CatalogModel[]
   agentLabel: string
@@ -142,18 +173,20 @@ function AssistantMessageImpl({
       false)
 
   const quiet = chrome === 'quiet'
+  const authorClassName = quiet ? 'mb-1.5' : undefined
+  const author = msg.speaker ? (
+    <SpeakerHeader speaker={msg.speaker} live={streaming} className={authorClassName} />
+  ) : msg.author ? (
+    <MessageAuthor author={msg.author} className={authorClassName} />
+  ) : null
   return (
     <div className={`mx-auto w-full max-w-3xl px-6 ${quiet ? 'group pb-1 pt-3' : 'py-3'}`}>
-      {quiet && msg.author && <MessageAuthor author={msg.author} className="mb-1.5" />}
+      {quiet && author}
       {!quiet && (
         <div
-          className={`mb-1 flex ${msg.author ? 'items-center' : 'items-baseline'} gap-2 text-xs tabular-nums text-muted-foreground`}
+          className={`mb-1 flex ${author ? 'items-center' : 'items-baseline'} gap-2 text-xs tabular-nums text-muted-foreground`}
         >
-          {msg.author ? (
-            <MessageAuthor author={msg.author} />
-          ) : (
-            <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>
-          )}
+          {author ?? <span className="font-semibold uppercase tracking-[0.05em]">{agentLabel}</span>}
           {msg.modelUsed && <span className="font-mono normal-case">{msg.modelUsed}</span>}
           {formatTokensPerSecond(msg) && <span>{formatTokensPerSecond(msg)}</span>}
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
@@ -401,21 +434,10 @@ export function ChatMessages({
     () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
     [renderMarkdown],
   )
-  // A turn answered by several agents is one stored row with a speaker part
-  // before each answer; the transcript draws each under its author.
-  const messages = useMemo(() => expandSpeakerRows(storedMessages).map((row) => {
-    // A split row carries only its speaker's parts; draw that agent's own
-    // reasoning and tool timeline from them. Rows the product already
-    // projected keep their fields.
-    if (!row.author || row.role !== 'assistant' || row.segments !== undefined || row.toolCalls !== undefined) return row
-    const reasoning = chatReasoningFromParts(row.parts)
-    const segments = segmentsFromParts(row.parts)
-    return {
-      ...row,
-      ...(segments.length > 0 ? { segments } : { toolCalls: toolCallsFromParts(row.parts) }),
-      ...(reasoning ? { reasoning: reasoning.text, reasoningStartedAt: reasoning.startedAt, reasoningEndedAt: reasoning.endedAt } : {}),
-    }
-  }), [storedMessages])
+  const messages = useMemo(() => splitBySpeaker(storedMessages), [storedMessages])
+  // The row the turn in flight writes. Its responders answer at the same time,
+  // so every share of it streams until that responder reports its end.
+  const liveId = loading ? storedMessages[storedMessages.length - 1]?.id : undefined
   const lastIsUser = messages[messages.length - 1]?.role === 'user'
   const quiet = chrome === 'quiet'
   if (messages.length === 0 && !loading && !error) {
@@ -475,7 +497,7 @@ export function ChatMessages({
           <AssistantMessage
             key={msg.id}
             msg={msg}
-            streaming={!!loading && msg.id === messages[messages.length - 1]?.id}
+            streaming={liveId !== undefined && (msg.splitFrom ?? msg.id) === liveId && !msg.speaker?.state}
             models={models}
             agentLabel={agentLabel}
             renderBody={renderBody}

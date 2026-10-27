@@ -8,7 +8,9 @@
  * Live, every responder is announced up front with a `speaker` event, in
  * mention order, and then every event carries `speaker` (the responder's
  * agent id) as it arrives, so a viewer draws one live block per responder and
- * sees them answer at the same time. The stored order stays the order typed,
+ * sees them answer at the same time. When a responder ends, its `speaker`
+ * event is sent again with `state` (`done` or `failed`), and the stored row's
+ * speaker parts carry the same state. The stored order stays the order typed,
  * so the transcript rereads the same way every time.
  *
  * Parallel and independent on purpose: the agents are addressed, not chained.
@@ -53,8 +55,9 @@ export async function addressAgents<TContext, TResource>(input: {
 /** The event a viewer receives when the next responder starts. */
 export const SPEAKER_EVENT = 'speaker'
 
-export function speakerPart(agent: ChatTurnAgentTarget): Record<string, unknown> {
-  return { type: 'speaker', id: agent.id, name: agent.name, handle: agent.handle }
+/** A responder's speaker part; `state` once it ended. */
+export function speakerPart(agent: ChatTurnAgentTarget, state?: 'done' | 'failed'): Record<string, unknown> {
+  return { type: 'speaker', id: agent.id, name: agent.name, handle: agent.handle, ...(state ? { state } : {}) }
 }
 
 /**
@@ -147,11 +150,18 @@ export async function composeAgentProducers<TContext, TResource>(
       }
     })()
   })
+  // A responder has ended once its producer settled; it failed if it threw or reported a failure.
+  const endOf = (index: number): 'done' | 'failed' | undefined => {
+    const slot = slots[index]!
+    if (!slot.done) return undefined
+    return slot.error !== undefined || slot.failure !== undefined ? 'failed' : 'done'
+  }
   const stream = (async function* (): AsyncGenerator<ChatRouteEvent> {
     for (const agent of agents) {
-      yield { type: SPEAKER_EVENT, id: agent.id, name: agent.name, handle: agent.handle } as ChatRouteEvent
+      yield { type: SPEAKER_EVENT, ...speakerPart(agent) } as ChatRouteEvent
     }
     const reported = new Set<number>()
+    const ended = new Set<number>()
     for (;;) {
       if (args.admissionSignal?.aborted) return
       let yielded = false
@@ -161,6 +171,12 @@ export async function composeAgentProducers<TContext, TResource>(
           reported.add(index)
           const agent = agents[index]!
           yield failedNotice(agent, slot.error instanceof Error ? slot.error.message : String(slot.error))
+          yielded = true
+        }
+        const end = slot.queue.length === 0 ? endOf(index) : undefined
+        if (end && !ended.has(index)) {
+          ended.add(index)
+          yield { type: SPEAKER_EVENT, ...speakerPart(agents[index]!, end) } as ChatRouteEvent
           yielded = true
         }
       }
@@ -179,7 +195,7 @@ export async function composeAgentProducers<TContext, TResource>(
         wake = resolve
         if (slots.some((slot) => slot.queue.length > 0 || slot.done)) {
           // Something landed between the scan and the wait; re-scan unless everything scanned is already settled.
-          const pending = slots.some((slot) => slot.queue.length > 0 || (slot.done && slot.error !== undefined && !reported.has(slots.indexOf(slot))))
+          const pending = slots.some((slot, index) => slot.queue.length > 0 || (slot.done && !ended.has(index)))
           if (pending || slots.every((slot) => slot.done)) { wake = undefined; resolve() }
         }
       })
@@ -201,7 +217,7 @@ export async function composeAgentProducers<TContext, TResource>(
     const parts = own ?? (text ? [{ type: 'text', text }] : [])
     const failure = failureOf(index)
     const notice = failure === undefined ? [] : [{ type: 'notice', noticeKind: 'error', id: `speaker-failed:${agent.id}`, text: `${agent.name} could not answer: ${failure}` }]
-    return [speakerPart(agent), ...parts, ...notice]
+    return [speakerPart(agent, endOf(index)), ...parts, ...notice]
   }
   const last = () => entries().at(-1)?.producer
   return {

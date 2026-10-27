@@ -1,13 +1,13 @@
 /**
- * A turn addressed to agents by mention answers once per agent, one after
- * another in mention order, as one assistant row whose parts carry a speaker
- * part before each answer, through a real SQLite store and the real route.
+ * A turn addressed to agents by mention answers once per agent, all at once,
+ * as one assistant row whose parts carry a speaker part before each answer in
+ * mention order, through a real SQLite store and the real route.
  */
 import { describe, expect, it } from 'vitest'
 import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnAgentTarget } from '../../src/chat-routes/index'
 import { createChatTables, createChatStore, type ChatDatabase } from '../../src/chat-store/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
-import { expandSpeakerRows } from '../../src/web/index'
+import { partitionBySpeaker } from '@tangle-network/ui/chat'
 import { openDatabase } from '../teams/db-helper'
 
 const ROSTER: ChatTurnAgentTarget[] = [
@@ -77,14 +77,19 @@ describe('a turn addressed to agents', () => {
       expect(new Set(ids).size).toBe(2)
       expect(ids[0]!.endsWith('-1') && ids[1]!.endsWith('-2')).toBe(true)
       // The live stream announces every responder up front, in the order typed, then
-      // tags each event with its speaker so a viewer draws one block per responder.
+      // tags each event with its speaker so a viewer draws one block per responder,
+      // and announces each responder again with its end state after its last event.
       const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
         .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
-      expect(events.filter((e) => e.type === 'speaker').map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
+      const announced = events.filter((e) => e.type === 'speaker' && e.state === undefined)
+      expect(announced.map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
       const texts = events.filter((e) => e.type === 'text').map((e) => `${e.speaker}:${e.text}`).sort()
       expect(texts).toEqual(['ap_research:Research Lead answers.', 'ap_writer:Writer answers.'])
-      const types = events.map((e) => String(e.type))
-      expect(types.indexOf('text')).toBeGreaterThan(types.lastIndexOf('speaker'))
+      expect(events.findIndex((e) => e.type === 'text')).toBeGreaterThan(events.indexOf(announced.at(-1)!))
+      for (const id of ['ap_writer', 'ap_research']) {
+        const end = events.findIndex((e) => e.type === 'speaker' && e.id === id && e.state === 'done')
+        expect(end).toBeGreaterThan(events.map((e) => e.speaker).lastIndexOf(id))
+      }
       // Each responder read the message addressed to it: handles gone, its own name first.
       expect(h.prompts).toEqual([
         'You answer this message as Writer (@writer). Research Lead (@research-lead) answers it separately at the same time; do your part and leave theirs to them.\n\nplan the launch',
@@ -95,9 +100,9 @@ describe('a turn addressed to agents', () => {
       expect(assistant).toHaveLength(1)
       expect(assistant[0]!.content).toBe('Writer answers.\n\nResearch Lead answers.')
       expect(assistant[0]!.parts).toEqual([
-        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer', state: 'done' },
         { type: 'text', text: 'Writer answers.' },
-        { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+        { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead', state: 'done' },
         { type: 'text', text: 'Research Lead answers.' },
       ])
       // The user row keeps the mentions it was sent with, by stable id.
@@ -105,9 +110,9 @@ describe('a turn addressed to agents', () => {
       expect(user.parts).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'mention', mentionKind: 'agent', path: 'writer', agentId: 'ap_writer' }),
       ]))
-      // A transcript draws two answers under two authors from the one row.
-      const drawn = expandSpeakerRows(rows.map((row) => ({ id: row.id, role: row.role, content: row.content, parts: row.parts ?? [] })))
-      expect(drawn.filter((row) => row.role === 'assistant').map((row) => row.author?.name)).toEqual(['Writer', 'Research Lead'])
+      // A transcript draws two finished answers under two speakers from the one row.
+      const drawn = partitionBySpeaker(assistant[0]!.parts ?? [])
+      expect(drawn.map(({ speaker, parts }) => [speaker?.name, speaker?.state, parts.length])).toEqual([['Writer', 'done', 1], ['Research Lead', 'done', 1]])
     } finally { h.close() }
   })
 
@@ -155,14 +160,16 @@ describe('mentioned agents answer at the same time', () => {
       // The failure reached the viewer as a notice under its speaker, never as the turn's error.
       expect(events.some((e) => e.type === 'error' || e.type === 'session.run.failed')).toBe(false)
       expect(events.find((e) => e.type === 'notice')).toMatchObject({ speaker: 'ap_research', noticeKind: 'error', text: expect.stringContaining('Research Lead could not answer') })
+      expect(events.filter((e) => e.type === 'speaker' && e.state !== undefined).map((e) => `${e.id}:${e.state}`).sort())
+        .toEqual(['ap_research:failed', 'ap_writer:done'])
       const assistant = (await h.store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
       expect(assistant).toHaveLength(1)
       expect(assistant[0]!.content).toBe('Writer answers.')
       // The stored row keeps the failed responder's header and its notice, so history rereads the same way.
       expect(assistant[0]!.parts).toEqual([
-        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer', state: 'done' },
         { type: 'text', text: 'Writer answers.' },
-        { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+        { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead', state: 'failed' },
         { type: 'notice', noticeKind: 'error', id: 'speaker-failed:ap_research', text: 'Research Lead could not answer: the model service did not answer' },
       ])
     } finally { h.close() }
@@ -215,7 +222,7 @@ describe('mentioned agents answer at the same time', () => {
       expect(wall).toBeLessThan(380)
       const events = text.split('\n').filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>)
         .map((line) => (line.kind === 'event' ? line.event : line) as Record<string, unknown>)
-      expect(events.filter((e) => e.type === 'speaker').map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
+      expect(events.filter((e) => e.type === 'speaker' && e.state === undefined).map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
       const assistant = (await store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
       expect(assistant[0]!.content).toBe('Writer answers.\n\nResearch Lead answers.')
     } finally { database.$client.close() }

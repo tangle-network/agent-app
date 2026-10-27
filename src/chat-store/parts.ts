@@ -258,12 +258,15 @@ export interface ChatMentionPart {
 /** Who wrote the parts that follow, when one assistant row holds more than one
  *  responder: a turn addressed to `@a @b` is one row whose parts read
  *  speaker a, a's text, speaker b, b's text. A renderer splits the row at
- *  these (`expandSpeakerRows` in `/web`); a row with none is one speaker. */
+ *  these (`partitionBySpeaker` in `@tangle-network/ui/chat`); a row with none
+ *  is one speaker. `state` is how the responder ended; rows written before
+ *  responders reported an end have none. */
 export interface ChatSpeakerPart {
   type: 'speaker'
   id: string
   name: string
   handle?: string
+  state?: 'done' | 'failed'
 }
 
 /** Represent parts of a chat message including text, reasoning, tools, files, images, subtasks, steps, interactions, notices, plans, and mentions */
@@ -398,7 +401,8 @@ export function isChatSpeakerPart(part: unknown): part is ChatSpeakerPart {
   const record = part as Record<string, unknown>
   return record.type === 'speaker' && typeof record.id === 'string' && record.id.length > 0 &&
     typeof record.name === 'string' && record.name.trim().length > 0 &&
-    (record.handle === undefined || typeof record.handle === 'string')
+    (record.handle === undefined || typeof record.handle === 'string') &&
+    (record.state === undefined || record.state === 'done' || record.state === 'failed')
 }
 
 /** Every mention part on one message, in stored order. The projection a
