@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.72
+
+- ci(release): upload native canary evidence; give post-release checks the release host (#1401)
+
 ## 0.63.71
 
 - test:generated: the scratch store is gone on every exit, and stale stores are swept at start (#1399)
