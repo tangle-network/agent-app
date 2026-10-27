@@ -1,5 +1,5 @@
 /** GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: 0724fdafc42190beb3b6fae05f536de07d65b10554c08d97eaa1ceef475a0602
+ * SHA-256: f89457b3f243a69b9934010b2def4febe4408eff0be5e69d8847502ee33dbea4
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 export const brandThemes = {
   "light": {
@@ -11,11 +11,11 @@ export const brandThemes = {
     "popoverForeground": "0 0% 17.6471%",
     "primary": "243.2787 80.6167% 55.4902%",
     "primaryForeground": "0 0% 100%",
-    "secondary": "230 27% 96%",
+    "secondary": "228 25% 94.5%",
     "secondaryForeground": "0 0% 17.6471%",
-    "muted": "230 27% 96%",
+    "muted": "228 25% 94.5%",
     "mutedForeground": "0 0% 29.8039%",
-    "accent": "230 27% 96%",
+    "accent": "228 25% 94.5%",
     "accentForeground": "0 0% 17.6471%",
     "destructive": "0 73.7% 41.8%",
     "destructiveForeground": "0 0% 100%",
@@ -29,8 +29,8 @@ export const brandThemes = {
     "warningStrong": "25.9 90% 35.3%",
     "inputFill": "hsl(225 29% 97%)",
     "canvasBackdrop": "#dcdee6",
-    "borderSoft": "rgba(0, 0, 0, 0.10)",
-    "cardEdge": "rgba(0, 0, 0, 0.14)",
+    "borderSoft": "hsl(244 16% 81%)",
+    "cardEdge": "hsl(244 16% 81%)",
     "canvasRender": {
       "grid": "#c8c7d6",
       "snapGrid": "#787878",
@@ -41,7 +41,7 @@ export const brandThemes = {
       "selectionAnchorFill": "#ffffff",
       "placeholderFill": "#f5f6fa",
       "placeholderStroke": "#c8c7d6",
-      "brokenFill": "#f2f3f8",
+      "brokenFill": "#edeff4",
       "brokenStroke": "#787878"
     }
   },
@@ -50,19 +50,19 @@ export const brandThemes = {
     "foreground": "0 0% 90.1961%",
     "card": "244 23% 12%",
     "cardForeground": "0 0% 90.1961%",
-    "popover": "247 23% 21%",
+    "popover": "247 21% 23%",
     "popoverForeground": "0 0% 90.1961%",
     "primary": "229.6552 93.5484% 81.7647%",
     "primaryForeground": "0 0% 0%",
-    "secondary": "249 24% 16%",
+    "secondary": "249 24% 17.5%",
     "secondaryForeground": "0 0% 90.1961%",
-    "muted": "249 24% 16%",
+    "muted": "249 24% 17.5%",
     "mutedForeground": "240 5% 68%",
-    "accent": "249 24% 16%",
+    "accent": "249 24% 17.5%",
     "accentForeground": "0 0% 90.1961%",
     "destructive": "2.8 100% 83.1%",
     "destructiveForeground": "0 0% 0%",
-    "border": "243 20% 20%",
+    "border": "244 16% 25%",
     "input": "240 5% 68%",
     "ring": "233 100% 87%",
     "success": "154.7 60.2% 60.6%",
@@ -72,10 +72,10 @@ export const brandThemes = {
     "warningStrong": "41.5 88.2% 63.3%",
     "inputFill": "hsl(244 29% 9%)",
     "canvasBackdrop": "#040408",
-    "borderSoft": "rgba(255, 255, 255, 0.10)",
-    "cardEdge": "rgba(255, 255, 255, 0.16)",
+    "borderSoft": "hsl(244 16% 25%)",
+    "cardEdge": "hsl(244 16% 25%)",
     "canvasRender": {
-      "grid": "#2a293d",
+      "grid": "#37364a",
       "snapGrid": "#8e8e8e",
       "snapGuide": "#67cdff",
       "snapPage": "#f4c14f",
@@ -83,8 +83,8 @@ export const brandThemes = {
       "selectionStroke": "#a5b4fc",
       "selectionAnchorFill": "#232238",
       "placeholderFill": "#11101e",
-      "placeholderStroke": "#2a293d",
-      "brokenFill": "#221f33",
+      "placeholderStroke": "#37364a",
+      "brokenFill": "#252237",
       "brokenStroke": "#8e8e8e"
     }
   }

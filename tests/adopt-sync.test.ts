@@ -25,7 +25,8 @@ const BUMPED = [
   '@tangle-network/ui',
 ]
 const INTEGRATIONS = '@tangle-network/agent-integrations'
-const MATERIALIZE = '@tangle-network/agent-profile-materialize'
+// A pre-1.0 peer whose floor is a `>=x <0.y.0` window; Materialize was this package until its 1.0.
+const WINDOWED = '@tangle-network/browser-agent-driver'
 const nextPatch = (version: string) => version.replace(/\d+$/, (patch) => String(Number(patch) + 1))
 const widenLast = (range: string, by: number) =>
   range.replace(/<(\d+)\.(\d+)\.0$/, (_, major: string, minor: string) => `<${major}.${Number(minor) + by}.0`)
@@ -54,8 +55,8 @@ let widened: string
 // pre-adoption HEAD. The bumped manifest is then written the way adopt-stack
 // writes it before `post-pin` (pins moved, peer upper bounds widened) and
 // STAGED, so a sync that read the index instead of HEAD would see no moved pin.
-// Materialize skips one minor, as it did in #1210 (0.25.2 -> 0.27.0), and the
-// widened floor claims the skipped minor.
+// The windowed peer skips one minor, as Materialize did in #1210 (0.25.2 -> 0.27.0),
+// and the widened floor claims the skipped minor.
 beforeEach(() => {
   copy = mkdtempSync(join(tmpdir(), 'adopt-sync-'))
   for (const path of ['package.json', 'scripts/adopt-sync.mjs', 'create-agent-app', 'tests/scaffold-cohort.test.ts', 'src/peer-floors']) {
@@ -68,16 +69,16 @@ beforeEach(() => {
   git('commit', '-q', '-m', 'pre-adoption')
 
   const root = JSON.parse(readFileSync(join(copy, 'package.json'), 'utf8'))
-  committedFloor = root.peerDependencies[MATERIALIZE]
+  committedFloor = root.peerDependencies[WINDOWED]
   const last = /<0\.(\d+)\.0$/.exec(committedFloor)
-  expect(last, `${MATERIALIZE} floor ${committedFloor} must end in a >=x <0.y.0 window`).not.toBeNull()
+  expect(last, `${WINDOWED} floor ${committedFloor} must end in a >=x <0.y.0 window`).not.toBeNull()
   const upper = Number(last![1])
   untested = `0.${upper}.0`
   adopted = `0.${upper + 1}.0`
   widened = widenLast(committedFloor, 2)
   for (const name of BUMPED) root.devDependencies[name] = nextPatch(root.devDependencies[name])
-  root.devDependencies[MATERIALIZE] = adopted
-  root.peerDependencies[MATERIALIZE] = widened
+  root.devDependencies[WINDOWED] = adopted
+  root.peerDependencies[WINDOWED] = widened
   root.peerDependencies[INTEGRATIONS] = widenLast(root.peerDependencies[INTEGRATIONS], 2)
   writeFileSync(join(copy, 'package.json'), `${JSON.stringify(root, null, 2)}\n`)
   git('add', 'package.json')
@@ -112,13 +113,13 @@ it('moves both templates and the peer floors onto the adopted cohort so both con
 
   // The floor keeps every committed window and gains the adopted minor alone.
   const floors = read('package.json').peerDependencies ?? {}
-  expect(floors[MATERIALIZE]).toBe(`${committedFloor} || >=${adopted} <0.${Number(adopted.split('.')[1]) + 1}.0`)
-  expect(satisfiesRange(adopted, floors[MATERIALIZE]!)).toBe(true)
-  expect(satisfiesRange(untested, floors[MATERIALIZE]!), `${floors[MATERIALIZE]} claims the untested ${untested}`).toBe(false)
+  expect(floors[WINDOWED]).toBe(`${committedFloor} || >=${adopted} <0.${Number(adopted.split('.')[1]) + 1}.0`)
+  expect(satisfiesRange(adopted, floors[WINDOWED]!)).toBe(true)
+  expect(satisfiesRange(untested, floors[WINDOWED]!), `${floors[WINDOWED]} claims the untested ${untested}`).toBe(false)
   // A committed floor that already admits its moved pin returns to HEAD's value,
   // undoing the widening; every other floor is as committed.
   for (const [name, range] of Object.entries(repoManifest.peerDependencies)) {
-    if (name !== MATERIALIZE) expect(floors[name], name).toBe(range)
+    if (name !== WINDOWED) expect(floors[name], name).toBe(range)
   }
 
   const cohort = vitest('tests/scaffold-cohort.test.ts')

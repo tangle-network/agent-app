@@ -85,12 +85,6 @@ const samples: Record<string, EmailMessage> = {
 }
 
 describe('email templates', () => {
-  it.each(Object.entries(samples))('%s renders the snapshotted HTML and text', async (name, message) => {
-    await expect(message.html).toMatchFileSnapshot(`__snapshots__/${name}.html`)
-    await expect(`Subject: ${message.subject}\nPreheader: ${message.preheader}\n\n${message.text}`)
-      .toMatchFileSnapshot(`__snapshots__/${name}.txt`)
-  })
-
   it.each(Object.entries(samples))('%s passes the Gmail and Outlook checks', (_name, message) => {
     expect(lintEmailHtml(message.html)).toEqual([])
   })

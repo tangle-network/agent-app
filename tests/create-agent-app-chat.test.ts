@@ -71,10 +71,13 @@ function linkDeps(projectDir: string) {
     if (skip.has(name)) continue
     link(join(nm, name), join(REPO, 'node_modules', name))
   }
-  // agent-app's own runtime dependency (zod) plus the sandbox SDK's peer graph
+  // agent-app's own runtime dependencies, zod and the sandbox SDK's peer graph
   // resolve through the copied payload's parent — the project's node_modules —
   // exactly as they would after a real install.
-  link(join(nm, 'zod'), join(REPO, 'node_modules', 'zod'))
+  const own = Object.keys(JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).dependencies ?? {})
+  for (const name of new Set([...own, 'zod'])) {
+    if (!existsSync(join(nm, name))) link(join(nm, name), join(REPO, 'node_modules', name))
+  }
 }
 
 describe('create-agent-app --chat scaffolder', () => {
