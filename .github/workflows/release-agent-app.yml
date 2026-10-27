@@ -6,7 +6,7 @@ on:
     inputs:
       environment: {type: string, required: true}
       release-runs-on: {type: string, required: true}
-      suites-runs-on: {type: string, required: true}
+      suites-runs-on: {type: string, default: '{"group":"app-production","labels":["ci-deploy"]}'}
       preflight-command: {type: string, required: true}
       release-command: {type: string, required: true}
       suites-command: {type: string, required: true}
