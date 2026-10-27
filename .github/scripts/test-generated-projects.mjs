@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   chmodSync,
   mkdirSync,
@@ -432,11 +432,14 @@ function main(scratch) {
 
 // ── The scratch store: 1.5 to 3 GB per run, gone on every exit ──────────────
 //
-// `finally` covers completion and throws; a signal during a synchronous child
-// spawn exits Node without running it, which left 12 stores (about 30 GB) on
-// one Mac between 2026-10-24 and 10-27. Each run marks its scratch with its
-// pid, removes it on SIGINT/SIGTERM/SIGHUP, and first sweeps every sibling
-// store whose owner is gone. `--sweep` runs only the sweep.
+// `finally` covers completion and throws. This runner blocks in synchronous
+// child spawns, so a signal cannot run a handler until the child ends, and a
+// killed parent orphans the install: 12 stores (about 30 GB) were left on one
+// Mac between 2026-10-24 and 10-27. So each run marks its scratch with its pid
+// and starts a detached janitor that removes the scratch once this process is
+// gone, however it went; signal handlers cover the case where the child ends
+// first; and every start sweeps sibling stores whose owner is gone. `--sweep`
+// runs only the sweep.
 const SCRATCH_PREFIX = 'agent-app-generated-'
 const OWNER_FILE = 'owner.pid'
 const removeScratch = (dir) => rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 })
@@ -479,6 +482,26 @@ function sweepStaleScratch() {
 sweepStaleScratch()
 if (process.argv.includes('--sweep')) process.exit(0)
 
+/** A detached process that outlives this one: it polls the owner pid and removes the scratch after it
+ *  dies, retrying while an orphaned child still writes there. */
+const JANITOR = `
+const [dir, pid] = [process.argv[1], Number(process.argv[2])]
+const { rmSync, existsSync } = require('node:fs')
+const alive = () => { try { process.kill(pid, 0); return true } catch (error) { return error.code === 'EPERM' } }
+let tries = 0
+const sweep = () => {
+  rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 200 })
+  if (existsSync(dir) && ++tries < 30) return setTimeout(sweep, 2000)
+  process.exit(0)
+}
+const tick = () => (alive() ? setTimeout(tick, 2000) : sweep())
+tick()
+`
+function startJanitor(dir) {
+  const child = spawn(process.execPath, ['-e', JANITOR, dir, String(process.pid)], { detached: true, stdio: 'ignore' })
+  child.unref()
+}
+
 let scratch
 const leave = (signal) => {
   if (scratch) removeScratch(scratch)
@@ -489,6 +512,7 @@ try {
   scratch = mkdtempSync(join(tmpdir(), SCRATCH_PREFIX))
   chmodSync(scratch, 0o700)
   writeFileSync(join(scratch, OWNER_FILE), String(process.pid))
+  startJanitor(scratch)
   main(scratch)
 } finally {
   if (scratch) removeScratch(scratch)
