@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -429,11 +430,66 @@ function main(scratch) {
   }
 }
 
+// ── The scratch store: 1.5 to 3 GB per run, gone on every exit ──────────────
+//
+// `finally` covers completion and throws; a signal during a synchronous child
+// spawn exits Node without running it, which left 12 stores (about 30 GB) on
+// one Mac between 2026-10-24 and 10-27. Each run marks its scratch with its
+// pid, removes it on SIGINT/SIGTERM/SIGHUP, and first sweeps every sibling
+// store whose owner is gone. `--sweep` runs only the sweep.
+const SCRATCH_PREFIX = 'agent-app-generated-'
+const OWNER_FILE = 'owner.pid'
+const removeScratch = (dir) => rmSync(dir, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 })
+
+function ownerAlive(dir) {
+  let pid
+  try {
+    pid = Number(readFileSync(join(dir, OWNER_FILE), 'utf8').trim())
+  } catch {
+    // No marker: a store from before markers, or one still being created. Keep it for two hours.
+    try {
+      return Date.now() - statSync(dir).mtimeMs < 2 * 60 * 60 * 1000
+    } catch {
+      return false
+    }
+  }
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === 'EPERM'
+  }
+}
+
+function sweepStaleScratch() {
+  const root = tmpdir()
+  const swept = []
+  for (const name of readdirSync(root)) {
+    if (!name.startsWith(SCRATCH_PREFIX)) continue
+    const dir = join(root, name)
+    if (ownerAlive(dir)) continue
+    removeScratch(dir)
+    swept.push(dir)
+  }
+  if (swept.length) process.stdout.write(`Removed ${swept.length} stale generated store(s): ${swept.join(', ')}\n`)
+  return swept
+}
+
+sweepStaleScratch()
+if (process.argv.includes('--sweep')) process.exit(0)
+
 let scratch
+const leave = (signal) => {
+  if (scratch) removeScratch(scratch)
+  process.exit(128 + (signal === 'SIGINT' ? 2 : signal === 'SIGHUP' ? 1 : 15))
+}
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, leave)
 try {
-  scratch = mkdtempSync(join(tmpdir(), 'agent-app-generated-'))
+  scratch = mkdtempSync(join(tmpdir(), SCRATCH_PREFIX))
   chmodSync(scratch, 0o700)
+  writeFileSync(join(scratch, OWNER_FILE), String(process.pid))
   main(scratch)
 } finally {
-  if (scratch) rmSync(scratch, { force: true, maxRetries: 3, recursive: true, retryDelay: 100 })
+  if (scratch) removeScratch(scratch)
 }
