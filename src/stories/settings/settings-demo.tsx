@@ -31,6 +31,7 @@ import {
   type SettingsNavSection,
 } from '../../settings-react'
 import { confirmWrite, type MutationOutcome } from '../../web-react/async'
+import type { InvitationDelivery } from '../../teams/invitations'
 import type { DemoBackend, DemoInvitation, DemoMember, DemoWorkspace, ViewerRole } from './settings-backend'
 
 export type DemoSectionId = 'general' | 'agent' | 'notifications' | 'limits' | 'team'
@@ -39,6 +40,8 @@ export interface SettingsDemoProps {
   backend: DemoBackend
   viewer?: ViewerRole
   initialSection?: DemoSectionId
+  /** `link` shows the team cards of a product that emails no invitations. */
+  delivery?: InvitationDelivery
   /** How long a section's "loader" takes, so the optimistic nav and progress line show. */
   routeDelayMs?: number
 }
@@ -351,7 +354,7 @@ function LimitsSection({ workspace, patch, viewer }: SectionProps) {
   )
 }
 
-function TeamSection({ members, invitations, send, viewer }: SectionProps) {
+function TeamSection({ members, invitations, send, viewer, delivery }: SectionProps) {
   const role = viewer === 'owner' ? 'owner' : 'admin'
   return (
     <>
@@ -363,6 +366,7 @@ function TeamSection({ members, invitations, send, viewer }: SectionProps) {
         onChangeRole={({ memberId, role: next }) => send('PATCH', `/api/members/${memberId}`, { role: next })}
         onRemove={({ memberId }) => send('DELETE', `/api/members/${memberId}`)}
         onInvite={(input) => send('POST', '/api/invitations', input)}
+        delivery={delivery}
         plansHref="#plans"
         LinkComponent={DemoLink}
         menuItems={() => [{ label: 'Make team owner…', onSelect: () => undefined, disabledReason: viewer === 'owner' ? undefined : ownerOnly('choose the team owner') }]}
@@ -370,6 +374,7 @@ function TeamSection({ members, invitations, send, viewer }: SectionProps) {
       <InvitationsSection
         invitations={invitations}
         currentRole={role}
+        delivery={delivery}
         onResend={({ invitationId }) => send('POST', `/api/invitations/${invitationId}/resend`)}
         onRevoke={({ invitationId }) => send('DELETE', `/api/invitations/${invitationId}`)}
         onCopy={() => undefined}
@@ -383,6 +388,7 @@ interface SectionProps {
   members: DemoMember[]
   invitations: DemoInvitation[]
   viewer: ViewerRole
+  delivery: InvitationDelivery
   patch: (next: Patch) => Promise<MutationOutcome<DemoWorkspace>>
   put: <K extends keyof DemoWorkspace>(path: string, key: K, value: DemoWorkspace[K]) => Promise<MutationOutcome<DemoWorkspace[K]>>
   send: (method: string, path: string, body?: unknown) => Promise<MutationOutcome<unknown>>
@@ -390,7 +396,7 @@ interface SectionProps {
   fetcher: typeof fetch
 }
 
-export function SettingsDemo({ backend: api, viewer = 'owner', initialSection = 'general', routeDelayMs = 350 }: SettingsDemoProps) {
+export function SettingsDemo({ backend: api, viewer = 'owner', initialSection = 'general', delivery = 'email', routeDelayMs = 350 }: SettingsDemoProps) {
   const { workspace, members, invitations, patch, put, send } = useWorkspaceApi(api)
   const [active, setActive] = useState<DemoSectionId>(initialSection)
   const [deleted, setDeleted] = useState(false)
@@ -408,7 +414,7 @@ export function SettingsDemo({ backend: api, viewer = 'owner', initialSection = 
   ]
   if (deleted) return <p className="p-8 text-sm text-muted-foreground" role="status">The project was deleted. A product navigates to its project list here.</p>
   if (!workspace) return <p className="p-8 text-sm text-muted-foreground" role="status">Loading settings…</p>
-  const props: SectionProps = { workspace, members, invitations, viewer, patch, put, send, fetcher: api.fetch }
+  const props: SectionProps = { workspace, members, invitations, viewer, delivery, patch, put, send, fetcher: api.fetch }
   const body: Record<DemoSectionId, ReactNode> = {
     general: <GeneralSection {...props} onDeleted={() => setDeleted(true)} />,
     agent: <AgentSection {...props} />,

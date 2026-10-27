@@ -83,7 +83,7 @@ interface ExportSectionProps
 `function`
 
 ```ts
-({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, }: InvitationsSectionProps) => Element
+({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, delivery, }: InvitationsSectionProps) => Element
 ```
 
 ### `InvitationsSectionProps`
@@ -99,7 +99,7 @@ interface InvitationsSectionProps
 `function`
 
 ```ts
-({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…
+({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, delivery, plans…
 ```
 
 ### `MembersSectionProps`

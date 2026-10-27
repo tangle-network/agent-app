@@ -4,7 +4,7 @@
 
 Source: `src/teams/index.ts`
 
-37 exports.
+38 exports.
 
 ### `ASSIGNABLE_WORKSPACE_ROLES`
 
@@ -92,6 +92,14 @@ type AssignableWorkspaceRole
 
 ```ts
 7
+```
+
+### `InvitationDelivery`
+
+`type` — How an invitation reaches the person: `email` sends them the link; `link` sends nothing, and the inviter shares it.
+
+```ts
+type InvitationDelivery
 ```
 
 ### `InvitationEmailStatus`
