@@ -124,7 +124,7 @@ _154 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./studio`](api/studio.md) | 68 | `media`, `runtime`, `tools`, `vault`, `web` |
 | [`./studio-react`](api/studio-react.md) | 53 | `runtime`, `studio`, `web-react` |
 | [`./studio/generated-media`](api/studio-generated-media.md) | 39 | `media`, `tools`, `vault`, `web` |
-| [`./teams`](api/teams.md) | 37 | — |
+| [`./teams`](api/teams.md) | 38 | — |
 | [`./teams-react`](api/teams-react.md) | 12 | `teams`, `web-react` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 27 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
@@ -1263,9 +1263,9 @@ Depends on: `media`, `tools`, `vault`, `web`
 
 ## `./teams`
 
-Source: `src/teams/index.ts` · 37 exports
+Source: `src/teams/index.ts` · 38 exports
 
-`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `createThreadAccessCheck`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EMAIL_HINT`, `INVITATION_EXPIRY_DAYS`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInvitationEmail`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `ThreadAccessOptions`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
+`ASSIGNABLE_WORKSPACE_ROLES`, `AssignableWorkspaceRole`, `canManageWorkspaceMemberRole`, `createThreadAccessCheck`, `generateInvitationToken`, `generateInviteToken`, `getInvitationExpiresAt`, `hasOrganizationRole`, `hasWorkspaceRole`, `INVITATION_EMAIL_HINT`, `INVITATION_EXPIRY_DAYS`, `InvitationDelivery`, `InvitationEmailStatus`, `InvitationPermission`, `InvitationStatus`, `InviteRejectionReason`, `InviteTokenState`, `inviteUrlForToken`, `InviteValidationResult`, `isAssignableWorkspaceRole`, `isInvitationEmail`, `isInviteTokenShape`, `normalizeInvitationEmail`, `ORGANIZATION_ROLE_RANK`, `ORGANIZATION_ROLES`, `OrganizationRole`, `organizationRoleGrantsWorkspaceOwner`, `parseInvitationPermission`, `resolveWorkspaceRole`, `SandboxWorkspaceRole`, `ThreadAccessOptions`, `validateInviteToken`, `WORKSPACE_ROLE_RANK`, `WORKSPACE_ROLES`, `WorkspaceCollaborationAccess`, `WorkspaceRole`, `workspaceRoleToCollaborationAccess`, `workspaceRoleToSandboxRole`
 
 [Full API →](api/teams.md)
 
