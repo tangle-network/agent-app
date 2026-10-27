@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.67
+
+- Peer the 1.0 stack with one caret each; NodeNext-resolvable declarations (#1393)
+
 ## 0.63.66
 
 - journeys: sendNew and sendInThread keep a staged draft with keepDraft (#1392)
