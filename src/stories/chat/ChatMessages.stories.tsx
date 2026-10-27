@@ -12,7 +12,7 @@ import {
   reasoningToolThread,
   shortThread,
   streamingAssistantMessage,
-  twoAgentsThread,
+  twoAgentsThread, twoAgentsAnswering,
   usageReportMessage,
 } from './fixtures'
 import { renderMarkdown } from './markdown'
@@ -104,6 +104,16 @@ export const Short: Story = {
 export const TwoAgentsAnswer: Story = {
   name: 'Two agents answer one message',
   args: { messages: twoAgentsThread, renderMarkdown, approval },
+}
+
+/**
+ * The same turn while it runs: the route announced both responders up front and
+ * tags every event with its speaker, so each block streams on its own. The
+ * Writer's text is mid-sentence while the Research Lead's tool call still runs.
+ */
+export const TwoAgentsAnswering: Story = {
+  name: 'Two agents answering at once',
+  args: { messages: twoAgentsAnswering, renderMarkdown, approval, loading: true },
 }
 
 /**

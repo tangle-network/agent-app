@@ -240,6 +240,33 @@ export const multiPartyThread: ChatUiMessage[] = [
 /** One turn addressed to two agents: ONE stored assistant row whose parts carry
  *  a speaker part before each answer. `ChatMessages` draws it as two answers
  *  under two authors, in the order the person typed the mentions. */
+/** The same ask, mid-turn: both responders were announced at once and each is
+ *  still answering, so the viewer sees two blocks typing side by side. */
+export const twoAgentsAnswering: ChatUiMessage[] = [
+  {
+    id: 'tl-1',
+    role: 'user',
+    content: '@writer @research-lead plan the launch announcement for the roster feature.',
+    parts: [
+      { type: 'mention', mentionKind: 'agent', path: 'writer', name: 'Writer', agentId: 'ap_writer' },
+      { type: 'mention', mentionKind: 'agent', path: 'research-lead', name: 'Research Lead', agentId: 'ap_research' },
+    ],
+  },
+  {
+    id: 'tl-2',
+    role: 'assistant',
+    content: 'Draft headline: "Every agent in your workspace, one @ away."\n\nChecking the roster and the mention routes before naming risks.',
+    parts: [
+      { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+      { type: 'text', text: 'Draft headline: "Every agent in your workspace, one @ away."\n\nSubhead, two options so far: "Address any agent from any thread" and' },
+      { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+      { type: 'reasoning', text: 'Check what shipped and what is still open before naming risks.' },
+      { type: 'tool', id: 'tool-live', callID: 'call_search_live', tool: 'search_repo', state: { status: 'running', input: { query: 'agent mention roster' } } },
+      { type: 'text', text: 'Checking the roster and the mention routes before naming risks.' },
+    ],
+  },
+]
+
 export const twoAgentsThread: ChatUiMessage[] = [
   {
     id: 'ta-1',
