@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.63.76
+
+- fix(release): post-release suites default to any ci-deploy runner again (#1432)
+- Drop the suites-result workflow output: a sharded matrix has no single result and no caller reads it (#1430)
+- Give post-release suites their own runner pool, cancel superseded suites and add optional shards (#1429)
+- docs(lessons): a Worker's chunks must not import each other (#1427)
+- feat(settings-react): link-only invitation delivery; AssistantPanel header on the 14px step (#1425)
+- chore(deps): adopt 2 @tangle-network/* packages (#1426)
+- feat(worker-build): keep agent-interface in one chunk and fail the build on a chunk cycle (#1424)
+- chore(deps): adopt 2 @tangle-network/* packages (#1423)
+- chore(deps): adopt 2 @tangle-network/* packages (#1422)
+- chore(deps): adopt 2 @tangle-network/* packages (#1421)
+- chore(deps): adopt 4 @tangle-network/* packages (#1420)
+
 ## 0.63.75
 
 - fix(deps): admit agent-runtime 2.x (#1419)

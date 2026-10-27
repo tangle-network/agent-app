@@ -21291,7 +21291,7 @@
         {
           "name": "InvitationsSection",
           "kind": "function",
-          "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, }: InvitationsSectionProps) => Element",
+          "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, delivery, }: InvitationsSectionProps) => Element",
           "doc": null
         },
         {
@@ -21303,7 +21303,7 @@
         {
           "name": "MembersSection",
           "kind": "function",
-          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, plansHref, Link…",
+          "signature": "({ id, title, description, members, currentRole, currentUserId, noun, onChangeRole, onRemove, onInvite, delivery, plans…",
           "doc": null
         },
         {
@@ -24533,6 +24533,12 @@
           "kind": "const",
           "signature": "7",
           "doc": "Define the number of days before an invitation expires"
+        },
+        {
+          "name": "InvitationDelivery",
+          "kind": "type",
+          "signature": "type InvitationDelivery",
+          "doc": "How an invitation reaches the person: `email` sends them the link; `link` sends nothing, and the inviter shares it."
         },
         {
           "name": "InvitationEmailStatus",
