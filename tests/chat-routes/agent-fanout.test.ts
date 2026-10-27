@@ -39,8 +39,8 @@ function harness(options: { agents?: boolean; fail?: string } = {}) {
           if (failing) { yield { type: 'error' as const, data: { message: 'the model service did not answer' } }; return }
           yield { type: 'text' as const, text }
         })(),
-        finalText: () => text,
-        assistantParts: () => [{ type: 'text', text }],
+        finalText: () => (failing ? '' : text),
+        assistantParts: () => (failing ? [] : [{ type: 'text', text }]),
         usage: () => ({ inputTokens: 10, outputTokens: 5 }),
       }
     },
@@ -83,7 +83,8 @@ describe('a turn addressed to agents', () => {
       expect(events.filter((e) => e.type === 'speaker').map((e) => e.id)).toEqual(['ap_writer', 'ap_research'])
       const texts = events.filter((e) => e.type === 'text').map((e) => `${e.speaker}:${e.text}`).sort()
       expect(texts).toEqual(['ap_research:Research Lead answers.', 'ap_writer:Writer answers.'])
-      expect(events.findIndex((e) => e.type === 'text')).toBeGreaterThan(events.findLastIndex((e) => e.type === 'speaker'))
+      const types = events.map((e) => String(e.type))
+      expect(types.indexOf('text')).toBeGreaterThan(types.lastIndexOf('speaker'))
       // Each responder read the message addressed to it: handles gone, its own name first.
       expect(h.prompts).toEqual([
         'You answer this message as Writer (@writer). Research Lead (@research-lead) answers it separately at the same time; do your part and leave theirs to them.\n\nplan the launch',
@@ -157,6 +158,13 @@ describe('mentioned agents answer at the same time', () => {
       const assistant = (await h.store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
       expect(assistant).toHaveLength(1)
       expect(assistant[0]!.content).toBe('Writer answers.')
+      // The stored row keeps the failed responder's header and its notice, so history rereads the same way.
+      expect(assistant[0]!.parts).toEqual([
+        { type: 'speaker', id: 'ap_writer', name: 'Writer', handle: 'writer' },
+        { type: 'text', text: 'Writer answers.' },
+        { type: 'speaker', id: 'ap_research', name: 'Research Lead', handle: 'research-lead' },
+        { type: 'notice', noticeKind: 'error', id: 'speaker-failed:ap_research', text: 'Research Lead could not answer: the model service did not answer' },
+      ])
     } finally { h.close() }
     const all = harness({ fail: 'ap_writer' })
     try {

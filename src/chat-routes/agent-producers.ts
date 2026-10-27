@@ -98,7 +98,7 @@ function responderArgs<TContext, TResource>(
       })()
   return {
     ...args, agent, executionId: `${args.executionId}-${index + 1}`, prompt,
-    body: { ...args.body, content: address(args.body.content) },
+    body: { ...args.body, ...(typeof args.body.content === 'string' ? { content: address(args.body.content) } : {}) },
   }
 }
 
@@ -186,18 +186,29 @@ export async function composeAgentProducers<TContext, TResource>(
     }
   })()
   const entries = () => agents.flatMap((agent, index) => (producers[index] ? [{ agent, producer: producers[index]! }] : []))
-  const partsOf = (entry: { agent: ChatTurnAgentTarget; producer: ChatTurnRouteProducer }, read: 'assistantParts' | 'draftParts') => {
-    const own = entry.producer[read]?.()
-    const text = entry.producer.finalText()
+  const failureOf = (index: number): string | undefined => {
+    const slot = slots[index]!
+    if (slot.error !== undefined) return slot.error instanceof Error ? slot.error.message : String(slot.error)
+    const data = slot.failure?.data
+    return slot.failure ? (typeof data?.message === 'string' ? data.message : 'the run failed') : undefined
+  }
+  // Every responder keeps its header in the stored row; a failed one carries its notice after whatever it said.
+  const partsOf = (index: number, read: 'assistantParts' | 'draftParts') => {
+    const agent = agents[index]!
+    const producer = producers[index]
+    const own = producer?.[read]?.()
+    const text = producer?.finalText() ?? ''
     const parts = own ?? (text ? [{ type: 'text', text }] : [])
-    return [speakerPart(entry.agent), ...parts]
+    const failure = failureOf(index)
+    const notice = failure === undefined ? [] : [{ type: 'notice', noticeKind: 'error', id: `speaker-failed:${agent.id}`, text: `${agent.name} could not answer: ${failure}` }]
+    return [speakerPart(agent), ...parts, ...notice]
   }
   const last = () => entries().at(-1)?.producer
   return {
     stream,
     finalText: () => entries().map(({ producer }) => producer.finalText()).filter((text) => text.trim() !== '').join('\n\n'),
-    assistantParts: () => entries().flatMap((entry) => partsOf(entry, 'assistantParts')),
-    draftParts: () => entries().flatMap((entry) => partsOf(entry, 'draftParts')),
+    assistantParts: () => agents.flatMap((_, index) => partsOf(index, 'assistantParts')),
+    draftParts: () => agents.flatMap((_, index) => partsOf(index, 'draftParts')),
     usage: () => entries().reduce<ChatTurnUsage>((sum, { producer }) => {
       const usage = producer.usage?.() ?? {}
       for (const [key, value] of Object.entries(usage)) {
