@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.63.75
+
+- fix(deps): admit agent-runtime 2.x (#1419)
+- chore(deps): adopt @tangle-network/sandbox 1.0.33 (#1418)
+- chore(deps): adopt 2 @tangle-network/* packages (#1417)
+- chore(deps): adopt @tangle-network/sandbox 1.0.31 (#1416)
+- chore(deps): adopt @tangle-network/sandbox 1.0.30 (#1415)
+- chore(deps): adopt @tangle-network/sandbox 1.0.29 (#1414)
+- chore(deps): adopt 2 @tangle-network/* packages (#1413)
+- docs(release): name required caller action reads (#1412)
+
 ## 0.63.74
 
 - fix(release): default post-release suites to deploy runners (#1411)
