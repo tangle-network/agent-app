@@ -177,6 +177,8 @@ jobs:
           PLATFORM_WORKFLOW_SMOKE_PASSWORD: ${{ secrets.PLATFORM_WORKFLOW_SMOKE_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
+          # The native release writes its sanitized canary receipts here; they upload with the release receipt.
+          RELEASE_EVIDENCE_DIR: ${{ runner.temp }}/agent-app-release-evidence
         shell: bash
         run: |
           set -euo pipefail
@@ -265,7 +267,9 @@ jobs:
         if: always()
         with:
           name: agent-app-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/agent-app-release.json
+          path: |
+            ${{ runner.temp }}/agent-app-release.json
+            ${{ runner.temp }}/agent-app-release-evidence/
           if-no-files-found: warn
           retention-days: 30
   suites:
@@ -296,6 +300,8 @@ jobs:
       - name: Full post-release suites from the native owner
         env:
           SUITES_COMMAND: ${{ inputs.suites-command }}
+          # A post-release check that drives the served app from its release host (QA leases and browsers).
+          RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
         shell: bash
         run: |
           set -euo pipefail
