@@ -26,8 +26,9 @@ runs:
           case "$store" in /*) ;; *) echo '::error::Provision the runner canonical pnpm store before releasing.'; exit 1 ;; esac
           [[ "$store" != *$'\n'* && "$store" != *$'\r'* ]]
           test -d "$store" && test -w "$store"
+          store=$(realpath -e -- "$store")
           # Provisioning owns both pnpm namespaces; verify rather than replace them.
-          resolved=$(pnpm store path --silent)
+          resolved=$(realpath -m -- "$(pnpm store path --silent)")
           case "$resolved/" in "$store/"*) ;; *) echo '::error::pnpm ignored the runner canonical store.'; exit 1 ;; esac
         fi
         browsers="${XDG_CACHE_HOME:-$HOME/.cache}/ms-playwright"
