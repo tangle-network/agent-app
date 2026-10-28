@@ -254,6 +254,36 @@ describe('integrations-react through the finite Hub settings server', () => {
     expect(screen.getByRole('button', { name: 'Connect another account' })).toBeTruthy()
   })
 
+  it('clears connection selection on Back before a document-level SPA interceptor without reloading', async () => {
+    const f = fixture()
+    window.history.replaceState(null, '', '/settings?integration=cloudbeds&connection=conn_1&keep=1')
+    const navigate = vi.fn()
+    const unload = vi.fn()
+    const interceptSpaLink = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null
+      if (!anchor) return
+      event.preventDefault()
+      navigate(anchor.getAttribute('href'))
+    }
+    document.addEventListener('click', interceptSpaLink)
+    window.addEventListener('beforeunload', unload)
+    try {
+      render(<HubIntegrationsPanel identity={identity} client={f.client} can={allow} callbackPath="/integrations/callback"
+        accounts={{ title: 'Accounts' }} />)
+      expect(await screen.findByText('Update a room')).toBeTruthy()
+      fireEvent.click(screen.getByRole('link', { name: '← Integrations' }), { button: 0 })
+      expect(navigate).not.toHaveBeenCalled()
+      await waitFor(() => expect(screen.queryByTestId('integration-connection-detail')).toBeNull())
+      expect(await screen.findByRole('list', { name: 'Accounts' })).toBeTruthy()
+      expect(window.location.search).toBe('?keep=1')
+      expect(unload).not.toHaveBeenCalled()
+    } finally {
+      document.removeEventListener('click', interceptSpaLink)
+      window.removeEventListener('beforeunload', unload)
+    }
+  })
+
   it('offers a provider again once its only account is disconnected', async () => {
     const f = fixture()
     f.setConnections([{ ...connection, status: 'revoked' }])
