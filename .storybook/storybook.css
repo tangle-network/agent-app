@@ -1,15 +1,10 @@
-@import '@tangle-network/sandbox-ui/styles';
 @import 'tailwindcss';
+@import '../src/theme/tailwind.css';
 @config '../tailwind.config.cjs';
 
-/*
- * tokens.css defines color tokens only — no font tokens — so body text falls
- * back to Inter (loaded in preview-head.html for the canvas text fixtures)
- * and then the system stack, same as any consumer that doesn't set a font.
- */
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
   background: hsl(var(--background));
   color: hsl(var(--foreground));
 }

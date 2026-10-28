@@ -1,4 +1,4 @@
-/** Resolve public theme exports from a packed archive, then paint its CSS. */
+/** Paint public theme exports from a local pack or the archive passed after proofDir. */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -27,14 +27,16 @@ const contrast = (a, b) => {
 }
 let browser
 try {
-  const packOutput = execFileSync('npm', ['pack', '--ignore-scripts', '--json',
-    '--pack-destination', scratch], { cwd: root, encoding: 'utf8' })
-  const packResult = JSON.parse(packOutput)
-  // pnpm's lifecycle environment asks npm for its keyed JSON shape; direct
-  // npm returns an array. Both describe the same single archive.
-  const packed = Array.isArray(packResult) ? packResult[0] : packResult['@tangle-network/agent-app']
-  assert.ok(packed?.filename, `npm pack must produce one archive; got ${packOutput.slice(0, 200)}`)
-  const archive = join(scratch, packed.filename)
+  const archive = process.argv[3] ? resolve(process.argv[3]) : (() => {
+    const packOutput = execFileSync('npm', ['pack', '--ignore-scripts', '--json',
+      '--pack-destination', scratch], { cwd: root, encoding: 'utf8' })
+    const packResult = JSON.parse(packOutput)
+    // pnpm's lifecycle environment asks npm for its keyed JSON shape; direct
+    // npm returns an array. Both describe the same single archive.
+    const packed = Array.isArray(packResult) ? packResult[0] : packResult['@tangle-network/agent-app']
+    assert.ok(packed?.filename, `npm pack must produce one archive; got ${packOutput.slice(0, 200)}`)
+    return join(scratch, packed.filename)
+  })()
   const consumer = join(scratch, 'consumer')
   const installation = join(consumer, 'node_modules/@tangle-network/agent-app')
   mkdirSync(installation, { recursive: true })
@@ -84,6 +86,14 @@ try {
               <div class="light" id="nested" style="background:hsl(var(--background));color:hsl(var(--foreground));padding:1rem">Nested light</div>
             </div>
             <div data-theme="aubergine" id="named" style="color:hsl(var(--primary))">Named accent</div>
+            <section class="light" id="accent-scope" data-accent="teal">
+              <button id="accent-action" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Accent action</button>
+              <span id="accent-ink" style="color:var(--accent-text)">Accent ink</span>
+              <section class="dark" id="accent-dark">
+                <button id="accent-dark-action" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Dark accent</button>
+                <span id="accent-dark-ink" style="color:var(--accent-text)">Dark ink</span>
+              </section>
+            </section>
             <span class="agent-shimmer">Working</span>
           </section>
         </main>`
@@ -110,12 +120,29 @@ try {
           viewportWidth: innerWidth,
         }
       })
+      const accents = []
+      for (const hue of ['violet', 'orange', 'teal', 'blue', 'pink', 'brown', 'cyan', 'lime']) {
+        await page.locator('#accent-scope').evaluate(async (element, value) => {
+          element.setAttribute('data-accent', value)
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        }, hue)
+        const pairs = await page.evaluate(() => ['accent', 'accent-dark'].map((prefix) => {
+          const action = getComputedStyle(document.getElementById(`${prefix}-action`))
+          const ink = getComputedStyle(document.getElementById(`${prefix}-ink`)).color
+          return { prefix, fill: action.backgroundColor, label: action.color, ink }
+        }))
+        accents.push({ hue, pairs })
+        for (const pair of pairs) {
+          assert.equal(pair.fill, pair.ink, `${hue} ${pair.prefix}: Agent App's legacy primary follows accent ink`)
+          assert.ok(contrast(pair.label, pair.fill) >= 4.5, `${hue} ${pair.prefix}: solid label clears AA`)
+        }
+      }
       assert.notEqual(state.defaultBackground, state.darkBackground)
       assert.equal(state.defaultBackground, state.nestedBackground)
       assert.notEqual(state.fieldBackground, state.fieldBorder)
       assert.notEqual(state.namedPrimary, state.defaultPrimary)
       assert.ok(contrast(state.primaryForeground, state.defaultPrimary) >= 4.5)
-      assert.ok(contrast(state.warningText, state.warningBackground) >= 4.5)
+      assert.ok(contrast(state.warningText, state.warningBackground) >= 4.5, `warning ${state.warningText} on ${state.warningBackground}`)
       assert.ok(contrast(state.darkWarningText, state.darkWarningBackground) >= 4.5)
       assert.equal(state.scrollWidth, state.viewportWidth)
       if (reducedMotion === 'reduce') {
@@ -130,15 +157,15 @@ try {
         mkdirSync(proofDir, { recursive: true })
         await page.screenshot({ path: join(proofDir, `packed-${viewport.width}.png`), fullPage: true })
       }
-      results.push({ viewport: viewport.width, reducedMotion, ...state, errors })
+      results.push({ viewport: viewport.width, reducedMotion, ...state, accents, errors })
       await page.close()
     }
   }
   const report = {
-    packageVersion: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
+    packageVersion: JSON.parse(readFileSync(join(installation, 'package.json'), 'utf8')).version,
     archiveSha256: sha256(readFileSync(archive)),
     cssSha256: sha256(exported.css),
-    packedFiles: packed.files.length,
+    packedFiles: execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n').filter((name) => !name.endsWith('/')).length,
     installedWithoutBrand: true,
     sourceContract: exported.sourceContract,
     publicExportsResolved: ['styles', 'theme', 'tailwind-preset', 'theme-contract'],

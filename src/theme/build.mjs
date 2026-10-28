@@ -68,11 +68,35 @@ const COLOR_ROLES = {
   '--surface-danger-text': 'danger',
   '--surface-warning-text': 'warning-text',
 }
+// An inherited role must rebind when a channel it references changes mode.
+function dependsOnOverride(name, own, defs, seen = new Set()) {
+  if (name in own) return true
+  if (seen.has(name)) return false
+  seen.add(name)
+  return [...(defs[name] ?? '').matchAll(/var\(\s*(--[\w-]+)\s*\)/g)]
+    .some(([, ref]) => dependsOnOverride(ref, own, defs, seen))
+}
 function adapters(own, inherited = darkValues) {
   const defs = { ...inherited, ...own }, result = {}
+  for (const [key, value] of Object.entries(own)) {
+    const tone = /^--tone-([a-z]+)-ink$/.exec(key)
+    if (!tone) continue
+    const ink = resolve(value, defs)
+    result[`--agent-app-tone-${tone[1]}-hsl`] = channels(ink)
+    result[`--agent-app-tone-${tone[1]}-foreground-hsl`] = foreground(ink)
+  }
   for (const [key, name] of Object.entries(COLOR_ROLES)) {
-    if (!(key in own)) continue
-    const value = resolve(own[key], defs)
+    if (!dependsOnOverride(key, own, defs)) continue
+    const tone = /^var\(--tone-([a-z]+)-ink\)$/.exec(defs[key] ?? '')
+    // Defer accent channels to this boundary's mode, including nested modes.
+    if (tone && name === 'accent') {
+      result['--agent-app-accent-hsl'] = `var(--agent-app-tone-${tone[1]}-hsl)`
+      result['--agent-app-accent-foreground-hsl'] = `var(--agent-app-tone-${tone[1]}-foreground-hsl)`
+      result['--primary'] = 'var(--agent-app-accent-hsl)'
+      result['--primary-foreground'] = 'var(--agent-app-accent-foreground-hsl)'
+      continue
+    }
+    const value = resolve(defs[key], defs)
     result[`--agent-app-${name}-hsl`] = channels(value)
     if (name !== 'warning-text') result[`--agent-app-${name}-foreground-hsl`] = foreground(value)
   }

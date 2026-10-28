@@ -49,10 +49,8 @@ const agentAppPreset = {
       },
       // Approval cards use a light tint; their label needs Brand's stronger
       // warning ink. The solid warning chip keeps its own foreground pairing.
-      // Brand's --primary is the FILL indigo: white sits on it at 7.4:1, but as
-      // dark-mode text on the canvas it reads about 2.6:1. Brand keeps the
-      // bright indigo for accent text in --accent-text (retinted per named
-      // theme), so text-primary paints that while bg-primary keeps the fill.
+      // Primary text follows Brand accent ink. Solid controls use the same
+      // generated ink channels with their AA foreground pairing.
       textColor: {
         primary: {
           DEFAULT: tier('--accent-text'),

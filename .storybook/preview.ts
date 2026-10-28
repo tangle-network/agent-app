@@ -1,5 +1,4 @@
 import type { Decorator, Preview } from '@storybook/react'
-import '../src/theme/tokens.css'
 import './storybook.css'
 import '../src/studio-react/studio.css'
 import '../src/hosted-agent/react/lines.css'

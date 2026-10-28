@@ -4,7 +4,7 @@
 
 `@tangle-network/brand` owns shared color, type, radius, motion, shadow, and
 status values. Agent App consumes Brand's published light-default stylesheet at
-build time. The development pin selects the artifact used to generate releases;
+build time. The lockfile selects the artifact used to generate releases;
 Brand remains an optional peer for consumers that use other Brand exports.
 
 Agent App owns its application behavior: focus treatment, composer exemptions,
@@ -27,7 +27,7 @@ node src/theme/build.mjs --check
 pnpm build
 ```
 
-For an intentional Brand upgrade, change the development pin and lockfile,
+For an intentional Brand upgrade, update the Brand dependency and lockfile,
 inspect the new Brand contract, run `node src/theme/build.mjs --write`, then
 review and test the generated diff. Do not edit generated values by hand.
 
@@ -94,11 +94,11 @@ roles for existing Agent App text and solid-control usage. The corresponding
 solid foregrounds are selected from Brand's own ink endpoints and checked for
 AA contrast during generation. `--warning-strong` supplies the warm label on
 subtle approval surfaces; a solid warning chip keeps
-`--warning-foreground`. `text-primary` paints Brand's `--accent-text`, the
-bright indigo Brand keeps for accent text, because Brand's `--primary` is the
-fill indigo and reads about 2.6:1 as text on the dark canvas; `bg-primary`,
-`border-primary` and `ring-primary` keep the fill. The Canvas renderer receives concrete colors generated
-from Brand because its bitmap cannot resolve CSS variables.
+`--warning-foreground`. Primary text and control utilities use Brand's accent
+ink through Agent App's generated channels, with an AA label for solid controls.
+The adapters rebind at each mode and `data-accent` boundary. The Canvas renderer
+receives concrete colors generated from Brand because its bitmap cannot resolve
+CSS variables.
 
 ## Scopes and overrides
 
@@ -139,4 +139,5 @@ Canvas and Chat React stories in light and dark modes at desktop and phone
 widths when changing this contract. Compare the rendered surfaces, keyboard
 focus, pointer controls, errors, and overflow. Pack and resolve the public
 styles, theme, and preset in an isolated consumer before publication; after
-publication, repeat against the anonymous registry archive.
+publication, pass the anonymous registry archive after the proof directory to
+`pnpm test:theme:packed <proof-dir> <archive.tgz>`.
