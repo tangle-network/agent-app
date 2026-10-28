@@ -93,8 +93,8 @@ importers:
         specifier: 0.37.0
         version: 0.37.0(@ai-sdk/anthropic@3.0.135(zod@4.6.7))(@ai-sdk/google@3.0.138(zod@4.6.7))(@anthropic-ai/sdk@1.3.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.64.1)(supports-color@10.2.2)(undici@8.12.3)(ws@8.22.0)(zod@4.6.7)
       '@tangle-network/hub-sdk':
-        specifier: 1.0.4
-        version: 1.0.4(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+        specifier: 1.0.6
+        version: 1.0.6(supports-color@10.2.2)
       '@tangle-network/sandbox':
         specifier: 1.0.40
         version: 1.0.40(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.153(zod@4.6.7))(viem@2.57.11(typescript@7.0.2)(zod@4.6.7))
@@ -2853,8 +2853,8 @@ packages:
     engines: {node: '>=22.13.0'}
     hasBin: true
 
-  '@tangle-network/hub-sdk@1.0.4':
-    resolution: {integrity: sha512-ToEjf2SCsQMJBfSxrvcj9g9mu06szpG4sEiLLfdK5UVohPOU19zYWfxTjqhFiwO3R71HK7muw9riwqpozFA6Kw==}
+  '@tangle-network/hub-sdk@1.0.6':
+    resolution: {integrity: sha512-c9ybyS6OfkzLO+WaqE5+Ys9/K+WMBq9JguPQ7HQngbtagvPk0/ZMO3JBkQaTO5B0AOXcGSLtdRFkJcflQp+bUg==}
 
   '@tangle-network/sandbox-ui@1.1.8':
     resolution: {integrity: sha512-BhqUxsG8+Q3yMLayhG7SnASHWUYL/hwA4/T0B1IzkSGZlMlYqz2cVhV+d9gjhhXxIjDuseLoQScjIgE+b76Rzw==}
@@ -8600,11 +8600,16 @@ snapshots:
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/hub-sdk@1.0.4(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))':
+  '@tangle-network/hub-sdk@1.0.6(supports-color@10.2.2)':
     dependencies:
+      '@modelcontextprotocol/sdk': 1.32.2(supports-color@10.2.2)(zod@4.6.7)
       '@tangle-network/agent-core': 1.0.1(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+      '@tangle-network/agent-interface': 5.10.2
+      hono: 4.13.13
+      zod: 4.6.7
     transitivePeerDependencies:
-      - '@modelcontextprotocol/sdk'
+      - '@cfworker/json-schema'
+      - supports-color
 
   '@tangle-network/sandbox-ui@1.1.8(8bf68236f320b0bfae654b17197e681c)':
     dependencies:

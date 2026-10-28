@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7
+
+- feat(integrations): forward selected OAuth scopes (#1450)
+
 ## 1.0.6
 
 - fix(web-react): confirm setup prompt copies in button (#1448)

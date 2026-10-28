@@ -45,6 +45,8 @@ export interface HubIntegrationsPanelProps {
   /** Host-enforced execution policy, displayed read-only for each action. */
   getActionPolicy?: HubActionPolicy
   callbackPath: string
+  /** Selects exact OAuth scopes for a provider. The server must authorize the same requested set. */
+  getOAuthScopes?: (provider: HubProvider) => readonly string[] | undefined
   title?: string
   /** Compact, icon-led tiles or descriptive cards. Defaults to cards. */
   layout?: IntegrationsCatalogProps['layout']

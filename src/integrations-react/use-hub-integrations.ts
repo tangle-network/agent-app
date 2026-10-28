@@ -17,6 +17,8 @@ export interface UseHubIntegrationsOptions {
   getActionPolicy?: HubActionPolicy
   /** Local app route that renders `HubConnectCallbackPage`. */
   callbackPath: string
+  /** Selects exact OAuth scopes for a provider. The server must authorize the same requested set. */
+  getOAuthScopes?: (provider: HubProvider) => readonly string[] | undefined
   /** Optional host handler for custom/native signup. No Platform redirect is assumed. */
   onUnsupportedConnect?: (provider: HubProvider) => void
   /**
@@ -63,7 +65,7 @@ function updateUrl(providerId: string | null, connectionId: string | null): void
 }
 
 /** Identity-bound Hub settings controller; connection state is always server-read. */
-export function useHubIntegrations({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions) {
+export function useHubIntegrations({ identity, client, can, callbackPath, getOAuthScopes, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions) {
   const scope = contextKey(identity)
   const activeScope = useRef(scope)
   activeScope.current = scope
@@ -185,9 +187,10 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
     const controller = new AbortController()
     pendingPopup.current = controller
     setConnectStatus({ scope, status: 'pending', providerId: target.providerId })
+    const requestedScopes = getOAuthScopes?.(target)
     const result = await connectWithPopup({
       client, identity, providerId: target.providerId, before: connections.value,
-      callbackPath, connectionParameters, signal: controller.signal,
+      callbackPath, connectionParameters, requestedScopes, signal: controller.signal,
       isCurrent: () => activeScope.current === scope && !controller.signal.aborted,
     })
     if (pendingPopup.current !== controller || activeScope.current !== scope) return result
@@ -198,7 +201,7 @@ export function useHubIntegrations({ identity, client, can, callbackPath, onUnsu
       setConnectStatus({ scope, status: 'connected', message: 'Connection verified.' })
     } else setConnectStatus({ scope, status: 'failed', providerId: target.providerId, message: result === 'blocked' ? 'Allow the popup and try again.' : result === 'unverified' ? 'Could not verify a new connection. Refresh and try again.' : result === 'failed' ? 'Could not connect your account. Please try again.' : result === 'cancelled' ? 'Connection was cancelled.' : 'This connection flow is unavailable.' })
     return result
-  }, [can, connections, client, identity, callbackPath, scope])
+  }, [can, connections, client, identity, callbackPath, getOAuthScopes, scope])
 
   const beginConnect = useCallback((target: HubProvider) => {
     if (hostConnect?.providerIds.includes(target.providerId)) {
