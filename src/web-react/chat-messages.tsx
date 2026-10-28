@@ -12,6 +12,7 @@ import type { WorkProductPersistedPart } from '../work-product/types'
 import type { TurnPhaseData } from '../chat-routes/turn-progress'
 import { TurnProgress } from './turn-progress'
 import { ReasoningRow } from './reasoning-row'
+import { useChatScroll } from './chat-scroll'
 
 import type { CatalogModel } from '../runtime/model-catalog'
 import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
@@ -172,6 +173,7 @@ function AssistantMessageImpl({
     (segments?.some((s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim() !== '') ??
       false)
 
+  const answerScroll = useChatScroll()
   const quiet = chrome === 'quiet'
   const authorClassName = quiet ? 'mb-1.5' : undefined
   const author = msg.speaker ? (
@@ -192,7 +194,8 @@ function AssistantMessageImpl({
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
         </div>
       )}
-      <div className={msg.speaker ? 'agent-speaker-answer' : undefined} tabIndex={msg.speaker ? 0 : undefined} role={msg.speaker ? 'region' : undefined} aria-label={msg.speaker ? `Answer from ${msg.speaker.name}` : undefined}>
+      <div ref={msg.speaker ? answerScroll.viewportRef : undefined} className={msg.speaker ? 'agent-speaker-answer' : undefined} tabIndex={msg.speaker ? 0 : undefined} role={msg.speaker ? 'region' : undefined} aria-label={msg.speaker ? `Answer from ${msg.speaker.name}` : undefined}>
+      <div ref={msg.speaker ? answerScroll.contentRef : undefined}>
       <ReasoningRow
         className="mb-2"
         text={msg.reasoning ?? ''}
@@ -262,7 +265,7 @@ function AssistantMessageImpl({
           />
         </div>
       )}
-      </div>
+      </div></div>
       {quiet && (
         <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
           <CopyMessageButton text={copyTextOf(msg)} />

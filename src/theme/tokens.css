@@ -220,7 +220,7 @@
 
 /* Each admitted responder keeps its header in place while a sibling streams. */
 .agent-speaker-answer {
-  height: min(24rem, 40dvh);
+  height: min(16rem, 28dvh);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
