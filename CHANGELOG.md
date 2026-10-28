@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.81
+
+- fix(deps): raise the ui peer floor to 11.48.0, the first ui with partitionBySpeaker (#1439)
+
 ## 0.63.80
 
 - fix(deps): depend on charts and agent-trace-contract by caret range (#1438)
