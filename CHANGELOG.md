@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.10
+
+- fix(integrations): clear connection selection on Back (#1452)
+
 ## 1.0.9
 
 - Use shared speaker ownership and qualify generated consumers (#1451)
