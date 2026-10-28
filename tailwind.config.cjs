@@ -21,18 +21,6 @@ module.exports = {
       },
     },
   },
-  // The package sources plus the linked UI libraries whose components are
-  // re-exported into agent-app surfaces (e.g. sandbox-ui/primitives' Dialog,
-  // consumed by studio-react). Without scanning them, their class strings
-  // (shadcn dialog centering: left-[50%]/top-[50%]/translate-x-[-50%]…) emit
-  // no CSS and forwarded components render unstyled — e.g. modals anchored to
-  // the bottom-left corner instead of centered.
-  content: [
-    './src/**/*.{ts,tsx}',
-    './.storybook/**/*.{ts,tsx,html}',
-    './node_modules/@tangle-network/sandbox-ui/src/**/*.{ts,tsx}',
-    './node_modules/@tangle-network/sandbox-ui/dist/**/*.js',
-    './node_modules/@tangle-network/ui/src/**/*.{ts,tsx}',
-    './node_modules/@tangle-network/ui/dist/**/*.js',
-  ],
+  // Package entries own dependency scanning; Storybook lists only its source.
+  content: ['./src/**/*.{ts,tsx}', './.storybook/**/*.{ts,tsx,html}'],
 }
