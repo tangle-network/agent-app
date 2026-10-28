@@ -2832,7 +2832,7 @@ interface QuestionOptionListProps
 
 ### `ReasoningRow`
 
-`function` — The model's reasoning for one message: live while it thinks, collapsed once it answers.
+`function` — Live reasoning retains its geometry; saved reasoning starts collapsed.
 
 ```ts
 ({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…

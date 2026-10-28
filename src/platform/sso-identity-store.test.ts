@@ -300,6 +300,21 @@ describe('createD1TangleIdentityStore', () => {
       db: h.db, legacyLinkTable: { table: 'tangle_identity; DROP TABLE user', userIdColumn: 'user_id', platformUserIdColumn: 'platform_user_id' },
     })).toThrow(/invalid legacyLinkTable.table/)
   })
+
+  it('rejects unsafe host table and column identifiers before querying', () => {
+    const h = database()
+    const hostSchema = {
+      user: { table: 'users', columns: { id: 'id', name: 'name', email: 'email', emailVerified: 'email_verified', createdAt: 'created_at', updatedAt: 'updated_at' } },
+      session: { table: 'sessions', columns: { id: 'id', userId: 'user_id', token: 'token', expiresAt: 'expires_at', ipAddress: 'ip_address', userAgent: 'user_agent', createdAt: 'created_at', updatedAt: 'updated_at' } },
+      account: { table: 'accounts', columns: { id: 'id', userId: 'user_id', accountId: 'account_id', providerId: 'provider_id', createdAt: 'created_at', updatedAt: 'updated_at' } },
+    }
+    expect(() => createD1TangleIdentityStore({ db: h.db, hostSchema: {
+      ...hostSchema, user: { ...hostSchema.user, table: 'users; DROP TABLE users' },
+    } })).toThrow(/invalid hostSchema.user.table/)
+    expect(() => createD1TangleIdentityStore({ db: h.db, hostSchema: {
+      ...hostSchema, account: { ...hostSchema.account, columns: { ...hostSchema.account.columns, accountId: 'account_id OR 1=1' } },
+    } })).toThrow(/invalid hostSchema.account.columns.accountId/)
+  })
 })
 
 describe('tangle sso prompt passthrough and the signed_out callback', () => {
