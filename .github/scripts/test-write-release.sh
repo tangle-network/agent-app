@@ -252,12 +252,13 @@ mkdir -p "$STAGED_WRITER"
 cp "$SCRIPT" "$STAGED_WRITER/write-release.sh"
 cp "$ROOT/.github/scripts/next-release-version.mjs" "$STAGED_WRITER/next-release-version.mjs"
 SCRIPT="$STAGED_WRITER/write-release.sh"
-fails 'expected next release 0.50.0' run_release wrong-minor 0.49.39
-run_release minor 0.50.0 >/dev/null
-MINOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v0.50.0)
-[[ $(git --git-dir="$ORIGIN" rev-parse "$MINOR_TAG^") == "$BASE" ]]
-[[ $(git --git-dir="$ORIGIN" show "$MINOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 0.50.0 ]]
-run_validate minor-valid 0.50.0 "$MINOR_TAG" >/dev/null
+# A 0.x base graduates to 1.0.0 at its next release (agent-runtime docs/release-versioning.md).
+fails 'expected next release 1.0.0' run_release wrong-graduation 0.50.0
+run_release graduation 1.0.0 >/dev/null
+GRADUATION_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v1.0.0)
+[[ $(git --git-dir="$ORIGIN" rev-parse "$GRADUATION_TAG^") == "$BASE" ]]
+[[ $(git --git-dir="$ORIGIN" show "$GRADUATION_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 1.0.0 ]]
+run_validate graduation-valid 1.0.0 "$GRADUATION_TAG" >/dev/null
 
 set_seed_version 1.2.3
 git -C "$SEED" commit --quiet --allow-empty -m 'fix(auth)!: change stable identity contract'
@@ -271,4 +272,4 @@ MAJOR_TAG=$(git --git-dir="$ORIGIN" rev-parse refs/tags/v2.0.0)
 [[ $(git --git-dir="$ORIGIN" show "$MAJOR_TAG:package.json" | node -p "JSON.parse(require('fs').readFileSync(0)).version") == 2.0.0 ]]
 run_validate major-valid 2.0.0 "$MAJOR_TAG" >/dev/null
 
-echo 'write release script: ok (patch, pre-1.0 minor, and stable major transitions)'
+echo 'write release script: ok (patch, 1.0 graduation, and stable major transitions)'
