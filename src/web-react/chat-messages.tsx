@@ -168,10 +168,9 @@ function AssistantMessageImpl({
   // reasoning row's thinking state for a producer that sends no end time, so a
   // segmented message with `content: ''` doesn't read as perpetually
   // "Thinking…" after its answer segments are visible.
-  const hasAnswerText =
-    content !== '' ||
-    (segments?.some((s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim() !== '') ??
-      false)
+  const hasAnswerText = Boolean(content || segments?.some(
+    (s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim(),
+  ))
 
   const answerScroll = useChatScroll()
   const quiet = chrome === 'quiet'
@@ -389,6 +388,8 @@ function OtherPersonMessage({
   )
 }
 
+const renderPlainBody = (content: string) => <p className="whitespace-pre-wrap">{content}</p>
+
 /**
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
@@ -432,14 +433,7 @@ export function ChatMessages({
   // Resolve role colors at the message, so nested host themes can override
   // the raw tokens without also redefining Tailwind's root color aliases.
   const assistantMessageClassName = `${messageClassName} bg-transparent text-[hsl(var(--foreground))]`
-  // Stabilize the fallback renderer's identity so it doesn't change every
-  // render — otherwise the memoized `AssistantMessage` (and its per-frame body
-  // memo) would invalidate on every parent render when no `renderMarkdown` is
-  // supplied.
-  const renderBody = useMemo(
-    () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
-    [renderMarkdown],
-  )
+  const renderBody = renderMarkdown ?? renderPlainBody
   const messages = useMemo(() => splitBySpeaker(storedMessages), [storedMessages])
   // The row the turn in flight writes. Its responders answer at the same time,
   // so every share of it streams until that responder reports its end.
