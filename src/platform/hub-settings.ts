@@ -11,6 +11,7 @@ export type HubSettingsApiKeyMetadata =
 export interface HubSettingsOAuthInput {
   returnUrl: string
   connectionParameters?: Record<string, string>
+  requestedScopes?: readonly string[]
 }
 
 type PolicyDecision = 'allow' | 'ask' | 'deny'
@@ -147,7 +148,7 @@ function metadata(value: unknown): HubSettingsApiKeyMetadata {
 }
 
 function oauthInput(body: Record<string, unknown>, url: URL, provider: string, callbackPath: string | undefined): HubSettingsOAuthInput {
-  onlyKeys(body, ['returnUrl', 'connectionParameters'])
+  onlyKeys(body, ['returnUrl', 'connectionParameters', 'requestedScopes'])
   const returnUrl = text(body.returnUrl, 2048)
   let destination: URL
   try { destination = new URL(returnUrl) } catch { invalid() }
@@ -163,6 +164,11 @@ function oauthInput(body: Record<string, unknown>, url: URL, provider: string, c
       if (/^(?:user|userid|owner|ownerid|workspace|workspaceid|team|teamid|principal|principalid|session|sessionid|authorization|headers|cookie|apikey|token|accesstoken|refreshtoken|clientsecret|secret|credentials?|appid|clientid)$/.test(key.replace(/[_-]/g, '').toLowerCase())) invalid()
       return [key, text(value, 1024)]
     }))
+  }
+  if (body.requestedScopes !== undefined) {
+    if (!Array.isArray(body.requestedScopes) || body.requestedScopes.length === 0 || body.requestedScopes.length > 100) invalid()
+    input.requestedScopes = body.requestedScopes.map(scope => text(scope, 2048))
+    if (new Set(input.requestedScopes).size !== input.requestedScopes.length) invalid()
   }
   return input
 }
