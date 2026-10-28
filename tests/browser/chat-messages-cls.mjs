@@ -16,8 +16,13 @@ try {
     await page.evaluate(() => document.fonts.ready)
     await page.evaluate(() => {
       window.__shifts = []
+      window.__streamStartedAt = 0
+      const stream = document.querySelector('[data-stream-length]')
+      new MutationObserver(() => {
+        if (Number(stream.dataset.streamLength) > 0) window.__streamStartedAt ||= performance.now()
+      }).observe(stream, { attributes: true, attributeFilter: ['data-stream-length'] })
       window.__observer = new PerformanceObserver((list) => {
-        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({
+        for (const e of list.getEntries()) if (!e.hadRecentInput && window.__streamStartedAt && e.startTime >= window.__streamStartedAt) window.__shifts.push({
           value: e.value, at: e.startTime, sources: e.sources.map((s) => ({ text: s.node?.textContent?.slice(0, 80), previous: s.previousRect.toJSON(), current: s.currentRect.toJSON() })),
         })
       })
@@ -25,8 +30,15 @@ try {
     })
     await page.waitForSelector('[data-stream-complete="true"]', { timeout: 20000 })
     await page.waitForTimeout(1000)
-    const shifts = await page.evaluate(() => window.__shifts)
-    const total = shifts.reduce((sum, e) => sum + e.value, 0)
+    const shifts = await page.evaluate(() => {
+      if (!window.__streamStartedAt) throw new Error('no second-responder deltas observed')
+      return window.__shifts
+    })
+    let total = 0, session = 0, start = 0, last = 0
+    for (const entry of shifts) {
+      if (entry.at - last > 1000 || entry.at - start > 5000) { session = 0; start = entry.at }
+      session += entry.value; last = entry.at; total = Math.max(total, session)
+    }
     results.push({ width, theme, total, shifts })
     await page.screenshot({ path: `${out}/${width}-${theme}.png`, fullPage: true })
     await context.close()
