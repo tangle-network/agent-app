@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.6
+
+- fix(web-react): confirm setup prompt copies in button (#1448)
+
 ## 1.0.5
 
 - fix(platform): map existing Better Auth identity schemas (#1447)
