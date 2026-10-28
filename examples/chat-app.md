@@ -342,8 +342,9 @@ The handle is the agent's normalized name (`normalizeProfileName` in
 several agents calls `produce` once per agent, all at the same time, each
 with the thread's history and none seeing another's answer, and persists one
 assistant row with a `speaker` part before each answer in the order typed. `ChatMessages` splits that row and draws each answer under a
-`SpeakerHeader` (`partitionBySpeaker` and `SpeakerHeader` in
-`@tangle-network/ui/chat`). Live, every responder is announced
+`SpeakerHeader`. `partitionBySpeaker` lives in the server-safe
+`@tangle-network/agent-interface/speaker` contract; UI chat re-exports it beside
+`SpeakerHeader`, and server history projection uses the same partition. Live, every responder is announced
 first as a `speaker` event (`onSpeaker`), then every event carries
 `speaker`, the responder's agent id (`onSpeakerEvent`, or `event.speaker`
 for a raw-event consumer), so a viewer keeps one live block per responder
