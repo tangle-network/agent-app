@@ -203,7 +203,7 @@ number
 `function` — Identity-bound Hub settings controller; connection state is always server-read.
 
 ```ts
-({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions…
+({ identity, client, can, callbackPath, getOAuthScopes, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubInt…
 ```
 
 ### `UseHubIntegrationsOptions`

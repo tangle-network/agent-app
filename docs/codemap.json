@@ -9692,7 +9692,7 @@
         {
           "name": "useHubIntegrations",
           "kind": "function",
-          "signature": "({ identity, client, can, callbackPath, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubIntegrationsOptions…",
+          "signature": "({ identity, client, can, callbackPath, getOAuthScopes, onUnsupportedConnect, hostConnect, getActionPolicy }: UseHubInt…",
           "doc": "Identity-bound Hub settings controller; connection state is always server-read."
         },
         {
