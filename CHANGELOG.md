@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.5
+
+- fix(platform): map existing Better Auth identity schemas (#1447)
+
 ## 1.0.4
 
 - chore(ci): drop the adopt-stack cron; dispatch only (#1446)
