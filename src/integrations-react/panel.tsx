@@ -313,6 +313,7 @@ export function HubIntegrationsPanel(props: HubIntegrationsPanelProps) {
       loading={hub.connections.status === 'loading' || hub.detail.status === 'loading'}
       error={detailError}
       backHref={catalogHref()}
+      onBack={() => { hub.selectProvider(null); showAccounts() }}
       onRetry={() => hub.refresh()}
       onTestConnection={connectionId => { void hub.test(connectionId) }}
       onDisconnect={connectionId => { void hub.revoke(connectionId) }}
