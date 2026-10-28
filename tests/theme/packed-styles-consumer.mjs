@@ -84,6 +84,14 @@ try {
               <div class="light" id="nested" style="background:hsl(var(--background));color:hsl(var(--foreground));padding:1rem">Nested light</div>
             </div>
             <div data-theme="aubergine" id="named" style="color:hsl(var(--primary))">Named accent</div>
+            <section class="light" id="accent-scope" data-accent="teal">
+              <button id="accent-action" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Accent action</button>
+              <span id="accent-ink" style="color:var(--accent-text)">Accent ink</span>
+              <section class="dark" id="accent-dark">
+                <button id="accent-dark-action" style="background:hsl(var(--primary));color:hsl(var(--primary-foreground))">Dark accent</button>
+                <span id="accent-dark-ink" style="color:var(--accent-text)">Dark ink</span>
+              </section>
+            </section>
             <span class="agent-shimmer">Working</span>
           </section>
         </main>`
@@ -110,12 +118,24 @@ try {
           viewportWidth: innerWidth,
         }
       })
+      for (const hue of ['violet', 'orange', 'teal', 'blue', 'pink', 'brown', 'cyan', 'lime']) {
+        await page.locator('#accent-scope').evaluate((element, value) => element.setAttribute('data-accent', value), hue)
+        const pairs = await page.evaluate(() => ['accent', 'accent-dark'].map((prefix) => {
+          const action = getComputedStyle(document.getElementById(`${prefix}-action`))
+          const ink = getComputedStyle(document.getElementById(`${prefix}-ink`)).color
+          return { prefix, fill: action.backgroundColor, label: action.color, ink }
+        }))
+        for (const pair of pairs) {
+          assert.equal(pair.fill, pair.ink, `${hue} ${pair.prefix}: Agent App's legacy primary follows accent ink`)
+          assert.ok(contrast(pair.label, pair.fill) >= 4.5, `${hue} ${pair.prefix}: solid label clears AA`)
+        }
+      }
       assert.notEqual(state.defaultBackground, state.darkBackground)
       assert.equal(state.defaultBackground, state.nestedBackground)
       assert.notEqual(state.fieldBackground, state.fieldBorder)
       assert.notEqual(state.namedPrimary, state.defaultPrimary)
       assert.ok(contrast(state.primaryForeground, state.defaultPrimary) >= 4.5)
-      assert.ok(contrast(state.warningText, state.warningBackground) >= 4.5)
+      assert.ok(contrast(state.warningText, state.warningBackground) >= 4.5, `warning ${state.warningText} on ${state.warningBackground}`)
       assert.ok(contrast(state.darkWarningText, state.darkWarningBackground) >= 4.5)
       assert.equal(state.scrollWidth, state.viewportWidth)
       if (reducedMotion === 'reduce') {
