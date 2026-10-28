@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.8
+
+- chore(theme): adopt generated Brand 1.31.1 palette (#1449)
+
 ## 1.0.7
 
 - feat(integrations): forward selected OAuth scopes (#1450)
