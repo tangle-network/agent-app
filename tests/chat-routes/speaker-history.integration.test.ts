@@ -1,6 +1,6 @@
 /** Persisted interleaved transcript → real SQLite reload → each responder's prompt. */
 import { expect, it } from 'vitest'
-import { projectDispatchHistory } from '../../src/chat-routes/dispatch-parts'
+import { projectDispatchHistory, type DispatchHistoryMessage } from '../../src/chat-routes/dispatch-parts'
 import { createChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { openDatabase, workspacesTable } from '../teams/db-helper'
@@ -12,20 +12,21 @@ it('projects each stored responder once with its own text and files, preserving 
     const store = createChatStore(db as unknown as ChatDatabase, tables)
     await db.insert(workspacesTable).values({ id: 'workspace', organizationId: 'org', name: 'Fixture' })
     const thread = await store.createThread({ workspaceId: 'workspace' })
+    const owned = <const T extends object>(part: T, speaker: string) => ({ ...part, speaker })
     await store.appendMessage({ threadId: thread.id, role: 'assistant', content: 'Combined display text', parts: [
       { type: 'text', text: 'Shared.' },
       { type: 'speaker', id: 'writer', name: 'Writer' },
       { type: 'speaker', id: 'research', name: 'Research' },
-      { type: 'text', text: 'Headline.', speaker: 'writer' },
-      { type: 'file', name: 'Brief', path: 'brief.md', mediaType: 'text/plain', speaker: 'writer' },
-      { type: 'reasoning', text: 'Private reasoning', speaker: 'writer' },
-      { type: 'text', text: 'Risks.', speaker: 'research' },
-      { type: 'tool-result', text: 'Private tool trace', speaker: 'research' },
-      { type: 'text', text: 'Unannounced.', speaker: 'unknown' },
+      owned({ type: 'text', text: 'Headline.' }, 'writer'),
+      owned({ type: 'file', name: 'Brief', path: 'brief.md', mediaType: 'text/plain' }, 'writer'),
+      owned({ type: 'reasoning', text: 'Private reasoning' }, 'writer'),
+      owned({ type: 'text', text: 'Risks.' }, 'research'),
+      owned({ type: 'tool', id: 'search', tool: 'search', state: { status: 'completed', output: 'Private tool trace' } }, 'research'),
+      owned({ type: 'text', text: 'Unannounced.' }, 'unknown'),
       { type: 'speaker', id: 'writer', name: 'Writer', state: 'done' },
       { type: 'speaker', id: 'research', name: 'Research', state: 'done' },
     ] })
-    const rows = await store.listMessages(thread.id)
+    const rows: DispatchHistoryMessage[] = JSON.parse(JSON.stringify(await store.listMessages(thread.id)))
     expect(rows).toHaveLength(1)
     const writer = projectDispatchHistory(rows, { pov: 'writer' })
     expect(writer.map(({ role, content }) => [role, content.split('\n\n')[0]])).toEqual([
@@ -46,7 +47,7 @@ it('projects each stored responder once with its own text and files, preserving 
     ])
     expect(JSON.stringify(writer)).not.toMatch(/Private|Combined display text/)
     await store.appendMessage({ threadId: thread.id, role: 'assistant', content: 'Plain answer', parts: [] })
-    const plain = (await store.listMessages(thread.id)).slice(1)
+    const plain: DispatchHistoryMessage[] = JSON.parse(JSON.stringify((await store.listMessages(thread.id)).slice(1)))
     expect(projectDispatchHistory(plain, { pov: 'research', owner: { id: 'writer', name: 'Writer' } })).toEqual([
       { role: 'user', content: '[Writer] Plain answer' },
     ])
