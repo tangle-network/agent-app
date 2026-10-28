@@ -118,6 +118,7 @@ try {
           viewportWidth: innerWidth,
         }
       })
+      const accents = []
       for (const hue of ['violet', 'orange', 'teal', 'blue', 'pink', 'brown', 'cyan', 'lime']) {
         await page.locator('#accent-scope').evaluate(async (element, value) => {
           element.setAttribute('data-accent', value)
@@ -128,6 +129,7 @@ try {
           const ink = getComputedStyle(document.getElementById(`${prefix}-ink`)).color
           return { prefix, fill: action.backgroundColor, label: action.color, ink }
         }))
+        accents.push({ hue, pairs })
         for (const pair of pairs) {
           assert.equal(pair.fill, pair.ink, `${hue} ${pair.prefix}: Agent App's legacy primary follows accent ink`)
           assert.ok(contrast(pair.label, pair.fill) >= 4.5, `${hue} ${pair.prefix}: solid label clears AA`)
@@ -153,7 +155,7 @@ try {
         mkdirSync(proofDir, { recursive: true })
         await page.screenshot({ path: join(proofDir, `packed-${viewport.width}.png`), fullPage: true })
       }
-      results.push({ viewport: viewport.width, reducedMotion, ...state, errors })
+      results.push({ viewport: viewport.width, reducedMotion, ...state, accents, errors })
       await page.close()
     }
   }

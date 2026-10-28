@@ -1,5 +1,5 @@
 /* GENERATED from @tangle-network/brand/styles/legacy-light.css
- * SHA-256: f89457b3f243a69b9934010b2def4febe4408eff0be5e69d8847502ee33dbea4
+ * SHA-256: 8cff6457f4410070d3fcd2ee9384bb5444b0d6fb632e7b8fb860eb42dd121be2
  * Run node src/theme/build.mjs --write; do not edit colors or ratios here. */
 :where(:root),
 [data-sandbox-ui],
@@ -21,13 +21,29 @@
 [data-theme="website"],
 .light,
 .dark {
-    --agent-app-accent-hsl: 229.6552 93.5484% 81.7647%;
+    --agent-app-tone-violet-hsl: 272.5424 80.8219% 85.6863%;
+    --agent-app-tone-violet-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-orange-hsl: 22.1429 80.7692% 79.6078%;
+    --agent-app-tone-orange-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-teal-hsl: 171.7647 80.315% 49.8039%;
+    --agent-app-tone-teal-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-blue-hsl: 208.4211 79.1667% 81.1765%;
+    --agent-app-tone-blue-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-pink-hsl: 322.7273 80.4878% 83.9216%;
+    --agent-app-tone-pink-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-brown-hsl: 25 35.2941% 80%;
+    --agent-app-tone-brown-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-cyan-hsl: 191.8966 79.4521% 71.3725%;
+    --agent-app-tone-cyan-foreground-hsl: 0 0% 0%;
+    --agent-app-tone-lime-hsl: 84 60.4396% 64.3137%;
+    --agent-app-tone-lime-foreground-hsl: 0 0% 0%;
+    --agent-app-accent-hsl: 245.5556 93.1034% 88.6275%;
     --agent-app-accent-foreground-hsl: 0 0% 0%;
-    --agent-app-success-hsl: 154.7 60.2% 60.6%;
+    --agent-app-success-hsl: 155.1429 64.8148% 78.8235%;
     --agent-app-success-foreground-hsl: 0 0% 0%;
-    --agent-app-danger-hsl: 2.8 100% 83.1%;
+    --agent-app-danger-hsl: 0 74.4681% 90.7843%;
     --agent-app-danger-foreground-hsl: 0 0% 0%;
-    --agent-app-warning-text-hsl: 41.5 88.2% 63.3%;
+    --agent-app-warning-text-hsl: 38.5714 65.1163% 83.1373%;
     --agent-app-warning-foreground-hsl: 0 0% 0%;
     --agent-app-radius-lg: 10px;
     --agent-app-radius-sm-factor: 0.6;
@@ -46,53 +62,138 @@
 [data-theme="agents-light"],
 .light,
 :where(:root) {
-    --agent-app-accent-hsl: 243.2787 80.6167% 55.4902%;
+    --agent-app-tone-violet-hsl: 271.8857 79.9087% 42.9412%;
+    --agent-app-tone-violet-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-orange-hsl: 22.314 80.1325% 29.6078%;
+    --agent-app-tone-orange-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-teal-hsl: 172.0482 80.5825% 20.1961%;
+    --agent-app-tone-teal-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-blue-hsl: 209.0909 80.4878% 32.1569%;
+    --agent-app-tone-blue-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-pink-hsl: 321.9403 79.7619% 32.9412%;
+    --agent-app-tone-pink-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-brown-hsl: 23.3898 36.1963% 31.9608%;
+    --agent-app-tone-brown-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-cyan-hsl: 192.2449 80.3279% 23.9216%;
+    --agent-app-tone-cyan-foreground-hsl: 0 0% 100%;
+    --agent-app-tone-lime-hsl: 83.8235 59.6491% 22.3529%;
+    --agent-app-tone-lime-foreground-hsl: 0 0% 100%;
+    --agent-app-accent-hsl: 246.2264 92.1739% 54.902%;
     --agent-app-accent-foreground-hsl: 0 0% 100%;
+    --agent-app-success-hsl: 154.8148 64.8% 24.5098%;
+    --agent-app-success-foreground-hsl: 0 0% 100%;
+    --agent-app-danger-hsl: 0 75.1244% 39.4118%;
+    --agent-app-danger-foreground-hsl: 0 0% 100%;
+    --agent-app-warning-text-hsl: 38.2979 65.2778% 28.2353%;
     --agent-app-warning-foreground-hsl: 0 0% 100%
 }
 [data-theme="aubergine"] {
-    --agent-app-accent-hsl: 255.1899 100% 84.5098%;
+    --agent-app-accent-hsl: 257.3684 92.6829% 83.9216%;
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="aubergine-light"] {
-    --agent-app-accent-hsl: 263.6364 70.2128% 46.0784%;
+    --agent-app-accent-hsl: 257.9724 92.3404% 53.9216%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="arena"] {
-    --agent-app-accent-hsl: 158.1132 64.3725% 51.5686%;
+    --agent-app-accent-hsl: 160 91.6667% 42.3529%;
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="arena-light"] {
-    --agent-app-accent-hsl: 163.2 94.3396% 20.7843%;
+    --agent-app-accent-hsl: 160.4082 92.4528% 20.7843%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="super"] {
-    --agent-app-accent-hsl: 139.3846 40.8805% 68.8235%;
+    --agent-app-accent-hsl: 147.9808 92.0354% 44.3137%;
     --agent-app-accent-foreground-hsl: 0 0% 0%
 }
 [data-theme="super-light"] {
-    --agent-app-accent-hsl: 148.2353 39.5349% 25.2941%;
+    --agent-app-accent-hsl: 148.4848 92.5234% 20.9804%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="tangle-light"] {
-    --agent-app-accent-hsl: 243.5714 75% 56.0784%;
+    --agent-app-accent-hsl: 246.0302 91.7051% 57.451%;
     --agent-app-accent-foreground-hsl: 0 0% 100%
 }
 [data-theme="hospitality"]:where(:not(.dark)) {
-    --agent-app-accent-hsl: 152.5 37.5% 25.098%;
+    --agent-app-accent-hsl: 153.2609 92% 19.6078%;
     --agent-app-accent-foreground-hsl: 0 0% 100%;
-    --agent-app-success-hsl: 141.6393 50.4132% 23.7255%;
+    --agent-app-success-hsl: 155.5556 60% 26.4706%;
     --agent-app-success-foreground-hsl: 0 0% 100%;
-    --agent-app-danger-hsl: 359.0323 60.1942% 40.3922%;
+    --agent-app-danger-hsl: 0 59.633% 42.7451%;
     --agent-app-danger-foreground-hsl: 0 0% 100%;
-    --agent-app-warning-text-hsl: 33.6207 82.8571% 27.451%
+    --agent-app-warning-text-hsl: 38.2418 60.2649% 29.6078%
 }
 .dark[data-theme="hospitality"] {
-    --agent-app-accent-hsl: 143.4146 36.2832% 77.8431%;
+    --agent-app-accent-hsl: 152.9464 91.8033% 47.8431%;
     --agent-app-accent-foreground-hsl: 0 0% 0%;
-    --agent-app-success-hsl: 136.3636 63.6364% 76.2745%;
+    --agent-app-success-hsl: 154.7143 60.3448% 54.5098%;
     --agent-app-success-foreground-hsl: 0 0% 0%;
-    --agent-app-danger-hsl: 2.5352 81.6092% 82.9412%;
+    --agent-app-danger-hsl: 0 59.292% 77.8431%;
     --agent-app-danger-foreground-hsl: 0 0% 0%;
-    --agent-app-warning-text-hsl: 37.92 98.4252% 75.098%
+    --agent-app-warning-text-hsl: 38.3784 60% 63.7255%
+}
+[data-accent="violet"],
+[data-accent="violet"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="violet"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-violet-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-violet-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="orange"],
+[data-accent="orange"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="orange"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-orange-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-orange-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="teal"],
+[data-accent="teal"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="teal"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-teal-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-teal-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="blue"],
+[data-accent="blue"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="blue"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-blue-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-blue-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="pink"],
+[data-accent="pink"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="pink"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-pink-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-pink-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="brown"],
+[data-accent="brown"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="brown"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-brown-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-brown-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="cyan"],
+[data-accent="cyan"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="cyan"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-cyan-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-cyan-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
+}
+[data-accent="lime"],
+[data-accent="lime"]:is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]),
+[data-accent="lime"] :is(.light, .dark, [data-theme], [data-sandbox-ui], [data-sandbox-theme]) {
+    --agent-app-accent-hsl: var(--agent-app-tone-lime-hsl);
+    --agent-app-accent-foreground-hsl: var(--agent-app-tone-lime-foreground-hsl);
+    --primary: var(--agent-app-accent-hsl);
+    --primary-foreground: var(--agent-app-accent-foreground-hsl)
 }
