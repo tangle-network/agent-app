@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { within } from '@testing-library/dom'
+import userEvent from '@testing-library/user-event'
 import { Button } from '@tangle-network/ui/primitives'
 import { HubIntegrationsPanel } from './panel'
 import { createHubIntegrationsClient } from './client'
@@ -40,6 +42,16 @@ export const Tiles: Story = { args: { layout: 'tiles' } }
 export const AgentAccounts: Story = { args: { layout: 'tiles', accounts: {
   title: 'Connected accounts', getStatus: () => ({ label: 'Enabled for this agent', tone: 'success' }),
 } } }
+export const BackToAccounts: Story = {
+  args: AgentAccounts.args,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const user = userEvent.setup({ document: canvasElement.ownerDocument })
+    await user.click(await canvas.findByRole('button', { name: 'Manage GitHub account Example team' }))
+    await user.click(await canvas.findByRole('link', { name: '← Integrations' }))
+    await canvas.findByRole('list', { name: 'Connected accounts' })
+  },
+}
 
 const manyProviders = [...providers, ...[
   ['linear', 'Linear', 'Development'], ['figma', 'Figma', 'Design'], ['discord', 'Discord', 'Messaging'],
