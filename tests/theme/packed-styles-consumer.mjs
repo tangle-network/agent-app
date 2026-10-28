@@ -1,4 +1,4 @@
-/** Resolve public theme exports from a packed archive, then paint its CSS. */
+/** Paint public theme exports from a local pack or the archive passed after proofDir. */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -27,14 +27,16 @@ const contrast = (a, b) => {
 }
 let browser
 try {
-  const packOutput = execFileSync('npm', ['pack', '--ignore-scripts', '--json',
-    '--pack-destination', scratch], { cwd: root, encoding: 'utf8' })
-  const packResult = JSON.parse(packOutput)
-  // pnpm's lifecycle environment asks npm for its keyed JSON shape; direct
-  // npm returns an array. Both describe the same single archive.
-  const packed = Array.isArray(packResult) ? packResult[0] : packResult['@tangle-network/agent-app']
-  assert.ok(packed?.filename, `npm pack must produce one archive; got ${packOutput.slice(0, 200)}`)
-  const archive = join(scratch, packed.filename)
+  const archive = process.argv[3] ? resolve(process.argv[3]) : (() => {
+    const packOutput = execFileSync('npm', ['pack', '--ignore-scripts', '--json',
+      '--pack-destination', scratch], { cwd: root, encoding: 'utf8' })
+    const packResult = JSON.parse(packOutput)
+    // pnpm's lifecycle environment asks npm for its keyed JSON shape; direct
+    // npm returns an array. Both describe the same single archive.
+    const packed = Array.isArray(packResult) ? packResult[0] : packResult['@tangle-network/agent-app']
+    assert.ok(packed?.filename, `npm pack must produce one archive; got ${packOutput.slice(0, 200)}`)
+    return join(scratch, packed.filename)
+  })()
   const consumer = join(scratch, 'consumer')
   const installation = join(consumer, 'node_modules/@tangle-network/agent-app')
   mkdirSync(installation, { recursive: true })

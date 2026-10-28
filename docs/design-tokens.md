@@ -139,4 +139,5 @@ Canvas and Chat React stories in light and dark modes at desktop and phone
 widths when changing this contract. Compare the rendered surfaces, keyboard
 focus, pointer controls, errors, and overflow. Pack and resolve the public
 styles, theme, and preset in an isolated consumer before publication; after
-publication, repeat against the anonymous registry archive.
+publication, pass the anonymous registry archive after the proof directory to
+`pnpm test:theme:packed <proof-dir> <archive.tgz>`.
