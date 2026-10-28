@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+
+- fix(release): the release contract expects a 0.x base to graduate to 1.0.0 (#1442)
+- release: graduate agent-app to 1.0.0 (#1440)
+
 ## 0.63.81
 
 - fix(deps): raise the ui peer floor to 11.48.0, the first ui with partitionBySpeaker (#1439)
