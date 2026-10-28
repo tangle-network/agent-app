@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.11
+
+- fix(conformance): run the computer turn on flat-rate glm-5.3 by default (#1453)
+
 ## 1.0.10
 
 - fix(integrations): clear connection selection on Back (#1452)
