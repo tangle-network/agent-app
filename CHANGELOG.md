@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.63.79
+
+- fix(release): pin shared setup to its main merge (#1436)
+- ci(release): post-release suites run only on ci-suites runners (#1437)
+
 ## 0.63.78
 
 - ci(release): reuse runner dependency caches through shared setup
