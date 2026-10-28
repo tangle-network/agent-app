@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- ci(release): admit the release version before publishing (#1443)
+
 ## 1.0.0
 
 - fix(release): the release contract expects a 0.x base to graduate to 1.0.0 (#1442)
