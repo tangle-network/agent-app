@@ -35,6 +35,8 @@ export interface ConformanceOptions {
   workspace?: string
   /** `digest` hashes a fresh nonce on the workspace computer; `file` has the computer save a file the app serves back. */
   computer?: ComputerProof
+  /** The computer turn's model. The plain turn keeps the app's own model, so the served model is still checked once. */
+  computerModel?: string
   /** Where the `file` proof is saved, relative to the workspace root. */
   fileDir?: string
   /** The budget of each turn, a cold box included. */
@@ -46,6 +48,8 @@ export interface ConformanceOptions {
 }
 
 const DEFAULT_TURN_MS = 300_000
+// Company spend rule: checks run on the flat-rate plan; per-token models are for product serving with real users.
+const DEFAULT_COMPUTER_MODEL = 'glm-5.3'
 
 /** Why an unexpected error is not a pass, in a line. */
 function describe(error: unknown): string {
@@ -129,7 +133,7 @@ export async function checkDeployedApp(options: ConformanceOptions): Promise<Che
     const open = access
     await check('plain-turn', async () => ({ value: true, detail: await plainTurn(open, turnMs) }))
     await check('computer-turn', async () => ({
-      value: true, detail: await computerTurn(open, turnMs, options.computer ?? 'digest', options.fileDir ?? 'proof'),
+      value: true, detail: await computerTurn(open, turnMs, options.computer ?? 'digest', options.fileDir ?? 'proof', options.computerModel ?? DEFAULT_COMPUTER_MODEL),
     }))
   } else {
     blocked('plain-turn', 'blocked by operator-access')

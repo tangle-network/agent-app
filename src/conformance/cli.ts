@@ -17,6 +17,7 @@
  *   --auth password|sso       how the member signs in (default password); sso goes through Tangle Platform
  *   --workspace <id|name>     the canary or smoke workspace the turns run in (default: the key's only workspace)
  *   --computer digest|file    digest: hash a fresh nonce on the computer; file: the computer saves a file the app serves back
+ *   --computer-model <id>     the computer turn's model (default glm-5.3, flat-rate); the plain turn keeps the app's model
  *   --file-dir <dir>          where the file proof is saved (default proof)
  *   --turn-ms <ms>            the budget of each turn, a cold box included (default 300000)
  *   --expect-revision <sha>   fail unless the served revision matches
@@ -28,7 +29,7 @@ import { checkDeployedApp, type ConformanceOptions } from './run.js'
 import type { ComputerProof } from './turns.js'
 import type { SignInMode } from './session.js'
 
-const VALUE_FLAGS = new Set(['--app-url', '--app', '--auth', '--email', '--password', '--workspace', '--computer', '--file-dir', '--turn-ms', '--expect-revision'])
+const VALUE_FLAGS = new Set(['--app-url', '--app', '--auth', '--email', '--password', '--workspace', '--computer', '--computer-model', '--file-dir', '--turn-ms', '--expect-revision'])
 
 function parseConformanceArgs(argv: readonly string[], env: NodeJS.ProcessEnv = process.env): ConformanceOptions {
   const flags = new Map<string, string>()
@@ -60,6 +61,7 @@ function parseConformanceArgs(argv: readonly string[], env: NodeJS.ProcessEnv = 
     ...(operatorKey ? { operatorKey } : {}),
     ...(flags.has('--workspace') ? { workspace: flags.get('--workspace')! } : {}),
     computer: computer as ComputerProof,
+    ...(flags.has('--computer-model') ? { computerModel: flags.get('--computer-model')! } : {}),
     ...(flags.has('--file-dir') ? { fileDir: flags.get('--file-dir')! } : {}),
     turnMs,
     ...(flags.has('--expect-revision') ? { expectRevision: flags.get('--expect-revision')! } : {}),

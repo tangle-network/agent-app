@@ -88,9 +88,9 @@ export async function openOperatorAccess(
 const reply = (turn: OperatorTurn) => (turn.reply?.content ?? '').trim()
 
 /** One turn on a new thread, followed until it settles. */
-async function runTurn(access: OperatorAccess, title: string, content: string, turnMs: number): Promise<{ turn: OperatorTurn; where: string }> {
+async function runTurn(access: OperatorAccess, title: string, content: string, turnMs: number, model?: string): Promise<{ turn: OperatorTurn; where: string }> {
   const turnId = randomUUID()
-  const started = await access.client.startTurn(access.workspace.id, { turnId, content, title })
+  const started = await access.client.startTurn(access.workspace.id, { turnId, content, title, ...(model ? { model } : {}) })
   if (!started.succeeded) throw new Failure(`the turn was refused: ${started.status} ${started.code}: ${started.error.slice(0, 200)}`)
   const where = `thread ${started.value.threadId}`
   const settled = await access.client.waitForTurn(access.workspace.id, started.value.threadId, started.value.turnId, { timeoutMs: turnMs })
@@ -106,16 +106,16 @@ export async function plainTurn(access: OperatorAccess, turnMs: number): Promise
   const { turn, where } = await runTurn(access, 'Conformance: plain turn',
     'Conformance check: reply with one short sentence confirming you can answer.', turnMs)
   if (!reply(turn)) throw new Failure(`the turn succeeded with an empty reply (${where})`)
-  return `${reply(turn).length} characters (${where})`
+  return `${reply(turn).length} characters from ${turn.model ?? 'an unreported model'} (${where})`
 }
 
-export async function computerTurn(access: OperatorAccess, turnMs: number, proof: ComputerProof, fileDir: string): Promise<string> {
+export async function computerTurn(access: OperatorAccess, turnMs: number, proof: ComputerProof, fileDir: string, model: string): Promise<string> {
   const nonce = `conformance-${randomBytes(12).toString('hex')}`
   if (proof === 'digest') {
     const digest = createHash('sha256').update(nonce).digest('hex')
     const { turn, where } = await runTurn(access, 'Conformance: computer turn',
       'Conformance check: run this exact shell command on the workspace computer (sandbox_run when you have it), then reply with only '
-      + `the 64-character hex digest it prints:\nprintf %s '${nonce}' | sha256sum`, turnMs)
+      + `the 64-character hex digest it prints:\nprintf %s '${nonce}' | sha256sum`, turnMs, model)
     if (!reply(turn).includes(digest)) {
       throw new Failure(`the reply does not hold the digest of the fresh nonce, so the computer did not run the command: "${reply(turn).slice(0, 160)}" (${where})`)
     }
@@ -123,7 +123,7 @@ export async function computerTurn(access: OperatorAccess, turnMs: number, proof
   }
   const path = `${fileDir.replace(/\/+$/, '')}/${nonce}.md`
   const { where } = await runTurn(access, 'Conformance: computer turn',
-    `Conformance check: use the workspace computer to save a file at ${path} whose whole content is this one line, then reply with the word saved:\n${nonce}`, turnMs)
+    `Conformance check: use the workspace computer to save a file at ${path} whose whole content is this one line, then reply with the word saved:\n${nonce}`, turnMs, model)
   const read = await access.client.readFile(access.workspace.id, path)
   if (!read.succeeded) throw new Failure(`the turn succeeded, but the app does not serve ${path}: ${read.status} ${read.code} (${where})`)
   if (read.value.content.trim() !== nonce) {
