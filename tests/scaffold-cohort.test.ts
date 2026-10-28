@@ -16,6 +16,7 @@ const repo = resolve(__dirname, '..')
 const readManifest = (path: string): PackageManifest =>
   JSON.parse(readFileSync(resolve(repo, path), 'utf8'))
 const app = readManifest('package.json')
+const installedVersion = (name: string) => readManifest(`node_modules/${name}/package.json`).version
 
 describe.each([{ flags: [] }, { flags: ['--chat'] }, { flags: ['--headless'] }])('scaffold version selection: $flags', ({ flags }) => {
   it('pins the released App cohort and preserves an explicit version override', () => {
@@ -41,7 +42,7 @@ describe.each([{ flags: [] }, { flags: ['--chat'] }, { flags: ['--headless'] }])
         expect(manifest.dependencies['@tangle-network/agent-app'])
           .toBe(override ?? scaffolder.version)
         expect(manifest.devDependencies['@tangle-network/agent-eval'])
-          .toBe(app.devDependencies?.['@tangle-network/agent-eval'])
+          .toBe(installedVersion('@tangle-network/agent-eval'))
       }
     } finally {
       rmSync(scratch, { recursive: true, force: true })
@@ -58,7 +59,7 @@ describe.each(['template', 'template-chat'])('scaffold release cohort: %s', (tem
       if (!name.startsWith('@tangle-network/') || name === '@tangle-network/agent-app') continue
       expect(valid(version), `${name} must use an exact release version`).not.toBeNull()
       expect(version, `${name}: generated users must receive the tested engine cohort`)
-        .toBe(app.devDependencies?.[name])
+        .toBe(installedVersion(name))
       const appPeerRange = app.peerDependencies?.[name]
       if (appPeerRange) {
         expect(satisfies(version, appPeerRange), `${name}@${version} violates ${appPeerRange}`).toBe(true)

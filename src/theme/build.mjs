@@ -4,6 +4,7 @@ import { copyFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { palettes } from '@tangle-network/brand'
 import postcss from 'postcss'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -155,7 +156,23 @@ function snapshot(defs) {
   return result
 }
 const themes = `/** ${provenance} */\nexport const brandThemes = ${JSON.stringify({ light: snapshot(lightValues), dark: snapshot(darkValues) }, null, 2)} as const\n`
-const outputs = [['compat.generated.css', compat], ['brand.generated.ts', themes]]
+const emailRoles = 'canvas card well hairline ink inkSecondary inkMuted accent onAccent accentText'.split(' ')
+const emailPalettes = Object.fromEntries(['light', 'dark'].map((mode) => [mode,
+  Object.fromEntries(emailRoles.map((role) => [role, toHex(palettes[mode][role])]))]))
+const emailHash = createHash('sha256').update(JSON.stringify(emailPalettes)).digest('hex')
+const email = `/** GENERATED from @tangle-network/brand canonical palettes at build time.
+ * SHA-256 (resolved roles): ${emailHash}. Run node src/theme/build.mjs --write; do not edit.
+ */
+export const EMAIL_PALETTE = {
+  light: ${JSON.stringify(emailPalettes.light)},
+  dark: ${JSON.stringify(emailPalettes.dark)},
+} as const
+
+/** System faces used when email clients cannot load web fonts. */
+export const EMAIL_FONT_STACK =
+  "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif"
+`
+const outputs = [['compat.generated.css', compat], ['brand.generated.ts', themes], ['../email/palette.ts', email]]
 function check() {
   for (const [file, text] of outputs) {
     if (readFileSync(join(here, file), 'utf8') !== text) throw new Error(`Stale ${file}; run node src/theme/build.mjs --write and review the Brand changes`)

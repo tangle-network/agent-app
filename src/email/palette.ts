@@ -1,40 +1,11 @@
-/**
- * The Brand roles the email layout paints with, as literal hex. Email clients
- * cannot read CSS variables, and importing `@tangle-network/brand` at runtime
- * would load React into a server-only renderer, so the values live here and
- * `tests/email/palette.test.ts` fails when they drift from Brand's `palettes`.
+/** GENERATED from @tangle-network/brand canonical palettes at build time.
+ * SHA-256 (resolved roles): 99466a2837783814e7baedf78b7fc387dd73fecc6da9342c08067315339d968c. Run node src/theme/build.mjs --write; do not edit.
  */
 export const EMAIL_PALETTE = {
-  light: {
-    canvas: '#eceef3',
-    card: '#ffffff',
-    well: '#f5f6fa',
-    hairline: '#c8c7d6',
-    ink: '#2d2d2d',
-    inkSecondary: '#3f3f3f',
-    inkMuted: '#4c4c4c',
-    accent: '#4c3fc6',
-    onAccent: '#ffffff',
-    accentText: '#3c32e9',
-  },
-  dark: {
-    canvas: '#0a0a14',
-    card: '#191826',
-    well: '#11101e',
-    hairline: '#37364a',
-    ink: '#e6e6e6',
-    inkSecondary: '#c7c7c7',
-    inkMuted: '#b5b5b5',
-    accent: '#4c3fc6',
-    onAccent: '#ffffff',
-    accentText: '#a5b4fc',
-  },
+  light: {"canvas":"#eceef4","card":"#ffffff","well":"#f4f5fb","hairline":"#c7c9ce","ink":"#3f3f3f","inkSecondary":"#505050","inkMuted":"#5d5d5d","accent":"#5f53cc","onAccent":"#ffffff","accentText":"#3822f6"},
+  dark: {"canvas":"#0b0a13","card":"#191826","well":"#12111d","hairline":"#37354d","ink":"#d7d7d7","inkSecondary":"#bdbdbd","inkMuted":"#ababab","accent":"#5f53cc","onAccent":"#ffffff","accentText":"#ccc7fd"},
 } as const
 
-/**
- * Brand's `--font-sans` stack with the system faces email clients actually
- * have. No client used for this mail loads web fonts reliably, so Inter shows
- * only where it is installed and the platform UI face carries the rest.
- */
+/** System faces used when email clients cannot load web fonts. */
 export const EMAIL_FONT_STACK =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, sans-serif"

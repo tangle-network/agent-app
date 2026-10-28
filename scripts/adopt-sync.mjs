@@ -1,36 +1,10 @@
 #!/usr/bin/env node
 /**
- * `pnpm run adopt:sync` — after an adoption bumps the root `@tangle-network/*`
- * pins, copy them into both create-agent-app templates and recompute this
- * package's own Tangle peer floors.
- *
- * agent-eval's adopt-stack workflow runs this as its `post-pin` step, after it
- * writes the pins and installs (whose `prepare` builds `dist/`) and before it
- * commits, so both edits join the adoption commit instead of failing
- * `tests/scaffold-cohort.test.ts` and `src/peer-floors/check.test.ts`.
- *
- * Templates: every Tangle package a template installs or declares as a peer,
- * except the shell itself, uses the exact version in the root
- * `devDependencies` (the rule `tests/scaffold-cohort.test.ts` enforces). A
- * template Tangle package the root does not pin fails the run by name, and no
- * file is written.
- *
- * Floors: a floor admits only versions this package was tested on. For each
- * Tangle peer whose exact pin moved since `HEAD`, the floor restarts from the
- * one in `HEAD`. If that floor already admits the new pin it is kept as is;
- * otherwise it gains one window for the pin's own line, `>=pin <0.(m+1).0` on
- * 0.x and `^pin` from 1.0, and nothing between. That undoes agent-eval's
- * `widenRange`, which stretches the last window's upper bound over every
- * intermediate minor (#1210: Materialize `>=0.25.2 <0.26.0` became
- * `>=0.25.2 <0.28.0`, claiming the never-tested 0.26). Floors whose pin did not
- * move are left as written, so a hand edit survives.
- *
- * The baseline is `git show HEAD:package.json`, never the index: adopt-stack
- * runs this after editing and before committing, so `HEAD` is the pre-adoption
- * manifest whatever is staged. Run after the adoption is committed, nothing
- * differs from `HEAD` and the floors are left alone.
- *
- * Files change only when a value changes, so a second run writes nothing.
+ * Sync both generated apps to the exact installed Tangle cohort after adoption.
+ * Library dependency ranges remain authored in package.json; generated apps pin
+ * the versions actually installed and tested. Run after the frozen install.
+ * Peer floors retain HEAD's admitted lines and add only a newly adopted line.
+ * Stage all outputs with the adoption; an unchanged second run writes nothing.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
@@ -56,7 +30,14 @@ const { satisfiesRange } = await import(pathToFileURL(check).href)
 
 const manifestPath = join(root, 'package.json')
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-const pins = manifest.devDependencies ?? {}
+const declared = manifest.devDependencies ?? {}
+const pins = Object.fromEntries(Object.keys(declared).filter(name => name.startsWith(SCOPE)).map(name => {
+  const path = join(root, 'node_modules', name, 'package.json')
+  if (!existsSync(path)) fail(`${name} is not installed; run the frozen install before adopt:sync`)
+  const { version } = JSON.parse(readFileSync(path, 'utf8'))
+  if (!RELEASE.test(version)) fail(`${name} has no stable installed version: ${version}`)
+  return [name, version]
+}))
 
 const writes = []
 const changes = []
@@ -92,7 +73,7 @@ for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
   const pin = pins[name]
   const floor = committed.peerDependencies?.[name]
   const release = RELEASE.exec(pin ?? '')
-  if (!name.startsWith(SCOPE) || !release || !floor || pin === committed.devDependencies?.[name]) continue
+  if (!name.startsWith(SCOPE) || !release || !floor || declared[name] === committed.devDependencies?.[name]) continue
   moved += 1
   const [, major, minor] = release
   const window = major === '0' ? `>=${pin} <0.${Number(minor) + 1}.0` : `^${pin}`
