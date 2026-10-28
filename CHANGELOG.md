@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- chore(ci): drop the adopt-stack cron; dispatch only (#1446)
+
 ## 1.0.3
 
 - fix(chat): keep responder positions stable while answers stream (#1445)
