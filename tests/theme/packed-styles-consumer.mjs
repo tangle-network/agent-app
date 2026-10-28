@@ -119,7 +119,10 @@ try {
         }
       })
       for (const hue of ['violet', 'orange', 'teal', 'blue', 'pink', 'brown', 'cyan', 'lime']) {
-        await page.locator('#accent-scope').evaluate((element, value) => element.setAttribute('data-accent', value), hue)
+        await page.locator('#accent-scope').evaluate(async (element, value) => {
+          element.setAttribute('data-accent', value)
+          await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        }, hue)
         const pairs = await page.evaluate(() => ['accent', 'accent-dark'].map((prefix) => {
           const action = getComputedStyle(document.getElementById(`${prefix}-action`))
           const ink = getComputedStyle(document.getElementById(`${prefix}-ink`)).color
