@@ -185,7 +185,9 @@ describe('this package audits itself', () => {
     const runtime = JSON.parse(
       await readFile(join(root, 'node_modules', '@tangle-network', 'agent-runtime', 'package.json'), 'utf8'),
     ) as { version: string; peerDependencies?: Record<string, string> }
-    const installed = own.devDependencies?.[name]
+    const { version: installed } = JSON.parse(
+      await readFile(join(root, 'node_modules', name, 'package.json'), 'utf8'),
+    ) as { version: string }
     const ownRange = own.peerDependencies?.[name]
     const runtimeRange = runtime.peerDependencies?.[name]
 

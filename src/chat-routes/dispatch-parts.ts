@@ -20,6 +20,7 @@
  * demotion math and emitted part shapes reproduce its dispatched prompt bytes).
  */
 
+import { partitionBySpeaker } from '@tangle-network/agent-interface/speaker'
 import { isWorkspaceFileExportable } from '../web/file-export'
 import { flattenHistory, type PromptInputPart } from '../sandbox'
 import {
@@ -184,7 +185,7 @@ export interface DispatchHistoryPov {
 }
 
 /** Project persisted rows using the same role and attachment policy as dispatch.
- *  A row written by several agents (a `speaker` part before each answer)
+ *  A row written by several agents (stored speaker headers or live ownership tags)
  *  projects as one message per speaker, each tagged with its name; with a
  *  point of view, the reader's own answers are untagged `assistant` turns and
  *  everyone else's are tagged `user` turns. Reasoning and tool parts never
@@ -201,44 +202,26 @@ export function projectDispatchHistory(
       out.push({ role: 'user', content: textOf(message) })
       continue
     }
-    const slices = speakerSlices(message)
-    if (slices.length === 0) {
-      const owner = view.owner
+    const sections = partitionBySpeaker(message.parts ?? [])
+    const grouped = sections.some(section => section.speaker !== null)
+    for (const { speaker, parts } of sections) {
+      const text = textOf(grouped ? {
+        role: 'assistant', parts,
+        content: parts.filter(part => part.type === 'text' && typeof part.text === 'string').map(part => part.text).join(''),
+      } : message)
+      if (grouped && !speaker && !text) continue
+      const owner = speaker ?? view.owner
       const foreign = view.pov !== undefined && owner !== undefined && owner.id !== view.pov
       out.push({
         role: foreign ? 'user' : 'assistant',
-        content: foreign ? tagged(owner!.name, textOf(message)) : textOf(message),
+        content: owner && (foreign || (speaker && view.pov === undefined)) ? tagged(owner.name, text) : text,
       })
-      continue
-    }
-    for (const slice of slices) {
-      const text = textOf({ role: 'assistant', content: slice.text, parts: slice.parts })
-      if (view.pov === undefined) out.push({ role: 'assistant', content: tagged(slice.name, text) })
-      else if (slice.id === view.pov) out.push({ role: 'assistant', content: text })
-      else out.push({ role: 'user', content: tagged(slice.name, text) })
     }
   }
   return out
 }
 
 const tagged = (name: string, text: string) => `[${name}] ${text}`
-
-/** One responder's slice of a multi-speaker row: its text and the parts that follow its speaker part. */
-function speakerSlices(message: DispatchHistoryMessage): Array<{ id: string; name: string; text: string; parts: Record<string, unknown>[] }> {
-  const parts = message.parts ?? []
-  const slices: Array<{ id: string; name: string; text: string; parts: Record<string, unknown>[] }> = []
-  let current: (typeof slices)[number] | null = null
-  for (const part of parts) {
-    if (part.type === 'speaker' && typeof part.id === 'string' && typeof part.name === 'string') {
-      current = { id: part.id, name: part.name, text: '', parts: [] }
-      slices.push(current)
-    } else if (current) {
-      current.parts.push(part)
-      if (part.type === 'text' && typeof part.text === 'string') current.text += part.text
-    }
-  }
-  return slices
-}
 
 /** Build input parameters for dispatching chat message parts including text, attachments, mentions, and history */
 export interface BuildDispatchPartsInput {
