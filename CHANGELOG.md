@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.9
+
+- Use shared speaker ownership and qualify generated consumers (#1451)
+
 ## 1.0.8
 
 - chore(theme): adopt generated Brand 1.31.1 palette (#1449)
