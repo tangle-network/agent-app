@@ -112,11 +112,11 @@ function TwoAgentsStream(args: ChatMessagesProps) {
   const [length, setLength] = useState(0)
   const answer = 'Checking the roster and the mention routes before naming risks.\n\nThe first risk is an empty roster in a new workspace. The second is a renamed handle that stays reserved. The third is a routine posting while nobody is watching. Each needs an explicit state and a useful next action. '
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval>
     const delay = setTimeout(() => {
-      const interval = setInterval(() => setLength((n) => Math.min(n + 12, answer.length)), 160)
-      setTimeout(() => clearInterval(interval), 6000)
+      interval = setInterval(() => setLength((n) => Math.min(n + 12, answer.length)), 160)
     }, 1500)
-    return () => clearTimeout(delay)
+    return () => { clearTimeout(delay); clearInterval(interval) }
   }, [])
   const messages = twoAgentsAnswering.map((message) => message.role !== 'assistant' ? message : {
     ...message,

@@ -1,8 +1,8 @@
 /**
  * The reasoning row every agent app shows above an answer. While the model
  * reasons, its reasoning streams in live under "Thinking · 12s"; when the
- * answer starts the row collapses to "Thought for 12 seconds", and a click
- * opens it again. It renders nothing when the turn has no reasoning.
+ * answer starts its label becomes "Thought for 12 seconds". The disclosure
+ * stays where the reader left it until they toggle it. It renders nothing when the turn has no reasoning.
  *
  * The props are a `ChatReasoningState` (`./chat-stream`): spread the state the
  * stream keeps (`onReasoningState`), or a saved message's
@@ -31,7 +31,7 @@ export interface ReasoningRowProps {
   endedAt?: number
   /** The model is still reasoning. Defaults to true while `startedAt` is set and `endedAt` is not. */
   thinking?: boolean
-  /** Open a settled row. Default false: once thinking ends the row is collapsed until the reader opens it. */
+  /** Open a saved row. Live reasoning stays open until the reader closes it. */
   defaultOpen?: boolean
   /** Render the reasoning text. Default: the shared markdown renderer. */
   renderText?: (text: string) => ReactNode
@@ -63,7 +63,7 @@ function useSecondTick(active: boolean): void {
 
 const defaultRenderText = (text: string) => <Markdown className="text-base leading-relaxed">{text}</Markdown>
 
-/** The model's reasoning for one message: live while it thinks, collapsed once it answers. */
+/** Live reasoning retains its geometry; saved reasoning starts collapsed. */
 export function ReasoningRow({
   text,
   startedAt,
@@ -91,11 +91,9 @@ export function ReasoningRow({
   const end = endedAt ?? seenEnd.current ?? undefined
   useSecondTick(thinking)
 
-  // Open while thinking, closed once the answer starts; a reader's click
-  // outranks that default from then on, across every later delta.
-  const [toggled, setToggled] = useState<boolean | null>(null)
+  // Do not pull the answer and sibling responders upward when thinking ends.
+  const [open, setOpen] = useState(thinking || defaultOpen)
   const { viewportRef, contentRef, following, jumpToLatest } = useChatScroll()
-  const open = toggled ?? (thinking || defaultOpen || !following)
 
   if (!visible) return null
 
@@ -118,7 +116,7 @@ export function ReasoningRow({
       description={thinking ? undefined : reasoningPreview(text)}
       status={thinking ? 'running' : 'idle'}
       open={open}
-      onOpenChange={setToggled}
+      onOpenChange={setOpen}
     >
       <div
         ref={viewportRef}

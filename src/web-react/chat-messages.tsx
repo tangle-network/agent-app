@@ -192,6 +192,7 @@ function AssistantMessageImpl({
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
         </div>
       )}
+      <div className={msg.speaker ? 'agent-speaker-answer' : undefined} tabIndex={msg.speaker ? 0 : undefined} role={msg.speaker ? 'region' : undefined} aria-label={msg.speaker ? `Answer from ${msg.speaker.name}` : undefined}>
       <ReasoningRow
         className="mb-2"
         text={msg.reasoning ?? ''}
@@ -260,6 +261,7 @@ function AssistantMessageImpl({
           />
         </div>
       )}
+      </div>
       {quiet && (
         <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
           <CopyMessageButton text={copyTextOf(msg)} />
