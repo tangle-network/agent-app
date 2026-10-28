@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { useEffect, useState } from 'react'
 import { ChatMessages } from '../../web-react'
 import type { ChatMessagesProps, ChatToolCallInfo } from '../../web-react'
 import {
@@ -106,15 +107,28 @@ export const TwoAgentsAnswer: Story = {
   args: { messages: twoAgentsThread, renderMarkdown, approval },
 }
 
-/**
- * The same turn while it runs: the route announced both responders up front and
- * tags every event with its speaker, so each block streams on its own. The
- * Writer has reported its end; the Research Lead's tool call still runs, so
- * only its header says Answering.
- */
+/** Replays the second responder's text after both headers were admitted. */
+function TwoAgentsStream(args: ChatMessagesProps) {
+  const [length, setLength] = useState(0)
+  const answer = 'Checking the roster and the mention routes before naming risks.\n\nThe first risk is an empty roster in a new workspace. The second is a renamed handle that stays reserved. The third is a routine posting while nobody is watching. Each needs an explicit state and a useful next action. '
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      const interval = setInterval(() => setLength((n) => Math.min(n + 12, answer.length)), 160)
+      setTimeout(() => clearInterval(interval), 6000)
+    }, 1500)
+    return () => clearTimeout(delay)
+  }, [])
+  const messages = twoAgentsAnswering.map((message) => message.role !== 'assistant' ? message : {
+    ...message,
+    parts: message.parts!.map((part, index) => index === 5 ? { ...part, text: answer.slice(0, length) } : part),
+  })
+  return <div data-stream-length={length} data-stream-complete={length === answer.length}><ChatMessages {...args} messages={messages} /></div>
+}
+
 export const TwoAgentsAnswering: Story = {
   name: 'Two agents answering at once',
-  args: { messages: twoAgentsAnswering, renderMarkdown, approval, loading: true },
+  args: { renderMarkdown, approval, loading: true },
+  render: (args) => <TwoAgentsStream {...args} />,
 }
 
 /**
