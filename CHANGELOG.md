@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- fix(chat): keep responder positions stable while answers stream (#1445)
+
 ## 1.0.2
 
 - fix(create-agent-app): templates depend on first-party packages by caret range (#1444)
