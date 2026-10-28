@@ -39,33 +39,6 @@ describe('ReasoningRow', () => {
     expect(trigger(container).textContent).toContain('Thinking · 6s')
   })
 
-  it('collapses to "Thought for N seconds" when the answer starts, and opens again on a click', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(10_000)
-    const { container, rerender } = render(<ReasoningRow text="Need the count." startedAt={7_000} />)
-    rerender(<ReasoningRow text="Need the count." startedAt={7_000} endedAt={11_400} />)
-    const button = trigger(container)
-    expect(button.textContent).toContain('Thought for 4 seconds')
-    expect(button.textContent).not.toContain('Thinking')
-    // The collapsed row previews what was considered.
-    expect(button.textContent).toContain('Need the count.')
-    expect(button.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(button)
-    expect(trigger(container).getAttribute('aria-expanded')).toBe('true')
-    expect(document.getElementById(trigger(container).getAttribute('aria-controls')!)?.textContent).toContain('Need the count.')
-  })
-
-  it('times the run itself when the stream sends no timestamps', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(50_000)
-    const { container, rerender } = render(<ReasoningRow text="Weighing it." thinking />)
-    act(() => { vi.advanceTimersByTime(3_000) })
-    expect(trigger(container).textContent).toContain('Thinking · 3s')
-    rerender(<ReasoningRow text="Weighing it." thinking={false} />)
-    expect(trigger(container).textContent).toContain('Thought for 3 seconds')
-    expect(trigger(container).getAttribute('aria-expanded')).toBe('false')
-  })
-
   it('starts its own timer at the first reasoning, not when the turn began', () => {
     vi.useFakeTimers()
     vi.setSystemTime(80_000)

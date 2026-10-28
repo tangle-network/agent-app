@@ -12,6 +12,7 @@ import type { WorkProductPersistedPart } from '../work-product/types'
 import type { TurnPhaseData } from '../chat-routes/turn-progress'
 import { TurnProgress } from './turn-progress'
 import { ReasoningRow } from './reasoning-row'
+import { useChatScroll } from './chat-scroll'
 
 import type { CatalogModel } from '../runtime/model-catalog'
 import type { ChatToolCallInfo, ChatUiMessage, ProposalApprovalHandlers, ToolDetailRenderers } from './chat-message-types'
@@ -167,11 +168,11 @@ function AssistantMessageImpl({
   // reasoning row's thinking state for a producer that sends no end time, so a
   // segmented message with `content: ''` doesn't read as perpetually
   // "Thinking…" after its answer segments are visible.
-  const hasAnswerText =
-    content !== '' ||
-    (segments?.some((s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim() !== '') ??
-      false)
+  const hasAnswerText = Boolean(content || segments?.some(
+    (s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim(),
+  ))
 
+  const answerScroll = useChatScroll()
   const quiet = chrome === 'quiet'
   const authorClassName = quiet ? 'mb-1.5' : undefined
   const author = msg.speaker ? (
@@ -192,6 +193,8 @@ function AssistantMessageImpl({
           {formatModelCost(msg, models) && <span>{formatModelCost(msg, models)}</span>}
         </div>
       )}
+      <div ref={msg.speaker ? answerScroll.viewportRef : undefined} className={msg.speaker ? 'agent-speaker-answer' : undefined} tabIndex={msg.speaker ? 0 : undefined} role={msg.speaker ? 'region' : undefined} aria-label={msg.speaker ? `Answer from ${msg.speaker.name}` : undefined}>
+      <div ref={msg.speaker ? answerScroll.contentRef : undefined}>
       <ReasoningRow
         className="mb-2"
         text={msg.reasoning ?? ''}
@@ -204,6 +207,7 @@ function AssistantMessageImpl({
           segments={segments}
           msg={msg}
           streaming={streaming}
+          showCaret={!msg.speaker}
           renderBody={renderBody}
           approval={approval}
           onToolCallClick={onToolCallClick}
@@ -214,7 +218,7 @@ function AssistantMessageImpl({
         <>
           <div className={messageClassName}>
             {body}
-            {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
+            {!msg.speaker && streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
           </div>
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">
@@ -260,6 +264,7 @@ function AssistantMessageImpl({
           />
         </div>
       )}
+      </div></div>
       {quiet && (
         <div data-testid="message-meta-lane" className={QUIET_META_LANE_CLASS}>
           <CopyMessageButton text={copyTextOf(msg)} />
@@ -383,6 +388,8 @@ function OtherPersonMessage({
   )
 }
 
+const renderPlainBody = (content: string) => <p className="whitespace-pre-wrap">{content}</p>
+
 /**
  * The message thread: one centered column; user messages are right-aligned
  * bubbles with a User label; agent messages carry an Agent meta line with
@@ -426,14 +433,7 @@ export function ChatMessages({
   // Resolve role colors at the message, so nested host themes can override
   // the raw tokens without also redefining Tailwind's root color aliases.
   const assistantMessageClassName = `${messageClassName} bg-transparent text-[hsl(var(--foreground))]`
-  // Stabilize the fallback renderer's identity so it doesn't change every
-  // render — otherwise the memoized `AssistantMessage` (and its per-frame body
-  // memo) would invalidate on every parent render when no `renderMarkdown` is
-  // supplied.
-  const renderBody = useMemo(
-    () => renderMarkdown ?? ((content: string) => <p className="whitespace-pre-wrap">{content}</p>),
-    [renderMarkdown],
-  )
+  const renderBody = renderMarkdown ?? renderPlainBody
   const messages = useMemo(() => splitBySpeaker(storedMessages), [storedMessages])
   // The row the turn in flight writes. Its responders answer at the same time,
   // so every share of it streams until that responder reports its end.
