@@ -22,7 +22,11 @@ const messages = execFileSync('git', ['log', '--first-parent', '--format=%B%x00'
 const subjects = messages.map((message) => message.split('\n')[0])
 const breaking = subjects.some((subject) => /^[a-z]+(?:\([^)]+\))?!:/.test(subject))
 let next
-if (breaking) {
+if (match[1] === '0') {
+  // Every library is 1.0 or later: a 0.x version graduates at its next release
+  // (agent-runtime docs/release-versioning.md).
+  next = '1.0.0'
+} else if (breaking) {
   next = match[1] === '0'
     ? `0.${BigInt(match[2]) + 1n}.0`
     : `${BigInt(match[1]) + 1n}.0.0`
