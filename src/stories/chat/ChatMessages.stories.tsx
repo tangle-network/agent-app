@@ -114,7 +114,11 @@ function TwoAgentsStream(args: ChatMessagesProps) {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>
     const delay = setTimeout(() => {
-      interval = setInterval(() => setLength((n) => Math.min(n + 12, answer.length)), 160)
+      let shown = 0
+      interval = setInterval(() => {
+        shown = Math.min(shown + 12, answer.length); setLength(shown)
+        if (shown === answer.length) clearInterval(interval)
+      }, 160)
     }, 1500)
     return () => { clearTimeout(delay); clearInterval(interval) }
   }, [])

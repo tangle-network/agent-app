@@ -205,6 +205,7 @@ function AssistantMessageImpl({
           segments={segments}
           msg={msg}
           streaming={streaming}
+          showCaret={!msg.speaker}
           renderBody={renderBody}
           approval={approval}
           onToolCallClick={onToolCallClick}
@@ -215,7 +216,7 @@ function AssistantMessageImpl({
         <>
           <div className={messageClassName}>
             {body}
-            {streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
+            {!msg.speaker && streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
           </div>
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">

@@ -13,6 +13,7 @@ try {
     const page = await context.newPage()
     await page.goto(`http://127.0.0.1:6098/iframe.html?id=chat-chatmessages--two-agents-answering&globals=agentTheme:${theme}`)
     await page.waitForSelector('[data-stream-length="0"]')
+    await page.evaluate(() => document.fonts.ready)
     await page.evaluate(() => {
       window.__shifts = []
       window.__observer = new PerformanceObserver((list) => {

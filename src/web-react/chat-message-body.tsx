@@ -10,9 +10,6 @@ import type { ChatToolCallInfo, ChatUiMessage, ChatMessageSegment, ChatNoticeTon
 export function StreamingCaret() {
   return (
     <span
-      // `animate-pulse` is a 2s ease-in-out opacity fade — a breathing
-      // placeholder, not a caret. A caret is a hard 1s step blink, which is
-      // what every text surface the user has ever typed into does.
       className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-[agent-caret_1s_step-end_infinite] rounded-sm bg-foreground/70"
       data-motion="essential"
       aria-hidden
@@ -88,6 +85,7 @@ export function SegmentedBody({
   segments,
   msg,
   streaming,
+  showCaret = true,
   renderBody,
   approval,
   onToolCallClick,
@@ -97,6 +95,7 @@ export function SegmentedBody({
   segments: ChatMessageSegment[]
   msg: ChatUiMessage
   streaming: boolean
+  showCaret?: boolean
   renderBody: (content: string) => ReactNode
   approval?: ProposalApprovalHandlers
   onToolCallClick?: (call: ChatToolCallInfo, message: ChatUiMessage) => void
@@ -176,7 +175,7 @@ export function SegmentedBody({
           content={g.content}
           // Only the trailing run of the live turn types out + shows the caret.
           streaming={streaming && g.index === lastIndex}
-          showCaret={streaming && g.index === lastIndex}
+          showCaret={showCaret && streaming && g.index === lastIndex}
           renderBody={renderBody}
           messageClassName={messageClassName}
         />,
@@ -221,7 +220,7 @@ export function SegmentedBody({
     g.calls.forEach((call, index) => children.push(renderToolCard(call, index)))
   }
   leftoverToolCalls.forEach((call, index) => children.push(renderToolCard(call, index)))
-  if (streaming && segments[lastIndex]?.kind === 'tool') {
+  if (showCaret && streaming && segments[lastIndex]?.kind === 'tool') {
     children.push(<StreamingCaret key="streaming-caret" />)
   }
 
