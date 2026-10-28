@@ -8,13 +8,11 @@
  * two partial unique indexes make the link one-per-user and
  * one-per-platform-user, which the write path relies on.
  *
- * Schema expectations are Better Auth's default SQLite model with camelCase
- * columns: `user(id, name, email, emailVerified, createdAt, updatedAt)`,
- * `session(id, userId, token, expiresAt, ipAddress, userAgent, createdAt,
- * updatedAt)` and `account(id, userId, accountId, providerId, createdAt,
- * updatedAt)`, with unix-second integer timestamps (Drizzle `mode:
- * 'timestamp'`). D1 is structural: Cloudflare `D1Database` satisfies
- * {@link TangleIdentityD1Like}.
+ * The default schema is Better Auth's singular SQLite model with camelCase
+ * columns. {@link D1TangleIdentityStoreOptions.hostSchema} maps an existing
+ * host's physical table and column names without changing those defaults.
+ * Timestamps are unix-second integers (Drizzle `mode: 'timestamp'`). D1 is
+ * structural: Cloudflare `D1Database` satisfies {@link TangleIdentityD1Like}.
  */
 
 import {
@@ -65,8 +63,24 @@ export interface TangleIdentityLegacyLinkTable {
   platformUserIdColumn: string
 }
 
+export interface TangleIdentityHostTable<Column extends string> {
+  table: string
+  columns: Record<Column, string>
+}
+
+/** Better Auth table and physical column names used by the identity store. */
+export interface TangleIdentityHostSchema {
+  user: TangleIdentityHostTable<'id' | 'name' | 'email' | 'emailVerified' | 'createdAt' | 'updatedAt'>
+  session: TangleIdentityHostTable<'id' | 'userId' | 'token' | 'expiresAt' | 'ipAddress' | 'userAgent' | 'createdAt' | 'updatedAt'>
+  account: TangleIdentityHostTable<'id' | 'userId' | 'accountId' | 'providerId' | 'createdAt' | 'updatedAt'>
+}
+
 export interface D1TangleIdentityStoreOptions {
   db: TangleIdentityD1Like
+  /** Physical Better Auth names. Default: singular tables with camelCase columns.
+   * Custom account tables need the same two partial unique indexes, using their
+   * mapped column names; the default index SQL only targets the default schema. */
+  hostSchema?: TangleIdentityHostSchema
   /**
    * The signed-in local user for an explicit "connect Tangle" flow. A live
    * local session plus a verified platform exchange jointly authorize linking
@@ -83,6 +97,29 @@ const SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/
 function identifier(value: string, field: string): string {
   if (!SQL_IDENTIFIER.test(value)) throw new Error(`createD1TangleIdentityStore: invalid ${field}`)
   return value
+}
+
+const DEFAULT_HOST_SCHEMA = {
+  user: {
+    table: 'user',
+    columns: { id: 'id', name: 'name', email: 'email', emailVerified: 'emailVerified', createdAt: 'createdAt', updatedAt: 'updatedAt' },
+  },
+  session: {
+    table: 'session',
+    columns: { id: 'id', userId: 'userId', token: 'token', expiresAt: 'expiresAt', ipAddress: 'ipAddress', userAgent: 'userAgent', createdAt: 'createdAt', updatedAt: 'updatedAt' },
+  },
+  account: {
+    table: 'account',
+    columns: { id: 'id', userId: 'userId', accountId: 'accountId', providerId: 'providerId', createdAt: 'createdAt', updatedAt: 'updatedAt' },
+  },
+} satisfies TangleIdentityHostSchema
+
+function hostTable<Column extends string>(value: TangleIdentityHostTable<Column>, field: string): TangleIdentityHostTable<Column> {
+  return {
+    table: identifier(value.table, `${field}.table`),
+    columns: Object.fromEntries((Object.entries(value.columns) as Array<[Column, string]>).map(([column, physical]) =>
+      [column, identifier(physical, `${field}.columns.${column}`)])) as Record<Column, string>,
+  }
 }
 
 interface CandidateRow {
@@ -106,18 +143,25 @@ function randomToken(): string {
 export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOptions): TangleIdentitySsoAccountStore {
   const { db, linkingUserId } = options
   const provider = TANGLE_IDENTITY_PROVIDER_ID
+  const host = options.hostSchema ?? DEFAULT_HOST_SCHEMA
+  const userTable = hostTable(host.user, 'hostSchema.user')
+  const sessionTable = hostTable(host.session, 'hostSchema.session')
+  const accountTable = hostTable(host.account, 'hostSchema.account')
+  const u = userTable.columns
+  const s = sessionTable.columns
+  const a = accountTable.columns
   const legacy = options.legacyLinkTable && {
     table: identifier(options.legacyLinkTable.table, 'legacyLinkTable.table'),
     userId: identifier(options.legacyLinkTable.userIdColumn, 'legacyLinkTable.userIdColumn'),
     platformUserId: identifier(options.legacyLinkTable.platformUserIdColumn, 'legacyLinkTable.platformUserIdColumn'),
   }
 
-  const selectAccount = `SELECT u.id AS userId, u.email AS email, u.emailVerified AS emailVerified,
-      a.accountId AS accountPlatformUserId,
+  const selectAccount = `SELECT u.${u.id} AS userId, u.${u.email} AS email, u.${u.emailVerified} AS emailVerified,
+      a.${a.accountId} AS accountPlatformUserId,
       ${legacy ? `l.${legacy.platformUserId}` : 'NULL'} AS legacyPlatformUserId
-    FROM user u
-    LEFT JOIN account a ON a.userId = u.id AND a.providerId = '${provider}'
-    ${legacy ? `LEFT JOIN ${legacy.table} l ON l.${legacy.userId} = u.id` : ''}`
+    FROM ${userTable.table} u
+    LEFT JOIN ${accountTable.table} a ON a.${a.userId} = u.${u.id} AND a.${a.providerId} = '${provider}'
+    ${legacy ? `LEFT JOIN ${legacy.table} l ON l.${legacy.userId} = u.${u.id}` : ''}`
 
   function toCandidate(row: CandidateRow): Candidate {
     const fromAccount = row.accountPlatformUserId?.trim() || null
@@ -133,8 +177,8 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
 
   async function candidates(email: string, platformUserId: string) {
     const where = legacy
-      ? `WHERE lower(trim(u.email)) = ? OR a.accountId = ? OR l.${legacy.platformUserId} = ?`
-      : 'WHERE lower(trim(u.email)) = ? OR a.accountId = ?'
+      ? `WHERE lower(trim(u.${u.email})) = ? OR a.${a.accountId} = ? OR l.${legacy.platformUserId} = ?`
+      : `WHERE lower(trim(u.${u.email})) = ? OR a.${a.accountId} = ?`
     const values = legacy ? [email, platformUserId, platformUserId] : [email, platformUserId]
     const { results } = await db.prepare(`${selectAccount} ${where}`).bind(...values).all<CandidateRow>()
     const rows = results.map(toCandidate)
@@ -160,7 +204,7 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
         })
       }
 
-      const ownRow = await db.prepare(`${selectAccount} WHERE u.id = ?`).bind(linkingUserId).first<CandidateRow>()
+      const ownRow = await db.prepare(`${selectAccount} WHERE u.${u.id} = ?`).bind(linkingUserId).first<CandidateRow>()
       if (!ownRow) return { kind: 'reject', reason: 'email-match-mismatch' }
       const own = toCandidate(ownRow)
       if (own.divergent) return { kind: 'reject', reason: 'platform-id-email-conflict' }
@@ -189,7 +233,7 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
       if (resolution.kind !== 'create') throw new TangleSsoUserCreateError('The selected account changed')
       const userId = crypto.randomUUID()
       try {
-        await db.prepare(`INSERT INTO user (id, name, email, emailVerified, createdAt, updatedAt)
+        await db.prepare(`INSERT INTO ${userTable.table} (${u.id}, ${u.name}, ${u.email}, ${u.emailVerified}, ${u.createdAt}, ${u.updatedAt})
           VALUES (?, ?, ?, 1, unixepoch(), unixepoch())`)
           .bind(userId, name || normalizedEmail, normalizedEmail).run()
       } catch {
@@ -205,7 +249,7 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
 
     async createSession({ userId, expiresAt, ipAddress, userAgent }) {
       const token = randomToken()
-      await db.prepare(`INSERT INTO session (id, userId, token, expiresAt, ipAddress, userAgent, createdAt, updatedAt)
+      await db.prepare(`INSERT INTO ${sessionTable.table} (${s.id}, ${s.userId}, ${s.token}, ${s.expiresAt}, ${s.ipAddress}, ${s.userAgent}, ${s.createdAt}, ${s.updatedAt})
         VALUES (?, ?, ?, ?, ?, ?, unixepoch(), unixepoch())`)
         .bind(crypto.randomUUID(), userId, token, Math.floor(expiresAt.getTime() / 1000), ipAddress, userAgent)
         .run()
@@ -215,7 +259,7 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
     async saveTangleLink({ userId, sessionToken, tangleUserId, email }) {
       const platformUserId = tangleUserId.trim()
       const normalizedEmail = normalizeTangleSsoEmail(email)
-      const session = await db.prepare('SELECT userId FROM session WHERE token = ? AND expiresAt > unixepoch()')
+      const session = await db.prepare(`SELECT ${s.userId} AS userId FROM ${sessionTable.table} WHERE ${s.token} = ? AND ${s.expiresAt} > unixepoch()`)
         .bind(sessionToken).first<{ userId: string }>()
       if (session?.userId !== userId) throw new TangleSsoAccountConflictError('email-platform-id-conflict')
       const current = await store.resolveAccount({ email: normalizedEmail, platformUserId })
@@ -227,13 +271,13 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
       // One atomic batch: every statement re-checks the live session and the
       // email owner, and the final verified-email update runs only when this
       // exact link exists, so a lost race commits nothing and rejects.
-      const liveSession = 'EXISTS (SELECT 1 FROM session WHERE token = ? AND userId = ? AND expiresAt > unixepoch())'
-      const emailFree = 'NOT EXISTS (SELECT 1 FROM user WHERE lower(trim(email)) = ? AND id <> ?)'
-      const linked = `EXISTS (SELECT 1 FROM account WHERE providerId = '${provider}' AND userId = ? AND accountId = ?)`
+      const liveSession = `EXISTS (SELECT 1 FROM ${sessionTable.table} WHERE ${s.token} = ? AND ${s.userId} = ? AND ${s.expiresAt} > unixepoch())`
+      const emailFree = `NOT EXISTS (SELECT 1 FROM ${userTable.table} WHERE lower(trim(${u.email})) = ? AND ${u.id} <> ?)`
+      const linked = `EXISTS (SELECT 1 FROM ${accountTable.table} WHERE ${a.providerId} = '${provider}' AND ${a.userId} = ? AND ${a.accountId} = ?)`
       const statements = [
-        db.prepare(`INSERT INTO account (id, userId, accountId, providerId, createdAt, updatedAt)
+        db.prepare(`INSERT INTO ${accountTable.table} (${a.id}, ${a.userId}, ${a.accountId}, ${a.providerId}, ${a.createdAt}, ${a.updatedAt})
             SELECT ?, ?, ?, '${provider}', unixepoch(), unixepoch()
-            WHERE EXISTS (SELECT 1 FROM user WHERE id = ?) AND ${liveSession} AND ${emailFree}
+            WHERE EXISTS (SELECT 1 FROM ${userTable.table} WHERE ${u.id} = ?) AND ${liveSession} AND ${emailFree}
             ON CONFLICT DO NOTHING`)
           .bind(crypto.randomUUID(), userId, platformUserId, userId, sessionToken, userId, normalizedEmail, userId),
       ]
@@ -243,9 +287,9 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
             ON CONFLICT DO NOTHING`)
           .bind(userId, platformUserId, userId, platformUserId))
       }
-      statements.push(db.prepare(`UPDATE user SET emailVerified = CASE WHEN lower(trim(email)) = ? THEN 1 ELSE emailVerified END,
-            updatedAt = unixepoch()
-          WHERE id = ? AND ${liveSession} AND ${linked} AND ${emailFree}`)
+      statements.push(db.prepare(`UPDATE ${userTable.table} SET ${u.emailVerified} = CASE WHEN lower(trim(${u.email})) = ? THEN 1 ELSE ${u.emailVerified} END,
+            ${u.updatedAt} = unixepoch()
+          WHERE ${u.id} = ? AND ${liveSession} AND ${linked} AND ${emailFree}`)
         .bind(normalizedEmail, userId, sessionToken, userId, userId, platformUserId, normalizedEmail, userId))
       const results = await db.batch(statements)
       if (results[results.length - 1]?.meta?.changes !== 1) {
@@ -256,7 +300,7 @@ export function createD1TangleIdentityStore(options: D1TangleIdentityStoreOption
     // `saveTangleLink` is one atomic batch, so a rejected call wrote nothing;
     // removing the unpublished session is the whole cleanup.
     async deleteSession({ sessionToken }) {
-      await db.prepare('DELETE FROM session WHERE token = ?').bind(sessionToken).run()
+      await db.prepare(`DELETE FROM ${sessionTable.table} WHERE ${s.token} = ?`).bind(sessionToken).run()
     },
   }
   return store

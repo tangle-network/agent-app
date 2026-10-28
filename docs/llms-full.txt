@@ -18446,6 +18446,22 @@ interface TangleIdentityD1Like
 interface TangleIdentityD1Statement
 ```
 
+### `TangleIdentityHostSchema`
+
+`interface` — Better Auth table and physical column names used by the identity store.
+
+```ts
+interface TangleIdentityHostSchema
+```
+
+### `TangleIdentityHostTable`
+
+`interface`
+
+```ts
+interface TangleIdentityHostTable
+```
+
 ### `TangleIdentityLegacyLinkTable`
 
 `interface` — A link table the product used before this store.
@@ -39262,7 +39278,7 @@ interface QuestionOptionListProps
 
 ### `ReasoningRow`
 
-`function` — The model's reasoning for one message: live while it thinks, collapsed once it answers.
+`function` — Live reasoning retains its geometry; saved reasoning starts collapsed.
 
 ```ts
 ({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…

@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-144 exports.
+146 exports.
 
 ### `AdminGuardOptions`
 
@@ -948,6 +948,22 @@ interface TangleIdentityD1Like
 
 ```ts
 interface TangleIdentityD1Statement
+```
+
+### `TangleIdentityHostSchema`
+
+`interface` — Better Auth table and physical column names used by the identity store.
+
+```ts
+interface TangleIdentityHostSchema
+```
+
+### `TangleIdentityHostTable`
+
+`interface`
+
+```ts
+interface TangleIdentityHostTable
 ```
 
 ### `TangleIdentityLegacyLinkTable`

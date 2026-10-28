@@ -14320,6 +14320,18 @@
           "doc": "A prepared D1 statement; Cloudflare `D1PreparedStatement` satisfies it."
         },
         {
+          "name": "TangleIdentityHostSchema",
+          "kind": "interface",
+          "signature": "interface TangleIdentityHostSchema",
+          "doc": "Better Auth table and physical column names used by the identity store."
+        },
+        {
+          "name": "TangleIdentityHostTable",
+          "kind": "interface",
+          "signature": "interface TangleIdentityHostTable",
+          "doc": null
+        },
+        {
           "name": "TangleIdentityLegacyLinkTable",
           "kind": "interface",
           "signature": "interface TangleIdentityLegacyLinkTable",
@@ -30392,7 +30404,7 @@
           "name": "ReasoningRow",
           "kind": "function",
           "signature": "({ text, startedAt, endedAt, thinking: thinkingProp, defaultOpen, renderText, className, }: ReasoningRowProps) => Eleme…",
-          "doc": "The model's reasoning for one message: live while it thinks, collapsed once it answers."
+          "doc": "Live reasoning retains its geometry; saved reasoning starts collapsed."
         },
         {
           "name": "ReasoningRowProps",
