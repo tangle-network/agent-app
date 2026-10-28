@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- fix(create-agent-app): templates depend on first-party packages by caret range (#1444)
+
 ## 1.0.1
 
 - ci(release): admit the release version before publishing (#1443)
