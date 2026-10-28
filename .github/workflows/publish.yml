@@ -101,6 +101,11 @@ jobs:
           run-id: ${{ needs.package_release.outputs.artifact-run-id }}
           path: ${{ runner.temp }}/publish-bundle
           merge-multiple: true
+      - name: Admit the release version
+        uses: tangle-network/agent-runtime/.github/actions/admit-release@76b8de28191e31f0c1301a3621bab2188f8695e7
+        with:
+          tarballs: ${{ runner.temp }}/publish-bundle/agent-app.tgz
+
       - name: Publish exact Agent App tarball
         env:
           EXPECTED_VERSION: ${{ needs.package_release.outputs.version }}
