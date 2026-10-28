@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AgentSetupBlock } from './agent-setup-block'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -18,7 +19,7 @@ describe('AgentSetupBlock', () => {
     expect(screen.queryByText(/gets its own capped key/)).toBeNull()
   })
 
-  it('copies the exact setup skill it is given and links the raw prompt', async () => {
+  it('copies the exact setup skill and shows an accessible Copied button with a check', async () => {
     const writeText = vi.fn(async () => {})
     stubClipboard(writeText)
     render(
@@ -33,11 +34,44 @@ describe('AgentSetupBlock', () => {
       'https://widget.tangle.tools/agent-setup.md',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Copy setup prompt' }))
-    expect(await screen.findByRole('status')).toHaveProperty('textContent', 'Copied. Paste it into your coding agent.')
+    const copiedButton = await screen.findByRole('button', { name: 'Copied' })
+    expect(copiedButton.querySelector('svg')).not.toBeNull()
+    expect(screen.getByRole('status')).toHaveProperty('textContent', 'Copied. Paste it into your coding agent.')
     expect(writeText).toHaveBeenCalledWith('---\nname: tangle-widget-setup\n---\n# Set up')
   })
 
-  it('falls back to a fetch instruction without the text and explains a blocked clipboard', async () => {
+  it('resets the button after the copied confirmation timeout', async () => {
+    vi.useFakeTimers()
+    stubClipboard(vi.fn(async () => {}))
+    render(<AgentSetupBlock productName="Tangle Widget" setupUrl="https://widget.tangle.tools/agent-setup.md" />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy setup prompt' }))
+    })
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy()
+
+    act(() => {
+      vi.advanceTimersByTime(2000)
+    })
+    expect(screen.getByRole('button', { name: 'Copy setup prompt' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull()
+  })
+
+  it('clears the copied confirmation timer on unmount', async () => {
+    vi.useFakeTimers()
+    stubClipboard(vi.fn(async () => {}))
+    const { unmount } = render(<AgentSetupBlock productName="Tangle Widget" setupUrl="https://widget.tangle.tools/agent-setup.md" />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy setup prompt' }))
+    })
+    expect(vi.getTimerCount()).toBe(1)
+
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('falls back to a fetch instruction and never claims a blocked clipboard was copied', async () => {
     const writeText = vi.fn(async () => {
       throw new Error('denied')
     })
@@ -47,6 +81,8 @@ describe('AgentSetupBlock', () => {
     expect((await screen.findByRole('status')).textContent).toBe(
       'Clipboard unavailable. Open https://widget.tangle.tools/agent-setup.md and copy it from there.',
     )
+    expect(screen.getByRole('button', { name: 'Copy setup prompt' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull()
     expect(writeText).toHaveBeenCalledWith(
       'Set up Tangle Widget for me. Fetch https://widget.tangle.tools/agent-setup.md and follow every step in it.',
     )

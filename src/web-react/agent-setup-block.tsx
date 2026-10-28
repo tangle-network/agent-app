@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { Check } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 
 export interface AgentSetupBlockProps {
   productName: string
@@ -20,13 +21,35 @@ export interface AgentSetupBlockProps {
  */
 export function AgentSetupBlock({ productName, setupUrl, markdown, description, className }: AgentSetupBlockProps) {
   const [notice, setNotice] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const copiedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mounted = useRef(true)
   const prompt = markdown ?? `Set up ${productName} for me. Fetch ${setupUrl} and follow every step in it.`
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      if (copiedResetTimer.current !== null) clearTimeout(copiedResetTimer.current)
+    }
+  }, [])
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(prompt)
+      if (!mounted.current) return
+      if (copiedResetTimer.current !== null) clearTimeout(copiedResetTimer.current)
+      setCopied(true)
       setNotice('Copied. Paste it into your coding agent.')
+      copiedResetTimer.current = setTimeout(() => {
+        setCopied(false)
+        copiedResetTimer.current = null
+      }, 2000)
     } catch {
+      if (!mounted.current) return
+      if (copiedResetTimer.current !== null) clearTimeout(copiedResetTimer.current)
+      copiedResetTimer.current = null
+      setCopied(false)
       setNotice(`Clipboard unavailable. Open ${setupUrl} and copy it from there.`)
     }
   }
@@ -43,9 +66,16 @@ export function AgentSetupBlock({ productName, setupUrl, markdown, description, 
         <button
           type="button"
           onClick={copy}
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
         >
-          Copy setup prompt
+          {copied ? (
+            <>
+              <Check aria-hidden="true" className="h-4 w-4" />
+              Copied
+            </>
+          ) : (
+            'Copy setup prompt'
+          )}
         </button>
       </div>
       <p className="text-sm text-muted-foreground">
