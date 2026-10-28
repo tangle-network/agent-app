@@ -31,7 +31,7 @@ export type HubSettingsRequestFn = (request: HubSettingsRequest) => Promise<Resp
 export interface HubIntegrationsClient {
   providers(identity: HubIntegrationsIdentity, signal?: AbortSignal): Promise<HubProvider[]>
   connections(identity: HubIntegrationsIdentity, signal?: AbortSignal): Promise<HubConnection[]>
-  startOAuth(identity: HubIntegrationsIdentity, providerId: string, input: { returnUrl: string; connectionParameters?: Record<string, string> }, signal?: AbortSignal): Promise<HubOAuthStartResponse>
+  startOAuth(identity: HubIntegrationsIdentity, providerId: string, input: { returnUrl: string; connectionParameters?: Record<string, string>; requestedScopes?: readonly string[] }, signal?: AbortSignal): Promise<HubOAuthStartResponse>
   connectApiKey(identity: HubIntegrationsIdentity, providerId: string, apiKey: string, metadata?: HubApiKeyConnectionMetadata, signal?: AbortSignal): Promise<HubConnection>
   revoke(identity: HubIntegrationsIdentity, connectionId: string, signal?: AbortSignal): Promise<HubConnection>
   health(identity: HubIntegrationsIdentity, connectionId: string, signal?: AbortSignal): Promise<HubConnectionHealthResponse>

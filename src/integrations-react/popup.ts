@@ -109,6 +109,7 @@ export async function connectWithPopup(input: {
   before: readonly HubConnection[]
   callbackPath: string
   connectionParameters?: Record<string, string>
+  requestedScopes?: readonly string[]
   signal: AbortSignal
   isCurrent: () => boolean
 }): Promise<PopupConnectResult> {
@@ -132,6 +133,7 @@ export async function connectWithPopup(input: {
     const start = await withAbort(input.client.startOAuth(input.identity, input.providerId, {
       returnUrl: callback.href,
       ...(input.connectionParameters === undefined ? {} : { connectionParameters: input.connectionParameters }),
+      ...(input.requestedScopes === undefined ? {} : { requestedScopes: input.requestedScopes }),
     }, timeout.signal), timeout.signal)
     if (!input.isCurrent() || input.signal.aborted) return 'cancelled'
     let redirect: URL

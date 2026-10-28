@@ -51,6 +51,13 @@ const cases: Array<{
     upstreamBody: { returnUrl: 'https://app.example/settings' },
   },
   {
+    path: '/connections/slack/start', method: 'POST', data: { ...OAUTH, provider: 'slack', scopes: ['channels:read'] },
+    input: { returnUrl: 'https://app.example/settings', requestedScopes: ['channels:read'] },
+    intent: { operation: 'oauth.start', provider: 'slack', input: { returnUrl: 'https://app.example/settings', requestedScopes: ['channels:read'] } },
+    upstreamPath: '/v1/hub/connections/slack/start', upstreamMethod: 'POST',
+    upstreamBody: { returnUrl: 'https://app.example/settings', requestedScopes: ['channels:read'] },
+  },
+  {
     path: '/connections/cloudbeds/connect-key', method: 'POST',
     input: { apiKey: 'provider-only-key', metadata: { propertyId: 'property-42', currency: 'USD' } },
     intent: { operation: 'api-key.connect', provider: 'cloudbeds', metadata: { propertyId: 'property-42', currency: 'USD' } },
@@ -253,7 +260,11 @@ describe('method/path and input allowlists', () => {
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { api_key: 'credential' } }],
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { tenant: { nested: true } } }],
     ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings\u007f' }],
-    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: ['read:user', 'repo', 'read:org'] }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: 'read:user' }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: [] }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: ['read:user', 'read:user'] }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: [''] }],
+    ['/connections/github/start', 'POST', { returnUrl: 'https://app.example/settings', requestedScopes: [42] }],
     ['/connections/cloudbeds/connect-key', 'POST', { apiKey: 'key', metadata: { propertyId: 'p', userId: 'other' } }],
     ['/connections/pricelabs/connect-key', 'POST', { apiKey: 'key', metadata: { listings: [{ id: 'i', pms: 'p', ownerId: 'other' }] } }],
     ['/connections/pricelabs/connect-key', 'POST', { apiKey: 'key', metadata: { listings: [] } }],
@@ -327,6 +338,25 @@ describe('method/path and input allowlists', () => {
 })
 
 describe('application authority and caller-bound credentials', () => {
+  it('lets server authorization enforce exact scopes and refuse a widened browser request', async () => {
+    const f = fixture({ ...OAUTH, provider: 'slack', scopes: ['channels:read'] })
+    f.authorize.mockImplementation(async (_request, operation) => {
+      if (operation.operation !== 'oauth.start' || operation.provider !== 'slack' ||
+        JSON.stringify(operation.input.requestedScopes) !== JSON.stringify(['channels:read'])) {
+        return Response.json({ code: 'OAUTH_SCOPE_DENIED' }, { status: 403 })
+      }
+      return { authorized: true, principal: PRINCIPAL }
+    })
+    const selected = { returnUrl: 'https://app.example/settings', requestedScopes: ['channels:read'] }
+    expect((await f.routes.handle(request('/connections/slack/start', 'POST', selected))).status).toBe(200)
+    const widened = { returnUrl: 'https://app.example/settings', requestedScopes: ['channels:read', 'channels:write'] }
+    const refused = await f.routes.handle(request('/connections/slack/start', 'POST', widened))
+    expect(refused.status).toBe(403)
+    expect(await refused.json()).toEqual({ code: 'OAUTH_SCOPE_DENIED' })
+    expect(f.upstream).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(f.upstream.mock.calls[0]?.[1]?.body))).toEqual(selected)
+  })
+
   it.each(['session-mismatch', 'denied-role'])('lets the application reject %s before credential lookup', async (reason) => {
     const f = fixture()
     // Application-owned fixture state, not browser identity or a simulated Hub grant.
@@ -432,15 +462,18 @@ describe('application authority and caller-bound credentials', () => {
     expect(JSON.parse(String(f.upstream.mock.calls[0]?.[1]?.body))).toEqual({ connectionId: 'connection-1', actionPath: 'github.issues.create' })
   })
 
-  it('also freezes nested OAuth parameters before authorization', async () => {
-    const f = fixture({ ...OAUTH, provider: 'slack' })
+  it('also freezes nested OAuth parameters and scopes before authorization', async () => {
+    const f = fixture({ ...OAUTH, provider: 'slack', scopes: ['channels:read'] })
     f.authorize.mockImplementation(async (_req, intent) => {
       if (intent.operation !== 'oauth.start') throw new Error('wrong intent')
       expect(Reflect.set(intent.input.connectionParameters!, 'subdomain', 'other')).toBe(false)
+      expect(Reflect.set(intent.input.requestedScopes!, 0, 'channels:write')).toBe(false)
       return { authorized: true, principal: PRINCIPAL }
     })
-    await f.routes.handle(request('/connections/slack/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { subdomain: 'owned' } }))
-    expect(JSON.parse(String(f.upstream.mock.calls[0]?.[1]?.body)).connectionParameters).toEqual({ subdomain: 'owned' })
+    await f.routes.handle(request('/connections/slack/start', 'POST', { returnUrl: 'https://app.example/settings', connectionParameters: { subdomain: 'owned' }, requestedScopes: ['channels:read'] }))
+    const forwarded = JSON.parse(String(f.upstream.mock.calls[0]?.[1]?.body))
+    expect(forwarded.connectionParameters).toEqual({ subdomain: 'owned' })
+    expect(forwarded.requestedScopes).toEqual(['channels:read'])
   })
 
   it('preserves application auth throws without resolving a client', async () => {

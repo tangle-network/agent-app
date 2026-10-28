@@ -56,6 +56,9 @@ function fixture() {
     } else if (url.pathname.endsWith('/policies') && method === 'DELETE') {
       policies = []
       data = { connectionId: 'conn_1', actionPath: tool.path, deleted: true }
+    } else if (url.pathname.endsWith('/start')) {
+      const input = body as { requestedScopes?: string[] }
+      data = { provider: url.pathname.split('/').at(-2), redirectUrl: 'https://provider.example/authorize', state: 'state', expiresAt: '2026-10-02T02:00:00Z', scopes: input.requestedScopes ?? [], cli: false }
     } else if (url.pathname.endsWith('/connect-key')) {
       rows = [connection]
       data = { connection, reconnected: false }
@@ -79,7 +82,7 @@ function fixture() {
     headers.set('x-expected-session', expected.sessionId)
     headers.set('x-expected-workspace', expected.workspaceId)
     headers.set('x-requested-with', 'XMLHttpRequest')
-    return routes.handle(new Request(`https://app.example${path}`, { ...init, headers }))
+    return routes.handle(new Request(`${window.location.origin}${path}`, { ...init, headers }))
   })
   return { client, authorize, upstream, seen, setFailPolicyRead: (value: boolean) => { failPolicyRead = value }, setConnections: (value: HubConnection[]) => { rows = value } }
 }
@@ -418,6 +421,42 @@ describe('integrations-react through the finite Hub settings server', () => {
     await act(async () => { pending.resolve(connection); await Promise.resolve() })
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByDisplayValue('second-key')).toBeTruthy()
+  })
+
+  it('forwards host-selected OAuth scopes from the panel through settings and the real SDK', async () => {
+    const f = fixture()
+    f.setConnections([])
+    const oauth: HubProvider = { ...provider, providerId: 'google', title: 'Google', authKind: 'oauth2' }
+    const client: HubIntegrationsClient = { ...f.client, providers: async () => [oauth] }
+    const popup = { closed: false, close: vi.fn(), location: { href: '' } } as unknown as Window
+    vi.spyOn(window, 'open').mockReturnValue(popup)
+    const requestedScopes = ['https://www.googleapis.com/auth/gmail.readonly']
+    const getOAuthScopes = vi.fn(() => requestedScopes)
+    render(<HubIntegrationsPanel identity={identity} client={client} can={allow} callbackPath="/integrations/callback" getOAuthScopes={getOAuthScopes} />)
+    fireEvent.click(await screen.findByTestId('integration-google'))
+    await waitFor(() => expect(f.seen.some(call => call.path.endsWith('/google/start'))).toBe(true))
+    const start = f.seen.find(call => call.path.endsWith('/google/start'))!
+    expect(start.body).toMatchObject({ requestedScopes })
+    expect(getOAuthScopes).toHaveBeenCalledExactlyOnceWith(oauth)
+    expect(f.authorize).toHaveBeenCalledWith(expect.any(Request), expect.objectContaining({
+      operation: 'oauth.start', input: expect.objectContaining({ requestedScopes }),
+    }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel connection' }))
+  })
+
+  it('leaves OAuth scopes at Hub defaults when the panel has no scope selector', async () => {
+    const f = fixture()
+    f.setConnections([])
+    const oauth: HubProvider = { ...provider, providerId: 'slack', title: 'Slack', authKind: 'oauth2' }
+    const client: HubIntegrationsClient = { ...f.client, providers: async () => [oauth] }
+    const popup = { closed: false, close: vi.fn(), location: { href: '' } } as unknown as Window
+    vi.spyOn(window, 'open').mockReturnValue(popup)
+    render(<HubIntegrationsPanel identity={identity} client={client} can={allow} callbackPath="/integrations/callback" />)
+    fireEvent.click(await screen.findByTestId('integration-slack'))
+    await waitFor(() => expect(f.seen.some(call => call.path.endsWith('/slack/start'))).toBe(true))
+    const start = f.seen.find(call => call.path.endsWith('/slack/start'))!
+    expect(start.body).not.toHaveProperty('requestedScopes')
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel connection' }))
   })
 
   it('offers explicit cancellation while an OAuth popup is pending', async () => {
