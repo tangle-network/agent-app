@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.63.80
+
+- fix(deps): depend on charts and agent-trace-contract by caret range (#1438)
+
 ## 0.63.79
 
 - fix(release): pin shared setup to its main merge (#1436)
