@@ -96,7 +96,7 @@ function adapters(own, inherited = darkValues) {
       result['--primary-foreground'] = 'var(--agent-app-accent-foreground-hsl)'
       continue
     }
-    const value = resolve(own[key], defs)
+    const value = resolve(defs[key], defs)
     result[`--agent-app-${name}-hsl`] = channels(value)
     if (name !== 'warning-text') result[`--agent-app-${name}-foreground-hsl`] = foreground(value)
   }
