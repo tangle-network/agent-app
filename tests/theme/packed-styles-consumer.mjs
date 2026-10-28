@@ -162,10 +162,10 @@ try {
     }
   }
   const report = {
-    packageVersion: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
+    packageVersion: JSON.parse(readFileSync(join(installation, 'package.json'), 'utf8')).version,
     archiveSha256: sha256(readFileSync(archive)),
     cssSha256: sha256(exported.css),
-    packedFiles: packed.files.length,
+    packedFiles: execFileSync('tar', ['-tzf', archive], { encoding: 'utf8' }).trim().split('\n').filter((name) => !name.endsWith('/')).length,
     installedWithoutBrand: true,
     sourceContract: exported.sourceContract,
     publicExportsResolved: ['styles', 'theme', 'tailwind-preset', 'theme-contract'],
