@@ -1,4 +1,5 @@
-import type { AgentProfile, BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
+import type { AgentProfile } from '@tangle-network/agent-interface'
+import type { BackendConfig, LineVoiceOptions } from '@tangle-network/sandbox'
 import { type Line, type LineInstanceCreate, Sandbox } from '@tangle-network/sandbox/core'
 
 /** Native Hub options. The kit does not keep a second membership or execution store. */
