@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.13
+
+- Accept sandbox-ui 2.0.11 as a peer (#1455)
+
 ## 1.0.12
 
 - refactor(hosted-agent): import AgentProfile from agent-interface (#1454)
