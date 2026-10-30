@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.14
+
+- refactor(sandbox): emit the flat model spelling; delete the stale pre-fold guard (#1456)
+
 ## 1.0.13
 
 - Accept sandbox-ui 2.0.11 as a peer (#1455)
