@@ -25,28 +25,20 @@ export interface ProviderResolutionConfig {
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 /**
- * Spread a {@link ResolvedModel} onto a sandbox backend config as the nested
- * `model` object — the one spelling every admitted SDK accepts.
- *
- * Do not add the role-named flat fields (`modelId`, `provider`, `apiKey`,
- * `baseUrl`) beside it until the sandbox peer floor reaches the release that
- * folds them (0.60.16). A pre-fold SDK forwards the whole backend unchanged,
- * and the platform's strict backend schema refuses the extra keys:
- * agent-app 0.53.10–0.54.0 emitted both, and every sandbox chat turn on a
- * product resolving sandbox < 0.60.16 failed with "unrecognized_keys
- * provider, apiKey, baseUrl, modelId at path backend" (Creative).
+ * Spread a {@link ResolvedModel} onto a sandbox backend config as the flat
+ * role-named fields (`modelId`, `provider`, ...) — the supported spelling since
+ * the SDK fold; the nested `model` object remains accepted only for
+ * compatibility. The peer floor (^1.0.1) carries the fold.
  */
 export function backendModelFields(model: ResolvedModel): {
-  model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string };
+  modelId: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string;
 } {
   return {
-    model: {
-      model: model.model,
-      provider: model.provider,
-      ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
-      ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
-      ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
-    },
+    modelId: model.model,
+    provider: model.provider,
+    ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
+    ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
+    ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
   };
 }
 
