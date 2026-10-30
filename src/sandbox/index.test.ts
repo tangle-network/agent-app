@@ -1430,13 +1430,13 @@ describe('streamSandboxPrompt seam', () => {
     const [prompt, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(prompt).toBe('Assistant: prior\n\nUser: hello')
     expect(opts.backend.type).toBe('opencode')
-    // Only the nested spelling: a pre-fold SDK forwards the backend as-is and
-    // the platform's strict schema refuses role-named keys beside it.
+    // Only the flat spelling: the nested object is deprecated compatibility.
     for (const key of ['modelId', 'provider', 'apiKey', 'baseUrl']) {
-      expect(opts.backend).not.toHaveProperty(key)
+      expect(opts.backend).toHaveProperty(key)
     }
-    expect(opts.backend.model).toEqual({
-      model: 'gpt-x',
+    expect(opts.backend).not.toHaveProperty('model')
+    expect(opts.backend).toMatchObject({
+      modelId: 'gpt-x',
       provider: 'openai-compat',
       apiKey: 'router-key',
       baseUrl: 'https://router',
@@ -3005,12 +3005,13 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       childKeyMint: async () => ({ succeeded: true, value: 'child-key' }),
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
-    for (const key of ['modelId', 'provider', 'apiKey', 'baseUrl']) {
-      expect(createMock.mock.calls[0]![0].backend).not.toHaveProperty(key)
+    for (const key of ['modelId', 'provider', 'apiKey']) {
+      expect(createMock.mock.calls[0]![0].backend).toHaveProperty(key)
     }
-    expect(createMock.mock.calls[0]![0].backend.model).toMatchObject({
+    expect(createMock.mock.calls[0]![0].backend).not.toHaveProperty('model')
+    expect(createMock.mock.calls[0]![0].backend).toMatchObject({
       provider: 'openai-compat',
-      model: 'm',
+      modelId: 'm',
       apiKey: 'child-key',
     })
   })
@@ -3045,9 +3046,8 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       },
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    const model = createMock.mock.calls[0]![0].backend.model
-    expect(model).toEqual({ model: 'm', provider: 'openai-compat', baseUrl: 'https://router' })
-    expect('apiKey' in model).toBe(false)
+    expect(createMock.mock.calls[0]![0].backend).toMatchObject({ modelId: 'm', provider: 'openai-compat', baseUrl: 'https://router' })
+    expect('apiKey' in createMock.mock.calls[0]![0].backend).toBe(false)
   })
 
   it('childKeyMint failure falls through to parent key (logged, not thrown)', async () => {
@@ -3060,7 +3060,7 @@ describe('ensureWorkspaceSandbox — new seams', () => {
       childKeyMint: async () => ({ succeeded: false, error: new Error('tcloud down') }),
     })
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(createMock.mock.calls[0]![0].backend.model.apiKey).toBe('parent')
+    expect(createMock.mock.calls[0]![0].backend.apiKey).toBe('parent')
   })
 
   it('runs bootstrap after create and on reuse; throws on bootstrap failure', async () => {

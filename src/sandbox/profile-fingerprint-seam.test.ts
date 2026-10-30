@@ -69,7 +69,7 @@ describe('streamSandboxPrompt onProfileResolved', () => {
     expect(observed).toBeDefined()
     const [, opts] = streamPrompt.mock.calls[0]!
     const handed = await fingerprintAgentProfile(opts.backend.profile, {
-      model: opts.backend.model?.model,
+      model: opts.backend.modelId,
       harness: opts.backend.type,
     })
     expect(observed).toEqual(handed)
