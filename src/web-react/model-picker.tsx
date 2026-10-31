@@ -28,7 +28,7 @@ export interface ModelPickerProps {
   'aria-label'?: string
   'aria-labelledby'?: string
   'aria-describedby'?: string
-  /** Render a provider logo/badge; default is ProviderLogo. */
+  /** Replaces the maker mark. A distinct route host still uses ProviderLogo. */
   renderProviderBadge?: (provider: string) => ReactNode
   /** Section label for `featured` models. */
   recommendedLabel?: string
@@ -68,12 +68,7 @@ const OUTPUT_UNIT_LABEL: Record<NonNullable<CatalogModel['outputPrice']>['unit']
   '1k_chars': '1K chars',
 }
 
-/**
- * The price a person pays per output, in the unit that output comes in: per
- * million prompt tokens for text, per image, per second of video, per minute of
- * audio, per 1,000 characters of speech. Undefined when the catalogue has no
- * price, so a row never shows a made-up number.
- */
+/** Per-output price in the unit that output comes in. Undefined when the catalogue has no price. */
 export function formatModelPrice(model: Pick<CatalogModel, 'pricing' | 'outputPrice'>): string | undefined {
   const media = model.outputPrice
   if (media && Number.isFinite(media.usd) && media.usd > 0) {
@@ -90,10 +85,18 @@ function formatContext(len?: number): string | undefined {
   return `${len} ctx`
 }
 
-/** The brand whose logo a row shows: its maker when the catalogue names one,
- *  else its host. A fal-hosted Veo row shows Google, not fal. */
-function logoBrand(model: Pick<CatalogModel, 'provider' | 'maker'>): string {
-  return model.maker?.trim() || model.provider
+function ModelMarks({ model, size, renderProviderBadge }: {
+  model: Pick<CatalogModel, 'provider' | 'maker' | 'servedBy'>
+  size: number
+  renderProviderBadge?: (provider: string) => ReactNode
+}) {
+  // Maker wins over the family. A fal-hosted Veo row shows Google, not fal.
+  // A different route host is a second mark, so Together stays visible on GLM.
+  const brand = model.maker?.trim() || model.provider
+  const host = model.servedBy?.trim()
+  const primary = renderProviderBadge ? renderProviderBadge(brand) : <ProviderLogo provider={brand} size={size} />
+  if (!host || host.toLowerCase() === brand.toLowerCase()) return primary
+  return <span className="inline-flex items-center gap-0.5">{primary}<ProviderLogo provider={host} size={size} /></span>
 }
 
 function SectionHeader({ children }: { children: ReactNode }) {
@@ -129,7 +132,7 @@ function ModelRow({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      title={`${model.name} (${model.id})`}
+      title={`${model.name} (${model.id})${model.servedBy ? ` · served by ${model.servedBy}` : ''}`}
       className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
       }`}
@@ -140,14 +143,14 @@ function ModelRow({
           className={`size-10 shrink-0 rounded-md border border-border object-cover${unavailable ? ' opacity-50' : ''}`} />
       ) : (
         <span className="shrink-0" aria-hidden>
-          {renderProviderBadge ? renderProviderBadge(logoBrand(model)) : <ProviderLogo provider={logoBrand(model)} size={16} />}
+          <ModelMarks model={model} size={16} renderProviderBadge={renderProviderBadge} />
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
           {thumb && (
             <span className="shrink-0" aria-hidden>
-              {renderProviderBadge ? renderProviderBadge(logoBrand(model)) : <ProviderLogo provider={logoBrand(model)} size={14} />}
+              <ModelMarks model={model} size={14} renderProviderBadge={renderProviderBadge} />
             </span>
           )}
           <span className={`min-w-0 break-words [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
@@ -173,16 +176,7 @@ function ModelRow({
   )
 }
 
-/**
- * Searchable model picker pill + popover. A featured model is recommended
- * when the catalog marks it as a current choice. The first view stays short;
- * search and the browse action retain every routeable legacy model.
- *
- * This is the CANONICAL ecosystem model picker (see docs/ui-picker-canon.md).
- * Catalogue requests, retry outcomes and persisted selections belong to the host.
- * The non-modal dialog uses native buttons, not a partial combobox/listbox:
- * Tab and Enter/Space work normally; arrow keys also move through its controls.
- */
+/** Canonical picker (docs/ui-picker-canon.md). The host owns fetch, retry, and the saved id. */
 export function ModelPicker({
   value, onChange, models, loading = false, error, onRetry, disabled = false,
   id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy,
@@ -245,7 +239,8 @@ export function ModelPicker({
         m.name.toLowerCase().includes(q) ||
         (m.description?.toLowerCase() ?? '').includes(q) ||
         m.provider.toLowerCase().includes(q) ||
-        (m.maker?.toLowerCase() ?? '').includes(q),
+        (m.maker?.toLowerCase() ?? '').includes(q) ||
+        (m.servedBy?.toLowerCase() ?? '').includes(q),
     )
   }, [sortedModels, query])
 
@@ -295,7 +290,7 @@ export function ModelPicker({
             changeOpen(true)
           }
         }}
-        title={selectedLabel || defaultOption?.label || 'Select model'}
+        title={selected ? `${selectedLabel}${selected.servedBy ? ` · served by ${selected.servedBy}` : ''}` : (selectedLabel || defaultOption?.label || 'Select model')}
         data-state={expanded ? 'open' : 'closed'}
         className={`${
           variant === 'field'
@@ -307,7 +302,7 @@ export function ModelPicker({
       >
         {triggerContent ?? <span className={variant === 'field' ? 'flex min-w-0 flex-1 items-center gap-2' : 'contents'}>
           <span className="shrink-0" aria-hidden>
-            {selected ? (renderProviderBadge ? renderProviderBadge(logoBrand(selected)) : <ProviderLogo provider={logoBrand(selected)} size={16} />) : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
+            {selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
           </span>
           <span className={variant === 'field' ? `min-w-0 flex-1 truncate ${value ? '' : 'text-muted-foreground'}` : 'max-w-[160px] truncate'}>
             {selectedLabel || defaultOption?.label || 'Select model'}</span>

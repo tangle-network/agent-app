@@ -2186,7 +2186,7 @@
           "name": "RouterModel",
           "kind": "interface",
           "signature": "interface RouterModel",
-          "doc": "Model catalogue — computed live from the Tangle Router, never hand-curated."
+          "doc": "Model catalogue from the Tangle Router."
         },
         {
           "name": "sortModelsByFreshness",
@@ -17057,7 +17057,7 @@
           "name": "RouterModel",
           "kind": "interface",
           "signature": "interface RouterModel",
-          "doc": "Model catalogue — computed live from the Tangle Router, never hand-curated."
+          "doc": "Model catalogue from the Tangle Router."
         },
         {
           "name": "RouterProtectedModelPortOptions",
@@ -29456,7 +29456,7 @@
           "name": "formatModelPrice",
           "kind": "function",
           "signature": "(model: Pick<CatalogModel, \"pricing\" | \"outputPrice\">) => string | undefined",
-          "doc": "The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech."
+          "doc": "Per-output price in the unit that output comes in."
         },
         {
           "name": "formatRecordGridValue",
@@ -29990,7 +29990,7 @@
           "name": "ModelPicker",
           "kind": "function",
           "signature": "({ value, onChange, models, loading, error, onRetry, disabled, id, \"aria-label\": ariaLabel, \"aria-labelledby\": ariaLabe…",
-          "doc": "Searchable model picker pill + popover."
+          "doc": "Canonical picker (docs/ui-picker-canon.md)."
         },
         {
           "name": "ModelPickerProps",

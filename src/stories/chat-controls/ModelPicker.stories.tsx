@@ -37,6 +37,24 @@ export const Interactive: Story = {
   },
 }
 
+const routeHostModels = buildCatalog([
+  { id: 'glm-5.3', name: 'GLM 5.3', _provider: 'zai', routeability: { provider: 'together', routeable: true } },
+  { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', _provider: 'deepseek', routeability: { provider: 'fireworks', routeable: true } },
+]).models.map((model) => ({ ...model, featured: true }))
+
+/** GLM through Together and DeepSeek through Fireworks, maker mark plus host mark. */
+export const RouteHost: Story = {
+  decorators: [withPopoverHeadroom],
+  render: () => {
+    const [model, setModel] = useState('glm-5.3')
+    return (
+      <AutoClick>
+        <ModelPicker value={model} onChange={setModel} models={routeHostModels} />
+      </AutoClick>
+    )
+  },
+}
+
 /** Open popover: Recommended section, then per-provider groups. */
 export const Open: Story = {
   decorators: [withPopoverHeadroom],

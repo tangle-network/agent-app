@@ -1568,7 +1568,7 @@ interface FileMention
 
 ### `formatModelPrice`
 
-`function` — The price a person pays per output, in the unit that output comes in: per million prompt tokens for text, per image, per second of video, per minute of audio, per 1,000 characters of speech.
+`function` — Per-output price in the unit that output comes in.
 
 ```ts
 (model: Pick<CatalogModel, "pricing" | "outputPrice">) => string | undefined
@@ -2280,7 +2280,7 @@ interface MissionActivityLaneProps
 
 ### `ModelPicker`
 
-`function` — Searchable model picker pill + popover.
+`function` — Canonical picker (docs/ui-picker-canon.md).
 
 ```ts
 ({ value, onChange, models, loading, error, onRetry, disabled, id, "aria-label": ariaLabel, "aria-labelledby": ariaLabe…

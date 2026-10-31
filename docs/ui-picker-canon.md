@@ -199,7 +199,7 @@ sandbox-ui merely to adopt this agent-app control.
 | `excludeProviders`, `modalities` | — | Filter the `models` array before passing it (`isChatCapableModel` handles the chat-surface trim). Do not filter the persisted value. |
 | `variant: "field" \| "pill"` | `variant: "chip" \| "quiet"` | `chip` is the default pill. `quiet` is the borderless 32px text button, the composer row's one height. Compose existing host form controls when an editable field is needed. |
 | `side`, `avoidCollisions`, `placeholder`, `triggerClassName` | — | Placement prefers above, flips when needed and clamps to the viewport. Use `triggerContent` for an intentional compact or unset-value label, not a second menu. |
-| — | `renderProviderBadge(provider)` | Override the provider logo/badge; defaults to `/web-react`'s `ProviderLogo`. |
+| — | `renderProviderBadge(provider)` | Replaces the maker mark. A distinct `servedBy` host still draws its own `ProviderLogo`. |
 
 `ModelInfo` → `CatalogModel` field mapping at a Router-backed host's data boundary:
 
@@ -214,7 +214,7 @@ sandbox-ui merely to adopt this agent-app control.
 | `featured` | `featured` |
 | `supportsReasoning` | `supportsReasoning` (required) |
 | — | `supportsTools` (required; drives the "no tools" badge) |
-| `architecture`, `logos`, `hostProvider`, `modelLab`, `maxReasoningEffort` | — (not carried; provider branding is derived from `provider`) |
+| `routeability.provider` | `servedBy`, only when it differs from `provider`. The picker draws that host beside the maker. `logos`, `hostProvider`, and `modelLab` are not copied. |
 
 ### `AgentSessionControls` (legacy cluster → `agent-app/web-react`)
 
