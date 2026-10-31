@@ -9,11 +9,7 @@ import {
 } from '../theme/dom'
 import { darkTheme, lightTheme, themeColor } from '../theme/theme'
 
-/**
- * The shared `useTheme` hook toggles only `.dark` on <html>. This mirrors every
- * such flip onto the `.light` class and the color-scheme/theme-color metas, and
- * tracks OS appearance changes while the preference is System.
- */
+/** The shared `useTheme` hook toggles only `.dark` on <html>. */
 export function ThemeClassSync() {
   useEffect(() => {
     const root = document.documentElement
@@ -61,6 +57,7 @@ export function AppDocument({ children, defaultTheme, bodyClassName, htmlAttribu
         <meta name="color-scheme" content={defaultTheme} />
         <Meta />
         <Links />
+        <script dangerouslySetInnerHTML={{ __html: APPLY_DEFERRED_FONTS }} />
       </head>
       <body className={bodyClassName}>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
@@ -85,6 +82,13 @@ export function svgFaviconHref(shapes: string): string {
   )
 }
 
+/** A fonts.googleapis.com sheet cannot block first paint. The head script applies it once loaded. */
+const APPLY_DEFERRED_FONTS = `(function(){for(const l of document.querySelectorAll('link[rel="stylesheet"][media="print"][href*="fonts.googleapis.com"]')){const apply=()=>{l.media="all"};l.addEventListener("load",apply);if(l.sheet)apply()}})()`
+
+function deferredFont(href: string) {
+  return { rel: 'stylesheet' as const, href, media: 'print' }
+}
+
 /** The root route's `links`: favicon, the app stylesheet, Inter, and any extra font stylesheets. */
 export function appDocumentLinks(options: { stylesheet: string; favicon: string; extraStylesheets?: readonly string[] }): ReturnType<LinksFunction> {
   return [
@@ -93,8 +97,8 @@ export function appDocumentLinks(options: { stylesheet: string; favicon: string;
     { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
     { rel: 'dns-prefetch', href: 'https://fonts.googleapis.com' },
     { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
-    { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap' },
-    ...(options.extraStylesheets ?? []).map((href) => ({ rel: 'stylesheet', href })),
+    deferredFont('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap'),
+    ...(options.extraStylesheets ?? []).map((href) => href.includes('fonts.googleapis.com') ? deferredFont(href) : { rel: 'stylesheet', href }),
   ]
 }
 
@@ -107,11 +111,7 @@ export function describeRouteError(error: unknown): { message: string; stack?: s
   return { message: 'An unexpected error occurred' }
 }
 
-/**
- * Wrap `window.fetch` for the page's lifetime so `onResponse` sees every
- * response. Read a body from `response.clone()`; the caller still gets the
- * original untouched. Install from an effect and call the result to restore.
- */
+/** Wrap `window.fetch` for the page's lifetime so `onResponse` sees every response. Read a body from `response.clone()`. */
 export function installFetchResponseObserver(onResponse: (response: Response, args: Parameters<typeof fetch>) => void | Promise<void>): () => void {
   const original = window.fetch
   window.fetch = async (...args) => {
