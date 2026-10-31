@@ -1,21 +1,9 @@
 /**
- * Model catalogue — computed live from the Tangle Router, never hand-curated.
- * Lifted from tuner-agent so every agent app's model picker shares one
- * filter/dedupe/rank/feature pipeline instead of re-deriving it.
+ * Model catalogue from the Tangle Router.
  *
- * The router's /models endpoint returns every routeable model (~200), which is
- * unusable as a picker list: it mixes chat models with TTS/embedding/realtime
- * endpoints, dated snapshots alias their parents, and provider-prefixed ids
- * duplicate canonical ones. This module turns that into a product catalogue:
- *
- *   filter (chat-capable, routeable) → dedupe (snapshot/prefix/:free aliases)
- *   → rank (provider tier, current generation) → recommend (current families)
- *   → default (env override or preferred family)
- *
- * The router is the authority for routeability. Its current response has no
- * release dates, so exact vendor-announced dates supplement it for known
- * models. Undated newer models use a conservative family floor. Other
- * routeable models stay available through search and explicit browsing.
+ * Chat-capable routeable rows are deduped, ranked, and marked when they are a
+ * current family. The router owns routeability. Known launch dates fill gaps
+ * in its response. Every other routeable model stays searchable.
  */
 
 export interface RouterModel {
@@ -56,6 +44,9 @@ export interface CatalogModel {
    *  `provider` (fal serves Seedance, Kling and Veo). The picker draws this
    *  brand's logo when present; `provider` still groups and searches. */
   maker?: string
+  /** API host when the Router serves the model through someone other than
+   *  `provider`. GLM 5.3 stays `zai`; Together is `servedBy`. */
+  servedBy?: string
   description?: string
   /** Router-supplied or vendor-verified release date; never inferred from an id. */
   releaseDate?: string
@@ -431,10 +422,13 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
   const toCatalogModel = (r: (typeof reps)[number]): CatalogModel => {
     const m = r.model
     const provider = providerForModel(m)
+    const routeHost = normalizeProvider(m.routeability?.provider ?? '')
+    const servedBy = routeHost && routeHost !== 'unknown' && routeHost !== provider ? routeHost : undefined
     return {
       id: m.id,
       name: m.name ?? m.id,
       provider,
+      ...(servedBy ? { servedBy } : {}),
       description: m.description ? m.description.slice(0, 160) : undefined,
       releaseDate: r.releaseDate,
       contextLength: m.context_length,

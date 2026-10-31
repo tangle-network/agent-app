@@ -100,6 +100,25 @@ describe('buildCatalog', () => {
     expect(catalog.models.map((model) => model.id)).toEqual(['gpt-5-mini'])
   })
 
+  it('keeps the model family and records a different route host', () => {
+    const catalog = buildCatalog([
+      { id: 'glm-5.3', name: 'GLM 5.3', _provider: 'zai', routeability: { provider: 'together', routeable: true } },
+      { id: 'glm-5', _provider: 'zai', routeability: { provider: 'zai', routeable: true } },
+      { id: 'glm-4.5', _provider: 'z-ai', routeability: { provider: 'zai', routeable: true } },
+      { id: 'deepseek-v4.1-flash', _provider: 'deepseek', routeability: { provider: 'fireworks', routeable: true } },
+      { id: 'together/zai-org/GLM-5.3', _provider: 'together', routeability: { provider: 'together', routeable: true } },
+    ])
+    const row = (id: string) => catalog.models.find((model) => model.id === id)
+
+    expect(row('glm-5.3')).toMatchObject({ provider: 'zai', servedBy: 'together' })
+    expect(row('glm-5')?.servedBy).toBeUndefined()
+    expect(row('glm-4.5')).toMatchObject({ provider: 'zai' })
+    expect(row('glm-4.5')?.servedBy).toBeUndefined()
+    expect(row('deepseek-v4.1-flash')).toMatchObject({ provider: 'deepseek', servedBy: 'fireworks' })
+    expect(row('together/zai-org/GLM-5.3')).toMatchObject({ provider: 'together' })
+    expect(row('together/zai-org/GLM-5.3')?.servedBy).toBeUndefined()
+  })
+
   it('uses nested provider metadata when the legacy provider field is absent', () => {
     const catalog = buildCatalog([
       { id: 'claude-fable-5-1', routeability: { provider: 'anthropic', routeable: true } },

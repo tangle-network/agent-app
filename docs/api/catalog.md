@@ -72,7 +72,7 @@ interface ModelCatalog
 
 ### `RouterModel`
 
-`interface` — Model catalogue — computed live from the Tangle Router, never hand-curated.
+`interface` — Model catalogue from the Tangle Router.
 
 ```ts
 interface RouterModel

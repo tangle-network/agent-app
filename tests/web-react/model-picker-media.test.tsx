@@ -53,4 +53,25 @@ describe('ModelPicker maker logo', () => {
     fireEvent.change(screen.getByLabelText('Search all models'), { target: { value: 'google' } })
     expect(screen.getAllByRole('button', { name: /Veo 3\.1/ }).length).toBeGreaterThan(0)
   })
+
+  it('draws the route host beside the maker and still hides fal behind Google', () => {
+    const glm: CatalogModel = { ...base, id: 'glm-5.3', name: 'GLM 5.3', provider: 'zai', servedBy: 'together' }
+    const flash: CatalogModel = { ...base, id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', provider: 'deepseek', servedBy: 'fireworks' }
+    const hosted: CatalogModel = { ...base, id: 'fal-ai/veo3.1', name: 'Veo 3.1', provider: 'fal', maker: 'google', output: 'video' }
+    render(<ModelPicker value="glm-5.3" onChange={() => {}} models={[glm, flash, hosted]} />)
+    const trigger = screen.getByRole('button', { name: /GLM 5\.3/ })
+    const triggerLabels = [...trigger.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label'))
+    expect(triggerLabels).toEqual(expect.arrayContaining(['Z.ai', 'Together']))
+    expect(trigger.getAttribute('title')).toContain('served by together')
+    fireEvent.click(trigger)
+    fireEvent.change(screen.getByLabelText('Search all models'), { target: { value: 'fireworks' } })
+    const deepseek = screen.getByRole('button', { name: /DeepSeek V4\.1 Flash/ })
+    const hostLabels = [...deepseek.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label'))
+    expect(hostLabels).toEqual(expect.arrayContaining(['DeepSeek', 'Fireworks']))
+    fireEvent.change(screen.getByLabelText('Search all models'), { target: { value: 'veo' } })
+    const veo = screen.getByRole('button', { name: /Veo 3\.1/ })
+    const veoLabels = [...veo.querySelectorAll('[aria-label]')].map((node) => node.getAttribute('aria-label'))
+    expect(veoLabels).toContain('Google')
+    expect(veoLabels.join(' ')).not.toMatch(/fal/i)
+  })
 })
