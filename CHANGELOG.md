@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.16
+
+- fix(web-react): do not block first paint on Google font CSS (#1458)
+
 ## 1.0.15
 
 - fix(sandbox): replace secrets in place, fenced by expectedUpdatedAt (#1457)
