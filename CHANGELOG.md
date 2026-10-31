@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.18
+
+- fix(web-react): put existing API keys in a card
+
 ## 1.0.17
 
 - fix(web-react): show the route host beside the model maker
