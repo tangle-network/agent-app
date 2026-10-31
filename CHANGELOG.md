@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.17
+
+- fix(web-react): show the route host beside the model maker
+
 ## 1.0.16
 
 - fix(web-react): do not block first paint on Google font CSS (#1458)
