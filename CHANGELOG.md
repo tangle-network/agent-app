@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.15
+
+- fix(sandbox): replace secrets in place, fenced by expectedUpdatedAt (#1457)
+
 ## 1.0.14
 
 - refactor(sandbox): emit the flat model spelling; delete the stale pre-fold guard (#1456)
