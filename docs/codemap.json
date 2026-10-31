@@ -17655,8 +17655,8 @@
         {
           "name": "backendModelFields",
           "kind": "function",
-          "signature": "(model: ResolvedModel) => { model: { model: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string |…",
-          "doc": "Spread a {@link ResolvedModel} onto a sandbox backend config as the nested `model` object — the one spelling every admitted SDK accepts."
+          "signature": "(model: ResolvedModel) => { modelId: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string | undefi…",
+          "doc": "Spread a {@link ResolvedModel} onto a sandbox backend config as the flat role-named fields (`modelId`, `provider`, ...) — the supported spelling since the SDK fold; the nested `model` object remains…"
         },
         {
           "name": "buildAppToolMcpServers",
