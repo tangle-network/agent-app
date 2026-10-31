@@ -264,10 +264,10 @@ export function ApiAccessPanel({ keys, access, defaultScopes, baseUrl, accountHr
           </form>
         )}
 
-        <section aria-labelledby="existing-keys" className="space-y-3">
+        <section aria-labelledby="existing-keys" className="space-y-3 rounded-xl border border-border bg-card p-5">
           <h2 id="existing-keys" className="font-medium">Your keys</h2>
           {keys.length === 0 ? <p className="text-sm text-muted-foreground">No keys yet.</p> : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+            <ul className="divide-y divide-border">
               {keys.map(key => (
                 <li key={key.id} className="flex items-start justify-between gap-3 p-4">
                   <div className="min-w-0 space-y-1">
