@@ -810,7 +810,7 @@
     "@tangle-network/brand": "^1.31.2",
     "@tangle-network/browser-agent-driver": "0.37.0",
     "@tangle-network/hub-sdk": "1.0.6",
-    "@tangle-network/sandbox": "1.0.40",
+    "@tangle-network/sandbox": "1.0.128",
     "@tangle-network/sandbox-ui": "^1.1.10",
     "@tangle-network/tcloud": "0.8.6",
     "@tangle-network/ui": "^11.51.2",

@@ -19,6 +19,7 @@ const sandboxCtor = vi.fn()
 const secretsCreateMock = vi.fn()
 const secretsListMock = vi.fn()
 const secretsDeleteMock = vi.fn()
+const secretsUpdateMock = vi.fn()
 
 vi.mock('@tangle-network/sandbox/core', () => ({
   Sandbox: class {
@@ -29,6 +30,7 @@ vi.mock('@tangle-network/sandbox/core', () => ({
       create: secretsCreateMock,
       list: secretsListMock,
       delete: secretsDeleteMock,
+      update: secretsUpdateMock,
     }
     constructor(opts: { apiKey: string; baseUrl: string }) {
       sandboxCtor(opts)
@@ -2093,24 +2095,33 @@ describe('secret CRUD typed outcomes', () => {
     if (!r.succeeded) expect(r.error.message).toContain('Failed to store sandbox secret N')
   })
 
-  it('storeSecret warns that a failed replacement leaves the secret absent', async () => {
+  it('storeSecret reports that a failed replacement leaves the previous value live', async () => {
     const s = store({
       create: vi.fn().mockRejectedValue(new Error('c')),
       update: vi.fn().mockRejectedValue(new Error('u')),
     })
     const r = await storeSecret(s, 'N', 'v')
     expect(r.succeeded).toBe(false)
-    if (!r.succeeded) expect(r.error.message).toContain('may now be absent')
+    if (!r.succeeded) expect(r.error.message).toContain('previous value remains live')
   })
 
-  it('secretStoreFromClient replaces by deleting before creating (no update route)', async () => {
+  it('secretStoreFromClient replaces in place, fenced by the row updatedAt', async () => {
+    secretsListMock.mockResolvedValue([
+      { name: 'N', createdAt: new Date(0), updatedAt: new Date(1_700_000_000_000) },
+    ])
     const s = secretStoreFromClient(shellFor({ apiKey: 'k1', baseUrl: 'https://s' }))
     await s.update('N', 'v')
-    expect(secretsDeleteMock).toHaveBeenCalledWith('N')
+    expect(secretsUpdateMock).toHaveBeenCalledWith('N', 'v', {
+      expectedUpdatedAt: new Date(1_700_000_000_000).toISOString(),
+    })
+    expect(secretsDeleteMock).not.toHaveBeenCalled()
+  })
+
+  it('secretStoreFromClient creates when the row is absent', async () => {
+    secretsListMock.mockResolvedValue([])
+    const s = secretStoreFromClient(shellFor({ apiKey: 'k1', baseUrl: 'https://s' }))
+    await s.update('N', 'v')
     expect(secretsCreateMock).toHaveBeenCalledWith('N', 'v')
-    expect(secretsDeleteMock.mock.invocationCallOrder[0]).toBeLessThan(
-      secretsCreateMock.mock.invocationCallOrder[0]!,
-    )
   })
 
   it('deleteSecret returns a typed failure rather than swallowing', async () => {

@@ -79,14 +79,18 @@ export function secretStoreFromClient(shell: SandboxRuntimeConfig): SecretStore 
     create: async (name, value) => {
       await client.secrets.create(name, value)
     },
-    // The API has no replace route, so a replacement is a delete followed by a
-    // create. That pair is NOT atomic: if the create fails, the secret is left
-    // deleted rather than at its previous value. `storeSecret` reports that
-    // state instead of reporting a generic write failure, because a caller
-    // retrying a lost secret needs to know it is now absent.
+    // Replace in place, guarded by the row's updatedAt: a concurrent writer
+    // cannot clobber a successor, and a failure leaves the PREVIOUS value
+    // live (the platform re-keys matching boxes on the update).
     update: async (name, value) => {
-      await client.secrets.delete(name)
-      await client.secrets.create(name, value)
+      const current = await client.secrets.list().then(rows => rows.find(row => row.name === name))
+      if (!current) {
+        await client.secrets.create(name, value)
+        return
+      }
+      await client.secrets.update(name, value, {
+        expectedUpdatedAt: current.updatedAt.toISOString(),
+      })
     },
     delete: async (name) => {
       await client.secrets.delete(name)
@@ -110,7 +114,7 @@ export async function storeSecret(
     } catch (err) {
       return fail(
         new Error(
-          `Failed to store sandbox secret ${name}. A replacement deletes before it creates, so ${name} may now be absent rather than holding its previous value.`,
+          `Failed to store sandbox secret ${name}. The previous value remains live; a concurrent writer may have replaced it first (retry resolves by expectedUpdatedAt).`,
           { cause: err },
         ),
       )
