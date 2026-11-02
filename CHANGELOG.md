@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.19
+
+- chore: admit agent-runtime 3.x as a peer; dev pin 3.0.24 (#1461)
+
 ## 1.0.18
 
 - fix(web-react): put existing API keys in a card
