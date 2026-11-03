@@ -140,11 +140,12 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
     pending.current = true; setBusy(true)
     try {
       // A stale row must never decide an artifact that changed after it rendered.
+      // Throwing (not returning) keeps the form's draft and shows the message
+      // inline — a silent return would let the form claim 'Feedback saved'.
       if (resolveCurrentRevision) {
         const current = await resolveCurrentRevision(item)
         if (current !== undefined && current !== item.revision) {
-          setRefreshError(`This item changed after it was shown (revision ${String(item.revision)} → ${String(current)}). Review the updated item before deciding.`)
-          return
+          throw new Error(`This item changed after it was shown (revision ${String(item.revision)} → ${String(current)}). Review the updated item before deciding.`)
         }
       }
       await onVerdict(item, { ...value, ...(comparisons.current.get(item.id) ? { comparison: positionOf(item) } : {}) })

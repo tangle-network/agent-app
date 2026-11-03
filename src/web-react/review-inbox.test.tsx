@@ -19,11 +19,13 @@ async function decideApprove() {
 }
 
 describe('ReviewInbox revision-bound verdicts', () => {
-  it('refuses a stale row whose live revision moved, without deciding it', async () => {
+  it('refuses a stale row whose live revision moved: no verdict, no false saved claim, draft kept', async () => {
     const onVerdict = renderInbox({ resolveCurrentRevision: vi.fn(async () => 'rev-2') })
     await decideApprove()
     await waitFor(() => expect(onVerdict).not.toHaveBeenCalled())
-    expect(screen.getByRole('alert').textContent).toMatch(/changed after it was shown/i)
+    // The refusal surfaces inline on the form — it must NOT claim the feedback was saved.
+    expect(screen.getByText(/changed after it was shown/i)).toBeTruthy()
+    expect(screen.queryByText('Feedback saved')).toBeNull()
   })
 
   it('decides when the re-resolved revision still matches the rendered row', async () => {
