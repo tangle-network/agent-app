@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { assertHubApprovalFresh, hubApprovalDigest, StaleApprovalError } from './binding'
 
 import {
   formatMinorAmount,
@@ -197,5 +198,24 @@ describe('results and vocabulary', () => {
     expect(hubApprovalResumePart([{ type: 'text', text: 'x' }, { type: 'hub-approval-resume', messageId: 'm1' }])).toEqual({ type: 'hub-approval-resume', messageId: 'm1' })
     expect(hubApprovalResumePart([{ type: 'hub-approval-resume' }])).toBeNull()
     expect(hubApprovalResumePart(null)).toBeNull()
+  })
+})
+
+describe('revision binding', () => {
+  it('digests exactly the material a decision executes, deterministically', async () => {
+    const first = await hubApprovalDigest({ actionPath: 'github.pulls.propose', input: { b: 2, a: 1 }, account: 'octocat' })
+    const reordered = await hubApprovalDigest({ actionPath: 'github.pulls.propose', input: { a: 1, b: 2 }, account: 'octocat' })
+    expect(first).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(reordered).toBe(first)
+    const changed = await hubApprovalDigest({ actionPath: 'github.pulls.propose', input: { a: 1, b: 3 }, account: 'octocat' })
+    expect(changed).not.toBe(first)
+  })
+
+  it('passes through when either side has not opted into binding, and refuses a moved digest', () => {
+    expect(() => assertHubApprovalFresh({ id: 'a' }, undefined)).not.toThrow()
+    expect(() => assertHubApprovalFresh({ id: 'a' }, 'sha256:x')).not.toThrow()
+    expect(() => assertHubApprovalFresh({ id: 'a', revisionDigest: 'sha256:x' }, 'sha256:x')).not.toThrow()
+    expect(() => assertHubApprovalFresh({ id: 'a', revisionDigest: 'sha256:x' }, 'sha256:y'))
+      .toThrow(StaleApprovalError)
   })
 })

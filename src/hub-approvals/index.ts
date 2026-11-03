@@ -22,6 +22,12 @@ export {
   splitHubActionPath,
 } from './present'
 export { summarizeHubResult, unwrapHubResult } from './result'
+export {
+  assertHubApprovalFresh,
+  hubApprovalDigest,
+  StaleApprovalError,
+  type HubApprovalBindingParts,
+} from './binding'
 
 /** A phase as a status label. */
 export const HUB_APPROVAL_PHASE_LABELS: Record<HubApprovalPhase, string> = {
