@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.21
+
+- feat(review): revision-bound verdicts on the shared review inbox (#1463)
+
 ## 1.0.20
 
 - feat(approvals): bind decisions to the exact rendered revision (#1462)
