@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.20
+
+- feat(approvals): bind decisions to the exact rendered revision (#1462)
+
 ## 1.0.19
 
 - chore: admit agent-runtime 3.x as a peer; dev pin 3.0.24 (#1461)
