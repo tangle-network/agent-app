@@ -5,8 +5,10 @@ import { Button, Label, RadioGroup, RadioGroupItem } from '@tangle-network/ui/pr
 import {
   HUB_APPROVAL_ACTIVE_PHASES,
   HUB_APPROVAL_OPEN_PHASES,
+  assertHubApprovalFresh,
   hubActionReceipt,
   presentHubAction,
+  StaleApprovalError,
   type HubApprovalItem,
   type HubApprovalPhase,
   type HubApprovalFeedback,
@@ -31,6 +33,9 @@ export interface HubApprovalDockProps {
   /** Every held call; open, running and uncertain calls stay visible until resolved or dismissed. */
   items: readonly HubApprovalItem[]
   onDecide: (item: HubApprovalItem, decision: HubApprovalDecision) => Promise<void>
+  /** Re-resolve the live digest at decision time; a card whose digest moved is
+   *  refused with a visible stale message instead of approving the changed call. */
+  resolveRevisionDigest?: (item: HubApprovalItem) => Promise<string | undefined>
   /** Standing-permission choices for a call; omit when the host offers none. */
   permissions?: (item: HubApprovalItem) => HubApprovalPermissions | null
   /** Show the call where the agent made it. */
@@ -98,7 +103,7 @@ function Progress({ item }: { item: HubApprovalItem }) {
  * permissions a host offers sit beside it. Approving shows the run in place —
  * starting, running, then the result — without leaving the conversation.
  */
-export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId, onFeedback, className = '' }: HubApprovalDockProps) {
+export function HubApprovalDock({ items, onDecide, resolveRevisionDigest, permissions, onOpen, focusId, onFeedback, className = '' }: HubApprovalDockProps) {
   const now = useNow(30_000)
   // Calls that finished while this dock watched them stay with their result: a
   // success briefly, a failure until dismissed. Uncertain outcomes also stay
@@ -182,9 +187,15 @@ export function HubApprovalDock({ items, onDecide, permissions, onOpen, focusId,
     setSubmitting({ id: active.id, label })
     setError(null)
     try {
+      // A stale card must never approve a call that changed after it rendered.
+      if (resolveRevisionDigest) {
+        assertHubApprovalFresh(active, await resolveRevisionDigest(active))
+      }
       await onDecide(active, decision)
     } catch (cause) {
-      setError({ id: active.id, message: cause instanceof Error ? cause.message : 'The decision did not go through. Try again.' })
+      setError({ id: active.id,
+        message: cause instanceof StaleApprovalError ? cause.message
+          : cause instanceof Error ? cause.message : 'The decision did not go through. Try again.' })
     } finally {
       setSubmitting(null)
     }

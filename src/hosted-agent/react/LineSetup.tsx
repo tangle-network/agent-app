@@ -48,6 +48,12 @@ function requiresNumber(identity: LineIdentityOption): boolean {
   return identity.transport === 'whatsapp' || identity.transport === 'sms' || identity.transport === 'voice' || identity.requiresPhoneNumberId === true
 }
 
+/** A line answering through the shared router number is the free shared entry;
+ *  a line with its own address is a dedicated number. */
+function isSharedEntry(line: LineSetupLine): boolean {
+  return Boolean(line.connect && line.routerAddress)
+}
+
 function canOfferReconnect(line: LineSetupLine, choice: Choice): boolean {
   if (line.connectionId !== choice.connection.id || line.transport !== choice.identity.transport || line.targetId !== null) return false
   if (line.providerNumberId === null) return !choice.identity.phoneNumberId && !requiresNumber(choice.identity)
@@ -62,7 +68,7 @@ function matchesLineIdentity(line: LineSetupLine, identity: LineIdentityOption, 
 }
 
 /** Set up an owned identity through a host route backed by sandbox.lines and Hub. */
-export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, showConnectionSetup = true, connectPrerequisite, setupDescription, emptyConnectionsMessage, onNotice }: LineSetupProps) {
+export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canManage, canConnect = canManage, showConnectionSetup = true, connectPrerequisite, setupDescription, emptyConnectionsMessage, dedicatedUpgrade, onNotice }: LineSetupProps) {
   const clientRef = useRef(client)
   clientRef.current = client
   const sequence = useRef(0)
@@ -273,10 +279,15 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
         {visibleLines.map(line =>
           <div className="tangle-lines__row" key={line.id}>
             <div className="tangle-lines__row-main">
-              <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span><span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? line.transport === 'voice' ? 'Not answering' : 'Awaiting member' : line.status}</span></div>
+              <div className="tangle-lines__row-heading"><span className="tangle-lines__transport">{TRANSPORT[line.transport]}</span>{isSharedEntry(line) && <span className="tangle-lines__entry-kind">Free shared number</span>}<span className={`tangle-lines__status${line.answering ? ' tangle-lines__status--answering' : ''}`}>{line.answering ? 'Answering' : line.targetId === null ? 'Disconnected' : line.status === 'active' ? line.transport === 'voice' ? 'Not answering' : 'Awaiting member' : line.status}</span></div>
               <strong>{line.address}</strong>
               {line.transport === 'imessage' && line.connect && line.routerAddress && line.targetId !== null && <p>Send <code>{line.connect}</code> to {line.routerAddress}. Then message the number Inkbox sends you.</p>}
               <LineMessageAction line={line} />
+              {isSharedEntry(line) && line.targetId !== null && <p className="tangle-lines__answering-app" role="status">{line.answering && line.targetLabel
+                ? `${line.targetLabel} answers this shared number.`
+                : 'No app answers this shared number yet.'}</p>}
+              {isSharedEntry(line) && dedicatedUpgrade && line.targetId !== null
+                && <a className="tangle-lines__secondary" href={dedicatedUpgrade.href}>{dedicatedUpgrade.label ?? 'Upgrade to a dedicated number'}</a>}
               <p>{line.targetLabel ?? 'No agent or box assigned'}{line.boxMode && ` · ${line.boxMode === 'per-member' ? 'one box per member' : 'shared box'}`}</p>
               {line.lastTurn.kind === 'latest' ? <p>Last turn: {line.lastTurn.status} · {dateTime(line.lastTurn.at)}</p>
                 : <p>{line.lastTurn.kind === 'none' ? 'No turns yet.' : 'Turn history unavailable.'}</p>}

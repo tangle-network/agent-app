@@ -64,6 +64,9 @@ export interface HubApprovalItem {
   providerId: string
   /** The call's input as Hub received it. */
   input: unknown
+  /** Digest binding this card to exactly what it renders (see `hubApprovalDigest`).
+   * A decision on a card whose digest no longer matches the live call is refused. */
+  revisionDigest?: string
   phase: HubApprovalPhase
   /** The connected account the action runs as, e.g. `octocat` or `ops@acme.com`. */
   account?: string | null

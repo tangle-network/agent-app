@@ -215,3 +215,24 @@ describe('receipts and rows', () => {
     expect(screen.getByText('src/routes/_index.tsx')).toBeTruthy()
   })
 })
+
+describe('revision-bound decisions', () => {
+  it('refuses a stale card whose live digest moved, without deciding', async () => {
+    const onDecide = vi.fn()
+    const bound: HubApprovalItem = { ...PROPOSE, revisionDigest: 'sha256:rendered' }
+    render(<HubApprovalDock items={[bound]} onDecide={onDecide}
+      resolveRevisionDigest={vi.fn(async () => 'sha256:changed-after-render')} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve' })) })
+    expect(onDecide).not.toHaveBeenCalled()
+    expect(screen.getByText('This request changed after it was shown. Review the updated request before deciding.')).toBeTruthy()
+  })
+
+  it('decides when the re-resolved digest still matches the rendered card', async () => {
+    const onDecide = vi.fn().mockResolvedValue(undefined)
+    const bound: HubApprovalItem = { ...PROPOSE, revisionDigest: 'sha256:same' }
+    render(<HubApprovalDock items={[bound]} onDecide={onDecide}
+      resolveRevisionDigest={vi.fn(async () => 'sha256:same')} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve' })) })
+    expect(onDecide).toHaveBeenCalledWith(bound, { kind: 'approve' })
+  })
+})
