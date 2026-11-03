@@ -14,9 +14,10 @@ const singleChoice: LineSetupSnapshot = {
   targets: [{ id: 'thread_research', label: 'Research conversation', kind: 'box', modes: ['shared'] }],
 }
 
-function setup(snapshot: LineSetupSnapshot, onNotice = vi.fn()) {
+function setup(snapshot: LineSetupSnapshot, onNotice = vi.fn(), props: { dedicatedUpgrade?: { href: string; label?: string } } = {}) {
   const connect = vi.fn(async (_input: LineConnectInput) => {})
-  render(<LineSetup scopeKey="research" canManage targetLabel="Conversation" onNotice={onNotice} client={{
+  render(<LineSetup scopeKey="research" canManage targetLabel="Conversation" onNotice={onNotice}
+    dedicatedUpgrade={props.dedicatedUpgrade} client={{
     load: async () => snapshot,
     connect,
     disconnect: async () => {},
@@ -110,6 +111,23 @@ describe('LineSetup choice display', () => {
     expect(screen.getByText('@research').tagName).toBe('STRONG')
     expect(screen.getByText(/Then message the number Inkbox sends you/)).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Text it now' })).toBeNull()
+    // The free shared entry names itself and its active answering app.
+    expect(screen.getByText('Free shared number')).toBeTruthy()
+    expect(screen.getByText('Research conversation answers this shared number.')).toBeTruthy()
+    // No host upgrade was offered: no upsell appears.
+    expect(screen.queryByRole('link', { name: 'Upgrade to a dedicated number' })).toBeNull()
+  })
+
+  it('says when no app answers a connected shared number, and offers the optional dedicated upgrade', async () => {
+    setup({ ...singleChoice, lines: [{
+      id: 'ln_shared_idle', connectionId: 'conn_inkbox', transport: 'imessage', address: '@research',
+      connect: 'connect @research', routerAddress: '+15550100002', providerNumberId: null,
+      status: 'active', answering: false, canDisconnect: true, targetId: 'thread_research',
+      targetLabel: 'Research conversation', boxMode: 'shared', lastTurn: { kind: 'none' },
+    }] }, vi.fn(), { dedicatedUpgrade: { href: '/settings/numbers/dedicated' } })
+    expect(await screen.findByText('No app answers this shared number yet.')).toBeTruthy()
+    expect((await screen.findByRole('link', { name: 'Upgrade to a dedicated number' })).getAttribute('href'))
+      .toBe('/settings/numbers/dedicated')
   })
 
   it('messages a dedicated number directly without sending a shared connect command', async () => {
@@ -119,10 +137,12 @@ describe('LineSetup choice display', () => {
       status: 'active', answering: true, canDisconnect: true, targetId: 'thread_research',
       targetLabel: 'Research conversation', boxMode: 'shared', lastTurn: { kind: 'none' },
     }] })
-    expect((await screen.findByRole('link', { name: 'Text it now' })).getAttribute('href'))
-      .toBe('sms:+15550100003?body=Hello')
+    const action = await screen.findByRole('link', { name: 'Text it now' })
+    expect(action.getAttribute('href')).toBe('sms:+15550100003?body=Hello')
     expect(screen.queryByRole('link', { name: 'Connect iMessage' })).toBeNull()
     expect(screen.queryByText(/Then message the number Inkbox sends you/)).toBeNull()
+    // A dedicated number is never labeled as the free shared entry.
+    expect(screen.queryByText('Free shared number')).toBeNull()
   })
 
   it.each([

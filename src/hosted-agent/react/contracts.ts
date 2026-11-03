@@ -89,6 +89,9 @@ export interface LineSetupProps {
   connectPrerequisite?(input: LineConnectInput): { content: ReactNode; ready: boolean }
   setupDescription?: string
   emptyConnectionsMessage?: string
+  /** Optional dedicated-number upgrade surfaced on shared-number rows only.
+   *  Absent hosts show no upsell; this is a link, never an automatic change. */
+  dedicatedUpgrade?: { href: string; label?: string }
   onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 
