@@ -32,6 +32,9 @@ export interface ReviewInboxProps {
   renderCompareBrief?: (rowId: string) => ReactNode
   /** Resolves only after the verdict and its learning signal have been stored. */
   onVerdict: (item: ReviewInboxItem, decision: ReviewInboxFeedback) => Promise<void>
+  /** Re-resolve the live revision at verdict time; a row whose revision moved
+   *  is refused with a visible stale message instead of deciding the changed row. */
+  resolveCurrentRevision?: (item: ReviewInboxItem) => Promise<string | number | undefined>
   onFeedback?: (item: ReviewInboxItem, feedback: Omit<ReviewInboxFeedback, 'verdict'>) => Promise<void>
   loading?: boolean
   error?: string | null
@@ -56,7 +59,7 @@ function ordered(items: readonly ReviewInboxItem[]) {
 }
 
 /** One oldest-first review round, with optional blind comparison rows. Hosts own rendering, storage and authority. */
-export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, onFeedback, loading = false, error, onRefresh }: ReviewInboxProps) {
+export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, resolveCurrentRevision, onFeedback, loading = false, error, onRefresh }: ReviewInboxProps) {
   const [round, setRound] = useState(() => ordered(items).map(item => item.id))
   const [answered, setAnswered] = useState<ReadonlySet<string>>(new Set())
   const [resolvedElsewhere, setResolvedElsewhere] = useState<ReadonlySet<string>>(new Set())
@@ -136,6 +139,15 @@ export function ReviewInbox({ items, initialSelectedId, renderItem, renderCompar
     if (pending.current || !item.canReview || !currentItems.has(item.id) || (comparisons.current.get(item.id) && !compareValid)) return
     pending.current = true; setBusy(true)
     try {
+      // A stale row must never decide an artifact that changed after it rendered.
+      // Throwing (not returning) keeps the form's draft and shows the message
+      // inline — a silent return would let the form claim 'Feedback saved'.
+      if (resolveCurrentRevision) {
+        const current = await resolveCurrentRevision(item)
+        if (current !== undefined && current !== item.revision) {
+          throw new Error(`This item changed after it was shown (revision ${String(item.revision)} → ${String(current)}). Review the updated item before deciding.`)
+        }
+      }
       await onVerdict(item, { ...value, ...(comparisons.current.get(item.id) ? { comparison: positionOf(item) } : {}) })
       const nextAnswered = new Set(answered).add(revisionKey(item))
       setAnswered(nextAnswered)
