@@ -15,9 +15,9 @@ permissions:
 
 jobs:
   adopt:
-    uses: tangle-network/agent-eval/.github/workflows/adopt-stack.yml@9509f8a89a1f13631609d571c3f299f91bf61794
+    uses: tangle-network/agent-eval/.github/workflows/adopt-stack.yml@97099c2bee8a59f2d998a640b581ba05ebdf0cc6
     with:
-      stack-ref: 9509f8a89a1f13631609d571c3f299f91bf61794
+      stack-ref: 97099c2bee8a59f2d998a640b581ba05ebdf0cc6
       gate: pnpm install --frozen-lockfile && pnpm typecheck && pnpm exec vitest run tests/chat-routes/computer-lane.integration.test.ts tests/chat-routes/hybrid-fallback.integration.test.ts tests/chat-routes/default-assembly.integration.test.ts
       runs-on: '["self-hosted", "beelink"]'
       default-branch: main
