@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.22
+
+- ci: run adopt-stack from agent-eval 97099c2b, which refuses a Runtime release whose Publish evidence failed (#1464)
+
 ## 1.0.21
 
 - feat(review): revision-bound verdicts on the shared review inbox (#1463)
