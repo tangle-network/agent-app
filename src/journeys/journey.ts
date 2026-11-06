@@ -31,6 +31,12 @@ import { postProcessVideo, type Chapter } from './video.js'
 
 export const DESKTOP = { width: 1440, height: 900 }
 export const PHONE = { width: 390, height: 844 }
+/** One phone for recorded journeys and phone screenshots: a mobile Chrome on a 390x844 touch screen at 2x. */
+const PHONE_CONTEXT = {
+  viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+  userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+}
+export type JourneyDevice = 'desktop' | 'phone'
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 const secs = (ms: number) => Math.round(ms / 100) / 10
 
@@ -59,6 +65,9 @@ const CURSOR_SCRIPT = `(() => {
 interface Recorded {
   label: string
   identity: string
+  device: JourneyDevice
+  /** The recorded video's frame size. */
+  size: { width: number; height: number }
   context: BrowserContext
   page: Page
   t0: number
@@ -142,20 +151,23 @@ export class Journey {
   }
 
   /**
-   * A recorded, traced 1440x900 context. A config identity starts signed in
+   * A recorded, traced context: 1440x900, or with `device: 'phone'` a 390x844 touch phone. A config identity starts signed in
    * from the cached session (no login form is ever recorded); `'anon'` starts
    * signed out, for public pages. Open at most two per journey.
    */
-  async open(label: string, identity: string, opts: { fresh?: boolean } = {}): Promise<Page> {
+  async open(label: string, identity: string, opts: { fresh?: boolean; device?: JourneyDevice } = {}): Promise<Page> {
     if (this.recorded.some((r) => r.label === label)) throw new Error(`a context labelled ${label} is already open`)
     if (!/^[a-z0-9][a-z0-9-]{0,30}$/.test(label)) throw new Error('context label: lowercase letters, digits and dashes')
     const storageState = identity === 'anon' ? undefined : (await storageStateFor(this.config, identity, opts)).path
     const rawDir = join(this.rawDir, label)
+    const device = opts.device ?? 'desktop'
+    // A phone records at its 2x pixels, so its text stays legible in the video.
+    const size = device === 'phone' ? { width: PHONE.width * 2, height: PHONE.height * 2 } : DESKTOP
     const context = await this.browser.newContext({
       baseURL: this.config.baseUrl,
       storageState,
-      viewport: DESKTOP,
-      recordVideo: { dir: rawDir, size: DESKTOP },
+      ...(device === 'phone' ? PHONE_CONTEXT : { viewport: DESKTOP }),
+      recordVideo: { dir: rawDir, size },
       locale: 'en-US',
       timezoneId: 'America/Denver',
     })
@@ -179,7 +191,7 @@ export class Journey {
     }
     await context.tracing.start({ screenshots: true, snapshots: true, title: `${this.id} ${label}` })
     const page = await context.newPage()
-    this.recorded.push({ label, identity, context, page, t0: Date.now(), rawDir })
+    this.recorded.push({ label, identity, device, size, context, page, t0: Date.now(), rawDir })
     return page
   }
 
@@ -309,21 +321,24 @@ export class Journey {
    * Desktop screenshot of the recorded page, then the same URL in a phone
    * context (390x844, same identity). Look at both before judging the screen.
    */
-  async shot(name: string, page?: Page, opts: { phone?: boolean; fullPage?: boolean; phoneUrl?: string } = {}): Promise<{ desktop: string; phone?: string }> {
+  async shot(name: string, page?: Page, opts: { phone?: boolean; fullPage?: boolean; phoneUrl?: string } = {}): Promise<{ desktop?: string; phone?: string }> {
     const r = this.recordedFor(page)
     const slug = name.replace(/[^a-z0-9-]+/gi, '-').toLowerCase()
-    const desktop = join(this.outDir, `${slug}-desktop.png`)
+    const own = join(this.outDir, `${slug}-${r.device}.png`)
     const cursor = (display: string) => r.page.evaluate((d) => { const c = document.getElementById('__journey_cursor'); if (c) c.style.display = d }, display).catch(() => {})
     await cursor('none')
-    await r.page.screenshot({ path: desktop, fullPage: opts.fullPage ?? false })
-    this.screenshots.add(desktop)
+    await r.page.screenshot({ path: own, fullPage: opts.fullPage ?? false })
+    this.screenshots.add(own)
     await cursor('')
+    // A recorded phone is its own phone screenshot.
+    if (r.device === 'phone') return { phone: own }
+    const desktop = own
     if (opts.phone === false) return { desktop }
     const phonePath = join(this.outDir, `${slug}-phone.png`)
     let ctx = this.phones.get(r.identity)
     if (!ctx) {
       const storageState = r.identity === 'anon' ? undefined : (await storageStateFor(this.config, r.identity)).path
-      ctx = await this.browser.newContext({ baseURL: this.config.baseUrl, storageState, viewport: PHONE, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-US', timezoneId: 'America/Denver' })
+      ctx = await this.browser.newContext({ baseURL: this.config.baseUrl, storageState, ...PHONE_CONTEXT, locale: 'en-US', timezoneId: 'America/Denver' })
       this.phones.set(r.identity, ctx)
     }
     const phone = await ctx.newPage()
@@ -581,7 +596,7 @@ export class Journey {
     for (const { r, rawTrace, webm, endedAt } of stopped) {
       if (webm) {
         files.push(...postProcessVideo({
-          webm, workDir: r.rawDir, videoDir: join(this.outDir, 'video'), label: r.label, t0: r.t0,
+          webm, workDir: r.rawDir, videoDir: join(this.outDir, 'video'), label: r.label, t0: r.t0, size: r.size,
           wallSeconds: (endedAt - r.t0) / 1000, chapters: this.chapters.filter((c) => c.label === null || c.label === r.label),
           speedup2x: opts.speedup2x ?? false,
         }))

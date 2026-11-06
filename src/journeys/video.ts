@@ -41,8 +41,9 @@ export interface HighlightSegment {
   text: string
 }
 
-const W = 1440
-const H = 900
+/** The frame a recording made before sizes were saved used. */
+const DESKTOP_FRAME = { width: 1440, height: 900 }
+type Frame = { width: number; height: number }
 const BAR = 84
 export const MAX_HIGHLIGHTS_S = 178
 
@@ -103,7 +104,7 @@ function srtText(cues: readonly Cue[]): string {
   return cues.map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n')
 }
 
-function assText(cues: readonly Cue[]): string {
+function assText(cues: readonly Cue[], { width: W, height: H }: Frame): string {
   const esc = (t: string) => t.replace(/\\/g, '\\\\').replace(/[{}]/g, '').replace(/\n/g, '\\N')
   const head = `[Script Info]\nScriptType: v4.00+\nPlayResX: ${W}\nPlayResY: ${H + BAR}\nWrapStyle: 0\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Bar,DejaVu Sans,26,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,1,28,200,14,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`
   return head + cues.map((c) => `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},Bar,,0,0,0,,${esc(c.text)}`).join('\n') + '\n'
@@ -158,23 +159,27 @@ interface PostProcessInput {
   wallSeconds: number
   chapters: readonly Chapter[]
   speedup2x: boolean
+  /** The recorded frame; desktop when absent. */
+  size?: Frame
 }
 
 export function postProcessVideo(o: PostProcessInput): string[] {
   mkdirSync(o.videoDir, { recursive: true })
   const keep = join(o.workDir, `${o.label}.webm`)
   if (o.webm !== keep) copyFileSync(o.webm, keep)
-  writeFileSync(join(o.workDir, `${o.label}.chapters.json`), JSON.stringify({ t0: o.t0, wallSeconds: o.wallSeconds, chapters: o.chapters }))
-  return renderAll(keep, o.workDir, o.videoDir, o.label, o.t0, o.chapters, o.speedup2x, o.wallSeconds)
+  const size = o.size ?? DESKTOP_FRAME
+  writeFileSync(join(o.workDir, `${o.label}.chapters.json`), JSON.stringify({ t0: o.t0, wallSeconds: o.wallSeconds, chapters: o.chapters, size }))
+  return renderAll(keep, o.workDir, o.videoDir, o.label, o.t0, o.chapters, o.speedup2x, o.wallSeconds, size)
 }
 
 /** Re-render from a raw folder after editing `<label>.chapters.json` by hand. */
 export function rebuildVideo(rawLabelDir: string, videoDir: string, label: string, speedup2x: boolean): string[] {
-  const meta = JSON.parse(readFileSync(join(rawLabelDir, `${label}.chapters.json`), 'utf8')) as { t0: number; wallSeconds: number; chapters: Chapter[] }
-  return renderAll(join(rawLabelDir, `${label}.webm`), rawLabelDir, videoDir, label, meta.t0, meta.chapters, speedup2x, meta.wallSeconds)
+  const meta = JSON.parse(readFileSync(join(rawLabelDir, `${label}.chapters.json`), 'utf8')) as { t0: number; wallSeconds: number; chapters: Chapter[]; size?: Frame }
+  return renderAll(join(rawLabelDir, `${label}.webm`), rawLabelDir, videoDir, label, meta.t0, meta.chapters, speedup2x, meta.wallSeconds, meta.size ?? DESKTOP_FRAME)
 }
 
-function renderAll(webm: string, work: string, videoDir: string, label: string, t0: number, chapters: readonly Chapter[], speedup2x: boolean, wallSeconds: number): string[] {
+function renderAll(webm: string, work: string, videoDir: string, label: string, t0: number, chapters: readonly Chapter[], speedup2x: boolean, wallSeconds: number, size: Frame): string[] {
+  const { width: W, height: H } = size
   const clean = join(work, `${label}.clean.mp4`)
   ff(['-i', webm, '-vf', `fps=25,scale=${W}:${H}:flags=lanczos,format=yuv420p`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-threads', '2', '-an', clean])
   const duration = probeSeconds(clean)
@@ -186,7 +191,7 @@ function renderAll(webm: string, work: string, videoDir: string, label: string, 
   const srt = join(videoDir, `${label}.srt`)
   writeFileSync(srt, srtText(cues))
   const ass = join(work, `${label}.full.ass`)
-  writeFileSync(ass, assText(cues))
+  writeFileSync(ass, assText(cues, size))
   const full = join(videoDir, `${label}-full.mp4`)
   const font = monoFont()
   const clock = `drawtext=${font ? `fontfile=${font}` : 'font=monospace'}:text='%{pts\\:hms}':x=w-tw-28:y=h-${BAR / 2}-th/2:fontsize=26:fontcolor=white@0.8`
@@ -211,7 +216,7 @@ function renderAll(webm: string, work: string, videoDir: string, label: string, 
   const joined = join(work, `${label}.highlights.raw.mp4`)
   ff(['-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', joined])
   const hass = join(work, `${label}.highlights.ass`)
-  writeFileSync(hass, assText(hcues))
+  writeFileSync(hass, assText(hcues, size))
   const highlights = join(videoDir, `${label}-highlights.mp4`)
   ff(['-i', joined, '-vf', `pad=${W}:${H + BAR}:0:0:color=0x111111,ass=${hass}`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-threads', '2', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', highlights])
   const out = [full, srt, highlights]
