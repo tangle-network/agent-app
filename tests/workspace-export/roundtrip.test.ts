@@ -1,18 +1,13 @@
-/**
- * One export through the real routes: start, advance to completion, download
- * the zip, then check it with the system `unzip` and `tar` the way an owner
- * would. Covers the contracts that matter: every source lands, counts match the
- * database, checksums match the bytes, no credential survives anywhere, and
- * every refusal path fails closed.
- */
+/** One export through the real routes, read back the way an owner would. */
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, describe, expect, it } from 'vitest'
+import { readZipDirectory, readZipEntry } from '../../src/documents/zip'
 import {
   createExportEngine,
   createMemoryExportStorage,
@@ -87,6 +82,24 @@ function walk(dir: string): string[] {
     const path = join(dir, name)
     return statSync(path).isDirectory() ? walk(path) : [path]
   })
+}
+
+/** Extract every member through the in-process reader; the sign-off host has no unzip binary. */
+async function unzipInto(zip: Uint8Array, dir: string): Promise<string[]> {
+  const directory = readZipDirectory(zip)
+  if (!directory.succeeded) throw new Error(directory.error)
+  mkdirSync(dir, { recursive: true })
+  const names: string[] = []
+  for (const entry of directory.value) {
+    if (entry.name.endsWith('/')) continue
+    const body = await readZipEntry(zip, entry)
+    if (!body.succeeded) throw new Error(body.error)
+    const file = join(dir, entry.name)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, body.value)
+    names.push(entry.name)
+  }
+  return names
 }
 
 const scratch = mkdtempSync(join(tmpdir(), 'wx-test-'))
@@ -172,16 +185,14 @@ describe('workspace export round trip', () => {
     const zip = new Uint8Array(await response.arrayBuffer())
     expect(Number(response.headers.get('Content-Length'))).toBe(zip.length)
 
-    const zipPath = join(scratch, 'export.zip')
     const out = join(scratch, 'out')
-    writeFileSync(zipPath, zip)
-    expect(execFileSync('unzip', ['-t', zipPath]).toString()).toContain('No errors detected')
-    execFileSync('unzip', ['-q', zipPath, '-d', out])
+    const names = await unzipInto(zip, out)
+    expect(names).toContain('manifest.json')
 
     // Every file in the archive is in the manifest with a matching checksum.
     const manifest = JSON.parse(readFileSync(join(out, 'manifest.json'), 'utf8'))
     const listed = new Map<string, string>(manifest.files.map((f: { path: string; sha256: string }) => [f.path, f.sha256]))
-    const actual = walk(out).map((p) => relative(out, p)).filter((p) => p !== 'manifest.json' && p !== 'README.txt')
+    const actual = names.filter((p) => p !== 'manifest.json' && p !== 'README.txt')
     expect(actual.sort()).toEqual([...listed.keys()].sort())
     for (const file of actual) {
       expect(createHash('sha256').update(readFileSync(join(out, file))).digest('hex'), file).toBe(listed.get(file))
@@ -294,13 +305,11 @@ describe('large files sources', () => {
     expect(progress.status).toBe('complete')
     expect(requests).toBe(3)
     expect(listings).toBe(3)
-    const zip = await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })
-    const zipPath = join(scratch, 'many.zip')
-    writeFileSync(zipPath, new Uint8Array(await zip.arrayBuffer()))
-    const members = execFileSync('unzip', ['-Z1', zipPath]).toString().trim().split('\n').filter((m) => m.startsWith('files/many/'))
+    const zip = new Uint8Array(await (await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })).arrayBuffer())
+    const members = (await unzipInto(zip, join(scratch, 'many'))).filter((m) => m.startsWith('files/many/'))
     expect(members).toHaveLength(450)
     expect(new Set(members).size).toBe(450)
-    expect(execFileSync('unzip', ['-p', zipPath, 'files/many/f/449.txt']).toString()).toBe('file 449')
+    expect(readFileSync(join(scratch, 'many/files/many/f/449.txt'), 'utf8')).toBe('file 449')
   })
 })
 
@@ -653,22 +662,20 @@ describe('an export an owner can read', () => {
     for (let i = 0; i < 5 && progress.status === 'running'; i += 1) progress = (await (await call(`${id}/advance`, { method: 'POST' })).json()) as typeof progress
     expect(progress.status).toBe('complete')
     const zip = new Uint8Array(await (await exporter.route(new Request(`https://app.test${progress.downloadUrl}`), { workspaceId: WS, path: `${id}/download` })).arrayBuffer())
-    const zipPath = join(scratch, 'readable.zip')
-    writeFileSync(zipPath, zip)
-    const members = execFileSync('unzip', ['-Z1', zipPath]).toString().trim().split('\n').sort()
+    const members = (await unzipInto(zip, join(scratch, 'readable'))).sort()
     expect(members).toEqual(['README.txt', 'files/knowledge/house-rules.md', 'manifest.json', 'sandbox/box.tar.gz', 'spreadsheets/tasks.csv'])
-    expect(execFileSync('unzip', ['-p', zipPath, 'files/knowledge/house-rules.md']).toString()).toContain('Quiet after 10pm')
-    expect(execFileSync('unzip', ['-p', zipPath, 'spreadsheets/tasks.csv']).toString()).toBe(
+    expect(readFileSync(join(scratch, 'readable/files/knowledge/house-rules.md'), 'utf8')).toContain('Quiet after 10pm')
+    expect(readFileSync(join(scratch, 'readable/spreadsheets/tasks.csv'), 'utf8')).toBe(
       'title,due,notes\r\n"Restock, towels",2026-10-12,"\'=HYPERLINK(""x"")"\r\n"Say ""hi""",,"{""a"":1}"\r\n',
     )
     const box = join(scratch, 'readable-box')
     mkdirSync(box)
     const tarPath = join(scratch, 'readable-box.tar.gz')
-    writeFileSync(tarPath, execFileSync('unzip', ['-p', zipPath, 'sandbox/box.tar.gz']))
+    writeFileSync(tarPath, readFileSync(join(scratch, 'readable/sandbox/box.tar.gz')))
     expect(execFileSync('tar', ['-tzf', tarPath]).toString().split('\n').filter((m) => /node_modules|sidecar/.test(m))).toEqual([])
     execFileSync('tar', ['-xzf', tarPath, '-C', box])
     expect(readFileSync(join(box, 'notes/plan.md'), 'utf8')).toBe('# Plan\n')
-    const readme = execFileSync('unzip', ['-p', zipPath, 'README.txt']).toString()
+    const readme = readFileSync(join(scratch, 'readable/README.txt'), 'utf8')
     expect(readme).toContain('spreadsheets/ 1 file')
     expect(readme).not.toContain('data/')
     expect(readme).toContain('1 source was empty')
