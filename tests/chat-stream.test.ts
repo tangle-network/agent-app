@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   consumeChatStream,
+  defaultReconnectDelayMs,
   dispatchChatStreamLine,
   streamChatTurn,
+  type ChatReasoningState,
   type ChatStreamCallbacks,
   type ProducerWireEvent,
 } from '../src/web-react/chat-stream'
@@ -64,7 +66,7 @@ describe('consumeChatStream', () => {
   it('normalizes live, replayed (seq), and route-level line shapes', async () => {
     const { log, cb } = recorder()
     const result = await consumeChatStream(ndjsonBody(TURN_LINES), cb)
-    expect(result).toEqual({ turnId: 't-1', receivedContent: true })
+    expect(result).toEqual({ turnId: 't-1', receivedContent: true, lastSeq: 3 })
     expect(log).toEqual([
       ['turn', 't-1'],
       ['reasoning', 'hmm '],
@@ -191,7 +193,8 @@ describe('streamChatTurn', () => {
     const { log, cb } = recorder()
     let didReset = false
     const result = await streamChatTurn({
-      start: async () => new Response(ndjsonBody(TURN_LINES.slice(0, 3), { failAfter: 3 })),
+      // Live lines carry no seq, so the drop replays from 0.
+      start: async () => new Response(ndjsonBody(TURN_LINES.slice(0, 2), { failAfter: 2 })),
       resume: async (turnId, fromSeq) => {
         expect(turnId).toBe('t-1')
         expect(fromSeq).toBe(0)
@@ -201,6 +204,7 @@ describe('streamChatTurn', () => {
         didReset = true
         log.length = 0
       },
+      reconnectDelayMs: () => 0,
       callbacks: cb,
     })
     expect(didReset).toBe(true)
@@ -227,6 +231,7 @@ describe('streamChatTurn', () => {
         didReset = true
         log.length = 0
       },
+      reconnectDelayMs: () => 0,
       callbacks: cb,
     })
     expect(didReset).toBe(true)
@@ -241,5 +246,100 @@ describe('streamChatTurn', () => {
         callbacks: {},
       }),
     ).rejects.toThrow('message is required')
+  })
+
+  it('resumes from the last stamped seq on a second drop, without resetting or duplicating', async () => {
+    const { log, cb } = recorder()
+    const resets: number[] = []
+    const resumes: Array<{ turnId: string; fromSeq: number }> = []
+    const result = await streamChatTurn({
+      start: async () => new Response(ndjsonBody([
+        { type: 'turn', turnId: 't-1' },
+        { kind: 'event', event: { type: 'text', text: 'Hello ' } },
+      ], { failAfter: 2 })),
+      resume: async (turnId, fromSeq) => {
+        resumes.push({ turnId, fromSeq })
+        return fromSeq === 0
+          ? new Response(ndjsonBody([
+              { kind: 'event', event: { type: 'text', text: 'Hello ' }, seq: 3 },
+              { kind: 'event', event: { type: 'text', text: 'world' }, seq: 4 },
+            ], { failAfter: 2 }))
+          : new Response(ndjsonBody([
+              { kind: 'event', event: { type: 'text', text: '!' }, seq: 5 },
+              { seq: -1, type: 'turn_status', status: 'complete' },
+            ]))
+      },
+      onResetForResume: () => {
+        resets.push(resumes.length)
+        log.length = 0
+      },
+      reconnectDelayMs: () => 0,
+      callbacks: cb,
+    })
+    expect(resumes).toEqual([{ turnId: 't-1', fromSeq: 0 }, { turnId: 't-1', fromSeq: 4 }])
+    expect(resets).toEqual([0])
+    expect(result.turnId).toBe('t-1')
+    expect(result.lastSeq).toBe(5)
+    expect(log.filter(([k]) => k === 'text')).toEqual([['text', 'Hello '], ['text', 'world'], ['text', '!']])
+  })
+
+  it('ends in the transport error after the reconnect budget is spent', async () => {
+    const resumes: number[] = []
+    const delays: number[] = []
+    await expect(
+      streamChatTurn({
+        start: async () => new Response(ndjsonBody([{ type: 'turn', turnId: 't-1' }], { failAfter: 1 })),
+        resume: async () => {
+          resumes.push(1)
+          return new Response('no stream', { status: 502 })
+        },
+        reconnectDelayMs: (attempt) => {
+          delays.push(attempt)
+          return 0
+        },
+        maxReconnects: 2,
+        callbacks: {},
+      }),
+    ).rejects.toThrow('network reset')
+    expect(resumes).toHaveLength(2)
+    expect(delays).toEqual([0, 1])
+  })
+
+  it('keeps reasoning and its start time across a tail resume', async () => {
+    const states: ChatReasoningState[] = []
+    const cb: ChatStreamCallbacks = { onReasoningState: (s) => states.push({ ...s }) }
+    const resumes: number[] = []
+    await streamChatTurn({
+      start: async () => new Response(ndjsonBody([
+        { type: 'turn', turnId: 't-1' },
+        { kind: 'event', event: { type: 'reasoning', text: 'part one ' } },
+      ], { failAfter: 2 })),
+      resume: async (_turnId, fromSeq) => {
+        resumes.push(fromSeq)
+        return fromSeq === 0
+          ? new Response(ndjsonBody([
+              { kind: 'event', event: { type: 'reasoning', text: 'part one ' }, seq: 2 },
+            ], { failAfter: 1 }))
+          : new Response(ndjsonBody([
+              { kind: 'event', event: { type: 'reasoning', text: 'part two' }, seq: 3 },
+              { seq: -1, type: 'turn_status', status: 'complete' },
+            ]))
+      },
+      reconnectDelayMs: () => 0,
+      callbacks: cb,
+    })
+    expect(resumes).toEqual([0, 2])
+    const last = states[states.length - 1]!
+    expect(last.text).toBe('part one part two')
+    expect(last.thinking).toBe(false)
+    expect(last.startedAt).toBe(states[0]!.startedAt)
+  })
+
+  it('grows the default reconnect delay exponentially, jittered, and caps it', () => {
+    expect(defaultReconnectDelayMs(0, () => 0)).toBe(250)
+    expect(defaultReconnectDelayMs(0, () => 1)).toBe(750)
+    expect(defaultReconnectDelayMs(2, () => 1)).toBe(3000)
+    expect(defaultReconnectDelayMs(4, () => 1)).toBe(8000)
+    expect(defaultReconnectDelayMs(10, () => 1)).toBe(8000)
   })
 })
