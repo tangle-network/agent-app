@@ -8853,6 +8853,12 @@
       "error": null,
       "exports": [
         {
+          "name": "assertHubApprovalFresh",
+          "kind": "function",
+          "signature": "(item: Pick<HubApprovalItem, \"id\" | \"revisionDigest\">, current: string | undefined) => void",
+          "doc": "Refuse a decision whose target moved."
+        },
+        {
           "name": "formatMinorAmount",
           "kind": "function",
           "signature": "(amount: number, currency?: string) => string",
@@ -8937,6 +8943,18 @@
           "doc": "What a decided call did, as its receipt shows it."
         },
         {
+          "name": "HubApprovalBindingParts",
+          "kind": "interface",
+          "signature": "interface HubApprovalBindingParts",
+          "doc": "The exact material a decision executes: the action path, its input and the account."
+        },
+        {
+          "name": "hubApprovalDigest",
+          "kind": "function",
+          "signature": "(parts: HubApprovalBindingParts) => Promise<string>",
+          "doc": "Compute the digest that binds one approval card to exactly what it shows."
+        },
+        {
           "name": "HubApprovalFeedback",
           "kind": "interface",
           "signature": "interface HubApprovalFeedback",
@@ -9003,6 +9021,12 @@
           "doc": "`provider.action` split at the first dot."
         },
         {
+          "name": "StaleApprovalError",
+          "kind": "class",
+          "signature": "class StaleApprovalError",
+          "doc": "Thrown when the current binding no longer matches the rendered card."
+        },
+        {
           "name": "summarizeHubResult",
           "kind": "function",
           "signature": "(result: unknown) => unknown",
@@ -9051,7 +9075,7 @@
         {
           "name": "HubApprovalDock",
           "kind": "function",
-          "signature": "({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null",
+          "signature": "({ items, onDecide, resolveRevisionDigest, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps)…",
           "doc": "The calls waiting on the owner, pinned above the composer so a held action never scrolls away."
         },
         {
@@ -16730,6 +16754,12 @@
           "doc": "Pure catalogue pipeline."
         },
         {
+          "name": "canonicalRouterModelId",
+          "kind": "function",
+          "signature": "(model: Pick<RouterModel, \"id\" | \"provider\" | \"_provider\" | \"routeability\">) => string",
+          "doc": "Canonical router-facing id: \"provider/model\"."
+        },
+        {
           "name": "CatalogModel",
           "kind": "interface",
           "signature": "interface CatalogModel",
@@ -21411,7 +21441,7 @@
         {
           "name": "SettingsSaveBar",
           "kind": "function",
-          "signature": "({ changes, summary, onDiscard, onSave, state, error, saveLabel, disabledReason, placement, }: SettingsSaveBarProps) =>…",
+          "signature": "({ changes, summary, invalid, onDiscard, onSave, state, error, saveLabel, disabledReason, placement, }: SettingsSaveBar…",
           "doc": null
         },
         {
@@ -28981,7 +29011,7 @@
         {
           "name": "consumeChatStream",
           "kind": "function",
-          "signature": "(body: ReadableStream<Uint8Array<ArrayBufferLike>>, cb: ChatStreamCallbacks) => Promise<ConsumeChatStreamResult>",
+          "signature": "(body: ReadableStream<Uint8Array<ArrayBufferLike>>, cb: ChatStreamCallbacks, seen?: { lastSeq: number; } | undefined) =…",
           "doc": "Drain one NDJSON body into the callbacks."
         },
         {
@@ -29087,6 +29117,12 @@
           "doc": null
         },
         {
+          "name": "defaultReconnectDelayMs",
+          "kind": "function",
+          "signature": "(attempt: number, rand?: () => number) => number",
+          "doc": "The default reconnect schedule: exponential from 500ms with ±50% jitter, capped at 8s."
+        },
+        {
           "name": "describeProvenance",
           "kind": "function",
           "signature": "(record: ProvenanceRecord) => string",
@@ -29149,7 +29185,7 @@
         {
           "name": "dispatchChatStreamLine",
           "kind": "function",
-          "signature": "(line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; }",
+          "signature": "(line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; seq?: number | unde…",
           "doc": "Parse one NDJSON line into the callbacks."
         },
         {
@@ -29294,7 +29330,7 @@
           "name": "EffortPicker",
           "kind": "function",
           "signature": "({ value, onChange, levels, label, fullWidth, variant, disabled, id, \"aria-describedby\": ariaDescribedBy }: EffortPicke…",
-          "doc": "Thinking-budget selector pill, styled to match {@link ModelPicker }."
+          "doc": "Reasoning-effort selector pill, styled to match {@link ModelPicker }."
         },
         {
           "name": "EffortPickerProps",
@@ -30679,7 +30715,7 @@
         {
           "name": "ReviewInbox",
           "kind": "function",
-          "signature": "({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, onFeedback, loading, error, onRefresh }: Review…",
+          "signature": "({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, resolveCurrentRevision, onFeedback, loading, er…",
           "doc": "One oldest-first review round, with optional blind comparison rows."
         },
         {
@@ -30968,7 +31004,7 @@
           "name": "streamChatTurn",
           "kind": "function",
           "signature": "(opts: StreamChatOptions) => Promise<ConsumeChatStreamResult>",
-          "doc": "Run one chat turn with automatic single-shot resume: if the transport drops mid-turn and the server announced a turnId, reset and replay the buffered turn."
+          "doc": "Run one chat turn with bounded automatic resume: reconnect with backoff and resume from the last stamped seq — a live drop resets and replays from 0, a replay drop resumes the tail only, one reasonin…"
         },
         {
           "name": "SubmitInteractionAnswer",

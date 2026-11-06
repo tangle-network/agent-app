@@ -39,8 +39,8 @@ export const OVERLAY_SHADOW = 'shadow-[var(--shadow-overlay)]'
  * panel wants the opposite — the compact `AgentSessionControls` gear popover
  * lays its controls out in a column, and a shrink-wrapped root there makes a
  * trigger's own `w-full` a no-op, since it fills a box the trigger itself
- * sized. That is what left Agent backend short of the panel edge and Thinking
- * narrower still.
+ * sized. That is what left the harness trigger short of the panel edge and
+ * the effort picker narrower still.
  *
  * The panel is portaled ({@link PopoverSurface}), so widening the root widens
  * the TRIGGER only. A menu that should follow it declares `matchTriggerWidth`.

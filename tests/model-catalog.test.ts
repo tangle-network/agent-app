@@ -60,7 +60,7 @@ describe('buildCatalog', () => {
       },
     ])
 
-    expect(catalog.models.map((model) => model.id)).toEqual(['claude-opus-5'])
+    expect(catalog.models.map((model) => model.id)).toEqual(['anthropic/claude-opus-5'])
   })
 
   it('rejects every explicit non-routeable Router status when its boolean is absent', () => {
@@ -72,7 +72,7 @@ describe('buildCatalog', () => {
       { id: 'cannot-route', _provider: 'test', routeability: { status: 'unrouteable' } },
     ])
 
-    expect(catalog.models.map((model) => model.id)).toEqual(['legacy-without-metadata', 'works'])
+    expect(catalog.models.map((model) => model.id)).toEqual(['test/legacy-without-metadata', 'test/works'])
   })
 
   it('rejects a chat endpoint marked non-routeable even when the model is routeable', () => {
@@ -97,7 +97,7 @@ describe('buildCatalog', () => {
       },
     ])
 
-    expect(catalog.models.map((model) => model.id)).toEqual(['gpt-5-mini'])
+    expect(catalog.models.map((model) => model.id)).toEqual(['openai/gpt-5-mini'])
   })
 
   it('keeps the model family and records a different route host', () => {
@@ -110,11 +110,11 @@ describe('buildCatalog', () => {
     ])
     const row = (id: string) => catalog.models.find((model) => model.id === id)
 
-    expect(row('glm-5.3')).toMatchObject({ provider: 'zai', servedBy: 'together' })
-    expect(row('glm-5')?.servedBy).toBeUndefined()
-    expect(row('glm-4.5')).toMatchObject({ provider: 'zai' })
-    expect(row('glm-4.5')?.servedBy).toBeUndefined()
-    expect(row('deepseek-v4.1-flash')).toMatchObject({ provider: 'deepseek', servedBy: 'fireworks' })
+    expect(row('zai/glm-5.3')).toMatchObject({ provider: 'zai', servedBy: 'together' })
+    expect(row('zai/glm-5')?.servedBy).toBeUndefined()
+    expect(row('z-ai/glm-4.5')).toMatchObject({ provider: 'zai' })
+    expect(row('z-ai/glm-4.5')?.servedBy).toBeUndefined()
+    expect(row('deepseek/deepseek-v4.1-flash')).toMatchObject({ provider: 'deepseek', servedBy: 'fireworks' })
     expect(row('together/zai-org/GLM-5.3')).toMatchObject({ provider: 'together' })
     expect(row('together/zai-org/GLM-5.3')?.servedBy).toBeUndefined()
   })
@@ -127,10 +127,28 @@ describe('buildCatalog', () => {
     ])
 
     expect(catalog.models.map(({ id, provider }) => ({ id, provider }))).toEqual([
-      { id: 'claude-fable-5-1', provider: 'anthropic' },
-      { id: 'claude-fable-5', provider: 'anthropic' },
-      { id: 'claude-opus-5', provider: 'anthropic' },
+      { id: 'anthropic/claude-fable-5-1', provider: 'anthropic' },
+      { id: 'anthropic/claude-fable-5', provider: 'anthropic' },
+      { id: 'anthropic/claude-opus-5', provider: 'anthropic' },
     ])
+  })
+
+  it('emits canonical provider-prefixed ids, qualifying with the raw provider', () => {
+    // #802: pickers display, products persist, and turns send "provider/model".
+    // The prefix is the RAW router provider — the normalized display alias
+    // ('zai', 'xai', 'mistral') is not a router id and would fail validation.
+    const catalog = buildCatalog([
+      { id: 'glm-5.3', _provider: 'zai', routeability: { routeable: true } },
+      { id: 'grok-4.6', _provider: 'x-ai', routeability: { routeable: true } },
+      { id: 'mistral-large', routeability: { provider: 'mistralai', routeable: true } },
+      { id: 'openai/gpt-oss-120b', _provider: 'openai', routeability: { routeable: true } },
+    ])
+    expect(Object.fromEntries(catalog.models.map((m) => [m.id, m.provider]))).toEqual({
+      'zai/glm-5.3': 'zai',
+      'x-ai/grok-4.6': 'xai',
+      'mistralai/mistral-large': 'mistral',
+      'openai/gpt-oss-120b': 'openai',
+    })
   })
 
   it('reconciles direct and provider-prefixed persisted ids to live catalogue ids', () => {
@@ -139,36 +157,36 @@ describe('buildCatalog', () => {
       { id: 'claude-fable-5-1', _provider: 'anthropic', routeability: { routeable: true } },
     ]).models
 
-    expect(catalogModelForId(models, 'openai/gpt-5')?.id).toBe('gpt-5')
+    expect(catalogModelForId(models, 'openai/gpt-5')?.id).toBe('openai/gpt-5')
     expect(catalogModelForId(models, 'opencode/zai-coding-plan/glm-5.3')).toBeUndefined()
-    expect(resolveCatalogModelId(models, 'openai/sunset-model', 'anthropic/claude-fable-5-1')).toBe('claude-fable-5-1')
-    expect(resolveCatalogModelId(models, 'sunset-model')).toBe('claude-fable-5-1')
+    expect(resolveCatalogModelId(models, 'openai/sunset-model', 'anthropic/claude-fable-5-1')).toBe('anthropic/claude-fable-5-1')
+    expect(resolveCatalogModelId(models, 'sunset-model')).toBe('anthropic/claude-fable-5-1')
   })
 
   it('dedupes dated snapshots and :free variants to one representative', () => {
     // gpt-5 and gpt-5-2025-08-07 collapse to the undated id
-    expect(ids).toContain('gpt-5')
-    expect(ids).not.toContain('gpt-5-2025-08-07')
+    expect(ids).toContain('openai/gpt-5')
+    expect(ids).not.toContain('openai/gpt-5-2025-08-07')
     // :free and paid variants collapse to one
     const oss = ids.filter((id) => normalizeModelId(id) === 'gpt-oss-120b')
     expect(oss).toHaveLength(1)
   })
 
   it('keeps distinct versions as distinct models', () => {
-    expect(ids).toContain('claude-opus-4-7')
-    expect(ids).toContain('claude-opus-4-6')
+    expect(ids).toContain('anthropic/claude-opus-4-7')
+    expect(ids).toContain('anthropic/claude-opus-4-6')
   })
 
   it('retains older generations for search without recommending them', () => {
     const featured = catalog.models.filter((m) => m.featured).map((m) => m.id)
     expect(featured).toEqual([])
-    expect(ids).toContain('claude-opus-4-7')
-    expect(ids).toContain('gpt-5.1')
-    expect(ids).toContain('gemini-3.1-pro-preview')
+    expect(ids).toContain('anthropic/claude-opus-4-7')
+    expect(ids).toContain('openai/gpt-5.1')
+    expect(ids).toContain('google/gemini-3.1-pro-preview')
   })
 
   it('keeps the product default independent from display freshness', () => {
-    expect(catalog.defaultModelId).toBe('claude-sonnet-4-6')
+    expect(catalog.defaultModelId).toBe('anthropic/claude-sonnet-4-6')
   })
 
   it('returns the catalogue in the same freshness order the picker uses', () => {
@@ -185,8 +203,8 @@ describe('buildCatalog', () => {
     ]
     const unavailable = buildCatalog(candidates)
     expect(unavailable.models.map((model) => model.id)).toEqual([
-      'claude-fable-5-1',
-      'claude-opus-5',
+      'anthropic/claude-fable-5-1',
+      'anthropic/claude-opus-5',
     ])
     expect(unavailable.models.every((model) => !model.featured)).toBe(true)
 
@@ -196,11 +214,11 @@ describe('buildCatalog', () => {
         ...candidates.slice(0, 1),
         { id: 'claude-opus-5-5', _provider: 'anthropic', routeability: { routeable: true } },
       ])
-      expect(available.models.find((model) => model.id === 'claude-opus-5-5')).toMatchObject({
+      expect(available.models.find((model) => model.id === 'anthropic/claude-opus-5-5')).toMatchObject({
         featured: true,
         releaseDate: '2026-09-22T00:00:00.000Z',
       })
-      expect(available.models.find((model) => model.id === 'claude-opus-5')?.featured).toBe(false)
+      expect(available.models.find((model) => model.id === 'anthropic/claude-opus-5')?.featured).toBe(false)
     } finally {
       now.mockRestore()
     }
@@ -221,7 +239,7 @@ describe('buildCatalog', () => {
     ])
 
     expect(current.models.map(({ id, provider }) => ({ id, provider }))).toEqual([
-      { id: 'kimi-k3', provider: 'moonshot' },
+      { id: 'moonshot/kimi-k3', provider: 'moonshot' },
       { id: 'moonshotai/kimi-k2', provider: 'moonshot' },
     ])
   })
@@ -233,8 +251,8 @@ describe('buildCatalog', () => {
     ])
 
     expect(current.models.map(({ id, provider, featured }) => ({ id, provider, featured }))).toEqual([
-      { id: 'grok-4.6', provider: 'xai', featured: false },
-      { id: 'mistral-medium-2604', provider: 'mistral', featured: false },
+      { id: 'x-ai/grok-4.6', provider: 'xai', featured: false },
+      { id: 'mistralai/mistral-medium-2604', provider: 'mistral', featured: false },
     ])
   })
 
@@ -254,19 +272,19 @@ describe('buildCatalog', () => {
   })
 
   it('picks a tool-capable featured model as default', () => {
-    expect(catalog.defaultModelId).toBe('claude-sonnet-4-6')
+    expect(catalog.defaultModelId).toBe('anthropic/claude-sonnet-4-6')
     const def = catalog.models.find((m) => m.id === catalog.defaultModelId)
     expect(def?.supportsTools).toBe(true)
   })
 
   it('respects a preferred default when it survives filtering', () => {
     const pinned = buildCatalog(fixture, { preferredDefault: 'gpt-5.1' })
-    expect(pinned.defaultModelId).toBe('gpt-5.1')
+    expect(pinned.defaultModelId).toBe('openai/gpt-5.1')
   })
 
   it('falls back to the heuristic when the preferred default is gone', () => {
     const pinned = buildCatalog(fixture, { preferredDefault: 'model-that-was-sunset' })
-    expect(pinned.defaultModelId).toBe('claude-sonnet-4-6')
+    expect(pinned.defaultModelId).toBe('anthropic/claude-sonnet-4-6')
   })
 
   it('marks tool support from merged alias metadata or family knowledge', () => {

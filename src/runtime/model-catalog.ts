@@ -121,6 +121,16 @@ function providerForModel(model: RouterModel): string {
   return 'unknown'
 }
 
+/** Canonical router-facing id: "provider/model". Pickers display, products
+ *  persist, and turns send this form. The prefix is the RAW router provider
+ *  ('moonshotai/kimi-k2'), never the normalized display alias, so the id is a
+ *  live router entry that validation admits. */
+export function canonicalRouterModelId(model: Pick<RouterModel, 'id' | '_provider' | 'provider' | 'routeability'>): string {
+  if (model.id.includes('/')) return model.id
+  const raw = model._provider ?? model.provider ?? model.routeability?.provider
+  return raw ? `${raw}/${model.id}` : model.id
+}
+
 /** A short, varied first screen. All other routeable entries remain searchable. */
 export const MAX_RECOMMENDED_MODELS = 8
 
@@ -425,7 +435,7 @@ export function buildCatalog(raw: RouterModel[], opts?: { preferredDefault?: str
     const routeHost = normalizeProvider(m.routeability?.provider ?? '')
     const servedBy = routeHost && routeHost !== 'unknown' && routeHost !== provider ? routeHost : undefined
     return {
-      id: m.id,
+      id: canonicalRouterModelId(m),
       name: m.name ?? m.id,
       provider,
       ...(servedBy ? { servedBy } : {}),

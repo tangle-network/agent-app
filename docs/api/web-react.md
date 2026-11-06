@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-535 exports.
+536 exports.
 
 ### `acceptRejectionReason`
 
@@ -939,7 +939,7 @@ interface ComposerSkillOption
 `function` — Drain one NDJSON body into the callbacks.
 
 ```ts
-(body: ReadableStream<Uint8Array<ArrayBufferLike>>, cb: ChatStreamCallbacks) => Promise<ConsumeChatStreamResult>
+(body: ReadableStream<Uint8Array<ArrayBufferLike>>, cb: ChatStreamCallbacks, seen?: { lastSeq: number; } | undefined) =…
 ```
 
 ### `ConsumeChatStreamResult`
@@ -1078,6 +1078,14 @@ ProvenanceConfidencePolicy
 96
 ```
 
+### `defaultReconnectDelayMs`
+
+`function` — The default reconnect schedule: exponential from 500ms with ±50% jitter, capped at 8s.
+
+```ts
+(attempt: number, rand?: () => number) => number
+```
+
 ### `describeProvenance`
 
 `function` — One plain sentence naming where the value came from — the panel's first line and part of what a screen reader announces.
@@ -1163,7 +1171,7 @@ number
 `function` — Parse one NDJSON line into the callbacks.
 
 ```ts
-(line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; }
+(line: string, cb: ChatStreamCallbacks) => { turnId?: string | undefined; receivedContent: boolean; seq?: number | unde…
 ```
 
 ### `DurableChatCard`
@@ -1352,7 +1360,7 @@ interface EffortLevel
 
 ### `EffortPicker`
 
-`function` — Thinking-budget selector pill, styled to match {@link ModelPicker }.
+`function` — Reasoning-effort selector pill, styled to match {@link ModelPicker }.
 
 ```ts
 ({ value, onChange, levels, label, fullWidth, variant, disabled, id, "aria-describedby": ariaDescribedBy }: EffortPicke…
@@ -3203,7 +3211,7 @@ interface ReviewFeedbackFormProps
 `function` — One oldest-first review round, with optional blind comparison rows.
 
 ```ts
-({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, onFeedback, loading, error, onRefresh }: Review…
+({ items, initialSelectedId, renderItem, renderCompareBrief, onVerdict, resolveCurrentRevision, onFeedback, loading, er…
 ```
 
 ### `ReviewInboxFeedback`
@@ -3584,7 +3592,7 @@ interface StreamChatOptions
 
 ### `streamChatTurn`
 
-`function` — Run one chat turn with automatic single-shot resume: if the transport drops mid-turn and the server announced a turnId, reset and replay the buffered turn.
+`function` — Run one chat turn with bounded automatic resume: reconnect with backoff and resume from the last stamped seq — a live drop resets and replays from 0, a replay drop resumes the tail only, one reasonin…
 
 ```ts
 (opts: StreamChatOptions) => Promise<ConsumeChatStreamResult>

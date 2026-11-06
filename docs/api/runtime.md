@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-110 exports.
+111 exports.
 
 ### `AnySurfaceKind`
 
@@ -44,6 +44,14 @@ interface AppToolLoopOptions
 
 ```ts
 (raw: RouterModel[], opts?: { preferredDefault?: string | undefined; } | undefined) => ModelCatalog
+```
+
+### `canonicalRouterModelId`
+
+`function` — Canonical router-facing id: "provider/model".
+
+```ts
+(model: Pick<RouterModel, "id" | "provider" | "_provider" | "routeability">) => string
 ```
 
 ### `CatalogModel`

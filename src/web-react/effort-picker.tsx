@@ -163,8 +163,8 @@ export interface EffortPickerProps {
   value: string
   onChange: (id: string) => void
   /** Selectable levels (engine id + user-facing label). Defaults to the plain
-   *  "Thinking" vocabulary; override to relabel without changing the ids the
-   *  runtime receives.
+   *  reasoning-effort vocabulary; override to relabel without changing the ids
+   *  the runtime receives.
    *
    *  A list that omits the current `value` is not a rendering error the picker
    *  papers over: `value` is reconciled INTO the rendered list under its own
@@ -172,7 +172,8 @@ export interface EffortPickerProps {
    *  the depth the session is running at and never some other list entry. */
   levels?: readonly EffortLevel[]
   /** Prefix shown before the active level on the pill — the "what is this"
-   *  context the bare value lacked. Default "Thinking". Pass '' to hide it. */
+   *  context the bare value lacked. Default "Reasoning effort". Pass '' to
+   *  hide it. */
   label?: string
   /** Fill the container instead of shrink-wrapping — opt-in, default `false`;
    *  see {@link pickerRootClass} for when and why. */
@@ -186,13 +187,13 @@ export interface EffortPickerProps {
   'aria-describedby'?: string
 }
 
-/** Thinking-budget selector pill, styled to match {@link ModelPicker}. Show
- *  it only when the selected model `supportsReasoning`. "Thinking" is the
- *  plain-English name for what was internally called "effort".
+/** Reasoning-effort selector pill, styled to match {@link ModelPicker}. Show
+ *  it only when the selected model `supportsReasoning`. "Reasoning effort" is
+ *  the plain-English name for what was internally called "effort".
  *
  *  The CANONICAL ecosystem effort picker — sandbox-ui's reasoning menu (inside
  *  its `chat/AgentSessionControls`) is legacy and frozen. */
-export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Thinking', fullWidth = false, variant = 'chip',
+export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, label = 'Reasoning effort', fullWidth = false, variant = 'chip',
   disabled = false, id, 'aria-describedby': ariaDescribedBy }: EffortPickerProps) {
   const [requestedOpen, setOpen] = useState(false)
   const open = requestedOpen && !disabled

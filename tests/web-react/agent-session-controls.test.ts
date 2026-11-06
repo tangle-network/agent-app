@@ -55,8 +55,8 @@ describe('layout', () => {
     expect(screen.queryByText('Claude Code (Anthropic)')).toBeNull()
     fireEvent.click(gear)
     expect(screen.getByText('Claude Code (Anthropic)')).toBeTruthy()
-    expect(screen.getByText('Agent backend')).toBeTruthy()
-    expect(screen.getByText('Thinking')).toBeTruthy()
+    expect(screen.getByText('Harness')).toBeTruthy()
+    expect(screen.getByText('Reasoning effort')).toBeTruthy()
   })
 })
 
@@ -68,6 +68,32 @@ describe('harness↔model coherence', () => {
     expect(onHarnessChange).toHaveBeenCalledWith('claude-code')
     // claude-code can run the anthropic model → no model snap
     expect(onModelChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('harness menu capability filter', () => {
+  // #802: offer only harnesses the capability table allows for the selected
+  // model (kimi-code is the one vendor-locked harness); the current harness
+  // stays offered so a pinned thread never loses its own row.
+  it('drops harnesses the selected model cannot run', () => {
+    setup({ model: 'openai/gpt-5', harness: 'opencode' })
+    fireEvent.click(screen.getByText('OpenCode (any model)'))
+    expect(screen.queryByText('Kimi (Moonshot)')).toBeNull()
+    expect(screen.getByText('Codex (OpenAI)')).toBeTruthy()
+  })
+
+  it('keeps a vendor-locked harness for that vendor\'s model', () => {
+    setup({
+      model: 'moonshotai/kimi-k3',
+      harness: 'kimi-code',
+      models: [
+        ...MODELS,
+        { id: 'moonshotai/kimi-k3', name: 'Kimi K3', provider: 'moonshot', supportsTools: true, supportsReasoning: true, featured: false },
+      ],
+    })
+    fireEvent.click(screen.getByText('Kimi (Moonshot)'))
+    expect(screen.getAllByText('OpenCode (any model)').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Kimi (Moonshot)').length).toBeGreaterThanOrEqual(2)
   })
 })
 
