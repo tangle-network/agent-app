@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2
+
+- feat(journeys): record a journey on a real phone context (#1474)
+
 ## 2.0.1
 
 - feat(plans): own turn plan-mode resolution (#1473)
