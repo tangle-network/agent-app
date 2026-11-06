@@ -13,6 +13,7 @@ import { type Outcome, ok } from './outcome'
 import { SandboxRecoveryFailedError } from './lifecycle-errors'
 import { serializeSandboxProvisioningError, isSandboxApiSandboxMissingFailure } from './diagnostics'
 import type { SandboxInstance } from '@tangle-network/sandbox'
+import { parseBackendType } from '@tangle-network/sandbox'
 import { resolveWorkspaceSandboxClient, getRunningBox, listRunning, listStopped, deleteBox } from './workspace-boxes'
 import {
   DEFAULT_PROVISION_TIMEOUT_MS,
@@ -384,7 +385,9 @@ async function prepareWorkspacePayload(
     ...(userId ? { permissions: { initialUsers: [{ userId, role }] } } : {}),
     env,
     secrets,
-    backend: { type: harness, profile, ...(model ? backendModelFields(model) : {}) },
+    // Fail fast for historical-only harness identities (`forge`) here too,
+    // matching resolveSandboxPromptBackend's dispatch seam.
+    backend: { type: parseBackendType(harness), profile, ...(model ? backendModelFields(model) : {}) },
     ...(storage ? { storage } : {}),
     ...(restore ? restore : {}),
     ...(shell.egressPolicy ? { egressPolicy: shell.egressPolicy } : {}),
