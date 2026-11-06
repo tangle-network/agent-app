@@ -24750,22 +24750,10 @@
       "error": null,
       "exports": [
         {
-          "name": "InvitationsPanel",
-          "kind": "function",
-          "signature": "({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelProps) => Element",
-          "doc": null
-        },
-        {
-          "name": "InvitationsPanelProps",
-          "kind": "interface",
-          "signature": "interface InvitationsPanelProps",
-          "doc": "Define properties and callbacks for managing workspace invitations and user roles"
-        },
-        {
           "name": "InvitationView",
           "kind": "interface",
           "signature": "interface InvitationView",
-          "doc": "One invitation row as `InvitationsPanel` renders it — the shape `invitations-api` returns."
+          "doc": "One invitation row as the invitations list renders it — the shape `invitations-api` returns."
         },
         {
           "name": "InviteAcceptDetails",
@@ -24804,22 +24792,10 @@
           "doc": "Props for the invite-token route page."
         },
         {
-          "name": "MembersPanel",
-          "kind": "function",
-          "signature": "({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…",
-          "doc": null
-        },
-        {
-          "name": "MembersPanelProps",
-          "kind": "interface",
-          "signature": "interface MembersPanelProps",
-          "doc": "Define properties and callbacks for managing members and their roles in a workspace panel"
-        },
-        {
           "name": "MemberView",
           "kind": "interface",
           "signature": "interface MemberView",
-          "doc": "One member row as the panel renders it — the shape `members-api` returns."
+          "doc": "One member row as the members list renders it — the shape `members-api` returns."
         }
       ]
     },

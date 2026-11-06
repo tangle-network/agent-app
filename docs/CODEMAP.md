@@ -125,7 +125,7 @@ _155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./studio-react`](api/studio-react.md) | 53 | `runtime`, `studio`, `web-react` |
 | [`./studio/generated-media`](api/studio-generated-media.md) | 39 | `media`, `tools`, `vault`, `web` |
 | [`./teams`](api/teams.md) | 38 | — |
-| [`./teams-react`](api/teams-react.md) | 12 | `teams`, `web-react` |
+| [`./teams-react`](api/teams-react.md) | 8 | `teams`, `web-react` |
 | [`./teams/drizzle`](api/teams-drizzle.md) | 27 | — |
 | [`./teams/invitations-api`](api/teams-invitations-api.md) | 13 | — |
 | [`./teams/members-api`](api/teams-members-api.md) | 10 | — |
@@ -1272,11 +1272,11 @@ Source: `src/teams/index.ts` · 38 exports
 
 ## `./teams-react`
 
-Source: `src/teams-react/index.ts` · 12 exports
+Source: `src/teams-react/index.ts` · 8 exports
 
 Depends on: `teams`, `web-react`
 
-`InvitationsPanel`, `InvitationsPanelProps`, `InvitationView`, `InviteAcceptDetails`, `InviteAcceptPage`, `InviteAcceptPageProps`, `InviteAcceptStatus`, `InviteTokenPage`, `InviteTokenPageProps`, `MembersPanel`, `MembersPanelProps`, `MemberView`
+`InvitationView`, `InviteAcceptDetails`, `InviteAcceptPage`, `InviteAcceptPageProps`, `InviteAcceptStatus`, `InviteTokenPage`, `InviteTokenPageProps`, `MemberView`
 
 [Full API →](api/teams-react.md)
 
