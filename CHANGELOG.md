@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.26
+
+- fix(web-react): canonical picker contract — provider-qualified ids, Harness/Reasoning effort labels, capability-filtered harness menu (#1469)
+
 ## 1.0.25
 
 - fix(web-react): reconnect a dropped chat turn from the last stamped seq (#1468)
