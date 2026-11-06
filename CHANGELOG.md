@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.23
+
+- test(agent-profiles): a stale binding version must reject as a conflict (#1465)
+
 ## 1.0.22
 
 - ci: run adopt-stack from agent-eval 97099c2b, which refuses a Runtime release whose Publish evidence failed (#1464)
