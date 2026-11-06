@@ -1,4 +1,4 @@
-/** The line under an invitation's address, shared by `InvitationsPanel` and the settings `InvitationsSection`. */
+/** The line under an invitation's address, as the settings `InvitationsSection` renders it. */
 
 import type { InvitationDelivery } from '../../teams/invitations'
 import type { InvitationView } from '../contracts'

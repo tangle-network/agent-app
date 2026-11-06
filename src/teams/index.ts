@@ -12,8 +12,8 @@
  *   - `@tangle-network/agent-app/teams/invitations-api` — framework-neutral
  *       email-invitation lifecycle (create/list/resend/revoke/preview/accept,
  *       imports `drizzle-orm`).
- *   - `@tangle-network/agent-app/teams-react`       — MembersPanel +
- *       InvitationsPanel + InviteAcceptPage (optional `react` peer).
+ *   - `@tangle-network/agent-app/teams-react`       — InviteAcceptPage +
+ *       the seams the settings-react team sections read (optional `react` peer).
  *
  * NEVER re-exported from the package root: `drizzle-orm` and `react` are
  * optional peers, and the whole point is that the tax stays clean.
