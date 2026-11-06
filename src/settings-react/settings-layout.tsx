@@ -5,11 +5,8 @@
  * section's data. The frame answers to the content area's width: from 60rem
  * the links are a sticky 13rem column beside a 48rem column of cards, and
  * below that a sticky 56px tab strip whose current tab is kept in view.
- *
- * Navigation responds at once: the clicked link becomes current before the
- * route resolves, nothing dims, and a thin progress line shows only after the
- * pending delay. A `#hash` scrolls its section (or row) into view and focuses
- * its heading.
+ * Navigation responds at once, and a `#hash` scrolls its section (or row)
+ * into view and focuses its heading.
  */
 
 import { Button, PageHeader, PageShell } from '@tangle-network/ui/primitives'
@@ -138,11 +135,8 @@ function useStripOverflow(listRef: RefObject<HTMLUListElement | null>) {
   return { overflow, page }
 }
 
-/**
- * A chevron on a solid panel at the strip's edge, as `SegmentedControl` draws
- * its own: a fade over a tab's text shows nothing. The panel's shadow paints
- * the page gutter too, so no half-hidden label shows beyond it.
- */
+/** A chevron on a solid panel at the strip's edge, as `SegmentedControl` draws its own:
+ * a fade over a tab's text shows nothing. The panel's shadow paints the page gutter too. */
 function ScrollCue({ side, onPage }: { side: 'start' | 'end'; onPage: () => void }) {
   const start = side === 'start'
   const Icon = start ? ChevronLeft : ChevronRight
@@ -235,7 +229,7 @@ function readHash(): string {
   }
 }
 
-/** Scrolls `#hash` into view and focuses its heading; without a hash, a section change starts at the top. */
+/** Scrolls `#hash` into view and focuses its heading — a card that lands after mount is revealed once it appears — and without a hash, a section change starts at the top. */
 function useSectionScroll(activeId: string, rootRef: RefObject<HTMLDivElement | null>) {
   const first = useRef(true)
   useEffect(() => {
@@ -251,9 +245,17 @@ function useSectionScroll(activeId: string, rootRef: RefObject<HTMLDivElement | 
     }
     if (!reveal() && !first.current) rootRef.current?.scrollIntoView({ block: 'start' })
     first.current = false
+    const pending = readHash()
+    const watch = pending && !document.getElementById(pending)
+      ? new MutationObserver(() => { if (readHash() === pending && reveal()) watch?.disconnect() })
+      : null
+    watch?.observe(document.body, { childList: true, subtree: true })
     const onHash = () => void reveal()
     window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    return () => {
+      watch?.disconnect()
+      window.removeEventListener('hashchange', onHash)
+    }
   }, [activeId, rootRef])
 }
 
@@ -288,8 +290,7 @@ export function SettingsLayout({
   const showProgress = useDelayed(pending)
   useSectionScroll(activeId, rootRef)
   const visible = sections.filter((section) => !section.hidden)
-  // PageHeader's level-2 title is the operational 20px size; titleAs keeps it the page's h1.
-  // The meta line rides in the description so it keeps the 14px floor.
+  // PageHeader's level-2 title is the page's h1 here (titleAs); the meta line rides in the description to keep the 14px floor.
   const header = (
     <PageHeader
       level={2}

@@ -1,9 +1,7 @@
 /**
  * One save that covers several cards, as an agent profile's does: its
- * instructions, model and knowledge are one versioned record. The group save
- * bar follows the last card it saves and, while it has something to report,
- * stays at the bottom of the screen over every card above it. The story
- * renders it and `scripts/prove-settings-pages.mjs` drives it.
+ * instructions, model and knowledge are one versioned record, and the group
+ * save bar follows the last card it saves.
  */
 
 import { Input, SettingsList, SettingsListItem, SettingsRow, SettingsSection, Textarea } from '@tangle-network/ui/primitives'
@@ -78,6 +76,7 @@ export function SaveGroupDemo({ saveDelayMs = 300 }: { saveDelayMs?: number }) {
         placement="group"
         changes={changes}
         state={state}
+        invalid={draft.model.trim() === '' ? 'Model is required.' : undefined}
         saveLabel="Save profile"
         onDiscard={() => {
           setDraft(saved)

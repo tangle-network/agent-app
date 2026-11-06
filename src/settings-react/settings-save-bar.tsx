@@ -3,19 +3,13 @@
  * sense saved together (a set of spend caps). Save is the primary action only
  * while there are changes; a refusal shows its sentence here and the edits
  * stay. "Saved" shows for two seconds after `state` becomes `saved`, as a
- * row's does.
+ * row's does. The bar stays in reach while it has something to report.
  *
- * The bar stays in reach while it has something to report: unsaved changes, a
- * refusal, "Saved", or a `summary` the product shows after a save.
- *
- * - `placement="footer"` (the default): pass it as a `SettingsSection` footer.
- *   On a narrow card the footer sticks to the bottom of the screen while the
- *   bar reports, so Save stays in reach while the person scrolls the fields
+ * - `placement="footer"` (the default): a `SettingsSection` footer, sticky to
+ *   the screen's bottom on a narrow card while the bar reports.
+ * - `placement="group"`: after the last of several cards one save covers; its
+ *   own card, sticky to the screen's bottom at every width, over every card
  *   above it.
- * - `placement="group"`: one save covers several cards. Render the bar after
- *   the last of them, in the same column. It is its own card on the muted
- *   plane and, while it reports, stays at the bottom of the screen at every
- *   width, over every card above it, until the person scrolls past it.
  */
 
 import { Button, Card } from '@tangle-network/ui/primitives'
@@ -34,6 +28,8 @@ export interface SettingsSaveBarProps {
   changes: number
   /** Replaces the "2 unsaved changes" count. */
   summary?: ReactNode
+  /** Why the edits cannot be saved yet, naming the field. Replaces the count and disables Save while there are changes. */
+  invalid?: ReactNode
   onDiscard: () => void
   onSave: () => void
   state: 'idle' | 'saving' | 'saved' | 'failed'
@@ -50,6 +46,7 @@ export interface SettingsSaveBarProps {
 export function SettingsSaveBar({
   changes,
   summary,
+  invalid,
   onDiscard,
   onSave,
   state,
@@ -68,10 +65,11 @@ export function SettingsSaveBar({
     return () => clearTimeout(timer)
   }, [state])
   const refused = state === 'failed' && error != null
+  const blocked = invalid != null && changes > 0
   const message = disabledReason != null
     ? <span className="flex items-start gap-1.5 text-muted-foreground"><Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0">{disabledReason}</span></span>
-    : refused
-      ? <span role="alert" className="flex items-start gap-1.5 text-[var(--surface-danger-text)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 [overflow-wrap:anywhere]">{error}</span></span>
+    : refused || blocked
+      ? <span role={refused ? 'alert' : undefined} className="flex items-start gap-1.5 text-[var(--surface-danger-text)]"><CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 [overflow-wrap:anywhere]">{refused ? error : invalid}</span></span>
       : summary ?? (dirty
         ? <span className="text-muted-foreground">{changes === 1 ? '1 unsaved change' : `${changes} unsaved changes`}</span>
         : showSaved ? <SavedStatus /> : <span className="text-muted-foreground">No unsaved changes</span>)
@@ -89,7 +87,7 @@ export function SettingsSaveBar({
       {disabledReason == null && (
         <div className="ml-auto flex shrink-0 gap-2">
           {dirty && <Button type="button" variant="ghost" disabled={saving} onClick={onDiscard}>Discard</Button>}
-          <Button type="button" variant={dirty ? 'default' : 'outline'} disabled={!dirty || saving} loading={saving} onClick={onSave}>
+          <Button type="button" variant={dirty ? 'default' : 'outline'} disabled={!dirty || saving || invalid != null} loading={saving} onClick={onSave}>
             {saveLabel}
           </Button>
         </div>

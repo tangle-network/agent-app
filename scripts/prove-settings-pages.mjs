@@ -96,8 +96,7 @@ async function check(name, run) {
   checks.push({ name, result: 'PASS' })
 }
 
-// A phone viewport widens its layout to fit content that overflows, so the
-// sideways-scroll checks compare with the width the page was opened at.
+// A phone viewport widens for overflowing content, so sideways-scroll checks compare with the width at open.
 
 /** Text under 14px anywhere visible on the page. */
 async function tinyText(page) {
@@ -144,7 +143,6 @@ try {
       const nav = page.getByRole('navigation', { name: 'Settings sections' })
       const project = page.locator('#project')
 
-      // A hand-edited #hash that does not decode leaves the page up.
       await open('section=general#%E0%A4%A')
       await check(`${tag}: a malformed #hash leaves the page up`, async () => {
         await page.waitForTimeout(300)
@@ -339,9 +337,13 @@ try {
       })
 
       // One grouped save: lowering would save at once; raising asks with from → to.
-      await page.locator('#cap-perDay').fill('1,500')
       const bar = page.locator('[data-settings-save-bar]')
-      await check(`${tag}: the save bar counts the change and shows the old value`, async () => {
+      await page.locator('#cap-perDay').fill('not dollars')
+      await shot('save-bar-invalid')
+      await check(`${tag}: edits that cannot be saved yet say why, refuse Save, then count once valid`, async () => {
+        await expect(bar).toContainText('Enter each cap as a dollar amount before saving.')
+        await expect(bar.getByRole('button', { name: 'Save caps' })).toBeDisabled()
+        await page.locator('#cap-perDay').fill('1,500')
         await expect(bar).toContainText('1 unsaved change')
         await expect(page.locator('#spend-caps')).toContainText('Was $50')
       })
@@ -371,10 +373,10 @@ try {
       await raise.locator('[data-confirm-action]').click()
       await check(`${tag}: the save bar shows Saved for two seconds, then no unsaved changes`, async () => {
         await expect(bar.locator('[data-setting-status="saved"]')).toBeVisible()
-        assert.equal(await bar.getAttribute('data-sticky'), 'true', 'the bar stops sticking before its Saved fades')
+        assert.equal(await bar.getAttribute('data-sticky'), 'true', 'the bar keeps sticking while its Saved shows')
         await expect(bar.locator('[data-setting-status="saved"]')).toHaveCount(0, { timeout: 3_500 })
         await expect(bar).toContainText('No unsaved changes')
-        assert.equal(await bar.getAttribute('data-sticky'), null, 'the bar still sticks with nothing to save')
+        assert.equal(await bar.getAttribute('data-sticky'), null, 'the bar stops sticking once it has nothing to report')
       })
 
       await nav.locator('a[data-settings-section="team"]').click()
@@ -449,7 +451,6 @@ try {
       await invitationsCard.scrollIntoViewIfNeeded()
       await shot('invitations-past')
 
-      // A seat-limit refusal stays in the invite dialog with its sentence and View plans.
       await members.getByRole('button', { name: 'Invite', exact: true }).click()
       const invite = phone ? page.getByRole('dialog') : page.getByRole('alertdialog')
       await invite.getByLabel('Email').fill('new@seats.example')
@@ -578,8 +579,7 @@ try {
       await page.locator('[data-team-panel="invitations"]').scrollIntoViewIfNeeded()
       await shot('team-panels-invitations')
 
-      // One save across several cards (an agent profile): the group bar follows the last card it saves and,
-      // while it reports, stays at the bottom of the screen over every card above it, at every width.
+      // One save across several cards (an agent profile): the group bar follows the last card it saves.
       const screen = phone ? 700 : 640
       await page.setViewportSize({ width, height: screen })
       await page.goto(`${origin}/?theme=${theme}&view=save-group`)
@@ -614,7 +614,7 @@ try {
         await shot('save-group-saved')
         await expect(groupBar.locator('[data-setting-status="saved"]')).toHaveCount(0, { timeout: 3_500 })
         await expect(groupBar).toContainText('No unsaved changes')
-        assert.equal(await groupBar.getAttribute('data-sticky'), null, 'the bar still sticks with nothing to save')
+        assert.equal(await groupBar.getAttribute('data-sticky'), null, 'the bar stops sticking once it has nothing to report')
         assert.ok((await group.boundingBox()).y > screen, 'the bar stayed on the screen with nothing to report')
       })
       await page.locator('#profile-model').fill('gpt-5-mini')
