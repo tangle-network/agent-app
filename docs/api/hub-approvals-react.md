@@ -43,7 +43,7 @@ type HubApprovalDecision
 `function` — The calls waiting on the owner, pinned above the composer so a held action never scrolls away.
 
 ```ts
-({ items, onDecide, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps) => Element | null
+({ items, onDecide, resolveRevisionDigest, permissions, onOpen, focusId, onFeedback, className }: HubApprovalDockProps)…
 ```
 
 ### `HubApprovalDockProps`
