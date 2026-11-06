@@ -137,7 +137,9 @@ it saves at once.
   bottom sheet. A refusal stays in the dialog with the server's sentence and
   the `refusalAction` that answers it, such as View plans for `plan_limit`.
 - Values that only make sense together use the page's one `SettingsSaveBar`.
-  Its "Saved" fades after two seconds too. While it has something to report
+  Its "Saved" fades after two seconds too. Edits the product cannot save yet
+  give it `invalid`: a sentence in place of the count that keeps Discard and
+  disables Save. While it has something to report
   (unsaved changes, a refusal, "Saved", or a `summary` after a save) it stays
   in reach: as a card's footer it sticks to the bottom of the screen on a
   narrow card. When one save covers several cards, such as an agent profile

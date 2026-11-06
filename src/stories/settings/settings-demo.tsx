@@ -310,9 +310,10 @@ function LimitsSection({ workspace, patch, viewer }: SectionProps) {
       description="Ads pause when a cap is reached."
       footer={
         <SettingsSaveBar
-          changes={invalid ? 0 : changed.length}
+          changes={changed.length}
           state={state}
           error={error}
+          invalid={invalid ? 'Enter each cap as a dollar amount before saving.' : undefined}
           saveLabel="Save caps"
           disabledReason={owner ? undefined : ownerOnly('change ad spend caps')}
           onDiscard={() => setDraft({ perDay: String(workspace.caps.perDay ?? ''), total: String(workspace.caps.total ?? '') })}

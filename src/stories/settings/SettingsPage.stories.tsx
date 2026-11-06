@@ -48,5 +48,5 @@ export const TeamLinkOnly: Story = { args: { section: 'team', delivery: 'link' }
 /** The `teams-react` panels in their cards: below 36rem of card each role picker takes its own line and Remove stays beside the name. */
 export const TeamPanels: Story = { render: () => <TeamPanelsDemo /> }
 
-/** One save across several cards, as an agent profile's: the group bar follows the last card it saves and stays at the bottom of the screen while it has something to report. */
+/** One save across several cards, as an agent profile's: the group bar follows the last card it saves and stays at the bottom of the screen while it has something to report. Clear Model: the bar says why it cannot save and keeps Discard. */
 export const SaveGroup: Story = { render: () => <SaveGroupDemo /> }
