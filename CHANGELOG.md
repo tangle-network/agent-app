@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+
+- feat(plans): own turn plan-mode resolution (#1473)
+
 ## 2.0.0
 
 - feat(teams-react)!: retire MembersPanel, InvitationsPanel and InviteForm (#1470)
