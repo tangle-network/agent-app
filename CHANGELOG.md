@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.3
+
+- fix(deps): better-auth and oauth-provider 1.7.18 (#1471)
+
 ## 2.0.2
 
 - feat(journeys): record a journey on a real phone context (#1474)
