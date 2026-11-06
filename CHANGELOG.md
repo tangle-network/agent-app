@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.25
+
+- fix(web-react): reconnect a dropped chat turn from the last stamped seq (#1468)
+
 ## 1.0.24
 
 - fix(settings-react): the save bar says why edits cannot be saved yet; a late #hash card still reveals (#1467)
