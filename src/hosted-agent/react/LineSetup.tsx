@@ -283,7 +283,7 @@ export function LineSetup({ client, scopeKey, initialTargetId, targetLabel, canM
               <strong>{line.address}</strong>
               {line.transport === 'imessage' && line.connect && line.routerAddress && line.targetId !== null && <p>Send <code>{line.connect}</code> to {line.routerAddress}. Then message the number Inkbox sends you.</p>}
               <LineMessageAction line={line} />
-              {isSharedEntry(line) && line.targetId !== null && <p className="tangle-lines__answering-app" role="status">{line.answering && line.targetLabel
+              {isSharedEntry(line) && line.targetId !== null && <p className="tangle-lines__answering-app">{line.answering && line.targetLabel
                 ? `${line.targetLabel} answers this shared number.`
                 : 'No app answers this shared number yet.'}</p>}
               {isSharedEntry(line) && dedicatedUpgrade && line.targetId !== null

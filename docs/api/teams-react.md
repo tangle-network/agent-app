@@ -4,27 +4,11 @@
 
 Source: `src/teams-react/index.ts`
 
-12 exports.
-
-### `InvitationsPanel`
-
-`function`
-
-```ts
-({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelProps) => Element
-```
-
-### `InvitationsPanelProps`
-
-`interface` — Define properties and callbacks for managing workspace invitations and user roles
-
-```ts
-interface InvitationsPanelProps
-```
+8 exports.
 
 ### `InvitationView`
 
-`interface` — One invitation row as `InvitationsPanel` renders it — the shape `invitations-api` returns.
+`interface` — One invitation row as the invitations list renders it — the shape `invitations-api` returns.
 
 ```ts
 interface InvitationView
@@ -78,25 +62,9 @@ type InviteAcceptStatus
 interface InviteTokenPageProps
 ```
 
-### `MembersPanel`
-
-`function`
-
-```ts
-({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…
-```
-
-### `MembersPanelProps`
-
-`interface` — Define properties and callbacks for managing members and their roles in a workspace panel
-
-```ts
-interface MembersPanelProps
-```
-
 ### `MemberView`
 
-`interface` — One member row as the panel renders it — the shape `members-api` returns.
+`interface` — One member row as the members list renders it — the shape `members-api` returns.
 
 ```ts
 interface MemberView

@@ -1,7 +1,7 @@
 /**
  * Who may change a member's access, and the words for a role shown as text.
- * `MembersPanel` and the settings `MembersSection` both read these, so the two
- * member lists apply one rule.
+ * The settings `MembersSection` reads these, so every member list applies one
+ * rule.
  */
 
 import { hasWorkspaceRole, type WorkspaceRole } from '../../teams/roles'

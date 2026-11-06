@@ -3,13 +3,13 @@
  * interface-only and callback-driven: the components never import an app's
  * router, fetch client, or toast system. The host passes data in and supplies
  * the async callbacks (which it backs with `./teams/members-api` or
- * `./teams/invitations-api` over fetch), so the same panel mounts in any app.
+ * `./teams/invitations-api` over fetch), so the same surface mounts in any app.
  */
 
 import type { WorkspaceRole } from '../teams/roles'
 import type { InvitationEmailStatus, InvitationPermission, InvitationStatus } from '../teams/invitations'
 
-/** One member row as the panel renders it — the shape `members-api` returns. */
+/** One member row as the members list renders it — the shape `members-api` returns. */
 export interface MemberView {
   id: string
   userId: string | null
@@ -22,30 +22,7 @@ export interface MemberView {
   inherited?: boolean
 }
 
-/** Define properties and callbacks for managing members and their roles in a workspace panel */
-export interface MembersPanelProps {
-  members: MemberView[]
-  /** The viewer's effective role — gates which controls are interactive. */
-  currentRole: WorkspaceRole
-  /** The viewer's user id, so their own row offers no role change or removal, as in `MembersSection`. */
-  currentUserId?: string | null
-  /** Invite a member; resolve with the shareable invite URL (or void). */
-  onInvite(input: { email: string; role: WorkspaceRole }): Promise<{ inviteUrl?: string } | void>
-  /** Change a member's role. */
-  onChangeRole(input: { memberId: string; role: WorkspaceRole }): Promise<void>
-  /** Remove a member. */
-  onRemove(input: { memberId: string }): Promise<void>
-  /** Optional toast/notice hook; defaults to a no-op (host owns its UX). */
-  onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
-  /**
-   * Show the built-in invite form. Default `true`. An app that drives invites
-   * through `InvitationsPanel` (the rich email flow) sets this `false` so the
-   * members panel is list-only and the two don't present competing invite UIs.
-   */
-  showInviteForm?: boolean
-}
-
-/** One invitation row as `InvitationsPanel` renders it — the shape `invitations-api` returns. */
+/** One invitation row as the invitations list renders it — the shape `invitations-api` returns. */
 export interface InvitationView {
   id: string
   email: string
@@ -58,23 +35,6 @@ export interface InvitationView {
   acceptedAt?: Date | number | string | null
   /** Shareable accept link, for copy-to-clipboard. */
   inviteUrl: string
-}
-
-/** Define properties and callbacks for managing workspace invitations and user roles */
-export interface InvitationsPanelProps {
-  invitations: InvitationView[]
-  /** The viewer's effective role — gates whether the invite controls are interactive. */
-  currentRole: WorkspaceRole
-  /** Create an invitation (sends the email); resolve with the shareable URL (or void). */
-  onInvite(input: { email: string; role: WorkspaceRole }): Promise<{ inviteUrl?: string } | void>
-  /** Resend the invitation email. */
-  onResend(input: { invitationId: string }): Promise<void>
-  /** Revoke a pending invitation. */
-  onRevoke(input: { invitationId: string }): Promise<void>
-  /** Copy the invite link; defaults to `navigator.clipboard.writeText`. */
-  onCopy?(input: { inviteUrl: string }): void | Promise<void>
-  /** Optional toast/notice hook; defaults to a no-op (host owns its UX). */
-  onNotice?(notice: { kind: 'success' | 'error'; message: string }): void
 }
 
 /** Define possible statuses for the acceptance state of an invitation */
