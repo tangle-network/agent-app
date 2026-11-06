@@ -4,7 +4,7 @@
 
 Source: `src/plans/index.ts`
 
-22 exports.
+26 exports.
 
 ### `canTransitionPlanStatus`
 
@@ -54,6 +54,14 @@ type ChatPlanStatus
 interface DurablePlanLike
 ```
 
+### `harnessSupportsPlanMode`
+
+`function` — Whether a harness can submit durable plans.
+
+```ts
+(harness: string | null | undefined, planCapableHarnesses?: readonly string[] | undefined) => boolean
+```
+
 ### `isTerminalPlanStatus`
 
 `function`
@@ -76,6 +84,14 @@ interface DurablePlanLike
 
 ```ts
 (url: URL) => PlanLookupQuery
+```
+
+### `parsePlanModeFormValue`
+
+`function` — Parse the new-thread form field without treating malformed input as false.
+
+```ts
+(value: FormDataEntryValue | null) => PlanModeFormValue
 ```
 
 ### `parsePlanSubmittedEvent`
@@ -150,6 +166,14 @@ type PlanDecisionOutcome
 type PlanLookupQuery
 ```
 
+### `PlanModeFormValue`
+
+`type`
+
+```ts
+type PlanModeFormValue
+```
+
 ### `planPartKey`
 
 `function` — Generate a unique key string for a given plan identifier
@@ -172,6 +196,14 @@ type PlanLookupQuery
 
 ```ts
 (plan: ChatPlan) => ChatPlanPersistedPart
+```
+
+### `resolveTurnPlanMode`
+
+`function` — Effective plan mode for one chat turn.
+
+```ts
+(input: { requested: boolean | undefined; threadPlanMode: boolean | null | undefined; workspaceDefault: boolean; harnes…
 ```
 
 ### `toChatPlan`

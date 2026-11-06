@@ -99,7 +99,7 @@ interface BuildAppToolMcpServersOptions
 `function`
 
 ```ts
-(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
+(publicOrigin: string | URL, extraDomains?: readonly string[]) => { mode: "blocked" | "open" | "strict"; allowDomains?:…
 ```
 
 ### `buildSandboxToolBinDirScript`
@@ -1856,7 +1856,7 @@ interface StoppedSandboxResumeRecovery
 
 ### `StorageConfig`
 
-`interface` — S3-compatible storage provider configuration (BYOS3 - Bring Your Own S3).
+`interface` — Customer S3-compatible snapshot storage (AWS S3, GCS HMAC or R2).
 
 ```ts
 interface StorageConfig

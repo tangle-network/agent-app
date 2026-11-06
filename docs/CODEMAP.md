@@ -81,7 +81,7 @@ _155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./operator`](api/operator.md) | 62 | `chat-routes`, `crypto`, `platform`, `stream`, `web` |
 | [`./peer-floors/check`](api/peer-floors-check.md) | 23 | `signoff` |
 | [`./peer-floors/cli`](api/peer-floors-cli.md) | 1 | `signoff` |
-| [`./plans`](api/plans.md) | 22 | — |
+| [`./plans`](api/plans.md) | 26 | — |
 | [`./plans/drizzle`](api/plans-drizzle.md) | 3 | — |
 | [`./platform`](api/platform.md) | 146 | `billing`, `crypto`, `runtime`, `sandbox`, `web` |
 | [`./platform/billing-config`](api/platform-billing-config.md) | 2 | `billing`, `crypto`, `runtime`, `sandbox`, `web` |
@@ -858,9 +858,9 @@ Depends on: `signoff`
 
 ## `./plans`
 
-Source: `src/plans/index.ts` · 22 exports
+Source: `src/plans/index.ts` · 26 exports
 
-`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `durablePlanConflictCode`, `DurablePlanLike`, `isTerminalPlanStatus`, `parsePlanDecisionBody`, `parsePlanLookupQuery`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `PlanDecisionBody`, `PlanDecisionOutcome`, `planDecisionRefusalResponse`, `planFollowUpTurnId`, `PlanLookupQuery`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`, `toChatPlan`
+`canTransitionPlanStatus`, `ChatPlan`, `ChatPlanPersistedPart`, `ChatPlanStatus`, `durablePlanConflictCode`, `DurablePlanLike`, `harnessSupportsPlanMode`, `isTerminalPlanStatus`, `parsePlanDecisionBody`, `parsePlanLookupQuery`, `parsePlanModeFormValue`, `parsePlanSubmittedEvent`, `ParsePlanSubmittedResult`, `persistedPartToPlan`, `PLAN_SUBMITTED_EVENT`, `PlanDecisionBody`, `PlanDecisionOutcome`, `planDecisionRefusalResponse`, `planFollowUpTurnId`, `PlanLookupQuery`, `PlanModeFormValue`, `planPartKey`, `planRevisionKey`, `planToPersistedPart`, `resolveTurnPlanMode`, `toChatPlan`
 
 [Full API →](api/plans.md)
 
