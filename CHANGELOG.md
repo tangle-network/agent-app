@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.24
+
+- fix(settings-react): the save bar says why edits cannot be saved yet; a late #hash card still reveals (#1467)
+
 ## 1.0.23
 
 - test(agent-profiles): a stale binding version must reject as a conflict (#1465)
