@@ -4,7 +4,15 @@
 
 Source: `src/hub-approvals/index.ts`
 
-27 exports.
+31 exports.
+
+### `assertHubApprovalFresh`
+
+`function` — Refuse a decision whose target moved.
+
+```ts
+(item: Pick<HubApprovalItem, "id" | "revisionDigest">, current: string | undefined) => void
+```
 
 ### `formatMinorAmount`
 
@@ -118,6 +126,22 @@ type HubActionPreview
 interface HubActionReceipt
 ```
 
+### `HubApprovalBindingParts`
+
+`interface` — The exact material a decision executes: the action path, its input and the account.
+
+```ts
+interface HubApprovalBindingParts
+```
+
+### `hubApprovalDigest`
+
+`function` — Compute the digest that binds one approval card to exactly what it shows.
+
+```ts
+(parts: HubApprovalBindingParts) => Promise<string>
+```
+
 ### `HubApprovalFeedback`
 
 `interface` — The host authenticates the reviewer, binds provenance and computes the edit diff.
@@ -204,6 +228,14 @@ interface HubPreviewMedia
 
 ```ts
 (actionPath: string) => { provider: string; action: string; }
+```
+
+### `StaleApprovalError`
+
+`class` — Thrown when the current binding no longer matches the rendered card.
+
+```ts
+class StaleApprovalError
 ```
 
 ### `summarizeHubResult`

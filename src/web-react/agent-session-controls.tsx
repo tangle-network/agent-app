@@ -21,9 +21,9 @@
  *  - `layout="inline"` (default): model, harness, and effort sit side by side as
  *    pills. This is the original arrangement; existing call sites that mounted
  *    `ModelPicker` + a harness picker + `EffortPicker` in a row get the same UI.
- *  - `layout="compact"`: the model picker stays inline and visible; the agent
- *    backend ("harness") and reasoning-effort controls — internal jargon a user
- *    rarely needs — tuck behind a single gear popover with plain-English copy.
+ *  - `layout="compact"`: the model picker stays inline and visible; the
+ *    harness and reasoning-effort controls — settings a user rarely needs —
+ *    tuck behind a single gear popover with plain-English copy.
  *
  * Two trigger treatments, also additive (`variant`, see `PickerVariant` in
  * `./controls`): `chip` (default) is the bordered pill every child draws
@@ -44,6 +44,7 @@
 
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  isModelCompatibleWithHarness,
   snapHarnessToModel,
   snapModelToHarness,
   type Harness,
@@ -202,7 +203,7 @@ export function HarnessPicker({
         onMouseLeave={locked ? hideHint : undefined}
         onFocus={locked ? showHint : undefined}
         onBlur={locked ? hideHint : undefined}
-        title="Agent backend"
+        title="Harness"
         data-state={!locked && open ? 'open' : 'closed'}
         className={
           field
@@ -301,7 +302,9 @@ export interface AgentSessionControlsProps {
   /** Current harness; harness↔model coherence is enforced on every change. */
   harness: Harness
   onHarnessChange(harness: Harness): void
-  /** Harnesses to offer; defaults to the labeled set. */
+  /** Harnesses to offer; defaults to the labeled set. Intersected with the
+   *  harnesses the capability table allows for the selected model — the
+   *  current harness always stays listed. */
   availableHarnesses?: ReadonlyArray<Harness>
   /** Reasoning-effort value + setter. Shown only when the selected model
    *  `supportsReasoning`, matching `EffortPicker`'s guidance. */
@@ -419,6 +422,12 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   const { containerRef: popoverRef, triggerRef, panelRef, triggerProps } = usePopover(open, setOpen)
   const panelId = useId()
 
+  // Offer only harnesses the capability table allows for the selected model
+  // (#802); the current harness stays listed so a pinned pair never loses its
+  // own row.
+  const offeredHarnesses = (availableHarnesses ?? (Object.keys(HARNESS_LABELS) as Harness[]))
+    .filter((h) => h === harness || isModelCompatibleWithHarness(h, model))
+
   const selectedModel = models.find((m) => m.id === model)
   const showEffort = selectedModel?.supportsReasoning ?? true
 
@@ -438,8 +447,8 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
       <AgentSettingsPopover summary={settingsSummary ?? selectedModel?.name ?? model} className={className}>
         {profileControl != null && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Profile</p>{profileControl}</div>}
         <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Model</p>{modelPicker}</div>
-        {showHarness && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Agent backend</p><HarnessPicker value={harness} onChange={(next) => { if (next) onHarness(next) }} available={availableHarnesses} lockReason={harnessLockReason} fullWidth variant={variant} /></div>}
-        {showEffort && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Thinking</p><EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} fullWidth variant={variant} /></div>}
+        {showHarness && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Harness</p><HarnessPicker value={harness} onChange={(next) => { if (next) onHarness(next) }} available={offeredHarnesses} lockReason={harnessLockReason} fullWidth variant={variant} /></div>}
+        {showEffort && <div className="space-y-1.5"><p className="text-xs font-medium text-muted-foreground">Reasoning effort</p><EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} fullWidth variant={variant} /></div>}
       </AgentSettingsPopover>
     )
   }
@@ -455,7 +464,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
           <HarnessPicker
             value={harness}
             onChange={(next) => { if (next) onHarness(next) }}
-            available={availableHarnesses}
+            available={offeredHarnesses}
             lockReason={harnessLockReason}
             variant={variant}
           />
@@ -477,7 +486,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
             {...triggerProps}
             aria-controls={open ? panelId : undefined}
             onClick={() => setOpen(!open)}
-            title="Model settings — pick the agent backend and how hard it thinks"
+            title="Model settings — pick the harness and how hard it thinks"
             className={`flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted ${FOCUS_RING}`}
             data-state={open ? 'open' : 'closed'}
           >
@@ -492,11 +501,11 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
           >
               {showHarness && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-foreground">Agent backend</p>
+                  <p className="text-xs font-medium text-foreground">Harness</p>
                   <HarnessPicker
                     value={harness}
                     onChange={(next) => { if (next) onHarness(next) }}
-                    available={availableHarnesses}
+                    available={offeredHarnesses}
                     fullWidth
                     lockReason={harnessLockReason}
                     variant={variant}
@@ -508,7 +517,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
               )}
               {showEffort && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-foreground">Thinking</p>
+                  <p className="text-xs font-medium text-foreground">Reasoning effort</p>
                   <EffortPicker value={effort} onChange={onEffortChange} levels={effortLevels} label="" fullWidth variant={variant} />
                   <p className="text-xs leading-snug text-muted-foreground">
                     How hard the agent thinks before answering. Higher is slower but more thorough.

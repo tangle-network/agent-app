@@ -137,7 +137,7 @@ describe('canonical picker popovers escape their host container', () => {
 
   it('the thinking panel portals out of a scrolling host', () => {
     renderInHost()
-    fireEvent.click(screen.getByRole('button', { name: /Thinking/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Reasoning effort/ }))
     const panel = openPanels()
     expect(panel).toHaveLength(1)
     expectEscapesHost(panel[0]!)
@@ -164,7 +164,7 @@ describe('canonical picker popovers escape their host container', () => {
     const panel = openPanels()
     expect(panel).toHaveLength(1)
     expectEscapesHost(panel[0]!)
-    expect(panel[0]!.textContent).toContain('Agent backend')
+    expect(panel[0]!.textContent).toContain('Harness')
   })
 
   it('a click on a portaled row still reaches its handler', () => {
@@ -203,7 +203,7 @@ describe('canonical picker popovers escape their host container', () => {
 
   it('an outside click still closes the popover', () => {
     renderInHost()
-    fireEvent.click(screen.getByRole('button', { name: /Thinking/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Reasoning effort/ }))
     expect(openPanels()).toHaveLength(1)
     fireEvent.mouseDown(document.body)
     expect(openPanels()).toHaveLength(0)

@@ -471,7 +471,7 @@ function AgentProfileEditorView({ className, error, jsonDirty, unsupportedResour
             <HarnessPicker id={`${id}-harness`} variant="field" value={harness ?? ''} onChange={changeHarness}
               available={config.harnesses} defaultOption={{ label: catalog?.defaultLabel ?? 'Product default' }} disabled={editingDisabled} />
           </Field>}
-          <Field label="Thinking" htmlFor={`${id}-thinking`} info="How hard the agent reasons before answering. Auto lets the harness decide.">
+          <Field label="Reasoning effort" htmlFor={`${id}-thinking`} info="How hard the agent reasons before answering. Auto lets the harness decide.">
             <EffortPicker id={`${id}-thinking`} variant="field" label="" value={value.model?.reasoningEffort ?? 'auto'} levels={thinkingLevels}
               disabled={editingDisabled}
               onChange={level => model({ ...value.model, reasoningEffort: level === 'auto' ? undefined : level as NonNullable<AgentProfile['model']>['reasoningEffort'] })} />

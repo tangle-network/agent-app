@@ -75,7 +75,7 @@ export const Compact: Story = {
 
 /**
  * Compact with the gear popover held open — the plain-English settings copy,
- * and the state to eyeball for #414: Agent backend and Thinking must both
+ * and the state to eyeball for #414: Harness and Reasoning effort must both
  * reach the panel's inner edge and carry the same pill radius as the model
  * selector, so the panel reads as one control stack.
  */
@@ -204,14 +204,16 @@ export const AllStates: Story = {
   ),
 }
 
-/** Harness menu held open across the branded set — every mark visible in its
- *  row, selected one checked. */
+/** Harness menu held open across the branded set, selected one checked. The
+ *  capability filter (#802) drops harnesses the selected model cannot run, so
+ *  vendor-locked Kimi (Moonshot) is absent for the default Anthropic model —
+ *  the Glyphs story below shows every mark unfiltered. */
 export const HarnessMenuOpen: Story = {
   name: 'Harness menu open',
   parameters: { layout: 'padded' },
   render: () => (
     <div className="pt-[460px]">
-      <AutoClick selector="button[title='Agent backend']">
+      <AutoClick selector="button[title='Harness']">
         {useSessionControls({ availableHarnesses: GLYPH_HARNESSES })}
       </AutoClick>
     </div>

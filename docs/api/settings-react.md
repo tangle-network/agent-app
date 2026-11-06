@@ -227,7 +227,7 @@ interface SettingsNavSection
 `function`
 
 ```ts
-({ changes, summary, onDiscard, onSave, state, error, saveLabel, disabledReason, placement, }: SettingsSaveBarProps) =>…
+({ changes, summary, invalid, onDiscard, onSave, state, error, saveLabel, disabledReason, placement, }: SettingsSaveBar…
 ```
 
 ### `SettingsSaveBarProps`
