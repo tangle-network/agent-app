@@ -17372,6 +17372,14 @@ type ChatPlanStatus
 interface DurablePlanLike
 ```
 
+### `harnessSupportsPlanMode`
+
+`function` — Whether a harness can submit durable plans.
+
+```ts
+(harness: string | null | undefined, planCapableHarnesses?: readonly string[] | undefined) => boolean
+```
+
 ### `isTerminalPlanStatus`
 
 `function`
@@ -17394,6 +17402,14 @@ interface DurablePlanLike
 
 ```ts
 (url: URL) => PlanLookupQuery
+```
+
+### `parsePlanModeFormValue`
+
+`function` — Parse the new-thread form field without treating malformed input as false.
+
+```ts
+(value: FormDataEntryValue | null) => PlanModeFormValue
 ```
 
 ### `parsePlanSubmittedEvent`
@@ -17468,6 +17484,14 @@ type PlanDecisionOutcome
 type PlanLookupQuery
 ```
 
+### `PlanModeFormValue`
+
+`type`
+
+```ts
+type PlanModeFormValue
+```
+
 ### `planPartKey`
 
 `function` — Generate a unique key string for a given plan identifier
@@ -17490,6 +17514,14 @@ type PlanLookupQuery
 
 ```ts
 (plan: ChatPlan) => ChatPlanPersistedPart
+```
+
+### `resolveTurnPlanMode`
+
+`function` — Effective plan mode for one chat turn.
+
+```ts
+(input: { requested: boolean | undefined; threadPlanMode: boolean | null | undefined; workspaceDefault: boolean; harnes…
 ```
 
 ### `toChatPlan`
@@ -22759,7 +22791,7 @@ interface BuildAppToolMcpServersOptions
 `function`
 
 ```ts
-(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy
+(publicOrigin: string | URL, extraDomains?: readonly string[]) => { mode: "blocked" | "open" | "strict"; allowDomains?:…
 ```
 
 ### `buildSandboxToolBinDirScript`
@@ -24516,7 +24548,7 @@ interface StoppedSandboxResumeRecovery
 
 ### `StorageConfig`
 
-`interface` — S3-compatible storage provider configuration (BYOS3 - Bring Your Own S3).
+`interface` — Customer S3-compatible snapshot storage (AWS S3, GCS HMAC or R2).
 
 ```ts
 interface StorageConfig
@@ -31954,25 +31986,9 @@ type WorkspaceRole
 
 Source: `src/teams-react/index.ts` · depends on `teams`, `web-react`
 
-### `InvitationsPanel`
-
-`function`
-
-```ts
-({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelProps) => Element
-```
-
-### `InvitationsPanelProps`
-
-`interface` — Define properties and callbacks for managing workspace invitations and user roles
-
-```ts
-interface InvitationsPanelProps
-```
-
 ### `InvitationView`
 
-`interface` — One invitation row as `InvitationsPanel` renders it — the shape `invitations-api` returns.
+`interface` — One invitation row as the invitations list renders it — the shape `invitations-api` returns.
 
 ```ts
 interface InvitationView
@@ -32026,25 +32042,9 @@ type InviteAcceptStatus
 interface InviteTokenPageProps
 ```
 
-### `MembersPanel`
-
-`function`
-
-```ts
-({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…
-```
-
-### `MembersPanelProps`
-
-`interface` — Define properties and callbacks for managing members and their roles in a workspace panel
-
-```ts
-interface MembersPanelProps
-```
-
 ### `MemberView`
 
-`interface` — One member row as the panel renders it — the shape `members-api` returns.
+`interface` — One member row as the members list renders it — the shape `members-api` returns.
 
 ```ts
 interface MemberView

@@ -211,10 +211,22 @@ function canonicalizeJson(value: unknown): unknown {
 function normalizedEgressPolicy(policy: EgressPolicy): string {
   const normalized: Record<string, unknown> = { ...policy }
   if (policy.mode === 'strict') {
+    // Entries arrive as bare domains or `{ domain, allowPrivateIps }` records;
+    // canonicalize both shapes so an equivalent record and bare entry compare
+    // equal while differing private-IP allowances still mismatch.
     normalized.allowDomains = [...new Set(
       (policy.allowDomains ?? [])
-        .map((domain) => domain.trim().toLowerCase())
-        .filter(Boolean),
+        .map((entry) => {
+          if (typeof entry === 'string') {
+            const domain = entry.trim().toLowerCase()
+            return domain ? JSON.stringify({ domain, allowPrivateIps: [] }) : null
+          }
+          const domain = entry.domain.trim().toLowerCase()
+          return domain
+            ? JSON.stringify({ domain, allowPrivateIps: [...new Set(entry.allowPrivateIps)].sort() })
+            : null
+        })
+        .filter((entry): entry is string => entry !== null),
     )].sort()
     normalized.includeImplicitDomains = policy.includeImplicitDomains !== false
   } else {

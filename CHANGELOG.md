@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.2
+
+- feat(journeys): record a journey on a real phone context (#1474)
+
+## 2.0.1
+
+- feat(plans): own turn plan-mode resolution (#1473)
+
+## 2.0.0
+
+- feat(teams-react)!: retire MembersPanel, InvitationsPanel and InviteForm (#1470)
+
 ## 1.0.26
 
 - fix(web-react): canonical picker contract — provider-qualified ids, Harness/Reasoning effort labels, capability-filtered harness menu (#1469)

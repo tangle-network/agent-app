@@ -13500,6 +13500,12 @@
           "doc": "The SDK's plan snapshot, as the fields the projection reads."
         },
         {
+          "name": "harnessSupportsPlanMode",
+          "kind": "function",
+          "signature": "(harness: string | null | undefined, planCapableHarnesses?: readonly string[] | undefined) => boolean",
+          "doc": "Whether a harness can submit durable plans."
+        },
+        {
           "name": "isTerminalPlanStatus",
           "kind": "function",
           "signature": "(status: ChatPlanStatus) => boolean",
@@ -13516,6 +13522,12 @@
           "kind": "function",
           "signature": "(url: URL) => PlanLookupQuery",
           "doc": "Validate a current-plan lookup (`?workspaceId&threadId[&planId&revision]`)."
+        },
+        {
+          "name": "parsePlanModeFormValue",
+          "kind": "function",
+          "signature": "(value: FormDataEntryValue | null) => PlanModeFormValue",
+          "doc": "Parse the new-thread form field without treating malformed input as false."
         },
         {
           "name": "parsePlanSubmittedEvent",
@@ -13572,6 +13584,12 @@
           "doc": null
         },
         {
+          "name": "PlanModeFormValue",
+          "kind": "type",
+          "signature": "type PlanModeFormValue",
+          "doc": null
+        },
+        {
           "name": "planPartKey",
           "kind": "function",
           "signature": "(planId: string) => string",
@@ -13588,6 +13606,12 @@
           "kind": "function",
           "signature": "(plan: ChatPlan) => ChatPlanPersistedPart",
           "doc": "Resolve a ChatPlan into its persisted part representation for storage or transmission"
+        },
+        {
+          "name": "resolveTurnPlanMode",
+          "kind": "function",
+          "signature": "(input: { requested: boolean | undefined; threadPlanMode: boolean | null | undefined; workspaceDefault: boolean; harnes…",
+          "doc": "Effective plan mode for one chat turn."
         },
         {
           "name": "toChatPlan",
@@ -17703,7 +17727,7 @@
         {
           "name": "buildProductEgressPolicy",
           "kind": "function",
-          "signature": "(publicOrigin: string | URL, extraDomains?: readonly string[]) => EgressPolicy",
+          "signature": "(publicOrigin: string | URL, extraDomains?: readonly string[]) => { mode: \"blocked\" | \"open\" | \"strict\"; allowDomains?:…",
           "doc": null
         },
         {
@@ -19024,7 +19048,7 @@
           "name": "StorageConfig",
           "kind": "interface",
           "signature": "interface StorageConfig",
-          "doc": "S3-compatible storage provider configuration (BYOS3 - Bring Your Own S3)."
+          "doc": "Customer S3-compatible snapshot storage (AWS S3, GCS HMAC or R2)."
         },
         {
           "name": "storeSecret",
@@ -24750,22 +24774,10 @@
       "error": null,
       "exports": [
         {
-          "name": "InvitationsPanel",
-          "kind": "function",
-          "signature": "({ invitations, currentRole, onInvite, onResend, onRevoke, onCopy, onNotice, }: InvitationsPanelProps) => Element",
-          "doc": null
-        },
-        {
-          "name": "InvitationsPanelProps",
-          "kind": "interface",
-          "signature": "interface InvitationsPanelProps",
-          "doc": "Define properties and callbacks for managing workspace invitations and user roles"
-        },
-        {
           "name": "InvitationView",
           "kind": "interface",
           "signature": "interface InvitationView",
-          "doc": "One invitation row as `InvitationsPanel` renders it — the shape `invitations-api` returns."
+          "doc": "One invitation row as the invitations list renders it — the shape `invitations-api` returns."
         },
         {
           "name": "InviteAcceptDetails",
@@ -24804,22 +24816,10 @@
           "doc": "Props for the invite-token route page."
         },
         {
-          "name": "MembersPanel",
-          "kind": "function",
-          "signature": "({ members, currentRole, currentUserId, onInvite, onChangeRole, onRemove, onNotice, showInviteForm, }: MembersPanelProp…",
-          "doc": null
-        },
-        {
-          "name": "MembersPanelProps",
-          "kind": "interface",
-          "signature": "interface MembersPanelProps",
-          "doc": "Define properties and callbacks for managing members and their roles in a workspace panel"
-        },
-        {
           "name": "MemberView",
           "kind": "interface",
           "signature": "interface MemberView",
-          "doc": "One member row as the panel renders it — the shape `members-api` returns."
+          "doc": "One member row as the members list renders it — the shape `members-api` returns."
         }
       ]
     },

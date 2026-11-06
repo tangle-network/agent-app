@@ -770,6 +770,50 @@ describe('ensureWorkspaceSandbox lifecycle', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
+  it('compares strict allow-domain string and record entries semantically on reuse', async () => {
+    const get = vi.fn().mockResolvedValue({
+      policy: {
+        mode: 'strict',
+        allowDomains: [
+          { domain: 'b.example.com', allowPrivateIps: [] },
+          { domain: 'a.example.com', allowPrivateIps: ['10.0.0.0/8'] },
+        ],
+      },
+      source: 'sandbox',
+    })
+    const update = vi.fn()
+    const running = fakeBox({
+      name: 'box-w1',
+      metadata: { harness: 'opencode' },
+      egress: { get, update },
+    } as unknown as Partial<SandboxInstance>)
+    listMock.mockResolvedValue([running])
+    const shell = shellFor({ apiKey: 'k', baseUrl: 'https://s' }, {
+      egressPolicy: {
+        mode: 'strict',
+        allowDomains: ['b.example.com', { domain: 'a.example.com', allowPrivateIps: ['10.0.0.0/8'] }],
+      },
+    })
+
+    await expect(ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })).resolves.toBe(running)
+
+    get.mockResolvedValue({
+      policy: {
+        mode: 'strict',
+        allowDomains: [
+          { domain: 'b.example.com', allowPrivateIps: ['10.0.0.0/8'] },
+          { domain: 'a.example.com', allowPrivateIps: ['10.0.0.0/8'] },
+        ],
+      },
+      source: 'sandbox',
+    })
+    await expect(ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })).rejects.toMatchObject({
+      name: 'SandboxEgressPolicyMismatchError',
+    })
+    expect(update).not.toHaveBeenCalled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
   it('rejects a mismatch in a future strict policy field instead of silently ignoring it', async () => {
     type FutureEgressPolicy = EgressPolicy & {
       dnsPolicy: { enforcement: 'audit' | 'enforce' }

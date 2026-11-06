@@ -27,6 +27,7 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   prime: '.prime/agent/skills',
   hermes: null,
   forge: null,
+  grok: null,
   openclaw: 'skills',
   acp: null,
   cursor: null,

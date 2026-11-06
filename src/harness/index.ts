@@ -217,6 +217,7 @@ const HARNESS_CAPABILITIES: Record<Harness, HarnessCapabilities> = {
   amp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   'factory-droids': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   forge: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
+  grok: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   cursor: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   'cli-base': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
 }

@@ -49,6 +49,7 @@ This kit is that harness made app-agnostic, with the scoring rule fixed: see [Ho
      const page = await j.open('founder', 'member')               // recorded, already signed in
      await j.step('Founder opens a new thread', () => page.goto(`/app/${WS}/chat/new`), page)
      await j.shot('first-screen', page)                           // first-screen-desktop.png + -phone.png
+     const phone = await j.open('founder-phone', 'member', { device: 'phone' }) // a recorded 390x844 touch phone
      const t = await j.sendNew(page, 'Research the three competitors most likely to lose me deals…')
      // t: { outcome, error, failures, firstProgressS, firstTextS, completeS, replyChars, stages, threadId, replyFile }
      await j.wait('Waiting for the file list', () => page.getByText('knowledge').waitFor({ timeout: 60_000 }), page)

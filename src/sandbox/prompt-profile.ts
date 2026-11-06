@@ -1,4 +1,5 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
+import { parseBackendType } from '@tangle-network/sandbox'
 import type { AgentProfileMcpServer, AgentProfile, ReasoningEffort } from '@tangle-network/agent-interface'
 import { mergeAgentProfiles } from '@tangle-network/agent-interface/profile'
 import { type Harness, DEFAULT_HARNESS, isHarness, assertHarnessModelCompatible } from '../harness/index'
@@ -248,7 +249,10 @@ export async function resolveSandboxPromptBackend(
     options.onProfileResolved(await fingerprintAgentProfile(profile, { model: model?.model, harness }))
   }
   return {
-    type: harness,
+    // BackendConfig admits dispatchable backend ids only; parseBackendType
+    // fails fast (and type-narrows) for historical-only harness identities
+    // such as `forge` instead of letting the platform reject them remotely.
+    type: parseBackendType(harness),
     profile,
     ...(model ? backendModelFields(model) : {}),
     ...(options.runtimeAttachments ? { runtimeAttachments: options.runtimeAttachments } : {}),
