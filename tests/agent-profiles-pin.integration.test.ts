@@ -103,4 +103,27 @@ describe('profile turn pin', () => {
     } finally { sqlite.close() }
   })
 
+  it('reports a stale binding version as a retryable conflict, not a raw constraint error', async () => {
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const { database } = d1(sqlite)
+    const store = createD1ProfileRevisionStore(database)
+    const key = { workspaceId: 'workspace', memberId: 'member', channel: 'chat' }
+    try {
+      const revision = await proposeRevision({ store, workspaceId: key.workspaceId, profileId: 'director', expectedRevisionId: null,
+        profile: { name: 'Director', prompt: { systemPrompt: 'You direct.' } }, knowledgeText: '', planDigest: PLAN,
+        author: { kind: 'person', id: 'owner' }, actorRole: 'owner', reason: 'Initial profile' })
+      // Another writer switches the binding to version 1 after this caller read version 0.
+      await switchProfile({ store, key, messageId: 'switch-first', content: 'switch profile', choice: { profileId: 'director' },
+        profiles: [{ id: 'director', name: 'Director', status: 'active' }], canSelect: async () => true,
+        prepareAuthority: async () => ({ planDigest: PLAN, healthy: true, conflicts: [] }) })
+      await expect(store.recordSwitch({
+        key, messageId: 'switch-second', inputHash: `sha256:${'c'.repeat(64)}`, conversationId: null,
+        profileId: 'director', revisionId: revision.id, pinnedRevisionId: revision.id,
+        authorityDigest: null, planDigest: PLAN, outcome: 'switched', message: 'Switched to Director', conflicts: [],
+      }, 0)).rejects.toMatchObject({ name: 'ProfileConflictError', message: 'Profile binding changed during switch' })
+      expect(sqlite.prepare('SELECT COUNT(*) AS n FROM agent_profile_switch_receipt').get()?.n).toBe(1)
+    } finally { sqlite.close() }
+  })
+
 })
