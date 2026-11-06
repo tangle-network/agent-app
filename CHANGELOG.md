@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+- feat(teams-react)!: retire MembersPanel, InvitationsPanel and InviteForm (#1470)
+
 ## 1.0.26
 
 - fix(web-react): canonical picker contract — provider-qualified ids, Harness/Reasoning effort labels, capability-filtered harness menu (#1469)
