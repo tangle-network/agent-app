@@ -8,9 +8,9 @@
  *   {type:'turn'|'metadata'|'error'|'turn_status', ...}          (route-level)
  *   {type:'interaction', data:{request}}                         (sidecar ask)
  *
- * Replayed lines carry an extra `seq` — transparently ignored. Works for
- * router-backed and sandbox-backed chats alike: anything producing these
- * lines (live pump, queued follow, resume replay) feeds the same callbacks.
+ * Replayed lines carry an extra `seq` — `consumeChatStream` tracks the last
+ * one so `streamChatTurn` can resume a dropped replay from the tail instead of
+ * replaying the whole turn.
  */
 
 import {
@@ -283,12 +283,17 @@ export interface ConsumeChatStreamResult {
   turnId: string | null
   /** True when any text/reasoning/tool activity was received. */
   receivedContent: boolean
+  /** The last `seq` a replayed line stamped (0 when none did): a resume after
+   *  a replay continues from here; after a live stream it starts from 0. */
+  lastSeq: number
 }
 
 /** Parse one NDJSON line into the callbacks. Exposed for tests. */
 export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
   turnId?: string
   receivedContent: boolean
+  /** The line's stamped buffer ordinal, when it carried a positive one. */
+  seq?: number
 } {
   let receivedContent = false
   let turnId: string | undefined
@@ -299,6 +304,9 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
   } catch {
     return { receivedContent } // tolerate a torn line
   }
+  const seq = typeof parsed.seq === 'number' && Number.isInteger(parsed.seq) && parsed.seq > 0
+    ? parsed.seq
+    : undefined
 
   if (parsed.kind === 'tool_result') {
     cb.onToolResult?.({
@@ -307,7 +315,7 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       label: parsed.label as string | undefined,
       outcome: (parsed.outcome ?? parsed.result) as ChatStreamToolResult['outcome'],
     })
-    return { receivedContent: true }
+    return seq === undefined ? { receivedContent: true } : { receivedContent: true, seq }
   }
 
   const evt = (parsed.kind === 'event' ? parsed.event : parsed) as Record<string, unknown>
@@ -457,20 +465,23 @@ export function dispatchChatStreamLine(line: string, cb: ChatStreamCallbacks): {
       break // turn_status and unknown line types are non-content
     }
   }
-  return { turnId, receivedContent }
+  return seq === undefined ? { turnId, receivedContent } : { turnId, receivedContent, seq }
 }
 
 /** Drain one NDJSON body into the callbacks. Throws on transport failure
- *  (caller decides whether to resume). */
+ *  (caller decides whether to resume). `seen` accumulates the last stamped seq
+ *  as lines arrive so it survives this stream dropping. */
 export async function consumeChatStream(
   body: ReadableStream<Uint8Array>,
   cb: ChatStreamCallbacks,
+  seen?: { lastSeq: number },
 ): Promise<ConsumeChatStreamResult> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
   let turnId: string | null = null
   let receivedContent = false
+  let lastSeq = 0
   // Callbacks already tracked (by `streamChatTurn`, across a resume) keep their state; otherwise this
   // stream owns one and settles it when the stream closes or fails.
   const owned = !trackedCallbacks.has(cb) && cb.onReasoningState ? trackChatReasoning(cb) : null
@@ -483,6 +494,10 @@ export async function consumeChatStream(
       cb.onTurnId?.(r.turnId)
     }
     if (r.receivedContent) receivedContent = true
+    if (r.seq !== undefined && r.seq > lastSeq) {
+      lastSeq = r.seq
+      if (seen) seen.lastSeq = lastSeq
+    }
   }
 
   try {
@@ -500,7 +515,7 @@ export async function consumeChatStream(
   } finally {
     owned?.end()
   }
-  return { turnId, receivedContent }
+  return { turnId, receivedContent, lastSeq }
 }
 
 /** Define options for managing and resuming streaming chat interactions with callbacks */
@@ -511,14 +526,27 @@ export interface StreamChatOptions {
   resume?: (turnId: string, fromSeq: number) => Promise<Response>
   callbacks: ChatStreamCallbacks
   /** Called before a resume replays from 0 so the UI can reset accumulated
-   *  turn state (text, reasoning, tool chips). */
+   *  turn state. A tail resume (fromSeq > 0) keeps it and does not call this. */
   onResetForResume?: () => void
+  /** Automatic reconnects after transport drops before the turn fails with the
+   *  last transport error. Default 5. */
+  maxReconnects?: number
+  /** Milliseconds to wait before reconnect attempt N (0-based); default
+   *  {@link defaultReconnectDelayMs}. */
+  reconnectDelayMs?: (attempt: number) => number
+}
+
+/** The default reconnect schedule: exponential from 500ms with ±50% jitter, capped at 8s. */
+export function defaultReconnectDelayMs(attempt: number, rand: () => number = Math.random): number {
+  return Math.min(8000, 500 * 2 ** attempt * (0.5 + rand()))
 }
 
 /**
- * Run one chat turn with automatic single-shot resume: if the transport drops
- * mid-turn and the server announced a turnId, reset and replay the buffered
- * turn. Server-side the turn keeps running either way (queued runner).
+ * Run one chat turn with bounded automatic resume: reconnect with backoff and
+ * resume from the last stamped seq — a live drop resets and replays from 0, a
+ * replay drop resumes the tail only, one reasoning tracker across all of it.
+ * The turn keeps running server-side (queued runner); once the reconnect
+ * budget is spent the last transport error surfaces.
  */
 export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeChatStreamResult> {
   // A progress-first response answers refusals in-stream; settle it into the response it stands for.
@@ -537,20 +565,37 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
       opts.callbacks.onTurnId?.(id)
     },
   }
-  // One reasoning state for the whole turn, across a resume, so a reconnect
+  // One reasoning state for the whole turn, across every resume, so a reconnect
   // neither duplicates the reasoning nor restarts its clock.
   const tracked = opts.callbacks.onReasoningState ? trackChatReasoning(withTurnId) : null
   const cb = tracked ?? withTurnId
+  const maxReconnects = opts.maxReconnects ?? 5
+  const delayMs = opts.reconnectDelayMs ?? defaultReconnectDelayMs
+  const seen = { lastSeq: 0 }
+  let attempt = 0
+  let body: ReadableStream<Uint8Array> | null = res.body
+  let lastErr: unknown = null
   try {
-    try {
-      return await consumeChatStream(res.body, cb)
-    } catch (transportErr) {
-      if (!turnId || !opts.resume) throw transportErr
-      opts.onResetForResume?.()
-      tracked?.replay()
-      const resumed = await opts.resume(turnId, 0)
-      if (!resumed.ok || !resumed.body) throw transportErr
-      return await consumeChatStream(resumed.body, cb)
+    for (;;) {
+      try {
+        if (!body) throw lastErr instanceof Error ? lastErr : new Error('The turn stream was lost.')
+        const r = await consumeChatStream(body, cb, seen)
+        // A tail resume may skip the turn marker; the id this run knows is authoritative.
+        return r.turnId ? r : { ...r, turnId }
+      } catch (transportErr) {
+        lastErr = transportErr
+        if (!turnId || !opts.resume || attempt >= maxReconnects) throw transportErr
+        await new Promise((resolve) => setTimeout(resolve, delayMs(attempt)))
+        attempt++
+        // Live lines carry no seq: the first resume replays from 0 and resets;
+        // a replay stamps seqs, so a later drop resumes from the tail.
+        if (seen.lastSeq === 0) {
+          opts.onResetForResume?.()
+          tracked?.replay()
+        }
+        const resumed = await opts.resume(turnId, seen.lastSeq).catch(() => null)
+        body = resumed && resumed.ok && resumed.body ? resumed.body : null
+      }
     }
   } finally {
     tracked?.end()
