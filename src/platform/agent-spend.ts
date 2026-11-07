@@ -1,26 +1,25 @@
 /**
  * Bill work an agent app runs for a Platform agent key to that key's one cap.
  *
- * An owner approves an agent key with one lifetime cap shared across every
- * product. Work the app runs for the key must spend that cap, even when the
- * owner already has their own credential in the app:
+ * The cap is shared across every product and is spent even when the owner
+ * already has their own credential in the app:
  *
- * - Model calls: `modelKey` delegates a Router key from the agent key that
- *   spends its cap directly ("spend-through"). Router refuses every call once
- *   the cap is spent, so a turn cannot run past it.
- * - Work the app cannot route through the key, such as compute in a sandbox
- *   the owner's own credential pays for: `hold` reserves the work's maximum
- *   against the cap before it starts, and `consume` spends what it measured,
- *   up to the hold, without charging the owner's wallet again.
+ * - Model calls: `modelKey` delegates a spend-through Router key, which Router
+ *   refuses once the cap is spent.
+ * - Other work, such as sandbox compute the owner's credential pays for: `hold`
+ *   reserves its maximum before it starts, and `consume` spends what it
+ *   measured, up to the hold, without charging the owner's wallet again.
  *
- * A spent or insufficient cap answers 402 `agent_key.budget_exhausted`, so an
- * app refuses the work before it starts. Web-standard fetch only.
+ * A spent or insufficient cap answers 402 `agent_key.budget_exhausted`; any
+ * other refusal keeps Platform's code. Web-standard fetch only.
  */
 
 export interface AgentSpendRefusal {
   status: 402 | 403 | 503
   code: string
   message: string
+  /** Platform's own error code for a refusal this client does not type. */
+  platformCode?: string
 }
 
 export type AgentSpendOutcome<T> =
@@ -54,14 +53,11 @@ export interface PlatformAgentSpend {
 
 const REQUEST_TIMEOUT_MS = 10_000
 
-const budgetExhausted: AgentSpendRefusal = {
-  status: 402,
-  code: 'agent_key.budget_exhausted',
-  message: 'The key has spent, or cannot cover, the cap its owner approved.',
-}
-
-function refusal(status: number, code: unknown): AgentSpendRefusal {
-  if (code === 'KEY_BUDGET_EXHAUSTED' || code === 'KEY_BUDGET_EXCEEDED' || code === 'PRODUCT_BUDGET_EXCEEDED') return budgetExhausted
+function refusal(status: number, error?: PlatformBody['error']): AgentSpendRefusal {
+  const code = error?.code
+  if (code === 'KEY_BUDGET_EXHAUSTED' || code === 'KEY_BUDGET_EXCEEDED' || code === 'PRODUCT_BUDGET_EXCEEDED') {
+    return { status: 402, code: 'agent_key.budget_exhausted', message: 'The key has spent, or cannot cover, the cap its owner approved.' }
+  }
   if (code === 'INSUFFICIENT_BALANCE') {
     return { status: 402, code: 'agent_key.payment_required', message: "The key owner's Tangle account has no credit." }
   }
@@ -71,13 +67,17 @@ function refusal(status: number, code: unknown): AgentSpendRefusal {
   if (status >= 500 || status === 429 || code === 'PLATFORM_BUSY') {
     return { status: 503, code: 'agent_key.spend_unavailable', message: 'Platform could not record the spend; retry.' }
   }
-  return { status: 403, code: 'agent_key.spend_refused', message: 'Platform refused to bill this work to the key.' }
+  // Carry Platform's cause (e.g. AUTHORIZATION_CONFLICT and its message), never a credential.
+  const platformCode = typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(code) ? code : undefined
+  const detail = typeof error?.message === 'string' ? error.message.replace(/\b(?:sk-tan-|svc_)[\w-]+/g, '[redacted]').slice(0, 240) : ''
+  const cause = [platformCode, detail].filter(Boolean).join(': ')
+  return { status: 403, code: 'agent_key.spend_refused', message: `Platform refused to bill this work to the key${cause ? ` (${cause})` : ''}.`, ...(platformCode ? { platformCode } : {}) }
 }
 
 interface PlatformBody {
   success?: unknown
   data?: { key?: unknown; id?: unknown; consumedAmount?: unknown }
-  error?: { code?: unknown }
+  error?: { code?: unknown; message?: unknown }
 }
 
 export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): PlatformAgentSpend {
@@ -104,7 +104,7 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
     }
   }
 
-  const unavailable = (): { succeeded: false; error: AgentSpendRefusal } => ({ succeeded: false, error: refusal(503, null) })
+  const unavailable = (): { succeeded: false; error: AgentSpendRefusal } => ({ succeeded: false, error: refusal(503) })
 
   return {
     async modelKey({ agentKey, name, expiresAt }) {
@@ -114,7 +114,7 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
       if (!result) return unavailable()
       const key = result.body.data?.key
       if (result.status !== 201 || typeof key !== 'string') {
-        return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
+        return { succeeded: false, error: refusal(result.status, result.body.error) }
       }
       const keyId = result.body.data?.id
       return { succeeded: true, value: { key, keyId: typeof keyId === 'string' ? keyId : null } }
@@ -126,7 +126,7 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
       if (!result) return unavailable()
       const id = result.body.data?.id
       if (result.status !== 201 || typeof id !== 'string') {
-        return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
+        return { succeeded: false, error: refusal(result.status, result.body.error) }
       }
       return { succeeded: true, value: { authorizationId: id } }
     },
@@ -135,14 +135,14 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
       if (!result) return unavailable()
       const consumed = result.body.data?.consumedAmount
       if (result.status !== 200 || typeof consumed !== 'number') {
-        return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
+        return { succeeded: false, error: refusal(result.status, result.body.error) }
       }
       return { succeeded: true, value: { consumedUsd: consumed } }
     },
     async release(authorizationId) {
       const result = await call(`/v1/billing/authorizations/${encodeURIComponent(authorizationId)}/release`, {})
       if (!result) return unavailable()
-      if (result.status !== 200) return { succeeded: false, error: refusal(result.status, result.body.error?.code) }
+      if (result.status !== 200) return { succeeded: false, error: refusal(result.status, result.body.error) }
       return { succeeded: true, value: null }
     },
   }
