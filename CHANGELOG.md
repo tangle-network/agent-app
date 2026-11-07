@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.8
+
+- fix(chat-store): make harness_cost_usd an optional message column (#1482)
+
 ## 2.0.7
 
 - fix(chat-routes): record harness_cost_usd beside the ledger cost_usd (#1481)
