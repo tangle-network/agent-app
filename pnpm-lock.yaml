@@ -64,46 +64,46 @@ importers:
         specifier: ^4.3.4
         version: 4.3.4
       '@tangle-network/agent-docs':
-        specifier: 0.2.1
+        specifier: ^0.2.1
         version: 0.2.1
       '@tangle-network/agent-eval':
-        specifier: 1.0.22
+        specifier: ^1.0.22
         version: 1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)
       '@tangle-network/agent-gateway':
-        specifier: 1.0.0
+        specifier: ^1.0.0
         version: 1.0.0(hono@4.13.16)
       '@tangle-network/agent-integrations':
-        specifier: 1.0.4
+        specifier: ^1.0.4
         version: 1.0.4(@opentelemetry/api@1.10.0)(@types/node@24.19.2)
       '@tangle-network/agent-interface':
         specifier: ^5.10.20
         version: 5.10.20
       '@tangle-network/agent-knowledge':
-        specifier: 23.0.3
+        specifier: ^23.0.3
         version: 23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-profile-materialize':
-        specifier: 1.1.58
+        specifier: ^1.1.58
         version: 1.1.58(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-runtime':
-        specifier: 7.0.0
+        specifier: ^7.0.0
         version: 7.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)
       '@tangle-network/brand':
         specifier: ^1.31.2
         version: 1.31.4(react@19.3.1)
       '@tangle-network/browser-agent-driver':
-        specifier: 0.37.0
+        specifier: ^0.37.0
         version: 0.37.0(@ai-sdk/anthropic@3.0.138(zod@4.6.7))(@ai-sdk/google@3.0.141(zod@4.6.7))(@anthropic-ai/sdk@1.6.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)(supports-color@10.2.2)(undici@8.12.4)(ws@8.22.1)(zod@4.6.7)
       '@tangle-network/hub-sdk':
-        specifier: 1.0.21
+        specifier: ^1.0.21
         version: 1.0.21(supports-color@10.2.2)
       '@tangle-network/sandbox':
-        specifier: 1.0.273
+        specifier: ^1.0.273
         version: 1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
       '@tangle-network/sandbox-ui':
         specifier: ^7.0.6
         version: 7.0.6(31c419edcab040d1e2c9046492f6964c)
       '@tangle-network/tcloud':
-        specifier: 1.0.4
+        specifier: ^1.0.4
         version: 1.0.4(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(typescript@7.0.2)(zod@4.6.7)
       '@tangle-network/ui':
         specifier: ^11.51.2
