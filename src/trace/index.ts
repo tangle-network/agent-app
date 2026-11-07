@@ -1,24 +1,15 @@
 /**
- * `@tangle-network/agent-app/trace` — flow observability for agent turns.
- *
- * The turn buffer stamps `_t` (ms since turn start) on every event, so any
- * live stream OR any historical turn replayed from a TurnEventStore can be
- * reconstructed into a span trace: pipeline overhead, model segments (with
- * thinking TTFT), tool executions, token usage, and cost. Renderers turn
- * traces into ASCII waterfalls — the
- * default artifact for "how did this run actually behave" questions across
- * evals, hill-climbs, and production debugging.
- *
- * Span boundaries derived from a buffered stream are quantized by the
- * pump's flush window and the reader's poll cadence (~100–400ms); spans
- * carry `approx: true` to keep reports honest about that.
+ * Flow observability for live and replayed turn-buffer events stamped `_t`.
+ * Reconstruct pipeline, model/reasoning, tool and usage spans for ASCII reports.
+ * Buffered boundaries are quantized by flush/poll cadence (~100–400ms);
+ * `approx: true` keeps that uncertainty visible.
  */
 
 export * from './mission-trace'
 export type { FlowSpan, FlowTrace } from '@tangle-network/charts'
 export * from './mission-flow'
 
-import type { FlowSpan, FlowTrace } from '@tangle-network/charts'
+import { reportedCount, sumReportedCounts, type FlowSpan, type FlowTrace } from '@tangle-network/charts'
 
 /** Represent a timed event with a timestamp and associated event data */
 export interface TimedEvent {
@@ -55,8 +46,8 @@ export function buildFlowTrace(
   opts?: { pricing?: { prompt?: string | number; completion?: string | number }; running?: boolean },
 ): FlowTrace {
   const spans: FlowSpan[] = []
-  let promptTokens = 0
-  let completionTokens = 0
+  const promptCounts: (number | undefined)[] = []
+  const completionCounts: (number | undefined)[] = []
   let toolCalls = 0
 
   const first = events[0]?.t ?? 0
@@ -119,9 +110,9 @@ export function buildFlowTrace(
         openCalls.delete(id)
       }
     } else if (type === 'usage') {
-      const u = (inner.usage ?? {}) as { promptTokens?: number; completionTokens?: number }
-      promptTokens += u.promptTokens ?? 0
-      completionTokens += u.completionTokens ?? 0
+      const u = inner.usage && typeof inner.usage === 'object' ? inner.usage : {}
+      promptCounts.push(reportedCount('promptTokens' in u ? u.promptTokens : undefined))
+      completionCounts.push(reportedCount('completionTokens' in u ? u.completionTokens : undefined))
     }
   }
   closeSegment()
@@ -132,9 +123,12 @@ export function buildFlowTrace(
       endMs: totalMs, status: opts?.running ? 'running' : undefined, approx: true })
   }
   if (opts?.running && spans.at(-1)?.kind === 'model') spans.at(-1)!.status = 'running'
+  const promptTokens = sumReportedCounts(promptCounts)
+  const completionTokens = sumReportedCounts(completionCounts)
   const trace: FlowTrace = { spans, totalMs, promptTokens, completionTokens, toolCalls }
   const p = opts?.pricing
-  if (p && (p.prompt != null || p.completion != null)) {
+  if (p && promptTokens !== undefined && completionTokens !== undefined &&
+      (p.prompt != null || p.completion != null)) {
     trace.costUsd = promptTokens * Number(p.prompt ?? 0) + completionTokens * Number(p.completion ?? 0)
   }
   return trace
@@ -157,9 +151,11 @@ export function renderWaterfall(trace: FlowTrace, opts?: { width?: number }): st
     const dur = `${fmtS(s.endMs - s.startMs)}${s.approx ? '~' : ''}`
     lines.push(`${fmtS(s.startMs).padStart(7)} ${branch} ${bar.padEnd(width + 2)} ${s.name} (${dur})`)
   }
-  const cost = trace.costUsd != null ? `  $${trace.costUsd.toFixed(trace.costUsd < 0.01 ? 6 : 4)}` : ''
+  const cost = trace.costUsd != null && Number.isFinite(trace.costUsd)
+    ? `  $${trace.costUsd.toFixed(trace.costUsd < 0.01 ? 6 : 4)}` : ''
+  const tokens = `${reportedCount(trace.promptTokens) ?? 'unknown'}p + ${reportedCount(trace.completionTokens) ?? 'unknown'}c tok`
   lines.push(
-    `${fmtS(trace.totalMs).padStart(7)} ── total · ${trace.promptTokens}p + ${trace.completionTokens}c tok · ${trace.toolCalls} tool calls${cost}`,
+    `${fmtS(trace.totalMs).padStart(7)} ── total · ${tokens} · ${reportedCount(trace.toolCalls) ?? 'unknown'} tool calls${cost}`,
   )
   return lines.join('\n')
 }

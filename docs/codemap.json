@@ -4794,6 +4794,12 @@
           "doc": "gtm's exact default header for {@link buildAttachmentPromptBlock} — kept byte-identical because it feeds dispatched prompts (gtm-agent#618 reproduces the prompt bytes through this module)."
         },
         {
+          "name": "harnessCostColumns",
+          "kind": "function",
+          "signature": "() => { harnessCostUsd: SQLiteRealBuilderInitial<\"harness_cost_usd\">; }",
+          "doc": "The optional `harness_cost_usd` message column: spread into `messageExtraColumns` once the table has it."
+        },
+        {
           "name": "historyAttachmentsFromMessages",
           "kind": "function",
           "signature": "(currentAttachments: readonly Pick<ChatAttachmentPart, \"path\">[], priorMessages: readonly { parts?: readonly Record<str…",

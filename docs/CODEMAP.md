@@ -29,7 +29,7 @@ _155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./channels`](api/channels.md) | 47 | `web-react` |
 | [`./chat-react`](api/chat-react.md) | 5 | `web-react` |
 | [`./chat-routes`](api/chat-routes.md) | 324 | `chat-store`, `harness`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web` |
-| [`./chat-store`](api/chat-store.md) | 65 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
+| [`./chat-store`](api/chat-store.md) | 66 | `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product` |
 | [`./chatgpt-react`](api/chatgpt-react.md) | 5 | `agent-enrollment`, `web-react` |
 | [`./chatgpt-react/styles`](api/chatgpt-react-styles.md) | 0 | `agent-enrollment`, `web-react` |
 | [`./config`](api/config.md) | 13 | `knowledge`, `runtime` |
@@ -374,11 +374,11 @@ Depends on: `chat-store`, `harness`, `interactions`, `launch-invariants`, `model
 
 ## `./chat-store`
 
-Source: `src/chat-store/index.ts` · 65 exports
+Source: `src/chat-store/index.ts` · 66 exports
 
 Depends on: `chat-routes`, `interactions`, `plans`, `store`, `stream`, `web-react`, `work-product`
 
-`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsByUpdatedAtInput`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatMessageValues`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatSpeakerPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createAgentRunsTable`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `createThreadArtifactLinksTable`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `historyAttachmentsFromMessages`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatSpeakerPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
+`AppendMessageInput`, `attachmentInputToPart`, `attachmentKindForMime`, `attachmentPartKey`, `attachmentPartsFromMessageParts`, `buildAttachmentPromptBlock`, `BULK_DELETE_MAX_THREADS`, `BulkDeleteThreadsByUpdatedAtInput`, `BulkDeleteThreadsInput`, `ChatAttachmentKind`, `ChatAttachmentPart`, `ChatDatabase`, `ChatExtraIndexes`, `ChatFilePart`, `ChatImagePart`, `ChatInteractionPart`, `ChatMentionKind`, `ChatMentionPart`, `ChatMessagePart`, `ChatMessageRow`, `ChatMessageValues`, `ChatNoticePart`, `ChatParentTable`, `ChatPartTime`, `ChatPlanPart`, `ChatReasoningPart`, `ChatSpeakerPart`, `ChatStepFinishPart`, `ChatStepStartPart`, `ChatStore`, `ChatStoreInputError`, `ChatSubtaskPart`, `ChatTables`, `ChatTextPart`, `ChatThreadRow`, `ChatToolPart`, `ChatToolState`, `ChatToolStatus`, `ChatUsageTokens`, `ChatWorkProductPart`, `createAgentRunsTable`, `createChatStore`, `createChatTables`, `CreateChatTablesOptions`, `createThreadArtifactLinksTable`, `CreateThreadInput`, `DEFAULT_ATTACHMENT_PROMPT_HEADER`, `harnessCostColumns`, `historyAttachmentsFromMessages`, `historyContentWithAttachments`, `isChatAttachmentPart`, `isChatInteractionPart`, `isChatMentionPart`, `isChatSpeakerPart`, `ListMessagesOptions`, `ListThreadsInput`, `ListThreadsResult`, `mentionInputToPart`, `mentionPartsFromMessageParts`, `NewChatMessageRow`, `NewChatThreadRow`, `StorableHarnessPartKind`, `threadTitleFromMessage`, `toChatMessageParts`, `UpdateMessageInput`, `WorkspaceAccessCheck`
 
 [Full API →](api/chat-store.md)
 

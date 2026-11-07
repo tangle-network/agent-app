@@ -6188,6 +6188,14 @@ interface CreateThreadInput
 "Attached files (already saved to the workspace vault — read them from these paths):"
 ```
 
+### `harnessCostColumns`
+
+`function` — The optional `harness_cost_usd` message column: spread into `messageExtraColumns` once the table has it.
+
+```ts
+() => { harnessCostUsd: SQLiteRealBuilderInitial<"harness_cost_usd">; }
+```
+
 ### `historyAttachmentsFromMessages`
 
 `function` — Attachment carry-forward in first-seen path order.
