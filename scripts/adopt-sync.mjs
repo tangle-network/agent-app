@@ -25,7 +25,7 @@ const fail = (message) => {
 const serialize = (manifest) => `${JSON.stringify(manifest, null, 2)}\n`
 
 const check = join(root, 'dist/peer-floors/check.js')
-if (!existsSync(check)) fail(`${check} is missing; \`pnpm install\` builds it`)
+if (!existsSync(check)) fail(`${check} is missing; \`pnpm build\` builds it`)
 const { satisfiesRange } = await import(pathToFileURL(check).href)
 
 const manifestPath = join(root, 'package.json')

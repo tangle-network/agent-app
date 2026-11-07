@@ -217,7 +217,7 @@ Failures retain their SDK cause for the redacted diagnostic serializer and prese
 
 ```bash
 pnpm install
-pnpm typecheck && pnpm test && pnpm build
+pnpm build && pnpm typecheck && pnpm test
 ```
 
 
