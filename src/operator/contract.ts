@@ -155,6 +155,8 @@ export interface OperatorTurn {
   executionId?: string
   model?: string
   costUsd?: number
+  /** The harness's own reported token cost, kept when the ledger charged nothing (a failed turn). */
+  harnessCostUsd?: number
   /** Producer-recorded basis for costUsd; catalog is an estimate, ledger is settlement evidence. */
   costSource?: 'ledger' | 'catalog' | 'reported' | 'unreported' | 'subscription'
   /** Producer-recorded billing path, not the identity of a payer. */

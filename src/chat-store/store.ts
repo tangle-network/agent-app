@@ -377,6 +377,7 @@ export function createChatStore<TTables extends ChatTables>(
         ...(input.cacheReadTokens !== undefined ? { cacheReadTokens: input.cacheReadTokens } : {}),
         ...(input.cacheWriteTokens !== undefined ? { cacheWriteTokens: input.cacheWriteTokens } : {}),
         ...(input.costUsd !== undefined ? { costUsd: input.costUsd } : {}),
+        ...(input.harnessCostUsd !== undefined ? { harnessCostUsd: input.harnessCostUsd } : {}),
         ...(input.extras ?? {}),
       } as NewChatMessageRow
       const [insertResult] = await runSqliteStatements(db, [
@@ -404,6 +405,7 @@ export function createChatStore<TTables extends ChatTables>(
         ...(patch.cacheReadTokens !== undefined ? { cacheReadTokens: patch.cacheReadTokens } : {}),
         ...(patch.cacheWriteTokens !== undefined ? { cacheWriteTokens: patch.cacheWriteTokens } : {}),
         ...(patch.costUsd !== undefined ? { costUsd: patch.costUsd } : {}),
+        ...(patch.harnessCostUsd !== undefined ? { harnessCostUsd: patch.harnessCostUsd } : {}),
         ...(patch.extras ?? {}),
       }
       if (Object.keys(values).length === 0) {

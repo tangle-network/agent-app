@@ -153,13 +153,15 @@ export function createChatTables<
     servedProvider: text('served_provider'),
     servedSource: text('served_model_source'),
     // Usage receipt, flattened from the harness's `step-finish` shape
-    // (`tokens {input, output, reasoning, cache{read, write}}` + `cost`).
+    // (`tokens {input, output, reasoning, cache{read, write}}`); `cost_usd` is the
+    // Platform ledger charge and `harness_cost_usd` the harness's `cost`.
     inputTokens: integer('input_tokens'),
     outputTokens: integer('output_tokens'),
     reasoningTokens: integer('reasoning_tokens'),
     cacheReadTokens: integer('cache_read_tokens'),
     cacheWriteTokens: integer('cache_write_tokens'),
     costUsd: real('cost_usd'),
+    harnessCostUsd: real('harness_cost_usd'),
     createdAt: createdAt(),
     ...messageExtras,
   }, (table) => [

@@ -45,6 +45,7 @@ import {
   type SandboxChatProducerOptions,
 } from './sandbox-producer'
 import type { ChatTurnUsage } from './turn-routes'
+import { measuredUsage, TURN_USAGE_KEYS } from './sandbox-turn-usage'
 
 /** The normalized structured message body (tool-call / file / plan / interaction
  *  parts) that `/chat-store` persists as the durable assistant row — the same
@@ -220,10 +221,7 @@ function cachedResultFrom(
   // A text-only recovery must not erase usage already stored for this turn.
   // Unknown values stay absent; an explicit measured zero is preserved.
   const usage: ChatTurnUsage = {}
-  for (const key of [
-    'inputTokens', 'outputTokens', 'reasoningTokens',
-    'cacheReadTokens', 'cacheWriteTokens', 'costUsd',
-  ] as const) {
+  for (const key of TURN_USAGE_KEYS) {
     const value = final?.usage?.[key] ?? persisted?.[key]
     if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[key] = value
   }
@@ -362,12 +360,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
       ...(result.servedModel ? { servedModel: result.servedModel } : {}),
       ...(result.servedProvider ? { servedProvider: result.servedProvider } : {}),
       ...(result.servedSource ? { servedSource: result.servedSource } : {}),
-      ...(result.usage.inputTokens !== undefined ? { inputTokens: result.usage.inputTokens } : {}),
-      ...(result.usage.outputTokens !== undefined ? { outputTokens: result.usage.outputTokens } : {}),
-      ...(result.usage.reasoningTokens !== undefined ? { reasoningTokens: result.usage.reasoningTokens } : {}),
-      ...(result.usage.cacheReadTokens !== undefined ? { cacheReadTokens: result.usage.cacheReadTokens } : {}),
-      ...(result.usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: result.usage.cacheWriteTokens } : {}),
-      ...(result.usage.costUsd !== undefined ? { costUsd: result.usage.costUsd } : {}),
+      ...measuredUsage(result.usage),
     }
     await draft.finalize(values)
     return { ...result, messageId: draft.rowId() ?? null }

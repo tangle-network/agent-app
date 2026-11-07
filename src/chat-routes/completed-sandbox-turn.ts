@@ -8,6 +8,7 @@
  * the same `DetachedTurnFinal` shape `runDetachedTurn` already consumes.
  */
 
+import { readTokenCostUsd } from '@tangle-network/agent-core/telemetry'
 import type { SandboxInstance, SessionMessage } from '@tangle-network/sandbox'
 import {
   asRecord,
@@ -55,7 +56,7 @@ function firstNumber(record: JsonRecord | undefined, keys: string[]): number | u
   return undefined
 }
 
-/** @internal Shared terminal-result decoder; callers must establish exact turn identity. */
+/** @internal Decode a raw runtime result, whose cost is the harness's own report; callers must establish exact turn identity. */
 export function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
   const raw = asRecord(result?.usage) ?? asRecord(result?.tokenUsage)
   const inputTokens = firstNumber(raw, ['inputTokens', 'promptTokens', 'input'])
@@ -71,8 +72,7 @@ export function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
     'cacheCreationInputTokens',
     'cacheWrite',
   ])
-  const costUsd = firstNumber(result, ['costUsd', 'totalCostUsd', 'cost'])
-    ?? firstNumber(raw, ['costUsd', 'cost'])
+  const harnessCostUsd = result ? readTokenCostUsd(result) : undefined
 
   return {
     ...(inputTokens !== undefined ? { inputTokens } : {}),
@@ -80,7 +80,7 @@ export function usageFromResult(result: JsonRecord | undefined): ChatTurnUsage {
     ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
     ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
     ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
-    ...(costUsd !== undefined ? { costUsd } : {}),
+    ...(harnessCostUsd !== undefined ? { harnessCostUsd } : {}),
   }
 }
 

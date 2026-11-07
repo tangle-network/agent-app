@@ -42,7 +42,10 @@ export interface ChatTurnUsage {
   reasoningTokens?: number
   cacheReadTokens?: number
   cacheWriteTokens?: number
+  /** What the Platform ledger charged (Sandbox `PromptResult.costUsd`); absent when nothing was charged or read. */
   costUsd?: number
+  /** The harness's own reported token cost; a failed turn keeps its model spend here. */
+  harnessCostUsd?: number
 }
 
 /** What the route persists — a structural subset of `/chat-store`'s

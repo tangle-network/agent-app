@@ -38,6 +38,7 @@ import type {
 import type { TurnRoutePhase } from './turn-progress'
 import { ChatTurnInputError, type ChatTurnPartInput } from './wire'
 import { addressAgents, composeAgentProducers } from './agent-producers'
+import { measuredUsage } from './sandbox-turn-usage'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 import type { AfterAuthorizeWork } from './early-turn-work'
 
@@ -827,12 +828,7 @@ function createTurnEngine<TContext, TResource>(
           ...(parts && parts.length > 0 ? { parts } : {}),
           ...(state.producer?.model ? { model: state.producer.model } : {}),
           ...modelAttributionFields(attribution),
-          ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
-          ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
-          ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
-          ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
-          ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
-          ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+          ...measuredUsage(usage),
         }
         // ONE row per turn either way. With drafting, `finalize` settles
         // any in-flight draft and then insert-or-patches the same

@@ -34,6 +34,8 @@ type Case = {
   malformedLedger?: boolean
   transportFailure?: boolean
   eventCount?: number
+  /** The harness's own token cost on the terminal frame; the ledger charged nothing. */
+  harnessCostUsd?: number
   expected: 'failed' | 'running' | 'throw'
   publicCause?: string
 }
@@ -77,13 +79,15 @@ async function boundary(test: Case) {
         ],
       })))
     }
-    if (path === `/agents/run/${turnId}/events`) {
+    if (path === `/agents/run/${turnId}/events` || (path === '/agents/events' && url.searchParams.get('executionId') === turnId)) {
       if (url.searchParams.get('sessionId') !== sessionId) return json({ error: 'wrong session' }, 400)
       if (test.transportFailure) return json({ error: 'retained event transport unavailable' }, 503)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       const effectiveBackend = { provider: 'openai-compat', model: 'fixture-model', source: 'request' }
+      // The sidecar puts a failure's harness usage on both error and done.
+      const usage = test.harnessCostUsd === undefined ? {} : { tokenUsage: { inputTokens: 1200, outputTokens: 80, cost: test.harnessCostUsd }, totalCostUsd: test.harnessCostUsd }
       const frame = (type: string, data: Record<string, unknown>, offset: number) => ({
-        type, data, sessionId, executionId: turnId, eventId: String(1061 + offset), timestamp: 1 + offset,
+        type, data: ['error', 'done'].includes(type) ? { ...usage, ...data } : data, sessionId, executionId: turnId, eventId: String(1061 + offset), timestamp: 1 + offset,
       })
       // The incident's six-frame shape: error.data owns the message; done.data
       // contains only requestId/effectiveBackend. Let the SDK assemble failure.
@@ -158,7 +162,7 @@ async function boundary(test: Case) {
           const writer = createAssistantDraftWriter({ store, threadId,
             messageId: `assistant:${turnId}`, snapshot: () => null })
           await writer.finalize({ content: receipt.text,
-            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')] })
+            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')], ...receipt.usage })
           return `assistant:${turnId}`
         },
         async settle(_payload, receipt) {
@@ -175,7 +179,7 @@ async function boundary(test: Case) {
       })
       expect(receipt.state).toBe('failed')
       expect(receipt.completedTurnIds).toEqual([turnId])
-      expect(receipt.usage).toEqual({})
+      expect(receipt.usage).toEqual(test.harnessCostUsd === undefined ? {} : { harnessCostUsd: test.harnessCostUsd })
       if (test.assistant === 'one') {
         expect(receipt.parts).toEqual(expect.arrayContaining([
           expect.objectContaining({ type: 'tool', id: 'tool-1' }),
@@ -200,6 +204,7 @@ async function boundary(test: Case) {
       expect(await turnStore.listRunning!(threadId)).toEqual([])
       const transcript = await store.listMessages(threadId)
       expect(transcript).toHaveLength(1)
+      if (test.harnessCostUsd !== undefined) expect(transcript[0]).toMatchObject({ costUsd: null, harnessCostUsd: test.harnessCostUsd })
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
       expect(JSON.stringify(transcript[0]!.parts)).toContain(test.publicCause ?? publicDiskCause)
@@ -224,6 +229,7 @@ async function boundary(test: Case) {
 describe('native terminal replay reaches the authorized public boundary', () => {
   for (const test of [
     { name: 'bootstrap failure with no assistant settles on its first observation', expected: 'failed' },
+    { name: 'failed native turn keeps its harness cost while the ledger charged nothing', harnessCostUsd: 0.0123, expected: 'failed' },
     { name: 'ordinary interrupted assistant keeps its exact partial answer', assistant: 'one', expected: 'failed' },
     { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'canonical user-stop result keeps user attribution at the public boundary', status: 'cancelled', error: 'Execution cancelled by user', publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },

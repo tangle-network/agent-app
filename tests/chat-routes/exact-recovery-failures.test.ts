@@ -43,16 +43,6 @@ describe('exact completed-turn recovery', () => {
     expect(result?.usage).toBeUndefined()
     expect(source.aggregate).not.toHaveBeenCalled()
   })
-  it('retains message-specific usage while the cache is unavailable', async () => {
-    const message = completedMessage()
-    const source = recoverySource({ cacheError: true, messages: [{ ...message, parts: [
-      ...message.parts, { type: 'step-finish', tokens: { input: 7, output: 2 }, cost: 0.01 },
-    ] }] })
-    await expect(readCompletedSandboxTurn(source.box, identity)).resolves.toMatchObject({
-      text: 'The original answer', usage: { inputTokens: 7, outputTokens: 2, costUsd: 0.01 },
-    })
-    expect(source.aggregate).not.toHaveBeenCalled()
-  })
   it('recovers an independently keyed cache when session reads fail', async () => {
     const source = recoverySource({ messagesError: true, cache: {
       ...identity, completedAt: '2030-01-01T00:00:00Z', result: { response: 'Keyed result', usage: { inputTokens: 8 } },

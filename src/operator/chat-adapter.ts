@@ -29,6 +29,7 @@ export interface ChatOperatorMessage {
   model?: string | null
   servedModel?: string | null
   costUsd?: number | null
+  harnessCostUsd?: number | null
   /** Explicit producer facts, supplied by the app's stored-row projection; metadata is not interpreted. */
   costSource?: OperatorTurn['costSource'] | null
   billingOwner?: OperatorTurn['billingOwner'] | null
@@ -300,6 +301,7 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
       const model = assistant.servedModel ?? assistant.model
       if (model) turn.model = model
       if (typeof assistant.costUsd === 'number') turn.costUsd = assistant.costUsd
+      if (typeof assistant.harnessCostUsd === 'number') turn.harnessCostUsd = assistant.harnessCostUsd
       if (assistant.costSource != null) turn.costSource = assistant.costSource
       if (assistant.billingOwner != null) turn.billingOwner = assistant.billingOwner
       if (assistant.credentialSource != null) turn.credentialSource = assistant.credentialSource
