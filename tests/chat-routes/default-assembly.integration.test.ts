@@ -36,8 +36,9 @@ async function boundary() {
     let body = ''
     request.on('data', chunk => { body += chunk })
     request.on('end', () => {
-      if (request.url === '/v1/sandboxes/observation-box') {
-        nativeRequests.push(`${request.method} ${request.url}`)
+      const path = request.url?.split('?')[0] // the SDK adds its own wire query (partText=suffix)
+      if (path === '/v1/sandboxes/observation-box') {
+        nativeRequests.push(`${request.method} ${path}`)
         response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
           id: 'observation-box', status: 'running', filesystemIncarnationId: 'observation-incarnation',
           filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
@@ -45,8 +46,8 @@ async function boundary() {
         }))
         return
       }
-      if (request.url === '/v1/sandboxes/observation-box/runtime/agents/run/stream') {
-        nativeRequests.push(`${request.method} ${request.url}`)
+      if (path === '/v1/sandboxes/observation-box/runtime/agents/run/stream') {
+        nativeRequests.push(`${request.method} ${path}`)
         const input = JSON.parse(body) as { sessionId: string; parts?: Array<{ type: string; text?: string }>
           backend?: { profile?: { resources?: { files?: Array<{ path: string; resource?: { content?: string } }> } } } }
         computerRequests.push({ sessionId: input.sessionId, bytes: Buffer.byteLength(body),

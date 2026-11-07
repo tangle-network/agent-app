@@ -51,6 +51,7 @@ async function boundary(test: RestartCase) {
     }
     if (path.endsWith('/runtime/process/spawn')) {
       if (test.permanent || probes++ < (test.probe ?? 0)) return restarting(test.probeCode)
+      response.setHeader('process-result', 'complete') // the sidecar answers a finished spawn inline
       return json({ data: { exitCode: 0, stdout: 'alive\n', stderr: '' } })
     }
     if (path.endsWith('/runtime/agents/sessions')) {

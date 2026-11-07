@@ -44,7 +44,7 @@ async function boundary(options: { policy?: 'down'; allowed?: string[]; refused?
   let holdNextRun = false
   let origin = ''
   const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) => {
-    const model = String((run.backend.model as { model?: unknown } | undefined)?.model ?? '')
+    const model = String(run.backend.modelId ?? '')
     if (options.refused?.includes(model)) {
       // As the Router refuses a disabled provider, relayed by the box agent at its run's end.
       return peer.fail(run, `opencode execution failed: Tangle-funded openai inference is unavailable for "${model}": the company credential is off (HTTP 403 provider_disabled)`)
@@ -156,7 +156,7 @@ it('copies the files a computer step wrote into the Vault and gives the Router m
     // The box ran the first of the turn's models its key allows, once, in the session the step was given.
     expect(peer.agentRequests).toHaveLength(1)
     const sent = peer.agentRequests[0]!
-    expect((sent.backend.model as { model?: string }).model).toBe('flat/model-a')
+    expect(sent.backend.modelId).toBe('flat/model-a')
     expect(sent.sessionId).toBe('computer-lane-session')
     expect(sent.backend.metadata).toBeUndefined()
     expect(sent.task).toContain(`Where files go: the workspace's files live under ${peer.root}.`)
@@ -247,7 +247,7 @@ it('keeps the product model when the box key policy cannot be read', async () =>
   try {
     const step = createComputerStep({ ...peer.computer({ files: undefined }), parentExecutionId: 'turn-execution' })
     expect(await step.runTask(peer.box, 'Read the workspace.', taskOptions('policy-call'))).toContain('Saved')
-    expect((peer.agentRequests[0]!.backend.model as { model?: string }).model).toBe('turn/model')
+    expect(peer.agentRequests[0]!.backend.modelId).toBe('turn/model')
   } finally { await peer.close() }
 }, 20_000)
 
@@ -294,7 +294,7 @@ it('moves to the next allowed model when the box refuses a disabled provider, un
       parentExecutionId: 'turn-execution' })
     const answer = await step.runTask(peer.box, 'Read the workspace.', taskOptions('fallback-call'))
     expect(answer).toContain('Saved')
-    expect(peer.agentRequests.map(request => (request.backend.model as { model?: string }).model)).toEqual(['flat/model-a', 'flat/model-b'])
+    expect(peer.agentRequests.map(request => request.backend.modelId)).toEqual(['flat/model-a', 'flat/model-b'])
     const [first, second] = peer.agentRequests.map(request => request.executionId)
     expect(second).toBe(`${first}-f2`)
     expect(peer.runtime.runs.get(second!)?.terminal).toBe('completed')

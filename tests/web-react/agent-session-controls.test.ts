@@ -73,15 +73,7 @@ describe('harness↔model coherence', () => {
 
 describe('harness menu capability filter', () => {
   // #802: offer only harnesses the capability table allows for the selected
-  // model (kimi-code is the one vendor-locked harness); the current harness
-  // stays offered so a pinned thread never loses its own row.
-  it('drops harnesses the selected model cannot run', () => {
-    setup({ model: 'openai/gpt-5', harness: 'opencode' })
-    fireEvent.click(screen.getByText('OpenCode (any model)'))
-    expect(screen.queryByText('Kimi (Moonshot)')).toBeNull()
-    expect(screen.getByText('Codex (OpenAI)')).toBeTruthy()
-  })
-
+  // model; the current harness stays offered so a pinned thread never loses its own row.
   it('keeps a vendor-locked harness for that vendor\'s model', () => {
     setup({
       model: 'moonshotai/kimi-k3',

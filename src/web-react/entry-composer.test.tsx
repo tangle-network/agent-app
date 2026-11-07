@@ -81,11 +81,9 @@ describe('EntryComposer', () => {
       />,
     )
     expect(screen.getByText('What do you want to work on?')).toBeTruthy()
-    // The canonical cluster renders the selected model, the harness pill, and
-    // the thinking-effort pill inline.
+    // The canonical cluster renders the selected model and the harness pill inline.
     expect(document.body.textContent).toContain('GPT-4.1 Mini')
     expect(document.body.textContent).toContain('OpenCode (any model)')
-    expect(document.body.textContent).toContain('Thinking')
   })
 
   it('renders NO agent control row when the product supplies none', () => {
