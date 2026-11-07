@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.11
+
+- fix(platform): keep Platform's code and message on an untyped agent-key spend refusal (#1484)
+
 ## 2.0.10
 
 - ci: pin coherent first-install stack adoption
