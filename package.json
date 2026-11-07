@@ -772,7 +772,6 @@
     "build": "node src/theme/build.mjs --check && tsup && tsc -p tsconfig.build.json && node scripts/explicit-declaration-specifiers.mjs",
     "dev": "tsup --watch",
     "dev:types": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "prepare": "pnpm run build",
     "test": "NODE_OPTIONS=--localstorage-file=.vitest-localstorage.json vitest run",
     "test:generated": "node .github/scripts/test-generated-projects.mjs",
     "test:theme:packed": "node tests/theme/packed-styles-consumer.mjs",
@@ -781,7 +780,7 @@
     "typecheck": "tsc --noEmit",
     "docs:gen": "agent-docs",
     "knip": "knip",
-    "signoff": "node dist/signoff/cli.js",
+    "signoff": "pnpm run build && node dist/signoff/cli.js",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "adopt:sync": "node scripts/adopt-sync.mjs"

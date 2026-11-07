@@ -6,12 +6,8 @@
  * The suite also runs twice in randomized file order.
  * The steps run as a graph instead of a line.
  *
- * `NODE_OPTIONS` is set at config level rather than per step because `prepare`
- * runs the build during install, before any step exists. It pins the heap so a
- * green run means the same thing on a small host as on a large one: V8 derives
- * its default old-space limit from system RAM, so an unpinned gate gets a
- * different ceiling per machine. Measured peaks: typecheck 1.6 GB, build
- * 1.0 GB, suite 0.7 GB.
+ * `NODE_OPTIONS` pins every step's heap independently of host RAM.
+ * Measured peaks: typecheck 1.6 GB, build 1.0 GB, suite 0.7 GB.
  */
 export default {
   install: {
