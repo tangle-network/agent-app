@@ -7,7 +7,7 @@ for await (const chunk of process.stdin) input += chunk
 
 let result
 try {
-  result = JSON.parse(input)
+  result = Object.values(JSON.parse(input))
 } catch {
   console.error('npm pack did not return valid JSON')
   process.exit(1)

@@ -209,7 +209,7 @@ function installAndRunScaffolder({
   // own workspace root.
   run(
     'pnpm',
-    ['install', '--ignore-workspace', '--ignore-scripts', '--strict-peer-dependencies', '--store-dir', storeDir],
+    ['install', '--ignore-workspace', '--ignore-scripts=false', '--strict-peer-dependencies', '--store-dir', storeDir],
     { cwd: runner, env },
   )
 
@@ -341,7 +341,7 @@ function main(scratch) {
     NPM_CONFIG_USERCONFIG: userNpmrc,
     NPM_CONFIG_FUND: 'false',
     NPM_CONFIG_AUDIT: 'false',
-    NPM_CONFIG_IGNORE_SCRIPTS: 'false',
+    PNPM_CONFIG_IGNORE_SCRIPTS: 'false',
     NO_COLOR: '1',
     WRANGLER_SEND_METRICS: 'false',
   }
