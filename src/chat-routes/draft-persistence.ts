@@ -41,6 +41,7 @@
 import type { ChatMessageValues } from '../chat-store/core'
 import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import type { ChatTurnUsage } from './turn-routes'
+import { measuredUsage } from './sandbox-turn-usage'
 
 /** Message row shape the writer reads back when re-entering a turn. */
 export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatTurnUsage> {
@@ -263,12 +264,7 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
       content,
       ...(parts && parts.length > 0 ? { parts } : {}),
       ...(snapshot.model ? { model: snapshot.model } : {}),
-      ...(usage.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
-      ...(usage.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
-      ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
-      ...(usage.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
-      ...(usage.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
-      ...(usage.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+      ...measuredUsage(usage),
     }
   }
 

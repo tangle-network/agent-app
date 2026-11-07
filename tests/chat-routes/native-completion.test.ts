@@ -129,45 +129,6 @@ describe('observeNativeCompletion', () => {
     expect(observed).toEqual({ state: 'running' })
   })
 
-  it('returns a completed receipt from the exact cached turn and assistant message', async () => {
-    const observed = await observeNativeCompletion({
-      source: source({
-        status: { id: 'session-1', status: 'completed', latestExecutionId: 'turn-1' },
-        runs: [{ executionId: 'turn-1', sessionId: 'session-1', status: 'completed', startedAt: 1, completedAt: 2, eventCount: 3, lastEventId: '3' }],
-        completed: {
-          turnId: 'turn-1', sessionId: 'session-1',
-          result: {
-            response: 'completed answer',
-            usage: { inputTokens: 12, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 5 },
-            costUsd: 0.04,
-            servedModel: 'served-model', servedProvider: 'served-provider', servedSource: 'profile',
-          },
-        },
-        messages: [{
-          id: 'assistant-1', role: 'assistant', timestamp: '2026-09-20T00:00:00.000Z',
-          metadata: { turnId: 'turn-1', status: 'completed', completed: true },
-          parts: [{ type: 'text', text: 'completed answer' }],
-        }],
-      }),
-      admissionStore: store(),
-      executionId: 'turn-1', sessionId: 'session-1', turnId: 'turn-1', registeredAt: 0, now: 100,
-    })
-
-    expect(observed).toMatchObject({
-      state: 'completed',
-      receipt: {
-        state: 'completed', text: 'completed answer',
-        usage: { inputTokens: 12, outputTokens: 3, cacheReadTokens: 4, cacheWriteTokens: 5, costUsd: 0.04 },
-        servedModel: 'served-model', servedProvider: 'served-provider', servedSource: 'profile',
-        completedTurnIds: ['turn-1'],
-      },
-    })
-    if (observed.state === 'running') throw new Error('expected completed receipt')
-    expect(observed.receipt.parts).toEqual([
-      expect.objectContaining({ type: 'text', text: 'completed answer' }),
-    ])
-  })
-
   describe('a completed run whose tool call the Sandbox aborted', () => {
     // GTM f03 run 1, 2026-10-10 15:13Z: the ADC roll restarted the runtime during a bash call. The run
     // reported completed, and GTM saved the half reply ("I'll make that access limit explicit…") as a

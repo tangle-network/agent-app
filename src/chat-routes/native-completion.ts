@@ -4,6 +4,7 @@
  * `driveTurn`, or cancels a run.
  */
 
+import { readTokenCostUsd } from '@tangle-network/agent-core/telemetry'
 import type { SandboxInstance, SessionInfo, SessionMessage } from '@tangle-network/sandbox'
 import type { ChatTurnUsage } from './turn-routes'
 import type { SessionExecutionInfo } from '@tangle-network/sandbox'
@@ -13,6 +14,7 @@ import {
   recoverSandboxAssistantMessage,
   usageFromResult,
 } from './completed-sandbox-turn'
+import { TURN_USAGE_KEYS } from './sandbox-turn-usage'
 
 export interface NativeCompletionReceipt {
   state: 'completed' | 'failed'
@@ -90,6 +92,8 @@ const MESSAGE_READ_SKEW_MS = 10 * 60_000
  * run takes its receipt from the recorded message and failure reason alone.
  */
 const INTERRUPTED_RESULT_REPLAY_MAX_EVENTS = 2_000
+/** Bound on the second replay that reads a failed execution's harness cost. */
+const HARNESS_COST_REPLAY_MS = 10_000
 /**
  * The fixed id of the terminal the sidecar appends when it fails an execution
  * whose runtime restarted before the run ended.
@@ -242,6 +246,30 @@ function exactFailedResult(value: unknown, turnId: string, sessionId: string): R
   return typeof result.error === 'string' && result.error.trim() ? result : undefined
 }
 
+/**
+ * Usage of a failed execution's SDK result. Its `costUsd` is the Platform
+ * ledger charge alone (Sandbox 1.0.264), so the harness's own token cost is
+ * read from the replayed terminal frames, where the sidecar puts a failure's
+ * `totalCostUsd` on `error` and `done`; an unread replay leaves it unknown.
+ */
+async function failedResultUsage(
+  session: ReturnType<NativeCompletionSessionSource['session']>, executionId: string, result: Record<string, unknown> | undefined,
+): Promise<ChatTurnUsage> {
+  if (!result) return {}
+  let harnessCostUsd: number | undefined
+  try {
+    for await (const event of session.events({ since: '0', executionId, signal: AbortSignal.timeout(HARNESS_COST_REPLAY_MS) })) {
+      if (['result', 'error', 'done'].includes(event.type)) harnessCostUsd = readTokenCostUsd(record(event.data) ?? {}) ?? harnessCostUsd
+    }
+  } catch { /* unknown, never zero */ }
+  const ledger = typeof result.costUsd === 'number' && Number.isFinite(result.costUsd) && result.costUsd >= 0 ? result.costUsd : undefined
+  return {
+    ...usageFromResult({ usage: result.usage }),
+    ...(ledger !== undefined ? { costUsd: ledger } : {}),
+    ...(harnessCostUsd !== undefined ? { harnessCostUsd } : {}),
+  }
+}
+
 function interruptedMessages(messages: SessionMessage[], turnId: string): SessionMessage[] {
   return messages.filter((message) =>
     message.role === 'assistant'
@@ -269,7 +297,7 @@ function sum(values: Array<number | undefined>): number | undefined {
 export function aggregateNativeCompletionReceipts(turns: readonly NativeCompletionTurnReceipt[]): NativeCompletionReceipt {
   const failed = turns.some((turn) => turn.state === 'failed')
   const usage: ChatTurnUsage = {}
-  for (const key of ['inputTokens', 'outputTokens', 'reasoningTokens', 'cacheReadTokens', 'cacheWriteTokens', 'costUsd'] as const) {
+  for (const key of TURN_USAGE_KEYS) {
     const total = sum(turns.map((turn) => turn.usage[key]))
     if (total !== undefined) usage[key] = total
   }
@@ -459,7 +487,7 @@ export async function observeNativeCompletion(
       const result = exactFailedResult(await exactSession.result({ executionId: turnId }), turnId, options.sessionId)
       if (result) {
         recovered.push({
-          turnId, state: 'failed', text: '', parts: [], usage: usageFromResult(result),
+          turnId, state: 'failed', text: '', parts: [], usage: await failedResultUsage(exactSession, turnId, result),
           ...attributionFromResult(result), error: terminalFailureMessage(result.error as string, run.status === 'cancelled' && isCanonicalUserStop(result.error)),
         })
         continue
@@ -478,7 +506,7 @@ export async function observeNativeCompletion(
         state: 'failed',
         text: message.text ?? (typeof result?.response === 'string' ? result.response : undefined) ?? '',
         parts: message.parts ?? [],
-        usage: { ...message.usage, ...usageFromResult(result) },
+        usage: { ...message.usage, ...await failedResultUsage(exactSession, turnId, result) },
         ...attributionFromResult(result),
         error: terminalFailureMessage((typeof result?.error === 'string' ? result.error : undefined)
           ?? interrupted[0]!.metadata?.interruptReason

@@ -25,21 +25,21 @@ export interface ProviderResolutionConfig {
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 /**
- * Spread a {@link ResolvedModel} onto a sandbox backend config as the flat
- * role-named fields (`modelId`, `provider`, ...) — the supported spelling since
- * the SDK fold; the nested `model` object remains accepted only for
- * compatibility. The peer floor (^1.0.1) carries the fold.
+ * Spread a {@link ResolvedModel} onto a sandbox backend config as the nested
+ * `model` object, the only spelling the SDK, wire and Sandbox API carry since
+ * agent-container b6b2f326 deleted the flat fields and their fold: SDK 1.0.128+
+ * drops a flat `modelId` from every turn.
  */
 export function backendModelFields(model: ResolvedModel): {
-  modelId: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string;
+  model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string };
 } {
-  return {
-    modelId: model.model,
+  return { model: {
+    model: model.model,
     provider: model.provider,
     ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
     ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
     ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
-  };
+  } }
 }
 
 export interface ResolvedModel {

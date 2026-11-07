@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
 import { toChatMessageParts } from '../../src/chat-store/parts'
-import { createChatTables } from '../../src/chat-store/schema'
+import { createChatTables, harnessCostColumns } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { noticePart } from '../../src/interactions/contract'
 import { runNativeCompletionWorkflow } from '../../src/preset-cloudflare/native-completion-workflow'
@@ -34,6 +34,10 @@ type Case = {
   malformedLedger?: boolean
   transportFailure?: boolean
   eventCount?: number
+  /** The harness's own token cost on the terminal frame; the ledger charged nothing. */
+  harnessCostUsd?: number
+  /** A message table created before `harness_cost_usd` existed. */
+  legacyTable?: boolean
   expected: 'failed' | 'running' | 'throw'
   publicCause?: string
 }
@@ -77,13 +81,15 @@ async function boundary(test: Case) {
         ],
       })))
     }
-    if (path === `/agents/run/${turnId}/events`) {
+    if (path === `/agents/run/${turnId}/events` || (path === '/agents/events' && url.searchParams.get('executionId') === turnId)) {
       if (url.searchParams.get('sessionId') !== sessionId) return json({ error: 'wrong session' }, 400)
       if (test.transportFailure) return json({ error: 'retained event transport unavailable' }, 503)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       const effectiveBackend = { provider: 'openai-compat', model: 'fixture-model', source: 'request' }
+      // The sidecar puts a failure's harness usage on both error and done.
+      const usage = test.harnessCostUsd === undefined ? {} : { tokenUsage: { inputTokens: 1200, outputTokens: 80, cost: test.harnessCostUsd }, totalCostUsd: test.harnessCostUsd }
       const frame = (type: string, data: Record<string, unknown>, offset: number) => ({
-        type, data, sessionId, executionId: turnId, eventId: String(1061 + offset), timestamp: 1 + offset,
+        type, data: ['error', 'done'].includes(type) ? { ...usage, ...data } : data, sessionId, executionId: turnId, eventId: String(1061 + offset), timestamp: 1 + offset,
       })
       // The incident's six-frame shape: error.data owns the message; done.data
       // contains only requestId/effectiveBackend. Let the SDK assemble failure.
@@ -106,7 +112,7 @@ async function boundary(test: Case) {
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  const tables = createChatTables()
+  const tables = test.legacyTable ? createChatTables() : createChatTables({ messageExtraColumns: harnessCostColumns() })
   const db = openDatabase([tables.threads, tables.messages])
   const store = createChatStore(db as unknown as ChatDatabase, tables)
   await store.createThread({ id: threadId, workspaceId: 'member-workspace' })
@@ -158,7 +164,7 @@ async function boundary(test: Case) {
           const writer = createAssistantDraftWriter({ store, threadId,
             messageId: `assistant:${turnId}`, snapshot: () => null })
           await writer.finalize({ content: receipt.text,
-            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')] })
+            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')], ...receipt.usage })
           return `assistant:${turnId}`
         },
         async settle(_payload, receipt) {
@@ -175,7 +181,7 @@ async function boundary(test: Case) {
       })
       expect(receipt.state).toBe('failed')
       expect(receipt.completedTurnIds).toEqual([turnId])
-      expect(receipt.usage).toEqual({})
+      expect(receipt.usage).toEqual(test.harnessCostUsd === undefined ? {} : { harnessCostUsd: test.harnessCostUsd })
       if (test.assistant === 'one') {
         expect(receipt.parts).toEqual(expect.arrayContaining([
           expect.objectContaining({ type: 'tool', id: 'tool-1' }),
@@ -200,6 +206,14 @@ async function boundary(test: Case) {
       expect(await turnStore.listRunning!(threadId)).toEqual([])
       const transcript = await store.listMessages(threadId)
       expect(transcript).toHaveLength(1)
+      if (test.harnessCostUsd !== undefined) {
+        // Old schema: the turn and a later patch both land without the column. Migrated: both store harness spend.
+        expect(transcript[0]).toMatchObject({ costUsd: null, ...(test.legacyTable ? {} : { harnessCostUsd: test.harnessCostUsd }) })
+        await store.updateMessage(transcript[0]!.id, { inputTokens: 7, harnessCostUsd: 0.02 })
+        const patched = await store.getMessage(transcript[0]!.id)
+        expect(patched).toMatchObject({ inputTokens: 7, costUsd: null, ...(test.legacyTable ? {} : { harnessCostUsd: 0.02 }) })
+        if (test.legacyTable) await expect(store.updateMessage(transcript[0]!.id, { harnessCostUsd: 0.03 })).resolves.not.toHaveProperty('harnessCostUsd')
+      } else expect(transcript[0]).toMatchObject({ harnessCostUsd: null })
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
       expect(JSON.stringify(transcript[0]!.parts)).toContain(test.publicCause ?? publicDiskCause)
@@ -224,6 +238,8 @@ async function boundary(test: Case) {
 describe('native terminal replay reaches the authorized public boundary', () => {
   for (const test of [
     { name: 'bootstrap failure with no assistant settles on its first observation', expected: 'failed' },
+    { name: 'failed native turn keeps its harness cost while the ledger charged nothing', harnessCostUsd: 0.0123, expected: 'failed' },
+    { name: 'a legacy message table without harness_cost_usd still writes and reads the failed turn', harnessCostUsd: 0.0123, legacyTable: true, expected: 'failed' },
     { name: 'ordinary interrupted assistant keeps its exact partial answer', assistant: 'one', expected: 'failed' },
     { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'canonical user-stop result keeps user attribution at the public boundary', status: 'cancelled', error: 'Execution cancelled by user', publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },

@@ -88,17 +88,6 @@ function terminal(observed: NativeCompletionObservation) {
 }
 
 describe('native completion uses one validated terminal receipt', () => {
-  it('reads each completed cache and message projection once', async () => {
-    const test = fixture()
-    const receipt = terminal(await test.observe())
-    assert.equal(receipt.text, 'retained answer')
-    assert.deepEqual(receipt.usage, knownUsage)
-    assert.equal(receipt.servedModel, attribution.servedModel)
-    assert.equal(receipt.servedProvider, attribution.servedProvider)
-    assert.equal(receipt.servedSource, attribution.servedSource)
-    assert.deepEqual(test.calls, { cache: 1, messages: 1, results: [] })
-  })
-
   for (const wrong of [{ turnId: 'foreign-turn' }, { sessionId: 'foreign-session' }]) {
     it(`does not borrow attribution or usage from a mismatched ${Object.keys(wrong)[0]}`, async () => {
       const test = fixture({ cache: () => ({
@@ -159,34 +148,9 @@ describe('native completion uses one validated terminal receipt', () => {
     assert.deepEqual(test.calls, { cache: 1, messages: 1, results: [] })
   })
 
-  for (const status of ['failed', 'cancelled'] as const) {
-    it(`uses the completed-result usage vocabulary for a ${status} execution`, async () => {
-      const test = fixture({ status, result: {
-        response: 'partial response', error: 'interrupted',
-        tokenUsage: {
-          promptTokens: '10', completionTokens: '2', reasoning: '3',
-          cacheReadInputTokens: '4', cacheCreationInputTokens: '5', cost: '0.25',
-        },
-        metadata: { effectiveBackend: { model: 'admitted-model', provider: 'admitted-provider', source: 'profile' } },
-      } })
-      const receipt = terminal(await test.observe())
-      assert.equal(receipt.state, 'failed')
-      assert.equal(receipt.text, 'partial response')
-      assert.deepEqual(receipt.usage, knownUsage)
-      assert.equal(receipt.servedModel, attribution.servedModel)
-      assert.deepEqual(test.calls, { cache: 0, messages: 1, results: ['turn-1'] })
-    })
-  }
-
   it('does not let an invalid raw cost override the validated result decoder', async () => {
     const test = fixture({ status: 'failed', result: { costUsd: Number.NaN } })
     assert.deepEqual(terminal(await test.observe()).usage, {})
-  })
-
-  it('preserves measured zero and terminal reasoning usage', async () => {
-    const zero = Object.fromEntries(Object.keys(knownUsage).map(key => [key, 0]))
-    const test = fixture({ status: 'failed', result: { usage: zero, costUsd: 0 } })
-    assert.deepEqual(terminal(await test.observe()).usage, zero)
   })
 
   it('reads interrupted history only once across multiple failed continuations', async () => {

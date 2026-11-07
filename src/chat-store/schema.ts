@@ -103,6 +103,14 @@ export type ChatExtraIndexes = (
   columns: Record<string, AnySQLiteColumn>,
 ) => SQLiteTableExtraConfigValue[]
 
+/**
+ * The optional `harness_cost_usd` message column: spread into
+ * `messageExtraColumns` once the table has it. The store writes and reads the
+ * harness's own token cost only when the table declares it, so a table without
+ * the column keeps working.
+ */
+export const harnessCostColumns = () => ({ harnessCostUsd: real('harness_cost_usd') })
+
 const hexId = () => text('id').primaryKey().default(sql`(lower(hex(randomblob(16))))`)
 
 const createdAt = () => integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`)
@@ -153,7 +161,8 @@ export function createChatTables<
     servedProvider: text('served_provider'),
     servedSource: text('served_model_source'),
     // Usage receipt, flattened from the harness's `step-finish` shape
-    // (`tokens {input, output, reasoning, cache{read, write}}` + `cost`).
+    // (`tokens {input, output, reasoning, cache{read, write}}`); `cost_usd` is the
+    // Platform ledger charge. The harness's `cost` needs `harnessCostColumns()`.
     inputTokens: integer('input_tokens'),
     outputTokens: integer('output_tokens'),
     reasoningTokens: integer('reasoning_tokens'),

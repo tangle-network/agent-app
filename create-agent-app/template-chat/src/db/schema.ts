@@ -14,7 +14,7 @@
  * — see `@tangle-network/agent-app/teams`.
  */
 
-import { createChatTables } from '@tangle-network/agent-app/chat-store'
+import { createChatTables, harnessCostColumns } from '@tangle-network/agent-app/chat-store'
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // ── better-auth tables ──────────────────────────────────────────────────────
@@ -69,4 +69,4 @@ export const verifications = sqliteTable('verifications', {
 
 // ── chat tables (shell-owned columns) ───────────────────────────────────────
 
-export const { threads, messages } = createChatTables({ messageExtraColumns: { turnStreamId: text('turn_stream_id'), backendTerminal: integer('backend_terminal', { mode: 'boolean' }).notNull().default(false) } })
+export const { threads, messages } = createChatTables({ messageExtraColumns: { ...harnessCostColumns(), turnStreamId: text('turn_stream_id'), backendTerminal: integer('backend_terminal', { mode: 'boolean' }).notNull().default(false) } })

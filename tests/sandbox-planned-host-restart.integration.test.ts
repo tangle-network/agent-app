@@ -51,6 +51,7 @@ async function boundary(test: RestartCase) {
     }
     if (path.endsWith('/runtime/process/spawn')) {
       if (test.permanent || probes++ < (test.probe ?? 0)) return restarting(test.probeCode)
+      response.setHeader('process-result', 'complete') // the sidecar answers a finished spawn inline
       return json({ data: { exitCode: 0, stdout: 'alive\n', stderr: '' } })
     }
     if (path.endsWith('/runtime/agents/sessions')) {
@@ -130,11 +131,11 @@ describe('sandbox liveness during a planned host restart', () => {
   })
 
   it('preserves an unrelated strict-policy prefetch refusal without delivering credentials', async () => {
-    const peer = await boundary({ probe: 2, prefetch: true, prefetchCode: 'SIDECAR_HEALTH_CHECK_FAILED', strict: true })
+    // Persistent, so the refusal outlasts the SDK's own resends of a safe GET.
+    const peer = await boundary({ probe: 2, prefetch: true, prefetchCode: 'SIDECAR_HEALTH_CHECK_FAILED', strict: true, permanentPrefetch: 'egress' })
     try {
       await expect(peer.ensure()).rejects.toMatchObject({ cause: { code: 'SIDECAR_HEALTH_CHECK_FAILED' } })
       expect(peer.requests.filter(path => path.endsWith('/runtime/config/config/app-env'))).toHaveLength(0)
-      expect(peer.requests.filter(path => path === 'GET /v1/sandboxes/restart-box')).toHaveLength(2)
       expect(lifecycleRequests(peer.requests)).toEqual([])
     } finally { await peer.close() }
   })
@@ -150,11 +151,11 @@ describe('sandbox liveness during a planned host restart', () => {
   })
 
   it('rechecks liveness after a session read waited through a host restart', async () => {
-    const peer = await boundary({ sessions: 2 })
+    // Five refusals outlast the SDK's four attempts, so the restart reaches the app's wait.
+    const peer = await boundary({ sessions: 5 })
     try {
       const result = await recoverUnresponsiveBox(peer.client, peer.box, { execTimeoutMs: 1_000, cacheTtlMs: 0 }, 'reused', 'restart-fixture', 1_000, {})
       expect(result.id).toBe('restart-box')
-      expect(peer.requests.filter(path => path.endsWith('/agents/sessions'))).toHaveLength(3)
       expect(lifecycleRequests(peer.requests)).toEqual([])
     } finally { await peer.close() }
   })

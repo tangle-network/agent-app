@@ -271,8 +271,8 @@ function extractReportedTurnUsage(data: JsonRecord | null | undefined): ChatTurn
   if (cacheReadTokens !== null) reported.cacheReadTokens = cacheReadTokens
   const cacheWriteTokens = toFiniteNumber(tokenUsage.cacheCreationInputTokens)
   if (cacheWriteTokens !== null) reported.cacheWriteTokens = cacheWriteTokens
-  const costUsd = toFiniteNumber(data?.totalCostUsd) ?? toFiniteNumber(tokenUsage.cost)
-  if (costUsd !== null) reported.costUsd = costUsd
+  const harnessCostUsd = toFiniteNumber(data?.totalCostUsd) ?? toFiniteNumber(tokenUsage.cost)
+  if (harnessCostUsd !== null) reported.harnessCostUsd = harnessCostUsd
   return reported
 }
 
@@ -284,8 +284,8 @@ function extractUsageSnapshot(value: JsonRecord | null | undefined): ChatTurnUsa
   const reported: ChatTurnUsage = { inputTokens, outputTokens }
   const reasoningTokens = toFiniteNumber(value?.reasoningTokens)
   if (reasoningTokens !== null && reasoningTokens >= 0) reported.reasoningTokens = reasoningTokens
-  const costUsd = toFiniteNumber(value?.providerCostUsd)
-  if (costUsd !== null && costUsd >= 0) reported.costUsd = costUsd
+  const harnessCostUsd = toFiniteNumber(value?.providerCostUsd)
+  if (harnessCostUsd !== null && harnessCostUsd >= 0) reported.harnessCostUsd = harnessCostUsd
   return reported
 }
 
@@ -295,7 +295,7 @@ function applyTerminalUsage(reported: ChatTurnUsage, usage: ChatTurnUsage): void
   if (reported.reasoningTokens !== undefined) usage.reasoningTokens = reported.reasoningTokens
   if (reported.cacheReadTokens !== undefined) usage.cacheReadTokens = reported.cacheReadTokens
   if (reported.cacheWriteTokens !== undefined) usage.cacheWriteTokens = reported.cacheWriteTokens
-  if (reported.costUsd !== undefined) usage.costUsd = reported.costUsd
+  if (reported.harnessCostUsd !== undefined) usage.harnessCostUsd = reported.harnessCostUsd
 }
 
 function sandboxStreamErrorMessage(data: unknown): string {
@@ -700,7 +700,7 @@ function createSandboxProjection(projectionState: SandboxProjectionState, pendin
           promptTokens,
           completionTokens,
           ...(usage.reasoningTokens !== undefined ? { reasoningTokens: usage.reasoningTokens } : {}),
-          ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+          ...(usage.harnessCostUsd !== undefined ? { providerCostUsd: usage.harnessCostUsd } : {}),
         },
       }
     }
@@ -831,7 +831,7 @@ async function* projectSandboxMessagePart(
             ...(usage.reasoningTokens !== undefined
               ? { reasoningTokens: usage.reasoningTokens }
               : {}),
-            ...(usage.costUsd !== undefined ? { providerCostUsd: usage.costUsd } : {}),
+            ...(usage.harnessCostUsd !== undefined ? { providerCostUsd: usage.harnessCostUsd } : {}),
           },
         }
       }

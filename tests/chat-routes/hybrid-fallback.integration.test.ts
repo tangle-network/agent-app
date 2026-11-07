@@ -79,6 +79,7 @@ it.each([
           lateReply = setTimeout(() => { lateExecutionCompleted = true; json({ answer: 'Late answer' }) }, 2_500)
           return
         }
+        response.setHeader('process-result', 'complete') // the sidecar answers a finished spawn inline
         return json({ data: { exitCode: 0, stdout: mode === 'empty' ? '' : 'Computer answer', stderr: '' } })
       }
       requests.push(JSON.parse(body))

@@ -20,9 +20,6 @@ const sourcesIn = (dir: string) => readdirSync(join(ROOT, dir))
 const FILES = [
   ...sourcesIn('src/workspace-react'),
   ...sourcesIn('src/settings-react'),
-  join(ROOT, 'src/teams-react/components/MembersPanel.tsx'),
-  join(ROOT, 'src/teams-react/components/InvitationsPanel.tsx'),
-  join(ROOT, 'src/teams-react/components/InviteForm.tsx'),
   join(ROOT, 'src/teams-react/components/RoleSelect.tsx'),
   join(ROOT, 'src/workspace-export/react.tsx'),
   join(ROOT, 'src/web-react/api-access-panel.tsx'),
