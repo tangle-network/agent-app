@@ -45,5 +45,7 @@ export type ChatMessageValues = {
   reasoningTokens?: number | null
   cacheReadTokens?: number | null
   cacheWriteTokens?: number | null
+  /** Platform ledger charge; `harnessCostUsd` is the harness's own reported token cost. */
   costUsd?: number | null
+  harnessCostUsd?: number | null
 }
