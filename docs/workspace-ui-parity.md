@@ -72,8 +72,9 @@ existing profile editor. Locked conversations offer only the host new-chat actio
 
 Move one app to one shared page in this order. Each step names its proof.
 
-1. Inventory: map every supported route to a concept in
-   [shared pages](./shared-pages.md), a domain screen, or a route to retire.
+1. Inventory: map every supported route to a shared composition in
+   [product surfaces](./product-surfaces.md#operational-pages), a domain screen,
+   or a route to retire.
 2. Package cohort: resolve the released cohort with a frozen lockfile and the
    stylesheet order in [app-shell.md](./app-shell.md#migrating-a-product). No
    sibling-source builds.
