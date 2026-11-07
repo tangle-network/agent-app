@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.10
+
+- ci: pin coherent first-install stack adoption
+
 ## 2.0.9
 
 - ci: allow controlled stack adoption before a named major
