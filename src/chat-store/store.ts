@@ -184,7 +184,7 @@ export function createChatStore<TTables extends ChatTables>(
   type TMessage = TTables['messages']['$inferSelect']
   const threads = tables.threads as ChatTables['threads']
   const messages = tables.messages as ChatTables['messages']
-  // `harness_cost_usd` is written only when the product's table declares it.
+  // harness_cost_usd only when the table declares it: a patch of nothing else must stay a no-op.
   const messageValueKeys = [
     'content', 'parts', 'toolName', 'model', 'requestedModel', 'servedModel', 'servedProvider', 'servedSource',
     'inputTokens', 'outputTokens', 'reasoningTokens', 'cacheReadTokens', 'cacheWriteTokens', 'costUsd',

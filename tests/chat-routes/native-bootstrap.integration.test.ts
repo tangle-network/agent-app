@@ -212,7 +212,7 @@ async function boundary(test: Case) {
         await store.updateMessage(transcript[0]!.id, { inputTokens: 7, harnessCostUsd: 0.02 })
         const patched = await store.getMessage(transcript[0]!.id)
         expect(patched).toMatchObject({ inputTokens: 7, costUsd: null, ...(test.legacyTable ? {} : { harnessCostUsd: 0.02 }) })
-        if (test.legacyTable) expect(patched).not.toHaveProperty('harnessCostUsd')
+        if (test.legacyTable) await expect(store.updateMessage(transcript[0]!.id, { harnessCostUsd: 0.03 })).resolves.not.toHaveProperty('harnessCostUsd')
       } else expect(transcript[0]).toMatchObject({ harnessCostUsd: null })
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
