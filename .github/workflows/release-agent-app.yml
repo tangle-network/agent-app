@@ -40,6 +40,7 @@ on:
       # A native release that migrates an external database, or reaches its release host over SSH.
       DATABASE_URL: {required: false}
       RELEASE_SSH_KEY: {required: false}
+      SUITES_SOURCE_SSH_KEY: {required: false}
     outputs:
       source-sha: {value: '${{ jobs.release.outputs.source-sha }}'}
       deployed: {value: '${{ jobs.release.outputs.deployed }}'}
@@ -270,15 +271,13 @@ jobs:
           retention-days: 30
   suites:
     needs: [release]
-    # A failed release still gets its post-merge test signal. Never block or
-    # roll back a served release because this later suite is red.
+    # A failed release still gets its post-merge test signal; never block or roll back a served release on a red suite.
     if: ${{ always() && !cancelled() && needs.release.outputs.source-validated == 'true' && needs.release.result != 'cancelled' }}
     name: ${{ inputs.suites-shards > 1 && format('suites ({0}/{1})', matrix.shard, strategy.job-total) || 'suites' }}
     runs-on: ${{ fromJSON(inputs.suites-runs-on) }}
     timeout-minutes: ${{ inputs.suites-timeout-minutes }}
-    # A newer release's suites cover this commit's changes, so a run for an older commit that is
-    # still queued or running is cancelled and frees its runner. One group per shard keeps a run's
-    # shards from cancelling each other.
+    # A newer release's suites cover this commit, so an older commit's queued or running suites are cancelled
+    # and free their runner. One group per shard keeps a run's shards from cancelling each other.
     concurrency:
       group: suites-${{ github.repository }}-${{ matrix.shard }}
       cancel-in-progress: true
@@ -303,8 +302,9 @@ jobs:
           # With suites-shards above 1 the command runs once per shard and takes its share from these.
           SUITES_SHARD_INDEX: ${{ matrix.shard }}
           SUITES_SHARD_TOTAL: ${{ strategy.job-total }}
-          # A post-release check that drives the served app from its release host (QA leases and browsers).
+          # RELEASE_SSH_KEY drives the served app from its release host (QA leases, browsers); SUITES_SOURCE_SSH_KEY is a read-only deploy key for a pinned private source.
           RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
+          SUITES_SOURCE_SSH_KEY: ${{ secrets.SUITES_SOURCE_SSH_KEY }}
         shell: bash
         run: |
           set -euo pipefail

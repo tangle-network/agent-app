@@ -5,6 +5,10 @@
 - BREAKING: `./trace` re-exports Charts 4 types. Treat absent prompt/completion token totals as unknown; observed zero stays zero. Cost is omitted when either total is unknown.
 - Adopt the tested current first-party cohort, preserving older Runtime peer lines and exact generated-app pins.
 
+## 2.0.13
+
+- ci(release): pass an optional read-only source key to post-release suites (#1488)
+
 ## 2.0.12
 
 - fix(build): sequence theme adoption before explicit build gates
