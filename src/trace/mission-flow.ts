@@ -96,8 +96,6 @@ export function stepActivityFlowTrace(
   return {
     spans,
     totalMs: spans.reduce((max, s) => Math.max(max, s.endMs), 0),
-    promptTokens: 0,
-    completionTokens: 0,
     ...(costUsd !== undefined ? { costUsd } : {}),
     toolCalls: spans.length,
   }

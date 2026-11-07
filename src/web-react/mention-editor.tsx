@@ -233,7 +233,7 @@ export async function loadMentionEditor(): Promise<{
  * box, like the composer's slash menu: an in-place panel is a panel the host
  * clips away (see the popover canon in AGENTS.md).
  */
-export function createMentionEditor(tiptap: TiptapModules): ComponentType<MentionEditorProps> {
+function createMentionEditor(tiptap: TiptapModules): ComponentType<MentionEditorProps> {
   const { EditorContent, useEditor } = tiptap.react
 
   return function MentionEditor({

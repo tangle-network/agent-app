@@ -51,8 +51,8 @@ describe('agent-runtime peer range', () => {
     const range = manifest.peerDependencies['@tangle-network/agent-runtime'] as string
     const lowest = [...range.matchAll(/>=\s*(\d+\.\d+\.\d+)/g)].map(m => m[1]!)
     expect(lowest.filter(version => newer(floor, version)), `every band starts at or above ${floor}`).toEqual([])
-    // Behavioral contracts may require a newer floor than the first available export.
-    // The version actually used to verify this package must still be admitted.
-    expect(satisfiesRange(manifest.devDependencies['@tangle-network/agent-runtime'], range)).toBe(true)
+    // Check the actual installed version; a declared caret is not a version.
+    const { version } = JSON.parse(readFileSync(join(root, 'node_modules/@tangle-network/agent-runtime/package.json'), 'utf8'))
+    expect(satisfiesRange(version, range)).toBe(true)
   })
 })

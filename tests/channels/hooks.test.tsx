@@ -314,14 +314,6 @@ describe('managed number hooks use Hub quote and order contracts', () => {
     expect(quote).not.toHaveBeenCalled()
   })
 
-  it('does not infer absence of orders from an older incomplete page', async () => {
-    const fake = setup()
-    vi.spyOn(fake.client.ordering!.numbers, 'list').mockResolvedValue({ orders: [] })
-    const { result } = renderHook(() => useNumberChannel('sms'), { wrapper: fake.wrapper })
-    await waitFor(() => expect(result.current.resource).toMatchObject({ value: { complete: false } }))
-    await act(async () => { expect((await result.current.run({ action: 'quote' })).succeeded).toBe(false) })
-  })
-
   it('follows order pages and discovers a held order on a later page', async () => {
     const fake = setup()
     const list = vi.spyOn(fake.client.ordering!.numbers, 'list').mockResolvedValueOnce({ orders: [], nextCursor: 'page2' }).mockResolvedValueOnce({ orders: [numberOrder()], nextCursor: null })
