@@ -1,17 +1,8 @@
 /**
- * Signed-in browser state for an app's test identities, with no login form in
- * any recorded frame.
- *
- * Sign-in happens over HTTP, never in a rendered page, so a recording starts
- * already signed in and no frame can show a password. The resulting storage
- * state (session cookies) is cached per origin and identity under the state
- * directory (mode 0600) and reused while the app's session endpoint still
- * answers with a verified user. Journeys running in parallel share it, so a
- * burst of journeys cannot trip an auth rate limit.
- *
- * Never press Sign out in a shared session: it revokes the session every
- * journey on the host is using. A journey that signs out opens its context with
- * `{ fresh: true }`, which signs in a session of its own.
+ * Signed-in browser state for test identities. Sign-in is HTTP only, so a
+ * recording starts already signed in. Storage state is cached per origin and
+ * identity (mode 0600) and reused while the session endpoint returns a user.
+ * Parallel journeys share it. A sign-out journey passes `{ fresh: true }`.
  */
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -80,7 +71,7 @@ async function signInWithPassword(ctx: APIRequestContext, config: ResolvedJourne
   if (r.status() !== 200) throw new SignInError(r.status(), `email sign-in returned ${r.status()}`)
 }
 
-/** "Log in with Tangle": the app's start route, Platform sign-in, authorize, the app's callback. */
+/** "Log in with Tangle": the app's start route, Platform sign-in, authorize, then GET the app callback. */
 async function signInWithTangle(ctx: APIRequestContext, config: ResolvedJourneysConfig, email: string, password: string): Promise<void> {
   const base = config.baseUrl
   const start = await ctx.get(`${base}${config.auth.tangleStart}`, { maxRedirects: 0 })
@@ -94,17 +85,21 @@ async function signInWithTangle(ctx: APIRequestContext, config: ResolvedJourneys
     maxRedirects: 0,
   })
   if (signIn.status() !== 200) throw new SignInError(signIn.status(), `Platform sign-in returned ${signIn.status()}`)
+  // A Location on the app is not success; GET it. /auth/callback stores the source key.
   const startPrefix = config.auth.tangleStart.replace(/\/start$/, '/')
+  const appOrigin = new URL(base).origin
   let next = authorize
   for (let hop = 0; hop < 8; hop += 1) {
-    const r = await ctx.get(next, { maxRedirects: 0 })
-    const location = r.headers()['location']
-    // Only a pathname is ever reported: the query carries OAuth codes.
-    if (!location) throw new SignInError(r.status(), `SSO stopped at ${new URL(next).pathname} with ${r.status()}`)
+    const response = await ctx.get(next, { maxRedirects: 0 })
+    const location = response.headers()['location']
+    if (!location) {
+      const path = new URL(next).pathname
+      if (new URL(next).origin === appOrigin && !path.startsWith(startPrefix) && response.status() < 400) return
+      throw new SignInError(response.status(), `SSO stopped at ${path} with ${response.status()}`)
+    }
     const url = new URL(location, next)
-    if (url.origin === new URL(base).origin && !url.pathname.startsWith(startPrefix)) {
-      if (url.pathname.startsWith('/login')) throw new SignInError(401, 'the app callback refused the sign-in')
-      return
+    if (url.origin === appOrigin && url.pathname.startsWith('/login')) {
+      throw new SignInError(401, 'the app callback refused the sign-in')
     }
     next = url.toString()
   }
