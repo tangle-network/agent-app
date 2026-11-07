@@ -72,10 +72,10 @@ interface AppToolDescriptor
 
 ### `backendModelFields`
 
-`function` — Spread a {@link ResolvedModel} onto a sandbox backend config as the flat role-named fields (`modelId`, `provider`, ...) — the supported spelling since the SDK fold; the nested `model` object remains…
+`function` — Put a {@link ResolvedModel} on a sandbox backend config as its nested `model` object (`BackendConfig.model`).
 
 ```ts
-(model: ResolvedModel) => { modelId: string; provider: string; apiKey?: string | undefined; apiKeyEnv?: string | undefi…
+(model: ResolvedModel) => { model: ResolvedModel; }
 ```
 
 ### `buildAppToolMcpServers`
@@ -1104,7 +1104,7 @@ type ReadyRunningSandboxOutcome
 
 ### `ResolvedModel`
 
-`interface`
+`interface` — Represent a fully configured model with optional API key and base URL for sandbox platform integration
 
 ```ts
 interface ResolvedModel

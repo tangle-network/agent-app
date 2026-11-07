@@ -5,7 +5,7 @@
  * spelled any other way never reaches the platform.
  */
 import type { AgentProfile } from '@tangle-network/agent-interface'
-import { normalizeRuntimeBackendConfig } from '@tangle-network/sandbox'
+import { normalizeRuntimeBackendConfig, type TurnBackendConfig } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
 import { fingerprintAgentProfile, type ProfileFingerprint } from '../../src/profile/fingerprint'
 import { resolveSandboxPromptBackend } from '../../src/sandbox'
@@ -22,7 +22,7 @@ describe('resolved sandbox backend through the SDK normalizer', () => {
       { provider: { providerName: 'openai-compat', apiKey: 'shell-key', routerBaseUrl: 'https://router.invalid/v1' } },
       { profile, modelApiKey: 'delegated-turn-key', onProfileResolved: (fingerprint) => { observed = fingerprint } },
     )
-    const wire = normalizeRuntimeBackendConfig(backend)
+    const wire = normalizeRuntimeBackendConfig(backend) as TurnBackendConfig | undefined
     expect(wire?.model).toEqual({
       model: 'openai/gpt-5',
       provider: 'openai-compat',

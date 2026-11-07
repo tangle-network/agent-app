@@ -23,25 +23,25 @@ export interface ProviderResolutionConfig {
   apiKeyEnv?: string
 }
 
-/** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 /**
- * Spread a {@link ResolvedModel} onto a sandbox backend config as the flat
- * role-named fields (`modelId`, `provider`, ...) — the supported spelling since
- * the SDK fold; the nested `model` object remains accepted only for
- * compatibility. The peer floor (^1.0.1) carries the fold.
+ * Put a {@link ResolvedModel} on a sandbox backend config as its nested `model`
+ * object (`BackendConfig.model`). The SDK's turn normalizer keeps only that
+ * spelling: since sandbox 1.0.75 it drops flat `modelId`/`provider`/`apiKey`/
+ * `baseUrl`, so the turn would run on the box's defaults without its key.
  */
-export function backendModelFields(model: ResolvedModel): {
-  modelId: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string;
-} {
+export function backendModelFields(model: ResolvedModel): { model: ResolvedModel } {
   return {
-    modelId: model.model,
-    provider: model.provider,
-    ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
-    ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
-    ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
-  };
+    model: {
+      model: model.model,
+      provider: model.provider,
+      ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
+      ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
+      ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+    },
+  }
 }
 
+/** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
 export interface ResolvedModel {
   model: string
   provider: string
