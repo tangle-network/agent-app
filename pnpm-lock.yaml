@@ -83,7 +83,7 @@ importers:
         version: 23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-profile-materialize':
         specifier: ^1.1.58
-        version: 1.1.61(@tangle-network/agent-interface@5.10.20)
+        version: 1.1.62(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-runtime':
         specifier: ^8.0.0
         version: 8.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.277(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)
@@ -2794,8 +2794,8 @@ packages:
       '@tangle-network/agent-eval': ^1.0.0
       '@tangle-network/agent-interface': ^5.2.0
 
-  '@tangle-network/agent-profile-materialize@1.1.61':
-    resolution: {integrity: sha512-V1BDn0DRwTIiEQg+1lpmDCf0rJ+MyXOT9KKeuXUVdU8vD7zFvkQhZm42PnXmcjomxtt/NZ9DI4t1oW5i787Vrg==}
+  '@tangle-network/agent-profile-materialize@1.1.62':
+    resolution: {integrity: sha512-FZPTP9uCKbuTgRGz/H3fYFOBqnqRYeNqqjvVdzNYpapcMYvojm5T0Cxf4A35Uu4iYllFGcCBHlhWehd8JpQNCw==}
     peerDependencies:
       '@tangle-network/agent-interface': ^5.10.11
 
@@ -8481,7 +8481,7 @@ snapshots:
       proper-lockfile: 4.1.2
       zod: 4.6.7
 
-  '@tangle-network/agent-profile-materialize@1.1.61(@tangle-network/agent-interface@5.10.20)':
+  '@tangle-network/agent-profile-materialize@1.1.62(@tangle-network/agent-interface@5.10.20)':
     dependencies:
       '@tangle-network/agent-interface': 5.10.20
 
@@ -8492,7 +8492,7 @@ snapshots:
       '@tangle-network/agent-eval': 1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)
       '@tangle-network/agent-interface': 5.10.20
       '@tangle-network/agent-knowledge': 23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)
-      '@tangle-network/agent-profile-materialize': 1.1.61(@tangle-network/agent-interface@5.10.20)
+      '@tangle-network/agent-profile-materialize': 1.1.62(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-trace-contract': 2.2.2
       '@tangle-network/sandbox': 1.0.277(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
       tar-stream: 3.2.2(bare-buffer@3.7.1)
