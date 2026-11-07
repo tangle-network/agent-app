@@ -1,12 +1,12 @@
-# Adopt each new @tangle-network release on its own: agent-eval's reusable workflow pins it,
-# widens our peer ranges, runs the gate and merges one PR only when it is green. Without it the
-# peer ranges fell behind (sandbox <0.65 while 0.68 shipped), capping every app on old SDKs.
-# A library has no deploy canary, so the gate also runs the shared lane's integration suites.
-# The publish contract requires exact SHAs, so `uses:` and `stack-ref` move only on purpose.
 name: Adopt stack
 
 on:
   workflow_dispatch:
+    inputs:
+      merge:
+        description: Merge the adoption PR when its gate passes
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -21,5 +21,5 @@ jobs:
       gate: pnpm install --frozen-lockfile && pnpm typecheck && pnpm exec vitest run tests/chat-routes/computer-lane.integration.test.ts tests/chat-routes/hybrid-fallback.integration.test.ts tests/chat-routes/default-assembly.integration.test.ts
       runs-on: '["self-hosted", "beelink"]'
       default-branch: main
-      merge: true
+      merge: ${{ inputs.merge }}
     secrets: inherit
