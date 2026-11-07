@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.12
+
+- fix(build): sequence theme adoption before explicit build gates
+
 ## 2.0.11
 
 - fix(platform): keep Platform's code and message on an untyped agent-key spend refusal (#1484)
