@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1
+
+- fix(deps): align generated apps with current Sandbox UI
+
 ## 3.0.0
 
 - BREAKING: `./trace` re-exports Charts 4 types. Treat absent prompt/completion token totals as unknown; observed zero stays zero. Cost is omitted when either total is unknown.
