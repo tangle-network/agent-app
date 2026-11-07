@@ -184,6 +184,14 @@ export function createChatStore<TTables extends ChatTables>(
   type TMessage = TTables['messages']['$inferSelect']
   const threads = tables.threads as ChatTables['threads']
   const messages = tables.messages as ChatTables['messages']
+  // `harness_cost_usd` is written only when the product's table declares it.
+  const messageValueKeys = [
+    'content', 'parts', 'toolName', 'model', 'requestedModel', 'servedModel', 'servedProvider', 'servedSource',
+    'inputTokens', 'outputTokens', 'reasoningTokens', 'cacheReadTokens', 'cacheWriteTokens', 'costUsd',
+    ...('harnessCostUsd' in getTableColumns(tables.messages) ? ['harnessCostUsd'] : []),
+  ]
+  const definedMessageValues = (source: object) => Object.fromEntries(messageValueKeys
+    .map((key) => [key, (source as Record<string, unknown>)[key]]).filter(([, value]) => value !== undefined))
 
   return {
     async listThreads(input) {
@@ -364,20 +372,7 @@ export function createChatStore<TTables extends ChatTables>(
         threadId: input.threadId,
         role: input.role,
         content: input.content,
-        ...(input.parts !== undefined ? { parts: input.parts } : {}),
-        ...(input.toolName !== undefined ? { toolName: input.toolName } : {}),
-        ...(input.model !== undefined ? { model: input.model } : {}),
-        ...(input.requestedModel !== undefined ? { requestedModel: input.requestedModel } : {}),
-        ...(input.servedModel !== undefined ? { servedModel: input.servedModel } : {}),
-        ...(input.servedProvider !== undefined ? { servedProvider: input.servedProvider } : {}),
-        ...(input.servedSource !== undefined ? { servedSource: input.servedSource } : {}),
-        ...(input.inputTokens !== undefined ? { inputTokens: input.inputTokens } : {}),
-        ...(input.outputTokens !== undefined ? { outputTokens: input.outputTokens } : {}),
-        ...(input.reasoningTokens !== undefined ? { reasoningTokens: input.reasoningTokens } : {}),
-        ...(input.cacheReadTokens !== undefined ? { cacheReadTokens: input.cacheReadTokens } : {}),
-        ...(input.cacheWriteTokens !== undefined ? { cacheWriteTokens: input.cacheWriteTokens } : {}),
-        ...(input.costUsd !== undefined ? { costUsd: input.costUsd } : {}),
-        ...(input.harnessCostUsd !== undefined ? { harnessCostUsd: input.harnessCostUsd } : {}),
+        ...definedMessageValues(input),
         ...(input.extras ?? {}),
       } as NewChatMessageRow
       const [insertResult] = await runSqliteStatements(db, [
@@ -391,21 +386,7 @@ export function createChatStore<TTables extends ChatTables>(
 
     async updateMessage(id, patch) {
       const values = {
-        ...(patch.content !== undefined ? { content: patch.content } : {}),
-        ...(patch.parts !== undefined ? { parts: patch.parts } : {}),
-        ...(patch.toolName !== undefined ? { toolName: patch.toolName } : {}),
-        ...(patch.model !== undefined ? { model: patch.model } : {}),
-        ...(patch.requestedModel !== undefined ? { requestedModel: patch.requestedModel } : {}),
-        ...(patch.servedModel !== undefined ? { servedModel: patch.servedModel } : {}),
-        ...(patch.servedProvider !== undefined ? { servedProvider: patch.servedProvider } : {}),
-        ...(patch.servedSource !== undefined ? { servedSource: patch.servedSource } : {}),
-        ...(patch.inputTokens !== undefined ? { inputTokens: patch.inputTokens } : {}),
-        ...(patch.outputTokens !== undefined ? { outputTokens: patch.outputTokens } : {}),
-        ...(patch.reasoningTokens !== undefined ? { reasoningTokens: patch.reasoningTokens } : {}),
-        ...(patch.cacheReadTokens !== undefined ? { cacheReadTokens: patch.cacheReadTokens } : {}),
-        ...(patch.cacheWriteTokens !== undefined ? { cacheWriteTokens: patch.cacheWriteTokens } : {}),
-        ...(patch.costUsd !== undefined ? { costUsd: patch.costUsd } : {}),
-        ...(patch.harnessCostUsd !== undefined ? { harnessCostUsd: patch.harnessCostUsd } : {}),
+        ...definedMessageValues(patch),
         ...(patch.extras ?? {}),
       }
       if (Object.keys(values).length === 0) {

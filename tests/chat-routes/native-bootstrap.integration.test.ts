@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
 import { describe, expect, it } from 'vitest'
 import { toChatMessageParts } from '../../src/chat-store/parts'
-import { createChatTables } from '../../src/chat-store/schema'
+import { createChatTables, harnessCostColumns } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { noticePart } from '../../src/interactions/contract'
 import { runNativeCompletionWorkflow } from '../../src/preset-cloudflare/native-completion-workflow'
@@ -36,6 +36,8 @@ type Case = {
   eventCount?: number
   /** The harness's own token cost on the terminal frame; the ledger charged nothing. */
   harnessCostUsd?: number
+  /** A message table created before `harness_cost_usd` existed. */
+  legacyTable?: boolean
   expected: 'failed' | 'running' | 'throw'
   publicCause?: string
 }
@@ -110,7 +112,7 @@ async function boundary(test: Case) {
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-  const tables = createChatTables()
+  const tables = test.legacyTable ? createChatTables() : createChatTables({ messageExtraColumns: harnessCostColumns() })
   const db = openDatabase([tables.threads, tables.messages])
   const store = createChatStore(db as unknown as ChatDatabase, tables)
   await store.createThread({ id: threadId, workspaceId: 'member-workspace' })
@@ -204,7 +206,9 @@ async function boundary(test: Case) {
       expect(await turnStore.listRunning!(threadId)).toEqual([])
       const transcript = await store.listMessages(threadId)
       expect(transcript).toHaveLength(1)
-      if (test.harnessCostUsd !== undefined) expect(transcript[0]).toMatchObject({ costUsd: null, harnessCostUsd: test.harnessCostUsd })
+      if (test.harnessCostUsd !== undefined) expect(transcript[0]).toMatchObject(test.legacyTable
+        ? { costUsd: null } : { costUsd: null, harnessCostUsd: test.harnessCostUsd })
+      if (test.legacyTable) expect(transcript[0]).not.toHaveProperty('harnessCostUsd')
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
       expect(JSON.stringify(transcript[0]!.parts)).toContain(test.publicCause ?? publicDiskCause)
@@ -230,6 +234,7 @@ describe('native terminal replay reaches the authorized public boundary', () => 
   for (const test of [
     { name: 'bootstrap failure with no assistant settles on its first observation', expected: 'failed' },
     { name: 'failed native turn keeps its harness cost while the ledger charged nothing', harnessCostUsd: 0.0123, expected: 'failed' },
+    { name: 'a legacy message table without harness_cost_usd still writes and reads the failed turn', harnessCostUsd: 0.0123, legacyTable: true, expected: 'failed' },
     { name: 'ordinary interrupted assistant keeps its exact partial answer', assistant: 'one', expected: 'failed' },
     { name: 'cancelled native execution remains failed rather than completed', status: 'cancelled', error: 'Native execution was cancelled.', publicCause: 'Native Sandbox execution was cancelled.', expected: 'failed' },
     { name: 'canonical user-stop result keeps user attribution at the public boundary', status: 'cancelled', error: 'Execution cancelled by user', publicCause: 'Execution cancelled by the user', userStop: true, expected: 'failed' },
