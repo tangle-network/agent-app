@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.13
+
+- ci(release): pass an optional read-only source key to post-release suites (#1488)
+
 ## 2.0.12
 
 - fix(build): sequence theme adoption before explicit build gates
