@@ -32,18 +32,3 @@ SUPER is the reference consumer: both its operator and public chat use the same
 attribution behavior. This extraction is not a claim that SUPER's custom DOM
 renderer was replaced with the maintained React surface. Layout and product copy
 remain application code.
-
-The existing `/web` implementation is moved byte-for-byte to `core.ts` and
-re-exported by `index.ts`; existing exports remain available. No package peer,
-new public subpath, build entry, or dependency version is introduced.
-
-Run `pnpm test tests/web/message-groups.test.ts`, the browser-safe entrypoint
-checks, the complete build/typecheck, and `pnpm signoff --source head` before
-merge. Authoring verification ran nine identical assertion bodies via Node's
-runner, plus a scoped TypeScript 5.8.3 build. A deliberately broken grouping
-implementation made the tests fail; the source was restored and the tests passed.
-The full package Vitest/build/signoff and rendered component qualification are
-separate gates, not inferred from these pure-function checks.
-
-See CHANGELOG.md for unreleased notes. The existing release workflow owns version
-selection; no unpublished version is guessed by this change.
