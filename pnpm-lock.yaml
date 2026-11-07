@@ -19,10 +19,10 @@ importers:
         version: 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
       '@tangle-network/agent-trace-contract':
         specifier: ^2.2.0
-        version: 2.2.0
+        version: 2.2.2
       '@tangle-network/charts':
-        specifier: ^1.0.0
-        version: 1.0.0(react@19.3.1)
+        specifier: ^4.0.21
+        version: 4.0.21(d236b43b3c9c209594054e8ce923e563)
       proper-lockfile:
         specifier: 4.1.2
         version: 4.1.2
@@ -67,47 +67,47 @@ importers:
         specifier: 0.2.1
         version: 0.2.1
       '@tangle-network/agent-eval':
-        specifier: 1.0.0
-        version: 1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+        specifier: 1.0.22
+        version: 1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)
       '@tangle-network/agent-gateway':
-        specifier: 0.11.5
-        version: 0.11.5(hono@4.13.16)
+        specifier: 1.0.0
+        version: 1.0.0(hono@4.13.16)
       '@tangle-network/agent-integrations':
-        specifier: 0.76.2
-        version: 0.76.2(@opentelemetry/api@1.10.0)(@types/node@24.19.2)
+        specifier: 1.0.4
+        version: 1.0.4(@opentelemetry/api@1.10.0)(@types/node@24.19.2)
       '@tangle-network/agent-interface':
         specifier: ^5.10.20
         version: 5.10.20
       '@tangle-network/agent-knowledge':
-        specifier: 23.0.0
-        version: 23.0.0(@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)))(@tangle-network/agent-interface@5.10.20)
+        specifier: 23.0.3
+        version: 23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-profile-materialize':
-        specifier: 1.1.2
-        version: 1.1.2(@tangle-network/agent-interface@5.10.20)
+        specifier: 1.1.58
+        version: 1.1.58(@tangle-network/agent-interface@5.10.20)
       '@tangle-network/agent-runtime':
-        specifier: 3.0.24
-        version: 3.0.24(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)
+        specifier: 7.0.0
+        version: 7.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)
       '@tangle-network/brand':
         specifier: ^1.31.2
-        version: 1.31.2(react@19.3.1)
+        version: 1.31.4(react@19.3.1)
       '@tangle-network/browser-agent-driver':
         specifier: 0.37.0
         version: 0.37.0(@ai-sdk/anthropic@3.0.138(zod@4.6.7))(@ai-sdk/google@3.0.141(zod@4.6.7))(@anthropic-ai/sdk@1.6.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)(supports-color@10.2.2)(undici@8.12.4)(ws@8.22.1)(zod@4.6.7)
       '@tangle-network/hub-sdk':
-        specifier: 1.0.6
-        version: 1.0.6(supports-color@10.2.2)
+        specifier: 1.0.21
+        version: 1.0.21(supports-color@10.2.2)
       '@tangle-network/sandbox':
-        specifier: 1.0.264
-        version: 1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
+        specifier: 1.0.273
+        version: 1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
       '@tangle-network/sandbox-ui':
-        specifier: ^1.1.10
-        version: 1.1.10(9fb13a49fe97debbe422d84285630c8d)
+        specifier: ^7.0.6
+        version: 7.0.6(31c419edcab040d1e2c9046492f6964c)
       '@tangle-network/tcloud':
-        specifier: 0.8.6
-        version: 0.8.6(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(typescript@7.0.2)(zod@4.6.7)
+        specifier: 1.0.4
+        version: 1.0.4(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(typescript@7.0.2)(zod@4.6.7)
       '@tangle-network/ui':
         specifier: ^11.51.2
-        version: 11.51.2(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.2(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)
+        version: 11.51.17(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.4(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)
       '@testing-library/dom':
         specifier: ^10.4.2
         version: 10.4.2
@@ -1692,8 +1692,8 @@ packages:
     resolution: {integrity: sha512-db8/4zqoWU/W8TPsitLRWaCJkwYvheISBJSdnjJz8VLBUp2yJqyLj1uAStJy6vKuE4615dbgsonnZrdHf/ogVA==}
     engines: {node: '>=18'}
 
-  '@pierre/diffs@1.6.4':
-    resolution: {integrity: sha512-RsKoruCOp50qaDM3a7BQan5K77xMkGWT1NF01fiYP1PfT3v4CvIjwytNk5WjZG0BesBkMOP2UbrBIDigB1k0ug==}
+  '@pierre/diffs@1.6.2':
+    resolution: {integrity: sha512-Hpk+HjjsJ2IWRZ3ALAa7rdBfhF2Zeyh5Kk7L4riMXRo3eHal9yQR1TgBryp+OzGyxfFfwsnEBOQztoANZIzpMQ==}
     peerDependencies:
       react: ^18.3.1 || ^19.0.0
       react-dom: ^18.3.1 || ^19.0.0
@@ -1703,8 +1703,8 @@ packages:
       react-dom:
         optional: true
 
-  '@pierre/highlights@0.4.0':
-    resolution: {integrity: sha512-2a38H7ep3KweGi1fGQpJk+Krod2OMpDIXagKPlqBd1Y9P460T7zQmc66Wm2JAH1SpIG93wCyyhZVrkc5dnAJVQ==}
+  '@pierre/highlights@0.3.0':
+    resolution: {integrity: sha512-s6xZ/giPPrSeCO2w254GiysUXD4ditKMTOrl1vHynvPqP7VdlujYi01O9joxJ0T16XkoXGQMN6zkRi9+O8NCzg==}
 
   '@pierre/theme@1.1.0':
     resolution: {integrity: sha512-GC2OWTAfTIIWWYhPCygwG8t2EtePQkRfON4MI2rwIkJylmiyqIttJID2dCL8sUD8cNdEvYkEyfEHHKMeCiDLoQ==}
@@ -1943,19 +1943,6 @@ packages:
 
   '@radix-ui/react-focus-scope@1.3.1':
     resolution: {integrity: sha512-ugeMhbXt4y5S2T1GnIqbWDKEN962PDwnX1fN0eKOOgf5f63Dh2mn8F1FUySlgW0iF6GiVsRF32DzuDIWTUyQJg==}
-    peerDependencies:
-      '@types/react': '*'
-      '@types/react-dom': '*'
-      react: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
-      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      '@types/react-dom':
-        optional: true
-
-  '@radix-ui/react-hover-card@1.2.1':
-    resolution: {integrity: sha512-4QooHxgmpCKRjj1Pft+hETKidYcrbPKcVwMGtk2Oa5DcWY2IH1fHuQt9LG6q5hUQBBV2MhQxSvtx6B/C1xfiTw==}
     peerDependencies:
       '@types/react': '*'
       '@types/react-dom': '*'
@@ -2776,56 +2763,56 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  '@tangle-network/agent-eval@1.0.0':
-    resolution: {integrity: sha512-Yy3iHAHpRhjXCJWfmIN2wNCdXkhnUC+vTW850nSqGj60VMYbIJwms/GGLF7Y4NdZSL0ssGK4uDgck5jDgGs7RQ==}
+  '@tangle-network/agent-eval@1.0.22':
+    resolution: {integrity: sha512-9FMo09KtekKFDKT5XNKHLch0ZuNf1uQ06M5ZNNxMnqxlxWMaBobQ2E+M2HDrilUTIX1avvnF2QWevEJMHYPHwQ==}
     engines: {node: '>=20.19.0'}
     hasBin: true
+    peerDependencies:
+      playwright: '>=1.64.1'
+    peerDependenciesMeta:
+      playwright:
+        optional: true
 
-  '@tangle-network/agent-gateway@0.11.5':
-    resolution: {integrity: sha512-vVkHhGTnA0rVQNbh41KH8XkH1Y6gDYbizode3+m9xvCbXlwyAUcKDhZbRCFdacF9iNAOLbnC4ozFWPdl3G/lBw==}
+  '@tangle-network/agent-gateway@1.0.0':
+    resolution: {integrity: sha512-XNLzR1gs6YAt+5URIXDRJJfL4aM6wyp3hdWRmSKGiy+kbaYdO1xXacPtADd0X7faizxUPrIG2uSzpnRUofqA4w==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
       hono: ^4.13.5
 
-  '@tangle-network/agent-integrations@0.76.2':
-    resolution: {integrity: sha512-XFkVK0u6qm74tEtrVk/OABMsAo1hBoKaJX3pZyNA205EslT7oo9O6d7S6UeOKydtt/vM1tOHkwVZPnQ9HPMQow==}
+  '@tangle-network/agent-integrations@1.0.4':
+    resolution: {integrity: sha512-UUyRJ+Vp67ydmkZDIUbY7rQHrbtGm9sXoWXWHC7cejnZ6+bZwY2L97D0BCtQLz1kRzTwgAxFoV6gCSkDJJXvLg==}
     engines: {node: '>=20.19.0'}
 
   '@tangle-network/agent-interface@5.10.20':
     resolution: {integrity: sha512-aEzAfS8iatWo/nX8dyTeZnQx+okHlumBZQyUCFLhQ6VoV+/byrRaQZzeVhMTtm3Yn89kvtOofZz4fZ5GH+vD/A==}
 
-  '@tangle-network/agent-knowledge@23.0.0':
-    resolution: {integrity: sha512-o5xhoRIuc6qzxAn2+7ZT/vpDcV00oS4b4499GDTbxf7ZYMBqmQnKPXh5fijLg3KJXo+you3n+din2MMopFRC1A==}
+  '@tangle-network/agent-knowledge@23.0.3':
+    resolution: {integrity: sha512-8FotlU9nC2Vu8n+XMfiIZ6kuIxMRzxrhx6rEBsXa0gQGiaC9FuSobjPHvMH+MFrn/Du53judiYkPaFEJje+GGQ==}
     engines: {node: '>=22.12.0'}
     hasBin: true
     peerDependencies:
       '@tangle-network/agent-eval': ^1.0.0
       '@tangle-network/agent-interface': ^5.2.0
 
-  '@tangle-network/agent-profile-materialize@1.1.2':
-    resolution: {integrity: sha512-r3PPcpjYQndHGvQKJv6sTMJyHBD3Ql0HjPISnMdS6m+PodNuAyGc+bWYm89QMM+UjKW7l/vqfGVMES/RlskfYA==}
+  '@tangle-network/agent-profile-materialize@1.1.58':
+    resolution: {integrity: sha512-n2WYHz+cPW81wgi1x50yss4oE0FJcYPmbt6kqtd33afIsf7/6fsvGjT2ZOEJr6xSd+9FdnpMcrV0TueOddQ6vg==}
     peerDependencies:
-      '@tangle-network/agent-interface': ^5.10.2
+      '@tangle-network/agent-interface': ^5.10.11
 
-  '@tangle-network/agent-profile-materialize@1.1.22':
-    resolution: {integrity: sha512-vTnZRlbCKcGx/ksg2RkhsoGbJT8kU0Wf1ZK0DnCQXfydmfntPvbqEq0L+wxH59J3uYhpnpfNRIyunfqdK7Q8NQ==}
-    peerDependencies:
-      '@tangle-network/agent-interface': ^5.10.2
-
-  '@tangle-network/agent-runtime@3.0.24':
-    resolution: {integrity: sha512-gxfNq4eZc4N3rJY920ECYoVzMnJ6J3/k/w0p/ggovtp2I5gUvCdUaZZRCMYm1ntZdcIQKN7DnwRTPsXoM4d+ig==}
+  '@tangle-network/agent-runtime@7.0.0':
+    resolution: {integrity: sha512-b6q5EARAX6sPuok/KD01UrcYTXKOLvXen0S6ipA7jtTKA55NESCpAqoAYA4jva91pOZ5yBuNrrg1kdWVXwB/dg==}
     engines: {node: '>=22.19.0'}
     hasBin: true
     peerDependencies:
       '@tangle-network/agent-eval': ^1.0.0
-      '@tangle-network/agent-interface': ^5.10.9
-      '@tangle-network/sandbox': ^1.0.111
+      '@tangle-network/agent-interface': ^5.10.19
+      '@tangle-network/sandbox': ^1.0.233
 
-  '@tangle-network/agent-trace-contract@2.2.0':
-    resolution: {integrity: sha512-M7UrrKmaQIvrW2S1PCIsTOHBqP/hKiSjIAbV/Shso78zTYet0bzhJ/vfwfCEs0bfAl1oDsh/tQlZZp66o+YgPg==}
+  '@tangle-network/agent-trace-contract@2.2.2':
+    resolution: {integrity: sha512-46CGFTHw1E+Fvykjdf3tS0ysQugv+DdM9TptHjALVeFzO+Z4Baiw6XWJLYiP3fx/UEk3QCIiITD1qoPi8XfgkA==}
 
-  '@tangle-network/brand@1.31.2':
-    resolution: {integrity: sha512-6qHQQ1fgd0khY8LnLx4by4oSFfW4jJeqkKU9Jlx9vhQtCsBgqNTex9CUKLH2w3TejNdwI3bmhthR3+oUTvi+Pg==}
+  '@tangle-network/brand@1.31.4':
+    resolution: {integrity: sha512-sWoylPgdMBxNMbRwMdGArY7EUeb8GMMvex1I1sBCFKuYz63KcsG2UM7yd0oJdCVSyunRRvsGj+MRxAQDWQEurg==}
     hasBin: true
     peerDependencies:
       react: '>=18'
@@ -2842,31 +2829,47 @@ packages:
       '@ai-sdk/google': ^3.0.33
       playwright: ^1.40.0
 
-  '@tangle-network/charts@1.0.0':
-    resolution: {integrity: sha512-j+zBZTi7n/Nyd4ZQFUq4Z8+AwsHgnOWkwy0hnGH97rvf0H3rvslMOwLmRNESCEPDbYRsbsHpAHnSYt7jjbcOsA==}
+  '@tangle-network/charts@4.0.21':
+    resolution: {integrity: sha512-D/QVKnd7It+qtFCeI++atPkY3Rrv579xAUsiyTiB1W/C2dtqN0j3TV6hnLsVWOcahEst11ektLNR85/+8T0i7g==}
     peerDependencies:
+      '@tangle-network/brand': ^1.31.3
+      '@tangle-network/ui': ^11.51.9
+      '@xyflow/react': ^12.0.0
+      elkjs: ^0.12.0
       react: ^18.0.0 || ^19.0.0
+      react-dom: ^18 || ^19
     peerDependenciesMeta:
+      '@tangle-network/brand':
+        optional: true
+      '@tangle-network/ui':
+        optional: true
+      '@xyflow/react':
+        optional: true
+      elkjs:
+        optional: true
       react:
         optional: true
+      react-dom:
+        optional: true
 
-  '@tangle-network/harness-sessions@1.0.1':
-    resolution: {integrity: sha512-RrZLofHn0wLj18AX9I3ObvFNRv3foAcVYefyVQ+sVUPpvq9OtJ/iV1Nl59SF2ZhCc74YaCOodvmDwyg1VY2kpA==}
+  '@tangle-network/harness-sessions@1.0.11':
+    resolution: {integrity: sha512-fE/tlWBf/sWGpa2KIc9ONI8sF8f/eOeFDneuu6XVHfMeR0V8aig64CFlIlE7GZVNpSy6VyeA5doSf+u2QYdj/Q==}
     engines: {node: '>=22.13.0'}
     hasBin: true
 
-  '@tangle-network/hub-sdk@1.0.6':
-    resolution: {integrity: sha512-c9ybyS6OfkzLO+WaqE5+Ys9/K+WMBq9JguPQ7HQngbtagvPk0/ZMO3JBkQaTO5B0AOXcGSLtdRFkJcflQp+bUg==}
+  '@tangle-network/hub-sdk@1.0.21':
+    resolution: {integrity: sha512-kX7zOLAlUz/h4FlNUIQN/UxUsZIE7Hc3zpRL6DoqIkdzBFn2toWh2wMNVQaVPITqRwdLXYAIlzdJA5D6HcuYCg==}
 
-  '@tangle-network/sandbox-ui@1.1.10':
-    resolution: {integrity: sha512-lrTP0uL06kDIDH7/jCk5jG09kv+6dopjLViiWqrc1rZslXyNKbEcyWMC2XsQzgmPCX1rUuzpUWIUd5iIX80L+A==}
+  '@tangle-network/sandbox-ui@7.0.6':
+    resolution: {integrity: sha512-HkSWqp82kD/RdZbvg/k2baXRbxY2+CXItv32giP/GZNqWawZMOavzO/g4Cn0PQoChUtsrPEo/r0r1UrdcwvVaw==}
     peerDependencies:
+      '@drewstone/agent-record': ^2.0.0 || ^3.0.0
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <2.0.0'
       '@tangle-network/agent-interface': ^1.0.0 || ^2.0.0 || ^3.0.0 || ^5.2.0
-      '@tangle-network/brand': ^1.31.1
-      '@tangle-network/charts': ^0.21.20 || ^1.0.0
-      '@tangle-network/ui': ^11.46.0
+      '@tangle-network/brand': ^1.31.4
+      '@tangle-network/charts': ^4.0.21
+      '@tangle-network/ui': ^11.51.17
       '@tanstack/react-query': ^5.0.0
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
@@ -2884,6 +2887,8 @@ packages:
       react-dom: ^18 || ^19
       yjs: ^13.6.0
     peerDependenciesMeta:
+      '@drewstone/agent-record':
+        optional: true
       '@hocuspocus/provider':
         optional: true
       '@nanostores/react':
@@ -2919,8 +2924,8 @@ packages:
       yjs:
         optional: true
 
-  '@tangle-network/sandbox@1.0.264':
-    resolution: {integrity: sha512-apuRQxPnm5igWxyBwpxo+DYPukAV1l2z75EoI+ez+vVC1VlTvKNbJBtxk+mKnDvqpbFPAid7cNjujPCEv/xQUA==}
+  '@tangle-network/sandbox@1.0.273':
+    resolution: {integrity: sha512-/6wlwWHc+j7Xn966H/BxSxbrxXDGeKeCse5tQQdwb7xxuMA65/vJei0uFzkGM59pJkmz1zodDH5x795r9rKSzw==}
     peerDependencies:
       '@mastra/core': ^1.36.0
       '@modelcontextprotocol/sdk': ^1.30.0
@@ -2943,17 +2948,17 @@ packages:
     resolution: {integrity: sha512-+TAF9s5t1jOWGyGHvKhIWe2FYmG7puVaxmmg0Et67ylAjGa7GqUAvISXGjG/6dzld7A170V0kQHK0WVdh2Wh0Q==}
     engines: {node: '>=18'}
 
-  '@tangle-network/tcloud@0.8.6':
-    resolution: {integrity: sha512-H3BAAi+Pw6rW64J5iU9m5M/zpWLNX04F4zUHqs2YYRmY/YSq1yAQXnvyzeWItFTmu5eojWnjBOEhQTX3EmwYig==}
+  '@tangle-network/tcloud@1.0.4':
+    resolution: {integrity: sha512-h13wnT3//sdbM7C7KbYEvvoc62hKI/Ip10ZNwKWwPUo88lO9cebJwAu/Bs8aeX/1EWVkXRUS6n1wVTW3RqBphg==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
-  '@tangle-network/ui@11.51.2':
-    resolution: {integrity: sha512-Hv1QaLWpupqZkeIVHBXQkEmNFm2eSbflHlYel2Jd5vd0L3nf/CBwYvGAS8VCxbZKg99bS/YsPfroIset5LXhww==}
+  '@tangle-network/ui@11.51.17':
+    resolution: {integrity: sha512-o4bG0wObfjfX9WFWR4g8lKU9ybaFPwpFEiPwO4/NyypOEwvwoZlBZX4oAAguNIHSj2Of1i8G5wBXYPjpKEWhiw==}
     peerDependencies:
       '@hocuspocus/provider': '>=2.15.0 <5.0.0'
       '@nanostores/react': '>=0.8.4 <3.0.0'
-      '@tangle-network/brand': ^1.31.2
+      '@tangle-network/brand': ^1.31.3
       '@tiptap/core': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration': '>=3.20.4 <4.0.0'
       '@tiptap/extension-collaboration-caret': '>=3.7.0 <4.0.0'
@@ -3241,6 +3246,9 @@ packages:
 
   '@types/hast@3.0.5':
     resolution: {integrity: sha512-rp/ezSWaD1m44dPKICGhiskI13nVr7qTloFwDa/IYkhhf5nzwP+zIQcIJh3WIFSBOy/H1PzB40jPjMDksN4F+g==}
+
+  '@types/katex@0.16.8':
+    resolution: {integrity: sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==}
 
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
@@ -3861,6 +3869,10 @@ packages:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
     engines: {node: '>= 6'}
 
+  commander@8.3.0:
+    resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
+    engines: {node: '>= 12'}
+
   concat-stream@2.0.0:
     resolution: {integrity: sha512-MWufYdFw53ccGjCA+Ol7XJYpAlW6/prSMzuPOTRnJGcGzuhLn4Scrz7qf6o8bROZ514ltazcIFJZevcfbo0x7A==}
     engines: {'0': node >= 6.0}
@@ -4155,6 +4167,10 @@ packages:
     resolution: {integrity: sha512-PPnnSJq3azKOIewXR/uppBV/6h98dprBJ/WaQ9Qgj10xX1lJLNfg+XShpbsrSqcDSy2yYYyhfXM1wWhftqgyzw==}
     engines: {node: '>=10.13.0'}
 
+  entities@6.0.1:
+    resolution: {integrity: sha512-aN97NXWF6AWBTahfVOIrB/NShkzi5H7F9r1s9mD3cDj4Ko5f2qhhVoYMibXF7GlLveb/D2ioWay8lxI97Ven3g==}
+    engines: {node: '>=0.12'}
+
   entities@9.0.0:
     resolution: {integrity: sha512-oJFNDJg3kTPwAD1cNn2+WmUq4wFoo09npc3Ydf1D7ED4smRiWrsKnaLxykrTWgyGEcusc87P5dxlAleol9kpkg==}
     engines: {node: '>=20.19.0'}
@@ -4389,8 +4405,23 @@ packages:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
     engines: {node: '>= 0.4'}
 
+  hast-util-from-dom@5.0.1:
+    resolution: {integrity: sha512-N+LqofjR2zuzTjCPzyDUdSshy4Ma6li7p/c3pA78uTwzFgENbgbUrm2ugwsOdcjI1muO+o6Dgzp9p8WHtn/39Q==}
+
+  hast-util-from-html-isomorphic@2.0.0:
+    resolution: {integrity: sha512-zJfpXq44yff2hmE0XmwEOzdWin5xwH+QIhMLOScpX91e/NSGPsAzNCvLQDIEPyO2TXi+lBmU6hjLIhV8MwP2kw==}
+
+  hast-util-from-html@2.0.3:
+    resolution: {integrity: sha512-CUSRHXyKjzHov8yKsQjGOElXy/3EKpyX56ELnkHH34vDVw1N1XSQ1ZcAvTyAPtGqLTuKP/uxM+aLkSPqF/EtMw==}
+
+  hast-util-from-parse5@8.0.4:
+    resolution: {integrity: sha512-Yq7XlXor0Cpb71sI2E0zpv8QxQ5a6rfhDEETk4bcgrFX2SvJAY2PHocWwFtL6U9qyfiyByW3wZ6sZEfP2kW81g==}
+
   hast-util-heading-rank@3.0.0:
     resolution: {integrity: sha512-EJKb8oMUXVHcWZTDepnr+WNbfnXKFNf9duMesmr4S8SXTJBJ9M4Yok08pu9vxdJwdlGRhVumk9mEhkEvKGifwA==}
+
+  hast-util-parse-selector@4.0.0:
+    resolution: {integrity: sha512-wkQCkSYoOGCRKERFWcxMVMOcYE2K1AaNLU8DXS9arxnLOUEWbOXKXiJUNzEpqZ3JOKpnha3jkFrumEjVliDe7A==}
 
   hast-util-sanitize@5.0.2:
     resolution: {integrity: sha512-3yTWghByc50aGS7JlGhk61SPenfE/p1oaFeNwkOOyrscaOkMGrcW9+Cy/QAIOBpZxP1yqDIzFMR0+Np0i0+usg==}
@@ -4407,8 +4438,14 @@ packages:
   hast-util-to-string@3.0.1:
     resolution: {integrity: sha512-XelQVTDWvqcl3axRfI0xSeoVKzyIFPwsAGSLIsKdJKQMXDYJS4WYrBNF/8J7RdhIcFI2BOHgAifggsvsxp/3+A==}
 
+  hast-util-to-text@4.0.3:
+    resolution: {integrity: sha512-5yrlWOvGFs6CqHriUpSsNrjzT/Tdo+IOQudbznxOn8K5qblp18MJyzOg8IgDOKQ8MYgQcJA7SusuCjSpDr8mSA==}
+
   hast-util-whitespace@3.0.0:
     resolution: {integrity: sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw==}
+
+  hastscript@9.0.3:
+    resolution: {integrity: sha512-1ALZXSmCGmW3h8AMz4R4+QKSKFi7sNgXLVwmwB8FYVtl1CwQ3WDkSAEY/d5tp1g/vbQgq2s1WlHgfO3jbw1TsA==}
 
   hono@4.13.16:
     resolution: {integrity: sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A==}
@@ -4590,6 +4627,14 @@ packages:
   kafkajs@2.2.4:
     resolution: {integrity: sha512-j/YeapB1vfPT2iOIUn/vxdyKEuhuY2PxMBvf5JWux6iSaukAccrMtXEY/Lb7OvavDhOWME589bpLrEdnVHjfjA==}
     engines: {node: '>=14.0.0'}
+
+  katex@0.16.47:
+    resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
+    hasBin: true
+
+  katex@0.19.1:
+    resolution: {integrity: sha512-jG8uKntjSEcm2EpQOh0XturpPuuC9r3Sq5HLHdsFdWZT27E672SF19QEi+of0/YeOy15lDgRhKvr5614uRrEfA==}
+    hasBin: true
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -4789,6 +4834,9 @@ packages:
   mdast-util-gfm@3.1.0:
     resolution: {integrity: sha512-0ulfdQOM3ysHhCJ1p06l0b0VKlhU0wuQs3thxZQagjcjPrlFRqY215uZGHHJan9GEAXd9MbfPjFJz+qMkVR6zQ==}
 
+  mdast-util-math@3.0.0:
+    resolution: {integrity: sha512-Tl9GBNeG/AhJnQM221bJR2HPvLOSnLE/T9cJI9tlc6zwQk2nPk/4f0cHkOdEixQPC/j8UtKDdITswvLAy1OZ1w==}
+
   mdast-util-mdx-expression@2.0.1:
     resolution: {integrity: sha512-J6f+9hUp+ldTZqKRSg7Vw5V6MqjATc+3E4gf3CFNcuZNWD8XdyI6zQ8GqH7f8169MM6P7hMBRDVGnn7oHB9kXQ==}
 
@@ -4847,6 +4895,9 @@ packages:
 
   micromark-extension-gfm@3.0.0:
     resolution: {integrity: sha512-vsKArQsicm7t0z2GugkCKtZehqUm31oeGBV/KVSorWSy8ZlNAv7ytjFhvaryUiCUJYqs+NoE6AFhpQvBTM6Q4w==}
+
+  micromark-extension-math@3.1.0:
+    resolution: {integrity: sha512-lvEqd+fHjATVs+2v/8kg9i5Q0AP2k85H0WUOwpIVvUML8BapsMvh1XAogmQjOCsLpoKRCVQqEkQBB3NhVBcsOg==}
 
   micromark-factory-destination@2.0.1:
     resolution: {integrity: sha512-Xe6rDdJlkmbFRExpTOmRj9N3MaWmbAgdpSrBQvCFqhezUn4AHqJHbaEnfbVYYiexVSs//tqOdY/DxhjdCiJnIA==}
@@ -5220,6 +5271,9 @@ packages:
   parse-entities@4.0.2:
     resolution: {integrity: sha512-GG2AQYWoLgL877gQIKeRPGO1xF9+eG1ujIb5soS5gPvLQ1y2o8FL90w2QWNdf9I361Mpp7726c+lj3U0qK1uGw==}
 
+  parse5@7.3.0:
+    resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
+
   parse5@8.1.0:
     resolution: {integrity: sha512-sq3qBFpee5jeocbFbO48VHlGr8sT7mbXS0vxlKN6sottBtJzrOG3998sr0llSZcQAGgfpdmEYAIZE0P9z0dE8w==}
 
@@ -5581,6 +5635,9 @@ packages:
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
 
+  rehype-katex@7.0.1:
+    resolution: {integrity: sha512-OiM2wrZ/wuhKkigASodFoo8wimG3H12LWQaH8qSPVJn9apWKFSH3YOCtbKpBorTVw/eI7cuT21XBbvwEswbIOA==}
+
   rehype-sanitize@6.0.0:
     resolution: {integrity: sha512-CsnhKNsyI8Tub6L4sm5ZFsme4puGfc6pYylvXo1AeqaGbjOYyzNv3qZPwvs0oMJ39eryyeOdmxwUIo94IpEhqg==}
 
@@ -5589,6 +5646,9 @@ packages:
 
   remark-gfm@4.0.1:
     resolution: {integrity: sha512-1quofZ2RQ9EWdeN34S79+KExV1764+wCUGop5CPL1WGdD0ocPpu91lzPGbwWMECpEpd42kJGQwzRfyov9j4yNg==}
+
+  remark-math@6.0.0:
+    resolution: {integrity: sha512-MMqgnP74Igy+S3WwnhQ7kqGlEerTETXMvJhrUzDikVZ2/uogJCb+WHUg97hK9/jcfc0dkD73s3LN8zU49cTEtA==}
 
   remark-parse@11.0.0:
     resolution: {integrity: sha512-FCxlKLNGknS5ba/1lmpYijMUzX2esxW5xQqjWxw2eHFfS2MSdaHVINFmhjo+qN1WhZhNimq0dZATN9pH0IDrpA==}
@@ -5850,9 +5910,6 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
-  tar-stream@3.2.1:
-    resolution: {integrity: sha512-nqsEO8zLZJvrOMdEwkA0QdCLFbetHMn95Zqu4fKwX+hkaTWJPZZOrxx/PwtxoK0MMGQmBQNRW3CPs8IFYQz4cQ==}
-
   tar-stream@3.2.2:
     resolution: {integrity: sha512-+8NeqHRjQWH9nYlwo2gamAMImZCVzI4UoEgDpWorBt9OEfppiZn+uSkskzQKPWIZyji/C8fpWO7u69G0DX0tbg==}
 
@@ -6022,6 +6079,9 @@ packages:
   unist-util-position@5.0.0:
     resolution: {integrity: sha512-fucsC7HjXvkB5R3kTCO7kUjRdrS0BJt3M/FPxmHMBOm8JQi2BsHAHFsy27E0EolP8rp0NzXsJ+jNPyDWvOJZPA==}
 
+  unist-util-remove-position@5.0.0:
+    resolution: {integrity: sha512-Hp5Kh3wLxv0PHj9m2yZhhLt58KzPtEYKQQ4yxfYFEO7EvHwzyDYnduhHnY1mDxoqr7VUwVuHXk9RXKIiYS1N8Q==}
+
   unist-util-stringify-position@4.0.0:
     resolution: {integrity: sha512-0ASV06AAoKCDkS2+xw5RXJywruurpbC4JZSm7nr7MOt1ojAzvyyaO+UxZf18j8FCF6kmzCZKcAgN/yu2gm2XgQ==}
 
@@ -6076,6 +6136,9 @@ packages:
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
+
+  vfile-location@5.0.3:
+    resolution: {integrity: sha512-5yXvWDEgqeiYiBe1lbxYF7UMAIm/IcopxMHrMQDq3nvKcjPKIhZklUKL+AE7J7uApI4kwe2snsK+eI6UTj9EHg==}
 
   vfile-message@4.0.3:
     resolution: {integrity: sha512-QTHzsGd1EhbZs4AsQ20JX1rC3cOlt/IWJruk893DfLRr57lcnOeMaWG4K0JrRta4mIJZKth2Au3mM3u03/JWKw==}
@@ -6188,6 +6251,9 @@ packages:
   walk-up-path@4.0.0:
     resolution: {integrity: sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A==}
     engines: {node: 20 || >=22}
+
+  web-namespaces@2.0.1:
+    resolution: {integrity: sha512-bKr1DkiNa2krS7qxNtdrtHAmzuYGFQLiQ13TsorsdT6ULTkPLKuu5+GsFpDlg6JFjUTwX2DyhMPG2be8uPrqsQ==}
 
   webidl-conversions@7.0.0:
     resolution: {integrity: sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==}
@@ -7410,9 +7476,9 @@ snapshots:
     dependencies:
       zod: 4.6.7
 
-  '@pierre/diffs@1.6.4(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
+  '@pierre/diffs@1.6.2(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
     dependencies:
-      '@pierre/highlights': 0.4.0
+      '@pierre/highlights': 0.3.0
       '@pierre/theme': 2.0.0
       '@pierre/theming': 1.0.2(@pierre/theme@2.0.0)(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(shiki@4.6.0)
       diff: 9.0.0
@@ -7425,7 +7491,7 @@ snapshots:
     transitivePeerDependencies:
       - '@shikijs/themes'
 
-  '@pierre/highlights@0.4.0': {}
+  '@pierre/highlights@0.3.0': {}
 
   '@pierre/theme@1.1.0': {}
 
@@ -7648,24 +7714,6 @@ snapshots:
       '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.3.0)(react@19.3.1)
       '@radix-ui/react-primitive': 2.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-use-callback-ref': 1.1.5(@types/react@19.3.0)(react@19.3.1)
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
-    optionalDependencies:
-      '@types/react': 19.3.0
-      '@types/react-dom': 19.3.0(@types/react@19.3.0)
-
-  '@radix-ui/react-hover-card@1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)':
-    dependencies:
-      '@radix-ui/primitive': 1.2.0
-      '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.3.0)(react@19.3.1)
-      '@radix-ui/react-context': 1.3.0(@types/react@19.3.0)(react@19.3.1)
-      '@radix-ui/react-dismissable-layer': 1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-focus-scope': 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-popper': 1.4.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-portal': 1.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-presence': 1.1.11(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-primitive': 2.2.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-use-controllable-state': 1.3.0(@types/react@19.3.0)(react@19.3.1)
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
     optionalDependencies:
@@ -8355,7 +8403,7 @@ snapshots:
   '@tangle-network/agent-core@1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))':
     dependencies:
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/agent-trace-contract': 2.2.0
+      '@tangle-network/agent-trace-contract': 2.2.2
       zod: 4.6.7
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.32.2(supports-color@10.2.2)(zod@4.6.7)
@@ -8364,27 +8412,29 @@ snapshots:
     dependencies:
       '@typescript/typescript6': 6.0.2
 
-  '@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))':
+  '@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)':
     dependencies:
       '@asteasolutions/zod-to-openapi': 9.1.0(zod@4.6.7)
       '@hono/node-server': 2.1.6(hono@4.13.16)
       '@tangle-network/agent-core': 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/agent-trace-contract': 2.2.0
-      '@tangle-network/harness-sessions': 1.0.1(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+      '@tangle-network/agent-trace-contract': 2.2.2
+      '@tangle-network/harness-sessions': 1.0.11(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
       hono: 4.13.16
       linear-sum-assignment: 1.0.9
       re2js: 2.9.0
       smol-toml: 1.9.1
       zod: 4.6.7
+    optionalDependencies:
+      playwright: 1.65.0
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/agent-gateway@0.11.5(hono@4.13.16)':
+  '@tangle-network/agent-gateway@1.0.0(hono@4.13.16)':
     dependencies:
       hono: 4.13.16
 
-  '@tangle-network/agent-integrations@0.76.2(@opentelemetry/api@1.10.0)(@types/node@24.19.2)':
+  '@tangle-network/agent-integrations@1.0.4(@opentelemetry/api@1.10.0)(@types/node@24.19.2)':
     dependencies:
       '@duckdb/node-api': 1.5.5-r.5
       '@ph0ny/sdk': 0.1.3
@@ -8423,32 +8473,28 @@ snapshots:
       spdx-expression-parse: 5.0.0
       zod: 4.6.7
 
-  '@tangle-network/agent-knowledge@23.0.0(@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)))(@tangle-network/agent-interface@5.10.20)':
+  '@tangle-network/agent-knowledge@23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)':
     dependencies:
-      '@tangle-network/agent-eval': 1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+      '@tangle-network/agent-eval': 1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)
       '@tangle-network/agent-interface': 5.10.20
       '@types/proper-lockfile': 4.1.4
       proper-lockfile: 4.1.2
       zod: 4.6.7
 
-  '@tangle-network/agent-profile-materialize@1.1.2(@tangle-network/agent-interface@5.10.20)':
+  '@tangle-network/agent-profile-materialize@1.1.58(@tangle-network/agent-interface@5.10.20)':
     dependencies:
       '@tangle-network/agent-interface': 5.10.20
 
-  '@tangle-network/agent-profile-materialize@1.1.22(@tangle-network/agent-interface@5.10.20)':
-    dependencies:
-      '@tangle-network/agent-interface': 5.10.20
-
-  '@tangle-network/agent-runtime@3.0.24(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)':
+  '@tangle-network/agent-runtime@7.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)(@tangle-network/sandbox@1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7)))(bare-buffer@3.7.1)':
     dependencies:
       '@earendil-works/pi-codemode': 1.4.0
       '@tangle-network/agent-core': 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
-      '@tangle-network/agent-eval': 1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
+      '@tangle-network/agent-eval': 1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0)
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/agent-knowledge': 23.0.0(@tangle-network/agent-eval@1.0.0(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7)))(@tangle-network/agent-interface@5.10.20)
-      '@tangle-network/agent-profile-materialize': 1.1.22(@tangle-network/agent-interface@5.10.20)
-      '@tangle-network/agent-trace-contract': 2.2.0
-      '@tangle-network/sandbox': 1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
+      '@tangle-network/agent-knowledge': 23.0.3(@tangle-network/agent-eval@1.0.22(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(playwright@1.65.0))(@tangle-network/agent-interface@5.10.20)
+      '@tangle-network/agent-profile-materialize': 1.1.58(@tangle-network/agent-interface@5.10.20)
+      '@tangle-network/agent-trace-contract': 2.2.2
+      '@tangle-network/sandbox': 1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
       tar-stream: 3.2.2(bare-buffer@3.7.1)
       yaml: 2.9.1
       zod: 4.6.7
@@ -8458,9 +8504,9 @@ snapshots:
       - bare-buffer
       - react-native-b4a
 
-  '@tangle-network/agent-trace-contract@2.2.0': {}
+  '@tangle-network/agent-trace-contract@2.2.2': {}
 
-  '@tangle-network/brand@1.31.2(react@19.3.1)':
+  '@tangle-network/brand@1.31.4(react@19.3.1)':
     optionalDependencies:
       react: 19.3.1
 
@@ -8491,18 +8537,22 @@ snapshots:
       - ws
       - zod
 
-  '@tangle-network/charts@1.0.0(react@19.3.1)':
+  '@tangle-network/charts@4.0.21(d236b43b3c9c209594054e8ce923e563)':
     optionalDependencies:
+      '@tangle-network/brand': 1.31.4(react@19.3.1)
+      '@tangle-network/ui': 11.51.17(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.4(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)
+      '@xyflow/react': 12.12.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
-  '@tangle-network/harness-sessions@1.0.1(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))':
+  '@tangle-network/harness-sessions@1.0.11(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))':
     dependencies:
       '@tangle-network/agent-core': 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
-      '@tangle-network/agent-trace-contract': 2.2.0
+      '@tangle-network/agent-trace-contract': 2.2.2
     transitivePeerDependencies:
       - '@modelcontextprotocol/sdk'
 
-  '@tangle-network/hub-sdk@1.0.6(supports-color@10.2.2)':
+  '@tangle-network/hub-sdk@1.0.21(supports-color@10.2.2)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.32.2(supports-color@10.2.2)(zod@4.6.7)
       '@tangle-network/agent-core': 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
@@ -8513,28 +8563,33 @@ snapshots:
       - '@cfworker/json-schema'
       - supports-color
 
-  '@tangle-network/sandbox-ui@1.1.10(9fb13a49fe97debbe422d84285630c8d)':
+  '@tangle-network/sandbox-ui@7.0.6(31c419edcab040d1e2c9046492f6964c)':
     dependencies:
       '@lobehub/icons-static-svg': 1.102.0
-      '@pierre/diffs': 1.6.4(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@pierre/diffs': 1.6.2(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-dialog': 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-dropdown-menu': 2.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-select': 2.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/brand': 1.31.2(react@19.3.1)
-      '@tangle-network/ui': 11.51.2(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.2(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)
+      '@tangle-network/brand': 1.31.4(react@19.3.1)
+      '@tangle-network/ui': 11.51.17(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.4(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)
       diff: 9.0.0
       eventsource-parser: 4.1.2
+      katex: 0.19.1
       lucide-react: 1.69.0(@types/react@19.3.0)(react@19.3.1)
       nanostores: 1.5.5
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
+      react-markdown: 10.1.0(@types/react@19.3.0)(react@19.3.1)(supports-color@10.2.2)
+      rehype-katex: 7.0.1
+      remark-gfm: 4.0.1(supports-color@10.2.2)
+      remark-math: 6.0.0(supports-color@10.2.2)
       tailwindcss-animate: 1.0.7(tailwindcss@4.3.4)
       yaml: 2.9.1
     optionalDependencies:
       '@hocuspocus/provider': 4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33)
       '@nanostores/react': 1.1.0(nanostores@1.5.5)(react@19.3.1)
-      '@tangle-network/charts': 1.0.0(react@19.3.1)
+      '@tangle-network/charts': 4.0.21(d236b43b3c9c209594054e8ce923e563)
       '@tiptap/core': 3.33.0(@tiptap/pm@3.33.0)
       '@tiptap/react': 3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tiptap/starter-kit': 3.33.0
@@ -8548,14 +8603,15 @@ snapshots:
       - '@shikijs/themes'
       - '@types/react'
       - '@types/react-dom'
+      - supports-color
       - tailwindcss
 
-  '@tangle-network/sandbox@1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))':
+  '@tangle-network/sandbox@1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))':
     dependencies:
       '@tangle-network/agent-core': 1.0.3(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/agent-trace-contract': 2.2.0
-      tar-stream: 3.2.1(bare-buffer@3.7.1)
+      '@tangle-network/agent-trace-contract': 2.2.2
+      tar-stream: 3.2.2(bare-buffer@3.7.1)
       zod: 4.6.7
     optionalDependencies:
       '@modelcontextprotocol/sdk': 1.32.2(supports-color@10.2.2)(zod@4.6.7)
@@ -8568,9 +8624,10 @@ snapshots:
 
   '@tangle-network/tcloud-attestation@0.1.1': {}
 
-  '@tangle-network/tcloud@0.8.6(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(typescript@7.0.2)(zod@4.6.7)':
+  '@tangle-network/tcloud@1.0.4(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(typescript@7.0.2)(zod@4.6.7)':
     dependencies:
-      '@tangle-network/sandbox': 1.0.264(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
+      '@tangle-network/agent-interface': 5.10.20
+      '@tangle-network/sandbox': 1.0.273(@modelcontextprotocol/sdk@1.32.2(supports-color@10.2.2)(zod@4.6.7))(ai@7.0.163(zod@4.6.7))(bare-buffer@3.7.1)(viem@2.57.16(typescript@7.0.2)(zod@4.6.7))
       '@tangle-network/tcloud-attestation': 0.1.1
       commander: 15.0.0
       viem: 2.57.16(typescript@7.0.2)(zod@4.6.7)
@@ -8588,7 +8645,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@tangle-network/ui@11.51.2(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.2(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)':
+  '@tangle-network/ui@11.51.17(@hocuspocus/provider@4.8.0(y-protocols@1.0.7(yjs@13.6.33))(yjs@13.6.33))(@nanostores/react@1.1.0(nanostores@1.5.5)(react@19.3.1))(@shikijs/themes@4.6.0)(@tangle-network/brand@1.31.4(react@19.3.1))(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/react@3.33.0(@floating-ui/dom@1.8.0)(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@tiptap/starter-kit@3.33.0)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(nanostores@1.5.5)(react-dom@19.3.1(react@19.3.1))(react-router@8.5.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(supports-color@10.2.2)(yjs@13.6.33)':
     dependencies:
       '@pierre/theme': 1.1.0
       '@pierre/trees': 1.0.0-beta.6(@pierre/theme@1.1.0)(@shikijs/themes@4.6.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(shiki@4.6.0)
@@ -8599,7 +8656,6 @@ snapshots:
       '@radix-ui/react-context-menu': 2.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-dialog': 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-dropdown-menu': 2.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@radix-ui/react-hover-card': 1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-label': 2.1.17(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-popover': 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-progress': 1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -8612,7 +8668,7 @@ snapshots:
       '@radix-ui/react-tabs': 1.2.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@radix-ui/react-tooltip': 1.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@tangle-network/agent-interface': 5.10.20
-      '@tangle-network/brand': 1.31.2(react@19.3.1)
+      '@tangle-network/brand': 1.31.4(react@19.3.1)
       class-variance-authority: 0.7.1
       clsx: 2.1.1
       github-slugger: 2.0.0
@@ -8937,6 +8993,8 @@ snapshots:
   '@types/hast@3.0.5':
     dependencies:
       '@types/unist': 3.0.3
+
+  '@types/katex@0.16.8': {}
 
   '@types/mdast@4.0.4':
     dependencies:
@@ -9433,6 +9491,8 @@ snapshots:
 
   commander@4.1.1: {}
 
+  commander@8.3.0: {}
+
   concat-stream@2.0.0:
     dependencies:
       buffer-from: 1.1.2
@@ -9608,6 +9668,8 @@ snapshots:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
+
+  entities@6.0.1: {}
 
   entities@9.0.0: {}
 
@@ -9876,7 +9938,44 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  hast-util-from-dom@5.0.1:
+    dependencies:
+      '@types/hast': 3.0.5
+      hastscript: 9.0.3
+      web-namespaces: 2.0.1
+
+  hast-util-from-html-isomorphic@2.0.0:
+    dependencies:
+      '@types/hast': 3.0.5
+      hast-util-from-dom: 5.0.1
+      hast-util-from-html: 2.0.3
+      unist-util-remove-position: 5.0.0
+
+  hast-util-from-html@2.0.3:
+    dependencies:
+      '@types/hast': 3.0.5
+      devlop: 1.1.0
+      hast-util-from-parse5: 8.0.4
+      parse5: 7.3.0
+      vfile: 6.0.3
+      vfile-message: 4.0.3
+
+  hast-util-from-parse5@8.0.4:
+    dependencies:
+      '@types/hast': 3.0.5
+      '@types/unist': 3.0.3
+      devlop: 1.1.0
+      hastscript: 9.0.3
+      property-information: 7.2.0
+      vfile: 6.0.3
+      vfile-location: 5.0.3
+      web-namespaces: 2.0.1
+
   hast-util-heading-rank@3.0.0:
+    dependencies:
+      '@types/hast': 3.0.5
+
+  hast-util-parse-selector@4.0.0:
     dependencies:
       '@types/hast': 3.0.5
 
@@ -9938,9 +10037,21 @@ snapshots:
     dependencies:
       '@types/hast': 3.0.5
 
+  hast-util-to-text@4.0.3:
+    dependencies:
+      '@types/hast': 3.0.5
+
   hast-util-whitespace@3.0.0:
     dependencies:
       '@types/hast': 3.0.5
+
+  hastscript@9.0.3:
+    dependencies:
+      '@types/hast': 3.0.5
+      comma-separated-tokens: 2.0.3
+      hast-util-parse-selector: 4.0.0
+      property-information: 7.2.0
+      space-separated-tokens: 2.0.2
 
   hono@4.13.16: {}
 
@@ -10104,6 +10215,14 @@ snapshots:
   jsonc-parser@3.3.1: {}
 
   kafkajs@2.2.4: {}
+
+  katex@0.16.47:
+    dependencies:
+      commander: 8.3.0
+
+  katex@0.19.1:
+    dependencies:
+      commander: 15.0.0
 
   kleur@4.1.5: {}
 
@@ -10314,6 +10433,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  mdast-util-math@3.0.0(supports-color@10.2.2):
+    dependencies:
+      '@types/hast': 3.0.5
+      '@types/mdast': 4.0.4
+      devlop: 1.1.0
+      longest-streak: 3.1.0
+      mdast-util-from-markdown: 2.1.0(supports-color@10.2.2)
+      mdast-util-to-markdown: 2.2.2
+      unist-util-remove-position: 5.0.0
+    transitivePeerDependencies:
+      - supports-color
+
   mdast-util-mdx-expression@2.0.1(supports-color@10.2.2):
     dependencies:
       '@types/estree-jsx': 1.0.5
@@ -10472,6 +10603,16 @@ snapshots:
       micromark-extension-gfm-tagfilter: 2.0.0
       micromark-extension-gfm-task-list-item: 2.1.0
       micromark-util-combine-extensions: 2.0.1
+      micromark-util-types: 2.0.3
+
+  micromark-extension-math@3.1.0:
+    dependencies:
+      '@types/katex': 0.16.8
+      devlop: 1.1.0
+      katex: 0.16.47
+      micromark-factory-space: 2.1.0
+      micromark-util-character: 2.1.1
+      micromark-util-symbol: 2.0.1
       micromark-util-types: 2.0.3
 
   micromark-factory-destination@2.0.1:
@@ -10893,6 +11034,10 @@ snapshots:
       is-decimal: 2.0.1
       is-hexadecimal: 2.0.1
 
+  parse5@7.3.0:
+    dependencies:
+      entities: 6.0.1
+
   parse5@8.1.0:
     dependencies:
       entities: 9.0.0
@@ -11285,6 +11430,16 @@ snapshots:
     dependencies:
       regex-utilities: 2.3.0
 
+  rehype-katex@7.0.1:
+    dependencies:
+      '@types/hast': 3.0.5
+      '@types/katex': 0.16.8
+      hast-util-from-html-isomorphic: 2.0.0
+      hast-util-to-text: 4.0.3
+      katex: 0.16.47
+      unist-util-visit-parents: 6.1.0
+      vfile: 6.0.3
+
   rehype-sanitize@6.0.0:
     dependencies:
       '@types/hast': 3.0.5
@@ -11305,6 +11460,15 @@ snapshots:
       micromark-extension-gfm: 3.0.0
       remark-parse: 11.0.0(supports-color@10.2.2)
       remark-stringify: 11.0.0
+      unified: 11.0.5
+    transitivePeerDependencies:
+      - supports-color
+
+  remark-math@6.0.0(supports-color@10.2.2):
+    dependencies:
+      '@types/mdast': 4.0.4
+      mdast-util-math: 3.0.0(supports-color@10.2.2)
+      micromark-extension-math: 3.1.0
       unified: 11.0.5
     transitivePeerDependencies:
       - supports-color
@@ -11674,17 +11838,6 @@ snapshots:
 
   tapable@2.3.3: {}
 
-  tar-stream@3.2.1(bare-buffer@3.7.1):
-    dependencies:
-      b4a: 1.9.0
-      bare-fs: 4.8.4(bare-buffer@3.7.1)
-      fast-fifo: 1.3.2
-      streamx: 2.28.1
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - react-native-b4a
-
   tar-stream@3.2.2(bare-buffer@3.7.1):
     dependencies:
       b4a: 1.9.0
@@ -11874,6 +12027,11 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
+  unist-util-remove-position@5.0.0:
+    dependencies:
+      '@types/unist': 3.0.3
+      unist-util-visit: 5.2.0
+
   unist-util-stringify-position@4.0.0:
     dependencies:
       '@types/unist': 3.0.3
@@ -11924,6 +12082,11 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   vary@1.1.2: {}
+
+  vfile-location@5.0.3:
+    dependencies:
+      '@types/unist': 3.0.3
+      vfile: 6.0.3
 
   vfile-message@4.0.3:
     dependencies:
@@ -11996,6 +12159,8 @@ snapshots:
       xml-name-validator: 5.0.0
 
   walk-up-path@4.0.0: {}
+
+  web-namespaces@2.0.1: {}
 
   webidl-conversions@7.0.0: {}
 
