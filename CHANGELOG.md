@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.7
+
+- fix(chat-routes): record harness_cost_usd beside the ledger cost_usd (#1481)
+- chore(deps): third-party patch/minor upgrades; glob/minimatch advisory fix (#1478)
+
 ## 2.0.6
 
 - fix(sandbox): send the model as the nested backend.model object; templates pin the tested cohort; fixtures speak the current SDK wire (#1479)
