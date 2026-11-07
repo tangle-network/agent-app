@@ -8,7 +8,7 @@ The workflow separates three existing command boundaries:
 | --- | --- |
 | `preflight-command` | Frozen lifecycle install, types, lint, build, bundle checks and applicable non-credentialed invariants. This command prepares the artifact that the release consumes. |
 | `release-command` | Credentialed startup qualification, additive migrations, native deployment, exact served identity, bounded smoke/canary and compatible artifact recovery. It consumes the already built artifact. |
-| `suites-command` | Its own frozen install and the app's complete post-release test population, plus any post-release check of the served app through its release host (`RELEASE_SSH_KEY` is its only credential). This job runs on the same source commit after the release job. |
+| `suites-command` | Its own frozen install and the app's complete post-release test population, plus any post-release check of the served app through its release host (`RELEASE_SSH_KEY` is its only credential there), and `SUITES_SOURCE_SSH_KEY`, a read-only deploy key for fetching a pinned private source. This job runs on the same source commit after the release job. |
 
 These are command inputs to the existing native surfaces, not additional CLIs. Release-only and suite-only modes must leave the normal full merge gate unchanged. A named suite with excluded cases is not proof of full coverage: account for every moved case before adopting the split.
 
