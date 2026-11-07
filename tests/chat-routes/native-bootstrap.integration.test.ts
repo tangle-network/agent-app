@@ -206,9 +206,14 @@ async function boundary(test: Case) {
       expect(await turnStore.listRunning!(threadId)).toEqual([])
       const transcript = await store.listMessages(threadId)
       expect(transcript).toHaveLength(1)
-      if (test.harnessCostUsd !== undefined) expect(transcript[0]).toMatchObject(test.legacyTable
-        ? { costUsd: null } : { costUsd: null, harnessCostUsd: test.harnessCostUsd })
-      if (test.legacyTable) expect(transcript[0]).not.toHaveProperty('harnessCostUsd')
+      if (test.harnessCostUsd !== undefined) {
+        // Old schema: the turn and a later patch both land without the column. Migrated: both store harness spend.
+        expect(transcript[0]).toMatchObject({ costUsd: null, ...(test.legacyTable ? {} : { harnessCostUsd: test.harnessCostUsd }) })
+        await store.updateMessage(transcript[0]!.id, { inputTokens: 7, harnessCostUsd: 0.02 })
+        const patched = await store.getMessage(transcript[0]!.id)
+        expect(patched).toMatchObject({ inputTokens: 7, costUsd: null, ...(test.legacyTable ? {} : { harnessCostUsd: 0.02 }) })
+        if (test.legacyTable) expect(patched).not.toHaveProperty('harnessCostUsd')
+      } else expect(transcript[0]).toMatchObject({ harnessCostUsd: null })
       expect(transcript[0]!.content).toBe(test.assistant === 'one' ? 'Exact partial answer.' : '')
       expect(JSON.stringify(transcript)).not.toContain('fixture-private-value')
       expect(JSON.stringify(transcript[0]!.parts)).toContain(test.publicCause ?? publicDiskCause)
