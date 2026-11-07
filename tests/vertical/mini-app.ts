@@ -32,7 +32,7 @@ import {
 } from '../../src/interactions/index'
 import { createAppAuth, type AppAuth, type AppAuthSession } from '../../src/app-auth/index'
 import { memoryAdapter } from 'better-auth/adapters/memory'
-import { createChatTables, type ChatTables } from '../../src/chat-store/schema'
+import { createChatTables, harnessCostColumns, type ChatTables } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase, type ChatStore } from '../../src/chat-store/store'
 import { ChatStoreInputError, type ChatMessagePart } from '../../src/chat-store/index'
 import {
@@ -119,7 +119,7 @@ async function handle(fn: () => Promise<Response>): Promise<Response> {
 }
 
 export async function createMiniApp(options: MiniAppOptions = {}): Promise<MiniApp> {
-  const tables = createChatTables({ workspaceTable: workspacesTable })
+  const tables = createChatTables({ workspaceTable: workspacesTable, messageExtraColumns: harnessCostColumns() })
   const db = openDatabase([workspacesTable, tables.threads, tables.messages]) as unknown as ChatDatabase
   const store = createChatStore(db, tables)
   const sidecar = createFakeSidecarSession()

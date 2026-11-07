@@ -125,7 +125,7 @@ describe('vertical: createChatTurnRoutes replaces the hand-rolled chat route', (
     expect(assistant.cacheReadTokens).toBe(10)
     expect(assistant.cacheWriteTokens).toBe(2)
     expect(assistant.costUsd).toBeNull()
-    expect(assistant.harnessCostUsd).toBeCloseTo(0.0123)
+    expect(assistant).toMatchObject({ harnessCostUsd: expect.closeTo(0.0123) })
     const parts = assistant.parts ?? []
     const tool = parts.find((p): p is ChatToolPart => p.type === 'tool')
     expect(tool).toMatchObject({ tool: 'vault_search', state: { status: 'completed' } })
