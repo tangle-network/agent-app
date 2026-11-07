@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.9
+
+- ci: allow controlled stack adoption before a named major
+
 ## 2.0.8
 
 - fix(chat-store): make harness_cost_usd an optional message column (#1482)
