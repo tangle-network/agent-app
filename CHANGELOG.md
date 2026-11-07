@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.6
+
+- fix(sandbox): send the model as the nested backend.model object; templates pin the tested cohort; fixtures speak the current SDK wire (#1479)
+
 ## 2.0.5
 
 - fix(deps): accept sandbox-ui 7.0.5 as the peer (#1477)
