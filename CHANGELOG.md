@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 3.0.0
 
 - BREAKING: `./trace` re-exports Charts 4 types. Treat absent prompt/completion token totals as unknown; observed zero stays zero. Cost is omitted when either total is unknown.
 - Adopt the tested current first-party cohort, preserving older Runtime peer lines and exact generated-app pins.
