@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.4
+
+- docs: remove superseded plans and uncited evidence (#1475)
+
 ## 2.0.3
 
 - fix(deps): better-auth and oauth-provider 1.7.18 (#1471)
