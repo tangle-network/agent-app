@@ -4,7 +4,7 @@
 
 Source: `src/chat-store/index.ts`
 
-65 exports.
+66 exports.
 
 ### `AppendMessageInput`
 
@@ -380,6 +380,14 @@ interface CreateThreadInput
 
 ```ts
 "Attached files (already saved to the workspace vault — read them from these paths):"
+```
+
+### `harnessCostColumns`
+
+`function` — The optional `harness_cost_usd` message column: spread into `messageExtraColumns` once the table has it.
+
+```ts
+() => { harnessCostUsd: SQLiteRealBuilderInitial<"harness_cost_usd">; }
 ```
 
 ### `historyAttachmentsFromMessages`
