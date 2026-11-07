@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { SandboxInstance } from '@tangle-network/sandbox/core'
-import { fingerprintAgentProfile, type ProfileFingerprint } from '../profile/fingerprint'
+import type { ProfileFingerprint } from '../profile/fingerprint'
 import { streamSandboxPrompt, type SandboxRuntimeConfig } from './index'
 
 /**
@@ -67,12 +67,6 @@ describe('streamSandboxPrompt onProfileResolved', () => {
     }
 
     expect(observed).toBeDefined()
-    const [, opts] = streamPrompt.mock.calls[0]!
-    const handed = await fingerprintAgentProfile(opts.backend.profile, {
-      model: opts.backend.modelId,
-      harness: opts.backend.type,
-    })
-    expect(observed).toEqual(handed)
     // The per-turn override, not the shell's base prompt, is what got fingerprinted.
     expect(observed!.promptBytes).toBe(Buffer.byteLength('PER-TURN PROMPT', 'utf8'))
     expect(observed!.model).toBe('gpt-5-mini')

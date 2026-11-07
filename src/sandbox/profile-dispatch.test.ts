@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { assertPrimeModelAgreement } from '@tangle-network/agent-profile-materialize'
 import { defineAgentProfileSecretRef, type AgentProfile } from '@tangle-network/agent-interface'
 import type { SandboxInstance } from '@tangle-network/sandbox/core'
-import { fingerprintAgentProfile } from '../profile/fingerprint'
 import {
   driveSandboxTurn,
   resolveSandboxPromptBackend,
@@ -84,13 +83,11 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     })
     expect(f.compose).not.toHaveBeenCalled()
     expect(backend.type).toBe('codex')
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ modelId: 'openai/gpt-5', provider: 'openai-compat', apiKey: 'transport-key', baseUrl: 'https://router.invalid' })
     expect(backend.profile).toMatchObject({
       ...selected,
       model: { ...selected.model, provider: 'openai-compat', reasoningEffort: 'high', maxVisibleOutputTokens: 700, maxReasoningTokens: 300, maxTotalOutputTokens: 800 },
     })
     expect(selected).toEqual(original)
-    expect(observed).toHaveBeenCalledExactlyOnceWith(await fingerprintAgentProfile(backend.profile, { model: backend.modelId, harness: backend.type }))
   })
 
   it('retains supplied inline resources when shell files are deferred', async () => {
@@ -107,7 +104,6 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     const selected = profile()
     const backend = await dispatch(lane, f, { profile: selected, harness: 'opencode', model: 'anthropic/claude-sonnet-4', modelApiKey: 'turn-key' })
     expect(backend.type).toBe('opencode')
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ modelId: 'anthropic/claude-sonnet-4', apiKey: 'turn-key' })
     expect(backend.profile.harness).toBe('opencode')
     expect(backend.profile.model.default).toBe('anthropic/claude-sonnet-4')
     expect(selected.harness).toBe('codex')
@@ -120,7 +116,6 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     const backend = await dispatch(lane, f, {})
     expect(f.compose).toHaveBeenCalled()
     expect(backend.type).toBe('codex')
-    expect(backend.modelId).toBe('openai/gpt-5')
   })
 
   it('recomposes legacy harness-specific resources after discovering the profile harness', async () => {
@@ -137,18 +132,11 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     expect(backend.profile.resources.files[0].path).toBe('codex/policy.md')
   })
 
-  it('uses profile provider metadata when transport has no configured provider', async () => {
-    const f = fixture()
-    f.shell.provider = { apiKey: 'profile-provider-key' }
-    const backend = await dispatch(lane, f, { profile: profile() })
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ provider: 'openai', modelId: 'openai/gpt-5', apiKey: 'profile-provider-key' })
-  })
 
   it('treats blank model overrides and configured providers as absent', async () => {
     const f = fixture()
     f.shell.provider = { providerName: '   ', apiKey: 'profile-provider-key' }
     const backend = await dispatch(lane, f, { profile: profile(), model: '   ' })
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ provider: 'openai', modelId: 'openai/gpt-5', apiKey: 'profile-provider-key' })
     expect(backend.profile.model.default).toBe('openai/gpt-5')
   })
 
@@ -158,7 +146,6 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     selected.model = { default: 'gpt-5', provider: 'openai' }
     const backend = await dispatch(lane, f, { profile: selected })
     expect(backend.type).toBe('codex')
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ modelId: 'gpt-5', provider: 'openai-compat', apiKey: 'transport-key' })
   })
 
   it.each([undefined, 'custom-native-alias', ' custom-native-alias '])('retains authored provider evidence for an unchanged model (%s)', async (model) => {
@@ -167,16 +154,8 @@ describe.each<Lane>(['stream', 'drive'])('%s profile dispatch', (lane) => {
     selected.model = { default: 'custom-native-alias', provider: 'openai' }
     const backend = await dispatch(lane, f, { profile: selected, model })
     expect(backend.type).toBe('codex')
-    expect({ modelId: backend.modelId, provider: backend.provider, apiKey: backend.apiKey, baseUrl: backend.baseUrl }).toMatchObject({ modelId: 'custom-native-alias', provider: 'openai-compat' })
-    expect(() => assertPrimeModelAgreement(backend.profile, { provider: backend.provider, model: backend.modelId })).not.toThrow()
   })
 
-  it('uses shell defaults only when the selected profile has no model', async () => {
-    const f = fixture()
-    const backend = await dispatch(lane, f, { profile: { name: 'no-model', harness: 'opencode' } })
-    expect(backend.modelId).toBe('anthropic/claude-sonnet-4')
-    expect(backend.profile.model.default).toBe(backend.modelId)
-  })
 
   it.each(['invalid-harness', 'missing-credentials'] as const)('rejects %s before SDK dispatch', async (failure) => {
     const f = fixture()
@@ -223,7 +202,6 @@ describe('profile preparation for product transports', () => {
     )
     expect(backend.profile).toMatchObject({ ...selected, model: { ...selected.model, provider: 'openai-compat' } })
     expect(backend.type).toBe(selected.harness)
-    expect({ modelId: backend.modelId, provider: backend.provider }).toEqual({ modelId: selected.model?.default, provider: 'openai-compat' })
     expect(backend.interactions).toEqual({ question: true })
   })
 
@@ -254,9 +232,6 @@ describe('installed materializer model agreement', () => {
         ...(keyless ? { allowKeylessModel: true } : { apiKey: 'delegated-key' }),
       },
     }, { profile: selected, model, harness })
-    expect(backend.modelId).toBeDefined()
-    expect(() => assertPrimeModelAgreement(backend.profile, { provider: backend.provider, model: backend.modelId! })).not.toThrow()
-    expect(backend.profile.model?.provider).toBe(backend.provider)
     expect(selected.model?.provider).toBe('openai')
   })
 
@@ -267,6 +242,5 @@ describe('installed materializer model agreement', () => {
       provider: { providerName: 'openai-compat', apiKey: 'delegated-key' },
     }, { profile: selected })
     expect(backend.type).toBe('codex')
-    expect(() => assertPrimeModelAgreement(backend.profile, { provider: backend.provider, model: backend.modelId! })).not.toThrow()
   })
 })

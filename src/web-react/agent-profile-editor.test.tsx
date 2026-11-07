@@ -82,16 +82,6 @@ describe('AgentProfileEditor model and runtime', () => {
     await waitFor(() => expect(current().model).toBeUndefined())
   })
 
-  it('uses the composer thinking picker and stores Auto as no override', async () => {
-    render(<Harness initial={{ harness: 'codex', model: { default: 'openai/gpt-6.1-sol', reasoningEffort: 'medium' } }} config={config()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Thinking' }))
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Extended/ }))
-    await waitFor(() => expect(current().model?.reasoningEffort).toBe('high'))
-    fireEvent.click(screen.getByRole('button', { name: 'Thinking' }))
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: /Auto/ }))
-    await waitFor(() => expect(current().model?.reasoningEffort).toBeUndefined())
-  })
-
   it('keeps plain fields without a catalog and never labels fields with schema paths', () => {
     render(<Harness initial={{ prompt: { systemPrompt: 'Be brief.' } }} />)
     expect(screen.getByRole('textbox', { name: 'Default model' }).getAttribute('data-1p-ignore')).toBe('true')

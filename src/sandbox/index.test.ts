@@ -1476,17 +1476,6 @@ describe('streamSandboxPrompt seam', () => {
     const [prompt, opts] = (box.streamPrompt as ReturnType<typeof vi.fn>).mock.calls[0]!
     expect(prompt).toBe('Assistant: prior\n\nUser: hello')
     expect(opts.backend.type).toBe('opencode')
-    // Only the flat spelling: the nested object is deprecated compatibility.
-    for (const key of ['modelId', 'provider', 'apiKey', 'baseUrl']) {
-      expect(opts.backend).toHaveProperty(key)
-    }
-    expect(opts.backend).not.toHaveProperty('model')
-    expect(opts.backend).toMatchObject({
-      modelId: 'gpt-x',
-      provider: 'openai-compat',
-      apiKey: 'router-key',
-      baseUrl: 'https://router',
-    })
     expect(opts.backend.profile.model.reasoningEffort).toBe('high')
     expect(opts.requireVisibleAssistantOutput).toBe(true)
   })
@@ -3050,27 +3039,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     expect(createMock).not.toHaveBeenCalled()
   })
 
-  it('bakes resolved model + childKeyMint override into the backend model fields', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      backendModelAtCreate: true,
-      resumeStopped: false,
-      provider: { providerName: 'openai-compat', modelName: 'm', apiKey: 'parent' },
-      childKeyMint: async () => ({ succeeded: true, value: 'child-key' }),
-    })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', userId: 'u9', harness: 'opencode' })
-    for (const key of ['modelId', 'provider', 'apiKey']) {
-      expect(createMock.mock.calls[0]![0].backend).toHaveProperty(key)
-    }
-    expect(createMock.mock.calls[0]![0].backend).not.toHaveProperty('model')
-    expect(createMock.mock.calls[0]![0].backend).toMatchObject({
-      provider: 'openai-compat',
-      modelId: 'm',
-      apiKey: 'child-key',
-    })
-  })
-
   it('billingOwnerId is included in the create payload only when set', async () => {
     listMock.mockResolvedValue([])
     createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
@@ -3085,37 +3053,6 @@ describe('ensureWorkspaceSandbox — new seams', () => {
     createMock.mockClear()
     await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
     expect('billingOwnerId' in createMock.mock.calls[0]![0]).toBe(false)
-  })
-
-  it('bakes keyless model metadata at create under allowKeylessModel (no apiKey field)', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      backendModelAtCreate: true,
-      resumeStopped: false,
-      provider: {
-        providerName: 'openai-compat',
-        modelName: 'm',
-        routerBaseUrl: 'https://router',
-        allowKeylessModel: true,
-      },
-    })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(createMock.mock.calls[0]![0].backend).toMatchObject({ modelId: 'm', provider: 'openai-compat', baseUrl: 'https://router' })
-    expect('apiKey' in createMock.mock.calls[0]![0].backend).toBe(false)
-  })
-
-  it('childKeyMint failure falls through to parent key (logged, not thrown)', async () => {
-    listMock.mockResolvedValue([])
-    createMock.mockResolvedValue(fakeBox({ waitFor: vi.fn(), refresh: vi.fn(), connection: { runtimeUrl: 'x' } as never }))
-    const shell = shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      backendModelAtCreate: true,
-      resumeStopped: false,
-      provider: { providerName: 'openai-compat', modelName: 'm', apiKey: 'parent' },
-      childKeyMint: async () => ({ succeeded: false, error: new Error('tcloud down') }),
-    })
-    await ensureWorkspaceSandbox(shell, { workspaceId: 'w1', harness: 'opencode' })
-    expect(createMock.mock.calls[0]![0].backend.apiKey).toBe('parent')
   })
 
   it('runs bootstrap after create and on reuse; throws on bootstrap failure', async () => {

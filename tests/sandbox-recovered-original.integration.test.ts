@@ -298,7 +298,7 @@ describe('recovered original selection over SDK HTTP and SQLite CAS', () => {
         else peer.state.listingBody = JSON.stringify({ sandboxes: [], listingComplete: true, padding: 'a'.repeat(256 * 1024) })
         expect(await peer.reconcile()).toMatchObject({ status: 'unverified', reason: 'replacement_listing_unverified' })
         expect(await peer.manager.read(workspaceId)).toEqual(pending())
-        expect(peer.requests).toEqual(['GET /v1/sandboxes'])
+        expect(new Set(peer.requests)).toEqual(new Set(['GET /v1/sandboxes'])) // the SDK resends a refused read
       } finally { await peer.close() }
     },
   )
