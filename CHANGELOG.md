@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.5
+
+- fix(deps): accept sandbox-ui 7.0.5 as the peer (#1477)
+
 ## 2.0.4
 
 - docs: remove superseded plans and uncited evidence (#1475)
