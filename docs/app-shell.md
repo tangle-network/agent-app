@@ -33,7 +33,7 @@ Everything else is shared. Do not hand-build a `logo` plus `railHeaderContent` p
 >
 ```
 
-The mark sits in the rail's brand slot and becomes the expand control when the rail collapses. Beside it, the identity shows two lines: the workspace name, then the product name. Both truncate inside the rail and keep the full text as a tooltip. A long client name cannot run into the collapse button or the page. It is a switcher only when there is somewhere to go. A workspace with no other options, no listing and no create route renders as plain text, not as a one-item menu.
+The mark sits in the rail's brand slot and becomes the expand control when the rail collapses. Beside it, the identity shows two lines: the workspace name, then the product name. A name too long for one line wraps onto a second before it truncates, and the full text stays as a tooltip. A long client name cannot run into the collapse button or the page. It is a switcher only when there is somewhere to go. A workspace with no other options, no listing and no create route renders as plain text, not as a one-item menu.
 
 Below the rail breakpoint the same identity heads the mobile bar and the navigation drawer, with the mark included, so no product adds a second mobile strip.
 
