@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.8
+
+- fix(journeys): request the app callback during Tangle sign-in (#1490)
+
 ## 3.0.7
 
 - fix(sandbox): a prewarm that names an unverifiable thread warms nothing (#1501)
