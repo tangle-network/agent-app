@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.6
+
+- fix(sandbox): a detached turn reads its admitted stream instead of reopening a replay (#1500)
+- chore(deps): adopt @tangle-network/agent-runtime 9.0.0 (#1498)
+
 ## 3.0.5
 
 - feat(chat-routes): prewarm: 'box' brings up the turn's box on page open, off the request (#1497)
