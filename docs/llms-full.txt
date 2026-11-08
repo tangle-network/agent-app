@@ -39612,6 +39612,22 @@ type RecordGridWriteOutcome
 (url: string, options?: WorkspacePrewarmRequestOptions) => boolean
 ```
 
+### `ResizeHandle`
+
+`function` — Drag-to-resize grip on a pane's edge, an ARIA window splitter.
+
+```ts
+({ width, minWidth, maxWidth, edge, label, onPreview, onCommit, onNudge, onReset, className }: ResizeHandleProps) => El…
+```
+
+### `ResizeHandleProps`
+
+`interface`
+
+```ts
+interface ResizeHandleProps
+```
+
 ### `resolveChatInteraction`
 
 `function` — Marks one ask resolved locally (the card's `onResolved`).

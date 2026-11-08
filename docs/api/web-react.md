@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-536 exports.
+538 exports.
 
 ### `acceptRejectionReason`
 
@@ -3116,6 +3116,22 @@ type RecordGridWriteOutcome
 
 ```ts
 (url: string, options?: WorkspacePrewarmRequestOptions) => boolean
+```
+
+### `ResizeHandle`
+
+`function` — Drag-to-resize grip on a pane's edge, an ARIA window splitter.
+
+```ts
+({ width, minWidth, maxWidth, edge, label, onPreview, onCommit, onNudge, onReset, className }: ResizeHandleProps) => El…
+```
+
+### `ResizeHandleProps`
+
+`interface`
+
+```ts
+interface ResizeHandleProps
 ```
 
 ### `resolveChatInteraction`
