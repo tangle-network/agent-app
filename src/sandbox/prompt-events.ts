@@ -81,6 +81,8 @@ export async function* detachedSandboxPromptEvents(
         executionId,
         turnId,
         backend,
+        keepEvents: true,
+        ...(options.signal ? { signal: options.signal } : {}),
         ...(options.expectedPublicProfileRequestDigest
           ? { expectedPublicProfileRequestDigest: options.expectedPublicProfileRequestDigest }
           : {}),
@@ -112,18 +114,16 @@ export async function* detachedSandboxPromptEvents(
     }
   }
 
-  // The SDK may return a different active execution with dispatched: false.
-  // That is neither admission of this run nor permission to observe its peer.
-  // Only an exact keyed completed turn above may retain a prior execution ID.
+  // A different active execution (dispatched: false) is neither admission of this run nor permission to
+  // observe its peer; only the exact keyed completed turn above may keep a prior execution id.
   if (admission && (admission.sessionId !== sessionId || admission.executionId !== executionId)) {
+    for await (const _ of admission.events ?? []) break
     throw new Error('sandbox.detached_admission_identity_mismatch')
   }
 
-  // The session bus is a useful observation surface, but its message events
-  // use a different envelope (`data.properties.part`). Use the SDK's exact
-  // execution replay instead so downstream producers receive the same event
-  // vocabulary as a direct prompt stream (`data.part`, terminal `result`, etc.).
-  yield* box.streamPrompt('', {
+  // Not the session bus (`data.properties.part`): the admitted stream, or the SDK's exact execution replay
+  // on a resume or an older SDK, keeps the direct prompt vocabulary (`data.part`, terminal `result`).
+  yield* admission?.events ?? box.streamPrompt('', {
     sessionId,
     executionId,
     lastEventId: lastEventId || '0',
