@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.2
+
+- fix(workspace-react): the listing's product name wraps onto a second line instead of truncating (#1492)
+
 ## 3.0.1
 
 - fix(deps): align generated apps with current Sandbox UI
