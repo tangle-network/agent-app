@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.3
+
+- feat(web-react): export ResizeHandle, a pane-edge splitter for either side (#1493)
+
 ## 3.0.2
 
 - fix(workspace-react): the listing's product name wraps onto a second line instead of truncating (#1492)
