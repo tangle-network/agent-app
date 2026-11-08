@@ -25,10 +25,10 @@ import {
   useRef,
 } from "react";
 import type { ToolDetailRenderers } from "../web-react";
+import { ResizeHandle } from "../web-react/resize-handle";
 import { AssistantPanel, type AssistantPanelProps } from "./AssistantPanel";
 import { useAssistantLauncher } from "./launcher";
 import { ASSISTANT_PANEL_ID, AssistantPanelToggle } from "./panel-toggle";
-import { ResizeHandle } from "./ResizeHandle";
 import type {
   AssistantPageContext,
   ConfirmedResult,
@@ -36,7 +36,7 @@ import type {
   ConnectRequirementResult,
 } from "./types";
 import { useAssistantChat } from "./useAssistantChat";
-import { useMediaQuery } from "./usePanelPrefs";
+import { MIN_PANEL_WIDTH, useMediaQuery } from "./usePanelPrefs";
 
 export interface AssistantDockProps {
   /** The signed-in user this conversation belongs to (null when signed out). */
@@ -316,7 +316,9 @@ export function AssistantDock({
     >
       {panel}
       <ResizeHandle
+        label="Resize assistant panel"
         width={width}
+        minWidth={MIN_PANEL_WIDTH}
         maxWidth={maxWidth}
         onPreview={previewWidth}
         onCommit={setWidth}

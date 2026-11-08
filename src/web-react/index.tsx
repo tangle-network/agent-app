@@ -25,6 +25,7 @@
 
 export * from './chat-stream'
 export { TurnProgress, type TurnProgressProps } from './turn-progress'
+export { ResizeHandle, type ResizeHandleProps } from './resize-handle'
 export { ReasoningRow, type ReasoningRowProps } from './reasoning-row'
 export { useChatScroll } from './chat-scroll'
 export * from './chat-interactions'

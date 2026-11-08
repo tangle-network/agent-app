@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
-import { ResizeHandle } from '../../assistant/ResizeHandle'
+import { ResizeHandle } from '../../web-react/resize-handle'
 
 /**
  * The panel's drag-to-resize grip, mounted on the left edge of a stand-in
@@ -38,7 +38,9 @@ function ResizeHarness() {
           style={{ width }}
         >
           <ResizeHandle
+            label="Resize assistant panel"
             width={width}
+            minWidth={MIN_WIDTH}
             maxWidth={MAX_WIDTH}
             onPreview={(next) => setWidth(clampWidth(next))}
             onCommit={(next) => {

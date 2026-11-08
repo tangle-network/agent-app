@@ -30653,6 +30653,18 @@
           "doc": "Send one prewarm request for `url` unless the tab is hidden, a request for it is in flight, or one was sent within `minIntervalMs`."
         },
         {
+          "name": "ResizeHandle",
+          "kind": "function",
+          "signature": "({ width, minWidth, maxWidth, edge, label, onPreview, onCommit, onNudge, onReset, className }: ResizeHandleProps) => El…",
+          "doc": "Drag-to-resize grip on a pane's edge, an ARIA window splitter."
+        },
+        {
+          "name": "ResizeHandleProps",
+          "kind": "interface",
+          "signature": "interface ResizeHandleProps",
+          "doc": null
+        },
+        {
           "name": "resolveChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], id: string, status: \"cancelled\" | \"expired\" | \"answered\" | \"declined\", answers?: InteractionA…",
