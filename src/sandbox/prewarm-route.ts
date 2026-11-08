@@ -155,14 +155,15 @@ const RECENT_LIMIT = 1_000
 const REASONS: readonly WorkspacePrewarmReason[] = ['page-open', 'composer-focus', 'heartbeat']
 const THREAD_ID = /^[A-Za-z0-9_:.-]{1,128}$/
 
-async function requestIntent(request: Request): Promise<{ reason: WorkspacePrewarmReason; threadId?: string }> {
-  if (Number(request.headers.get('content-length') ?? 0) > 1_024) return { reason: 'page-open' }
+async function requestIntent(request: Request): Promise<{ reason: WorkspacePrewarmReason; threadId?: string } | undefined> {
+  if (Number(request.headers.get('content-length') ?? 0) > 1_024) return undefined
   try {
     // A clone, so a product's authorize can still read the body.
     const body = (await request.clone().json()) as { reason?: unknown; threadId?: unknown } | null
     const reason = REASONS.find((known) => known === body?.reason) ?? 'page-open'
-    const threadId = typeof body?.threadId === 'string' && THREAD_ID.test(body.threadId) ? body.threadId : undefined
-    return { reason, ...(threadId ? { threadId } : {}) }
+    const threadId = body?.threadId
+    if (threadId !== undefined && (typeof threadId !== 'string' || !THREAD_ID.test(threadId))) return undefined
+    return { reason, ...(typeof threadId === 'string' ? { threadId } : {}) }
   } catch {
     return { reason: 'page-open' }
   }
@@ -299,9 +300,11 @@ export function createWorkspacePrewarmRoute<Context = void>(
     }
     if (isAutomatedPrewarmRequest(request)) return reply({ outcome: 'automated', ms: 0 })
 
+    const intent = await requestIntent(request)
+    if (!intent) return reply({ outcome: 'declined', ms: now() - started, reason: 'invalid_thread' })
     let auth: WorkspacePrewarmAuthorization
     try {
-      auth = await options.authorize({ request, context, ...(await requestIntent(request)) })
+      auth = await options.authorize({ request, context, ...intent })
     } catch (err) {
       // An authorization that cannot decide refuses; it never warms.
       emit({ type: 'failed', key: '', ms: now() - started, error: err instanceof Error ? err.message : String(err) })

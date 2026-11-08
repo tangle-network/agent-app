@@ -150,7 +150,7 @@ async function boundary() {
   const turn = (threadId: string, content = 'Hello.') => post('/api/chat', { threadId, turnId: crypto.randomUUID(), content })
   const ctx = { waitUntil(work: Promise<unknown>) { pending.push(work) } }
   const flush = async () => { for (let at = 0; at < pending.length; at++) await pending[at] }
-  return { db, store, requests, nativeRequests, computerRequests, channels, routes, post, turn, ctx, flush, origin,
+  return { db, store, requests, nativeRequests, computerRequests, channels, routes, post, turn, ctx, pending, flush, origin,
     holdStarted: () => heldModelStarted ? Promise.resolve() : new Promise<void>(resolve => modelStarted.push(resolve)),
     release: () => { for (const send of held.splice(0)) send() },
     close: async () => {
@@ -263,6 +263,17 @@ it('prewarms only a server-authorized workspace and checks access to any named t
     expect(peer.channels).toHaveLength(count)
     expect(peer.requests).toEqual([])
     expect(peer.db.sqlite.prepare('SELECT * FROM sandbox_prewarm_claims').all()).toEqual([])
+  } finally { await peer.close() }
+})
+
+it("starts prewarm: 'box' only after authorize verifies the thread a request names", async () => {
+  const peer = await boundary()
+  try {
+    const prewarm = (body: Record<string, unknown>) => peer.routes({ prewarm: 'box' }).prewarm(peer.post('/api/chat/prewarm', body), peer.ctx)
+    expect((await prewarm({ threadId: 'foreign-thread' })).status).toBe(404)
+    for (const threadId of ['not a thread id', 42, '']) expect(await (await prewarm({ threadId })).json()).toMatchObject({ outcome: 'declined', reason: 'invalid_thread' })
+    expect([peer.pending, peer.channels]).toEqual([[], []])
+    expect([(await prewarm({ threadId: 'first', reason: 'composer-focus' })).status, peer.pending.length]).toEqual([200, 1])
   } finally { await peer.close() }
 })
 
