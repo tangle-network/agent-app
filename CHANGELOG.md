@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.4
+
+- feat(turn-trace): the turn's summary line splits sandbox time by span, as it does admission (#1495)
+
 ## 3.0.3
 
 - feat(web-react): export ResizeHandle, a pane-edge splitter for either side (#1493)
