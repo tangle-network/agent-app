@@ -84,8 +84,8 @@ export interface TurnTraceSummary {
   d1Queries?: number
   /** From the request to the first model request: the wait the app owns before the model can start. */
   dispatchMs?: number
-  /** Each `admission.*` span's duration by its name after `admission.`, the split of the wait before the turn opens. */
-  admission?: Record<string, number>
+  /** Each admission and sandbox span's duration by name, less its `admission.` or `sandbox.` prefix: where the wait before first output went. */
+  admission?: Record<string, number>; sandbox?: Record<string, number>
   /** Prompt tokens over every model call, and how many of them the provider served from its prompt cache. */
   inputTokens?: number
   cachedInputTokens?: number
@@ -258,14 +258,14 @@ export function summarizeTurnSpans(
 
 /** The summary fields read from span names and attributes: dispatch time, the admission split and prompt-cache use. */
 function spanMeasurements(spans: readonly TurnSpanRecord[], startedAt: number): Partial<TurnTraceSummary> {
-  const admission: Record<string, number> = {}
+  const split: Record<'admission' | 'sandbox', Record<string, number>> = { admission: {}, sandbox: {} }
   let firstModelCall: number | undefined
   let inputTokens: number | undefined
   let cachedInputTokens: number | undefined
   for (const span of spans) {
-    if (span.kind === 'admission' && span.name.startsWith('admission.')) {
-      const step = span.name.slice('admission.'.length)
-      admission[step] = round1((admission[step] ?? 0) + span.endMs - span.startMs)
+    if (span.kind === 'admission' || span.kind === 'sandbox') {
+      const step = span.name.replace(/^(admission|sandbox)\./, '')
+      split[span.kind][step] = round1((split[span.kind][step] ?? 0) + span.endMs - span.startMs)
     }
     if (span.name !== 'model.call') continue
     firstModelCall = Math.min(firstModelCall ?? span.startMs, span.startMs)
@@ -276,7 +276,7 @@ function spanMeasurements(spans: readonly TurnSpanRecord[], startedAt: number): 
   }
   return {
     ...(firstModelCall === undefined ? {} : { dispatchMs: round1(Math.max(0, firstModelCall - startedAt)) }),
-    ...(Object.keys(admission).length ? { admission } : {}),
+    ...Object.fromEntries(Object.entries(split).filter(([, steps]) => Object.keys(steps).length)),
     ...(inputTokens === undefined ? {} : { inputTokens }),
     ...(cachedInputTokens === undefined ? {} : { cachedInputTokens }),
   }
