@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.9
+
+- test(sandbox): the sidecar doubles announce dispatchGuard and refuse a guarded POST as the sidecar does (#1502)
+
 ## 3.0.8
 
 - fix(journeys): request the app callback during Tangle sign-in (#1490)
