@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.5
+
+- feat(chat-routes): prewarm: 'box' brings up the turn's box on page open, off the request (#1497)
+
 ## 3.0.4
 
 - feat(turn-trace): the turn's summary line splits sandbox time by span, as it does admission (#1495)
