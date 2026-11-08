@@ -67,8 +67,8 @@ function DefaultLink({ href, to, ...props }: { href?: string; to?: string; [key:
 /**
  * The top of every product's rail: which product, and which workspace.
  *
- * One line when no workspace is open (the listing), two when one is: the
- * workspace name, then the product beneath it. A name too long for one line
+ * The product alone when no workspace is open (the listing), wrapping onto a second line rather than truncating; two
+ * lines when one is: the workspace name, then the product beneath it. A name too long for one line
  * takes both lines and the product moves to the tooltip, which carries the
  * full text either way, so a long name can never push into the collapse
  * button, the page beside the rail, or the height of the header row. It is a switcher only when
@@ -91,7 +91,7 @@ export function AgentRailIdentity({ product, workspace, hideBelow = 'lg', LinkCo
         className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent"
       >
         {mobileMark}
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{product.name}</span>
+        <span className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-5 text-foreground [overflow-wrap:anywhere]">{product.name}</span>
       </Link>
     )
   }
