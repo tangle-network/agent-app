@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.7
+
+- fix(sandbox): a prewarm that names an unverifiable thread warms nothing (#1501)
+
 ## 3.0.6
 
 - fix(sandbox): a detached turn reads its admitted stream instead of reopening a replay (#1500)
