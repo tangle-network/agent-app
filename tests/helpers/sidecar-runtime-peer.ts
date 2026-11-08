@@ -5,7 +5,9 @@
  * `GET /agents/run/{id}/events`, the session's status and execution ledger,
  * completed turns by turn id (a repeated turn id is the same run, never a
  * second one), the interaction registry, and a real directory as the box's file
- * tree. The test decides what each new run does (`onRun`).
+ * tree. `execution.started` announces `dispatchGuard`, and a guarded POST is
+ * refused before admission with 409 TURN_COMPLETED or SESSION_BUSY, as the
+ * sidecar does. The test decides what each new run does (`onRun`).
  */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -30,7 +32,7 @@ export interface RuntimeRun {
 
 export interface SidecarRuntimePeer {
   runs: Map<string, RuntimeRun>
-  /** Every admission request, by execution id, including repeats of a run that already exists. */
+  /** Every admission request, by execution id, including repeats of a run that already exists; never a guard refusal. */
   sends: string[]
   unknown: string[]
   push(run: RuntimeRun, event: RuntimeEvent): void
@@ -81,6 +83,8 @@ export function createSidecarRuntimePeer(options: {
     handle(request, response, path, url, body) {
       const json = (value: unknown, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value)); return true }
       const inSession = (sessionId: string) => [...runs.values()].filter(run => run.sessionId === sessionId)
+      const completedTurn = (sessionId: unknown, turnId: unknown) =>
+        [...runs.values()].find(run => run.turnId === turnId && run.sessionId === sessionId && run.terminal === 'completed')
       const session = path.match(/^\/agents\/sessions\/([^/]+)(\/runs|\/interactions)?$/)
       if (session && request.method === 'GET' && !session[2]) {
         const latest = inSession(decodeURIComponent(session[1]!)).at(-1)
@@ -103,8 +107,8 @@ export function createSidecarRuntimePeer(options: {
         return json({ success: true })
       }
       if (path === '/messages/turns') {
-        const run = [...runs.values()].find(value => value.turnId === url.searchParams.get('turnId') && value.sessionId === url.searchParams.get('sessionId'))
-        if (run?.terminal !== 'completed') { response.writeHead(204).end(); return true }
+        const run = completedTurn(url.searchParams.get('sessionId'), url.searchParams.get('turnId'))
+        if (!run) { response.writeHead(204).end(); return true }
         const text = String(run.events.find(event => event.type === 'result')?.data.finalText ?? '')
         return json({ turnId: run.turnId, sessionId: run.sessionId, completedAt: new Date().toISOString(),
           result: { text, response: text, success: true, executionId: run.executionId } })
@@ -112,7 +116,12 @@ export function createSidecarRuntimePeer(options: {
       if (path === '/messages') return json([])
       if (path === '/agents/run/stream' && request.method === 'POST') {
         const input = JSON.parse(body) as { sessionId: string; turnId?: string; runControlRef?: unknown; detach?: boolean
-          parts?: Array<{ type: string; text?: string }>; backend: Record<string, unknown> }
+          dispatchGuard?: boolean; parts?: Array<{ type: string; text?: string }>; backend: Record<string, unknown> }
+        const active = input.dispatchGuard && input.sessionId ? inSession(input.sessionId).at(-1) : undefined
+        if (input.dispatchGuard && input.turnId && completedTurn(input.sessionId, input.turnId))
+          return json({ success: false, error: { code: 'TURN_COMPLETED', message: `Turn ${input.turnId} already completed` } }, 409)
+        if (active && !active.terminal) return json({ success: false, error: { code: 'SESSION_BUSY',
+          message: `Session ${input.sessionId} is running ${active.executionId}`, activeExecutionId: active.executionId } }, 409)
         const executionId = String(request.headers['x-execution-id'] ?? '')
         sends.push(executionId)
         const detached = input.detach === true || request.headers['x-agent-detach'] === 'true'
@@ -128,7 +137,7 @@ export function createSidecarRuntimePeer(options: {
         response.writeHead(200, { 'content-type': 'text/event-stream' })
         let sent = 0
         const write = (id: number, event: RuntimeEvent) => response.write(`id: ${id}\nevent: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`)
-        write(0, { type: 'execution.started', data: { ...ids(live), runControlRef: input.runControlRef } })
+        write(0, { type: 'execution.started', data: { dispatchGuard: true, ...ids(live), runControlRef: input.runControlRef } })
         const flush = () => {
           while (sent < live.events.length) { write(sent + 1, live.events[sent]!); sent++ }
           if (live.terminal) { live.listeners.delete(flush); response.end() }

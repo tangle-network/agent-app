@@ -468,7 +468,11 @@ it('gives detached tool calls distinct native identities and reuses only the exa
     }
     const frame = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`
     if (request.method === 'POST' && path === '/agents/run/stream') {
-      const input = JSON.parse(body) as { sessionId: string; turnId: string; runControlRef?: unknown; parts: Array<{ type: string; text?: string }> }
+      const input = JSON.parse(body) as { sessionId: string; turnId: string; runControlRef?: unknown; dispatchGuard?: boolean
+        parts: Array<{ type: string; text?: string }> }
+      // The sidecar's guard refuses a completed turn id before admission; no session here is ever in flight.
+      if (input.dispatchGuard && turns.has(`${input.sessionId}:${input.turnId}`))
+        return json({ success: false, error: { code: 'TURN_COMPLETED', message: `Turn ${input.turnId} already completed` } }, 409)
       const executionId = String(request.headers['x-execution-id'])
       // The SDK encodes every text part on the wire; the sidecar decodes it before dispatch.
       const task = input.parts.filter(part => part.type === 'text').map(part => Buffer.from(part.text ?? '', 'base64').toString('utf8')).join('\n')
@@ -476,7 +480,7 @@ it('gives detached tool calls distinct native identities and reuses only the exa
       admissions.push(turn)
       turns.set(`${turn.sessionId}:${turn.turnId}`, turn)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
-      response.end(frame('execution.started', { sessionId: turn.sessionId, executionId,
+      response.end(frame('execution.started', { dispatchGuard: true, sessionId: turn.sessionId, executionId,
         ...(input.runControlRef ? { runControlRef: input.runControlRef } : {}) }))
       return
     }
