@@ -132,11 +132,10 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   input: CreateChatTurnRoutesOptions<TContext, TResource>,
 ): ChatTurnRoutes {
   const produce = input.produce
+  const backend = typeof produce === 'function' || (produce && 'router' in produce && typeof produce.router === 'function') ? undefined
+    : createDefaultChatBackend<TContext, TResource>(input.projectId, input.env ?? {}, produce as ChatTurnDefaultBackend<TContext, TResource> | undefined ?? {}, turnStorageBindings(input), input.modelPolicy)
   const options: ResolvedChatTurnRoutesOptions<TContext, TResource> = {
-    ...input, ...resolveTurnStorage(input),
-    produce: typeof produce === 'function' || (produce && 'router' in produce && typeof produce.router === 'function')
-      ? produce as ResolvedChatTurnRoutesOptions<TContext, TResource>['produce']
-      : createDefaultChatBackend<TContext, TResource>(input.projectId, input.env ?? {}, produce as ChatTurnDefaultBackend<TContext, TResource> | undefined ?? {}, turnStorageBindings(input), input.modelPolicy),
+    ...input, ...resolveTurnStorage(input), produce: backend ?? produce as ResolvedChatTurnRoutesOptions<TContext, TResource>['produce'],
   }
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
 
@@ -401,7 +400,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   }
 
   return {
-    prewarm: createChatPrewarm(input),
+    prewarm: createChatPrewarm(input, backend?.prewarm),
     turn: (request, ctx) => withD1QueryCount(() => turn(request, ctx)),
     cancel: request => cancelChatTurn(request, { authorize: options.authorize, cancel: options.cancel, log }),
     replay,

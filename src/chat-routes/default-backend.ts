@@ -2,6 +2,7 @@
 import type { SandboxInstance } from '@tangle-network/sandbox'
 import type { Harness } from '../harness/index'
 import { createD1PrewarmClaimStore } from '../sandbox/prewarm-claim-d1'
+import { createSandboxPrewarmer } from '../sandbox/prewarm'
 import { runForegroundSandboxSingleFlight } from '../sandbox/foreground-single-flight'
 import { ensureWorkspaceSandbox, peekWorkspaceSandbox, streamSandboxPrompt } from '../sandbox/index'
 import type { SandboxRuntimeConfig } from '../sandbox/configuration'
@@ -94,7 +95,9 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     ...runOptions(args), sessionId: args.identity.sessionId, executionId: args.executionId,
     turnId: args.executionId, trace: args.trace, signal: args.admissionSignal,
   })
+  const warmer = bindings && createSandboxPrewarmer(shell, { claim: createD1PrewarmClaimStore(bindings.db), mode: 'create-or-resume', claimTtlSeconds: 45 })
   return {
+    prewarm: (scope: { workspaceId: string; userId: string }) => warmer ? warmer.prewarm({ ...scope, harness }).then(warm => warm.completion) : Promise.resolve(),
     when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false
       && (Boolean(config.funding) || Boolean(env.TANGLE_API_KEY?.trim())) && !turnCarriesFiles(args.prompt)
       // The Router can cap total output but not a separate reasoning subset.

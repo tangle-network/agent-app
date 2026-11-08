@@ -562,8 +562,8 @@ export interface ChatTurnTraceOptions<TContext> {
 export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknown> {
   /** Deployment bindings for the template defaults. Custom producers keep their own credentials and policy. */
   env?: import('./default-backend').ChatTurnEnvironment
-  /** Disable the inherited prewarm endpoint explicitly. It warms only authenticated thread locks. */
-  prewarm?: false
+  /** `false` disables the prewarm endpoint; `'box'` also brings up the default backend's box on page open (paid compute). */
+  prewarm?: false | 'box'
   /** Names the product in `deriveExecutionId` so retries land on the same
    *  substrate execution. */
   projectId: string
@@ -791,8 +791,8 @@ export const INTENT_LINE_MAX_CHARS = 240
 
 /** Define routes to run, replay, and list running chat turns with streaming and reconnect support */
 export interface ChatTurnRoutes {
-  /** POST — warm the server-authorized workspace lock; verify a named thread before allowing it. Never provisions paid compute. */
-  prewarm(request: Request): Promise<Response>
+  /** POST — warm the server-authorized workspace lock (and with `prewarm: 'box'` its box, under `ctx.waitUntil`); verify a named thread first. */
+  prewarm(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** POST — run one turn, streaming NDJSON. First line is
    *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
