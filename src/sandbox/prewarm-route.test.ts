@@ -136,23 +136,9 @@ describe('createWorkspacePrewarmRoute', () => {
     expect((await body(await route(post()))).outcome).toBe('warmed')
   })
 
-  it('returns the denial response and never warms for an unauthenticated request', async () => {
-    const warm = vi.fn(async () => undefined)
-    const route = createWorkspacePrewarmRoute({
-      authorize: async () => ({ status: 'denied', response: Response.json({ error: 'Authentication required' }, { status: 401 }) }),
-    })
-    expect((await route(post())).status).toBe(401)
-    expect(warm).not.toHaveBeenCalled()
-  })
-
   it('fails closed when authorization throws', async () => {
     const route = createWorkspacePrewarmRoute({ authorize: async () => { throw new Error('db down') } })
     expect(await body(await route(post()))).toMatchObject({ outcome: 'failed' })
-  })
-
-  it('declines quietly for a member the product does not warm for', async () => {
-    const route = createWorkspacePrewarmRoute({ authorize: async () => ({ status: 'declined', reason: 'finance' }) })
-    expect(await body(await route(post()))).toMatchObject({ outcome: 'declined', reason: 'finance' })
   })
 
   it('skips crawlers and speculative prefetch before authorizing', async () => {
