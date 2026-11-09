@@ -36,10 +36,6 @@
  * model switches to the model's native harness. Catalog model ids are canonical
  * ("provider/model"), which is exactly what the snap helpers expect — no id
  * translation is needed here.
- *
- * Dependency-free beyond React: inline SVG glyphs, CSS-var / Tailwind tokens the
- * app shell defines. The harness picker is rendered inline so this needs no
- * sandbox-ui dependency.
  */
 
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -129,7 +125,7 @@ function GearGlyph({ className }: { className?: string }) {
  *    descendant, and that surface is this package's answer to exactly that.
  */
 /** `description` is one muted line under the label, truncated with an ellipsis; the row's title carries the full text. */
-export interface ChoiceOption { value: string; label: string; description?: string; icon?: ReactNode }
+export interface ChoiceOption { value: string; label: string; description?: string; icon?: ReactNode; /** A row that cannot be chosen; its description says why. */ disabled?: boolean }
 
 export interface ChoicePickerProps {
   value: string
@@ -229,13 +225,13 @@ export function ChoicePicker({ value, onChange, options, placeholder = '', fullW
           {options.map((o) => (
             <button
               key={o.value}
-              type="button"
+              type="button" disabled={o.disabled}
               role="menuitemradio"
               aria-checked={o.value === value}
               title={o.description ? `${o.label} — ${o.description}` : o.label}
               onClick={() => choose(o.value)}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
-                o.value === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                o.value === value ? 'bg-primary/10 font-medium' : o.disabled ? '' : 'hover:bg-accent'
               }`}
             >
               {o.icon}
@@ -254,18 +250,20 @@ export type HarnessPickerProps = Omit<ChoicePickerProps, 'value' | 'onChange' | 
   onChange: (h: Harness | '') => void
   /** Harnesses to offer; defaults to the labeled set. */
   available?: ReadonlyArray<Harness>
+  /** A harness's own label, description or disabled state, such as its seat's room or why it cannot run now. */
+  optionsOverride?: Partial<Record<string, Partial<Pick<ChoiceOption, 'label' | 'description' | 'disabled'>>>>
   /** Offer "no selection" as the first row; choosing it calls `onChange('')`. */
   defaultOption?: { label: string }
 }
 
 /** {@link ChoicePicker} over the harness set, each row its brand mark (from `./harness-glyphs`), name and qualifier. */
-export function HarnessPicker({ value, onChange, available, defaultOption, variant = 'chip', ...rest }: HarnessPickerProps) {
+export function HarnessPicker({ value, onChange, available, optionsOverride, defaultOption, variant = 'chip', ...rest }: HarnessPickerProps) {
   // Quiet inherits the trigger's tone, so the mark lifts with the label on hover.
   const glyph = (h: Harness) => <HarnessGlyph harness={h} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
   const ids = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   const options = [
     ...(defaultOption ? [{ value: '', label: defaultOption.label, icon: <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" /> }] : []),
-    ...(value && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h) })),
+    ...(value && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h), ...optionsOverride?.[h] })),
   ]
   return <ChoicePicker {...rest} variant={variant} value={value} onChange={(v) => onChange(v as Harness | '')} options={options} placeholder="Select harness" title="Harness" />
 }
