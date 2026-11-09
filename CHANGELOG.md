@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.13
+
+- fix(web-react): the Model chip's brand mark shares its label's centre line (#1507)
+
 ## 3.0.12
 
 - feat(web-react): export PickerTrigger and ChoicePicker; HarnessPicker is ChoicePicker over the harness set (#1505)
