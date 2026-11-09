@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.14
+
+- fix(web-react): a ChoicePicker row can be disabled, and HarnessPicker takes each harness's label, description and disabled state (#1508)
+
 ## 3.0.13
 
 - fix(web-react): the Model chip's brand mark shares its label's centre line (#1507)
