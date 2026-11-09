@@ -552,8 +552,8 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
   // A progress-first response answers refusals in-stream; settle it into the response it stands for.
   const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase))
   if (!res.ok || !res.body) {
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string }
-    throw new Error(err.error ?? `HTTP ${res.status}`)
+    const { error: e } = await res.json().catch(() => ({})) as { error?: string | { code?: string; message?: string } }
+    throw Object.assign(new Error((typeof e === 'string' ? e : e?.message) ?? `HTTP ${res.status}`), { code: typeof e === 'object' ? e?.code : undefined })
   }
   // Headers arrive before the body, so a reset before the marker still has a
   // replay id. The body marker remains authoritative when it arrives.
