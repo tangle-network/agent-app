@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.15
+
+- chat-stream: show the turn-lock refusal's message and keep its code on the thrown Error (#1509)
+
 ## 3.0.14
 
 - fix(web-react): a ChoicePicker row can be disabled, and HarnessPicker takes each harness's label, description and disabled state (#1508)
