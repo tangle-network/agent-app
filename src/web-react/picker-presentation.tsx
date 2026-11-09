@@ -1,6 +1,7 @@
 /** Shared picker geometry, focus, and theme presentation. */
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { Chip } from '@tangle-network/ui/primitives'
+import { ChevronDown } from './control-glyphs'
 import { fieldPresentation, fieldSizes, fieldTouchText } from '@tangle-network/ui/presentation'
 
 /**
@@ -78,12 +79,15 @@ export function fieldPickerTriggerClass({ interactive = true }: { interactive?: 
     interactive ? 'data-[state=open]:border-[var(--ix-hover-border)] data-[state=open]:shadow-[var(--ix-after)]' : 'cursor-default'}`
 }
 
-/** A picker's trigger. `chip` IS `@tangle-network/ui`'s md outline `Chip`, `icon` its glyph and the caret in its
- *  label, so pickers beside a product's Chips are one grammar; `quiet`/`field` are a button holding their own glyph. */
-export const PickerTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant: PickerVariant; icon?: ReactNode }>(
-  ({ variant, icon, children, className, ...props }, ref) => variant === 'chip'
-    ? <Chip ref={ref} size="md" emphasis="outline" icon={icon} className={`[&>span:last-child]:inline-flex [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:justify-between [&>span:last-child]:gap-1.5 ${className ?? ''}`} {...props}>{children}</Chip>
-    : <button ref={ref} type="button" className={className} {...props}>{children}</button>)
+export type PickerTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: PickerVariant; icon?: ReactNode; trailing?: ReactNode }
+
+/** A picker's trigger, also for a host-owned popover. `chip` (default) IS `@tangle-network/ui`'s md outline `Chip`,
+ *  `icon` its glyph, the label and `trailing` (default: the caret) on one nowrap line, so pickers beside a product's
+ *  Chips are one grammar; `quiet`/`field` are a button holding their own glyph. */
+export const PickerTrigger = forwardRef<HTMLButtonElement, PickerTriggerProps>(
+  ({ variant = 'chip', icon, trailing = <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />, children, className, ...props }, ref) => variant === 'chip'
+    ? <Chip ref={ref} size="md" emphasis="outline" icon={icon} className={`[&>span:last-child]:inline-flex [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:justify-between [&>span:last-child]:gap-1.5 ${className ?? ''}`} {...props}>{children}{trailing}</Chip>
+    : <button ref={ref} type="button" className={className} {...props}>{children}{trailing}</button>)
 
 /** The quiet trigger at rest: geometry, type, and keyboard focus. */
 const QUIET_PICKER_TRIGGER_BASE =

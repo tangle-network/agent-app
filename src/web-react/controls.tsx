@@ -12,7 +12,7 @@
 
 export { ChevronDown, BrainGlyph, CheckGlyph } from './control-glyphs'
 export * from './popover-surface'
-export { POPOVER_OPTION_FOCUS, OVERLAY_SHADOW, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+export { POPOVER_OPTION_FOCUS, OVERLAY_SHADOW, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, PickerTrigger, type PickerTriggerProps, type PickerVariant } from './picker-presentation'
 export * from './use-pending'
 export * from './model-picker'
 export * from './effort-picker'
