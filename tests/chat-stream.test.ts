@@ -248,6 +248,26 @@ describe('streamChatTurn', () => {
     ).rejects.toThrow('message is required')
   })
 
+  it('throws the durable turn lock refusal message, not [object Object]', async () => {
+    const message = 'A chat turn is already running for this workspace. Wait for it to finish before starting another.'
+    const body = { error: { code: 'workspace_turn_in_flight', message, threadId: 'th-1', executionId: 'ex-1' } }
+    const run = streamChatTurn({
+      start: async () => new Response(JSON.stringify(body), { status: 409 }),
+      callbacks: {},
+    })
+    await expect(run).rejects.toThrow(message)
+    await expect(run).rejects.not.toThrow('[object Object]')
+  })
+
+  it('falls back to the HTTP status when an object error has no usable message', async () => {
+    await expect(
+      streamChatTurn({
+        start: async () => new Response(JSON.stringify({ error: { code: 'workspace_turn_in_flight' } }), { status: 409 }),
+        callbacks: {},
+      }),
+    ).rejects.toThrow('HTTP 409')
+  })
+
   it('resumes from the last stamped seq on a second drop, without resetting or duplicating', async () => {
     const { log, cb } = recorder()
     const resets: number[] = []
