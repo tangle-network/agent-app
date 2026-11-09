@@ -370,7 +370,7 @@ describe('EffortPicker width', () => {
     const trigger = screen.getByRole('button', { expanded: false })
     expect(root(trigger).className).toContain('inline-flex')
     expect(root(trigger).className).not.toContain('w-full')
-    expect(trigger.className).not.toContain('w-full')
+    expect(trigger.className.split(/\s+/)).not.toContain('w-full')
   })
 
   it('fills its container when asked', () => {
