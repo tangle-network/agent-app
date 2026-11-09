@@ -56,27 +56,26 @@ import { CHIP_PICKER_TRIGGER } from './picker-presentation'
 import { HarnessGlyph } from './harness-glyphs'
 import { AgentSettingsPopover } from './agent-settings-popover'
 
-/** Plain-English labels for the harnesses a product is likely to expose. Unknown
- *  ids fall back to the raw value so a new backend still renders a usable label. */
-const HARNESS_LABELS: Partial<Record<Harness, string>> = {
-  opencode: 'OpenCode (any model)',
-  'claude-code': 'Claude Code (Anthropic)',
-  codex: 'Codex (OpenAI)',
-  'kimi-code': 'Kimi (Moonshot)',
-  amp: 'Amp',
-  'factory-droids': 'Factory Droids',
-  cursor: 'Cursor',
-  hermes: 'Hermes',
-  forge: 'Forge',
-  pi: 'Pi',
-  openclaw: 'OpenClaw',
-  acp: 'ACP',
-  'cli-base': 'CLI',
+/** Each harness's name, which the trigger shows, and the qualifier its menu row
+ *  adds beneath it. Unknown ids fall back to the raw value so a new backend
+ *  still renders a usable label. */
+const HARNESS_LABELS: Partial<Record<Harness, readonly [name: string, description?: string]>> = {
+  opencode: ['OpenCode', 'Any model'],
+  'claude-code': ['Claude Code', 'Anthropic models'],
+  codex: ['Codex', 'OpenAI models'],
+  'kimi-code': ['Kimi', 'Moonshot models'],
+  amp: ['Amp'],
+  'factory-droids': ['Factory Droids'],
+  cursor: ['Cursor'],
+  hermes: ['Hermes'],
+  forge: ['Forge'],
+  pi: ['Pi'],
+  openclaw: ['OpenClaw'],
+  acp: ['ACP'],
+  'cli-base': ['CLI'],
 }
 
-function harnessLabel(h: Harness): string {
-  return HARNESS_LABELS[h] ?? h
-}
+const harnessLabel = (h: Harness): string => HARNESS_LABELS[h]?.[0] ?? h
 
 function ChevronDown({ className }: { className?: string }) {
   return (
@@ -278,7 +277,7 @@ export function HarnessPicker({
               }`}
             >
               <HarnessGlyph harness={h} className="h-4 w-4 shrink-0 text-foreground" />
-              <span className="truncate">{harnessLabel(h)}</span>
+              <span className="min-w-0"><span className="block truncate">{harnessLabel(h)}</span>{HARNESS_LABELS[h]?.[1] && <span className="block truncate text-xs font-normal text-muted-foreground">{HARNESS_LABELS[h]?.[1]}</span>}</span>
               {h === value && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
