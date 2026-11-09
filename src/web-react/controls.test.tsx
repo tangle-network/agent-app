@@ -394,9 +394,8 @@ describe('EffortPicker width', () => {
 })
 
 /**
- * The trigger VARIANT. `chip` is the shipped 32px bordered pill and the
- * default, so a consumer that names no variant renders the trigger it rendered
- * before the prop existed; `quiet` is the borderless 32px text button a
+ * The trigger VARIANT. `chip` is the default, and it is `@tangle-network/ui`'s
+ * md outline `Chip` (32px, bordered); `quiet` is the borderless 32px text button a
  * composer whose card already draws the border opts into. jsdom paints
  * nothing, so what is pinned is the class contract: the border, the card fill,
  * and the pill radius are what the quiet trigger must NOT carry and the chip
@@ -414,9 +413,9 @@ describe('picker trigger variant', () => {
     render(<ModelPicker value="gpt-4" onChange={() => {}} models={[model('gpt-4', { name: 'GPT-4' })]} />)
     const classes = classesOf(trigger())
     expect(classes).toContain('border')
-    expect(classes).toContain('border-border')
-    expect(classes).toContain('bg-card')
-    expect(classes).toContain('rounded-full')
+    expect(classes).toContain('border-[var(--border-default)]')
+    expect(classes).toContain('bg-transparent')
+    expect(classes).toContain('rounded-md')
     expect(classes).toContain('font-medium')
   })
 
@@ -438,10 +437,10 @@ describe('picker trigger variant', () => {
     render(<EffortPicker value="medium" onChange={() => {}} />)
     const classes = classesOf(trigger())
     expect(classes).toContain('border')
-    expect(classes).toContain('border-border')
-    expect(classes).toContain('bg-card')
-    expect(classes).toContain('rounded-full')
-    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
+    expect(classes).toContain('border-[var(--border-default)]')
+    expect(classes).toContain('bg-transparent')
+    expect(classes).toContain('rounded-md')
+    expect(classes).toContain('h-8')
     expect(classes).not.toContain('py-1.5')
   })
 
@@ -450,7 +449,7 @@ describe('picker trigger variant', () => {
     const classes = classesOf(trigger())
     expect(classes).not.toContain('min-h-[36px]')
     expect(classes).toContain('w-full')
-    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
+    expect(classes).toContain('h-8')
   })
 
   it('EffortPicker quiet draws no border, no card fill, no pill radius', () => {
