@@ -226,8 +226,6 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
             ? fieldPickerTriggerClass({ interactive: !disabled })
             : variant === 'quiet'
             ? quietPickerTriggerClass()
-            : fullWidth
-            ? 'inline-flex min-h-[36px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-accent'
             : `${CHIP_PICKER_TRIGGER} shrink-0 hover:bg-accent`
         } ${fullWidth ? 'w-full' : ''}`}
       >

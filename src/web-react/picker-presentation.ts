@@ -76,9 +76,9 @@ export function fieldPickerTriggerClass({ interactive = true }: { interactive?: 
     interactive ? 'data-[state=open]:border-[var(--ix-hover-border)] data-[state=open]:shadow-[var(--ix-after)]' : 'cursor-default'}`
 }
 
-/** The chip trigger: a fixed 32px height (no vertical padding, so the 20px
- *  line and the border cannot push it to 34px). A full-width EffortPicker in a
- *  settings panel keeps the 36px field row instead. */
+/** The one chip trigger every picker draws, full width or not: a fixed 32px
+ *  height (no vertical padding, so the 20px line and the border cannot push it
+ *  to 34px). */
 export const CHIP_PICKER_TRIGGER =
   'inline-flex h-[var(--control-height-sm,2rem)] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground transition'
 

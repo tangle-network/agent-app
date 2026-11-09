@@ -52,6 +52,7 @@ import {
 import type { CatalogModel } from '../runtime/model-catalog'
 import { ModelPicker, EffortPicker, CheckGlyph, fieldPickerTriggerClass, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
 import type { EffortLevel, PickerVariant } from './controls'
+import { CHIP_PICKER_TRIGGER } from './picker-presentation'
 import { HarnessGlyph } from './harness-glyphs'
 import { AgentSettingsPopover } from './agent-settings-popover'
 
@@ -104,18 +105,14 @@ function GearGlyph({ className }: { className?: string }) {
   )
 }
 
-/** Tailwind utilities for keyboard-visible focus on popover options + triggers. */
-const FOCUS_RING =
-  ''
-
 /**
  * Pill-styled harness picker — inline, no sandbox-ui dependency. The brand
  * marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
  * shipped, vendored inline).
  *
- * `rounded-full` + `min-h-[36px]`, not `rounded-lg` at whatever height the
- * padding gives: this pill sits beside `ModelPicker` and `EffortPicker` in
- * both layouts, and both of those are 36px pills. A single odd-shaped control
+ * The chip is the shared `CHIP_PICKER_TRIGGER`, not `rounded-lg` at whatever
+ * height the padding gives: this pill sits beside `ModelPicker` and
+ * `EffortPicker` in both layouts, all three 32px pills. A single odd-shaped control
  * is what made the compact popover read as a pile of unrelated widgets rather
  * than one selector stack. The `quiet` variant holds the same rule the other
  * way: its 28px text-button geometry comes from the one
@@ -210,9 +207,7 @@ export function HarnessPicker({
             ? fieldPickerTriggerClass({ interactive: !locked && !disabled })
             : variant === 'quiet'
             ? `${quietPickerTriggerClass({ interactive: !locked })} w-full justify-between`
-            : `inline-flex min-h-[36px] w-full items-center justify-between gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground transition ${
-                locked ? 'cursor-default' : 'hover:bg-accent'
-              } ${FOCUS_RING}`
+            : `${CHIP_PICKER_TRIGGER} w-full justify-between ${locked ? 'cursor-default' : 'hover:bg-accent'}`
         }
       >
         <span className={`flex min-w-0 items-center ${field ? 'flex-1 gap-2' : 'gap-1.5'}`}>
@@ -262,7 +257,7 @@ export function HarnessPicker({
               role="menuitemradio"
               aria-checked={value === ''}
               onClick={() => choose('')}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
                 value === '' ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
             >
@@ -278,7 +273,7 @@ export function HarnessPicker({
               role="menuitemradio"
               aria-checked={h === value}
               onClick={() => choose(h)}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${FOCUS_RING} ${
+              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
                 h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
             >
@@ -487,7 +482,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
             aria-controls={open ? panelId : undefined}
             onClick={() => setOpen(!open)}
             title="Model settings — pick the harness and how hard it thinks"
-            className={`flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted ${FOCUS_RING}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted"
             data-state={open ? 'open' : 'closed'}
           >
             <GearGlyph className="h-4 w-4" />
