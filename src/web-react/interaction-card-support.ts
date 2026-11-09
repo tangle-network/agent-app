@@ -228,19 +228,18 @@ export type InteractionSubmitResult =
  *  hand-rolled implementation. */
 export type SubmitInteractionAnswer = (submission: InteractionAnswerSubmission) => Promise<InteractionSubmitResult>
 
-/** Extracts the most specific error message a route returned. */
-export async function responseErrorMessage(res: Response): Promise<{ code?: string; message: string }> {
+/** Extracts the most specific error message a route returned: `error`, `error.message` (the durable turn lock's refusal), then `message`. */
+export async function responseErrorMessage(res: Response, fallback = `Answer failed (${res.status})`): Promise<{ code?: string; message: string }> {
   const text = await res.text().catch(() => '')
   if (text) {
     try {
       const parsed = JSON.parse(text) as { code?: unknown; error?: unknown; message?: unknown }
-      const message = typeof parsed.error === 'string' && parsed.error.trim() ? parsed.error
-        : typeof parsed.message === 'string' && parsed.message.trim() ? parsed.message
-        : null
+      const nested = parsed.error && typeof parsed.error === 'object' ? (parsed.error as { message?: unknown }).message : null
+      const message = [parsed.error, nested, parsed.message].find((m): m is string => typeof m === 'string' && !!m.trim())
       if (message) return { ...(typeof parsed.code === 'string' ? { code: parsed.code } : {}), message }
     } catch { /* non-JSON body falls through */ }
   }
-  return { message: `Answer failed (${res.status})` }
+  return { message: fallback }
 }
 
 /** Define options for submitting interaction answers including URL, body, timeout, and fetch implementation */

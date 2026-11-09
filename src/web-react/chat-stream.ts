@@ -34,6 +34,7 @@ import {
   type TurnIntentData,
   type TurnPhaseData,
 } from '../chat-routes/turn-progress'
+import { responseErrorMessage } from './interaction-card-support'
 
 // The `/chat-routes` wire contract, re-exported for turn-body construction —
 // `./chat-routes/wire` and `./chat-routes/file-index`'s response types are
@@ -541,15 +542,6 @@ export function defaultReconnectDelayMs(attempt: number, rand: () => number = Ma
   return Math.min(8000, 500 * 2 ** attempt * (0.5 + rand()))
 }
 
-/** A failed start response's message in words: `error` as a string, `error.message`
- *  (the durable turn lock's refusal), a top-level `message`, else `HTTP <status>`. */
-function startFailureMessage(body: unknown, status: number): string {
-  const b = (body && typeof body === 'object' ? body : {}) as { error?: unknown; message?: unknown }
-  const nested = b.error && typeof b.error === 'object' ? (b.error as { message?: unknown }).message : undefined
-  for (const m of [b.error, nested, b.message]) if (typeof m === 'string' && m.trim()) return m
-  return `HTTP ${status}`
-}
-
 /**
  * Run one chat turn with bounded automatic resume: reconnect with backoff and
  * resume from the last stamped seq — a live drop resets and replays from 0, a
@@ -561,7 +553,7 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
   // A progress-first response answers refusals in-stream; settle it into the response it stands for.
   const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase))
   if (!res.ok || !res.body) {
-    throw new Error(startFailureMessage(await res.json().catch(() => null), res.status))
+    throw new Error((await responseErrorMessage(res, `HTTP ${res.status}`)).message)
   }
   // Headers arrive before the body, so a reset before the marker still has a
   // replay id. The body marker remains authoritative when it arrives.
