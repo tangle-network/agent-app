@@ -42,8 +42,9 @@ function setup(overrides: Partial<Parameters<typeof AgentSessionControls>[0]> = 
 describe('layout', () => {
   it('default (inline) renders the harness pill directly (no gear)', () => {
     setup()
-    // The harness label is visible inline, not hidden behind a gear.
-    expect(screen.getByText('Claude Code (Anthropic)')).toBeTruthy()
+    // The trigger names the harness alone; its qualifier is the menu row's subtext.
+    fireEvent.click(screen.getByText('Claude Code'))
+    expect(screen.getByText('Anthropic models')).toBeTruthy()
     expect(screen.queryByTitle(/Model settings/)).toBeNull()
   })
 
@@ -52,9 +53,9 @@ describe('layout', () => {
     const gear = screen.getByTitle(/Model settings/)
     expect(gear).toBeTruthy()
     // harness label not in the DOM until the popover opens
-    expect(screen.queryByText('Claude Code (Anthropic)')).toBeNull()
+    expect(screen.queryByText('Claude Code')).toBeNull()
     fireEvent.click(gear)
-    expect(screen.getByText('Claude Code (Anthropic)')).toBeTruthy()
+    expect(screen.getByText('Claude Code')).toBeTruthy()
     expect(screen.getByText('Harness')).toBeTruthy()
     expect(screen.getByText('Reasoning effort')).toBeTruthy()
   })
@@ -63,8 +64,8 @@ describe('layout', () => {
 describe('harness↔model coherence', () => {
   it('compatible harness change does not force a model change', () => {
     const { onHarnessChange, onModelChange } = setup({ harness: 'opencode' })
-    fireEvent.click(screen.getByText('OpenCode (any model)'))
-    fireEvent.click(screen.getByText('Claude Code (Anthropic)'))
+    fireEvent.click(screen.getByText('OpenCode'))
+    fireEvent.click(screen.getByText('Claude Code'))
     expect(onHarnessChange).toHaveBeenCalledWith('claude-code')
     // claude-code can run the anthropic model → no model snap
     expect(onModelChange).not.toHaveBeenCalled()
@@ -83,9 +84,9 @@ describe('harness menu capability filter', () => {
         { id: 'moonshotai/kimi-k3', name: 'Kimi K3', provider: 'moonshot', supportsTools: true, supportsReasoning: true, featured: false },
       ],
     })
-    fireEvent.click(screen.getByText('Kimi (Moonshot)'))
-    expect(screen.getAllByText('OpenCode (any model)').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Kimi (Moonshot)').length).toBeGreaterThanOrEqual(2)
+    fireEvent.click(screen.getByText('Kimi'))
+    expect(screen.getAllByText('OpenCode').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Kimi').length).toBeGreaterThanOrEqual(2)
   })
 })
 
