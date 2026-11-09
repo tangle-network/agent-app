@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.12
+
+- feat(web-react): export PickerTrigger and ChoicePicker; HarnessPicker is ChoicePicker over the harness set (#1505)
+
 ## 3.0.11
 
 - fix(web-react): the harness trigger names the harness; the qualifier moves to the menu row (#1504)
