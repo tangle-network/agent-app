@@ -239,13 +239,13 @@ describe('streamChatTurn', () => {
     expect(log.filter(([k]) => k === 'text')).toEqual([['text', 'Hello']])
   })
 
-  it('throws on a failed start response with the server error message', async () => {
+  it.each([
+    [400, { error: 'message is required' }, 'message is required', undefined],
+    [409, { error: { code: 'workspace_turn_in_flight', message: 'A turn is still running' } }, 'A turn is still running', 'workspace_turn_in_flight'],
+  ])('throws on a failed start response (%i) with the server error message and code', async (status, body, message, code) => {
     await expect(
-      streamChatTurn({
-        start: async () => new Response(JSON.stringify({ error: 'message is required' }), { status: 400 }),
-        callbacks: {},
-      }),
-    ).rejects.toThrow('message is required')
+      streamChatTurn({ start: async () => Response.json(body, { status }), callbacks: {} }),
+    ).rejects.toMatchObject({ message, code })
   })
 
   it('resumes from the last stamped seq on a second drop, without resetting or duplicating', async () => {
