@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.11
+
+- fix(web-react): the harness trigger names the harness; the qualifier moves to the menu row (#1504)
+
 ## 3.0.10
 
 - fix(web-react): one 32px chip trigger for harness, effort and profile pills; accept sandbox-ui 8.0.4 (#1503)
