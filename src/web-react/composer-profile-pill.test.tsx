@@ -41,7 +41,7 @@ describe('ComposerProfilePill', () => {
     expect(screen.getByRole('button', { name: /agent profile/i }).className).toContain('max-w-[180px]')
     rerender(<ComposerProfilePill selection={selection} placement="menu-row" />)
     const row = screen.getByRole('button', { name: /agent profile/i })
-    expect(row.className).toContain('h-9')
+    expect(row.className).toContain('h-[var(--control-height-sm,2rem)]')
     expect(row.className).toContain('w-full')
     // The picker root shrink-wraps; the row must widen it too.
     expect((row.parentElement as HTMLElement).className).toContain('w-full')
@@ -62,7 +62,7 @@ describe('ComposerProfilePill', () => {
       />,
     )
     const trigger = screen.getByRole('button', { name: 'Agent profile (locked)' })
-    expect(trigger.className).toContain('h-9')
+    expect(trigger.className).toContain('h-[var(--control-height-sm,2rem)]')
     fireEvent.click(trigger)
     fireEvent.click(screen.getByText('New chat to switch profile'))
     expect(onNewChat).toHaveBeenCalledOnce()
