@@ -271,7 +271,7 @@ export function ModelPicker({
     <ModelRow key={model.id} model={model} selected={model.id === value} onSelect={() => select(model.id)} renderProviderBadge={renderProviderBadge} />
   )
 
-  const glyph = <span className="shrink-0" aria-hidden>{selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}</span>
+  const glyph = <span className="inline-flex shrink-0" aria-hidden>{selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}</span>
   return (
     <div ref={containerRef} className={variant === 'field' ? 'relative flex w-full min-w-0' : 'relative inline-flex min-w-0 max-w-full'}>
       <PickerTrigger variant={variant} icon={triggerContent ? undefined : glyph}
