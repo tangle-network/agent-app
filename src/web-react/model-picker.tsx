@@ -6,7 +6,7 @@ import { StatusPill } from '@tangle-network/ui/primitives'
 import { MAX_RECOMMENDED_MODELS, sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
 import { ChevronDown, CheckGlyph, SearchGlyph, SparkleGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
-import { CHIP_PICKER_TRIGGER, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
 export interface ModelPickerProps {
   /** Controlled, opaque saved id. Never replaced merely because the catalogue omits it. */
@@ -271,10 +271,10 @@ export function ModelPicker({
     <ModelRow key={model.id} model={model} selected={model.id === value} onSelect={() => select(model.id)} renderProviderBadge={renderProviderBadge} />
   )
 
+  const glyph = <span className="shrink-0" aria-hidden>{selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}</span>
   return (
     <div ref={containerRef} className={variant === 'field' ? 'relative flex w-full min-w-0' : 'relative inline-flex min-w-0 max-w-full'}>
-      <button
-        type="button"
+      <PickerTrigger variant={variant} icon={triggerContent ? undefined : glyph}
         {...triggerProps}
         id={id}
         disabled={disabled}
@@ -297,18 +297,16 @@ export function ModelPicker({
             ? fieldPickerTriggerClass({ interactive: !disabled })
             : variant === 'quiet'
             ? quietPickerTriggerClass({ interactive: !disabled })
-            : `${CHIP_PICKER_TRIGGER} ${disabled ? '' : 'hover:bg-accent'}`
+            : ''
         } max-w-full disabled:cursor-not-allowed disabled:opacity-50`}
       >
         {triggerContent ?? <span className={variant === 'field' ? 'flex min-w-0 flex-1 items-center gap-2' : 'contents'}>
-          <span className="shrink-0" aria-hidden>
-            {selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}
-          </span>
+          {variant !== 'chip' && glyph}
           <span className={variant === 'field' ? `min-w-0 flex-1 truncate ${value ? '' : 'text-muted-foreground'}` : 'max-w-[160px] truncate'}>
             {selectedLabel || defaultOption?.label || 'Select model'}</span>
         </span>}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      </button>
+      </PickerTrigger>
       {describeValue && value && <span id={valueId} className="sr-only">Selected model: {selectedLabel}</span>}
 
       <PopoverSurface

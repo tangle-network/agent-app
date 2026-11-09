@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import { Chip } from '@tangle-network/ui/primitives'
 
 import { AgentSessionControls } from './agent-session-controls'
 import type { CatalogModel } from '../runtime/model-catalog'
@@ -58,12 +59,13 @@ describe('AgentSessionControls locked harness', () => {
     expect(props.onHarnessChange).not.toHaveBeenCalled()
   })
 
-  it('draws model, harness and effort as one row of 32px chips', () => {
+  it('draws model, harness and effort as the md outline Chip', () => {
+    render(<Chip size="md" emphasis="outline">Budget</Chip>)
+    const chip = screen.getByRole('button', { name: 'Budget' }).className.split(/\s+/)
     render(<AgentSessionControls models={MODELS} model="anthropic/claude-opus-4-8" onModelChange={vi.fn()} harness="claude-code"
       onHarnessChange={vi.fn()} availableHarnesses={['claude-code', 'codex']} effort="medium" onEffortChange={vi.fn()} />)
     const triggers = screen.getAllByRole('button', { expanded: false })
     expect(triggers.map((t) => t.title)).toContain('Harness')
-    for (const t of triggers) expect(t.className.split(/\s+/)).toEqual(expect.arrayContaining(['h-[var(--control-height-sm,2rem)]', 'rounded-full']))
-    for (const t of triggers) expect(t.className).not.toMatch(/min-h-\[36px\]|py-1\.5/)
+    for (const t of triggers) expect(t.className.split(/\s+/)).toEqual(expect.arrayContaining(chip))
   })
 })

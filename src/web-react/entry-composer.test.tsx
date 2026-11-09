@@ -83,7 +83,7 @@ describe('EntryComposer', () => {
     expect(screen.getByText('What do you want to work on?')).toBeTruthy()
     // The canonical cluster renders the selected model and the harness pill inline.
     expect(document.body.textContent).toContain('GPT-4.1 Mini')
-    expect(document.body.textContent).toContain('OpenCode (any model)')
+    expect(screen.getByTitle('Harness').textContent).toBe('OpenCode')
   })
 
   it('renders NO agent control row when the product supplies none', () => {

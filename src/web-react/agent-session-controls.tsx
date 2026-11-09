@@ -52,31 +52,30 @@ import {
 import type { CatalogModel } from '../runtime/model-catalog'
 import { ModelPicker, EffortPicker, CheckGlyph, fieldPickerTriggerClass, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
 import type { EffortLevel, PickerVariant } from './controls'
-import { CHIP_PICKER_TRIGGER } from './picker-presentation'
+import { PickerTrigger } from './picker-presentation'
 import { HarnessGlyph } from './harness-glyphs'
 import { AgentSettingsPopover } from './agent-settings-popover'
 
-/** Plain-English labels for the harnesses a product is likely to expose. Unknown
- *  ids fall back to the raw value so a new backend still renders a usable label. */
-const HARNESS_LABELS: Partial<Record<Harness, string>> = {
-  opencode: 'OpenCode (any model)',
-  'claude-code': 'Claude Code (Anthropic)',
-  codex: 'Codex (OpenAI)',
-  'kimi-code': 'Kimi (Moonshot)',
-  amp: 'Amp',
-  'factory-droids': 'Factory Droids',
-  cursor: 'Cursor',
-  hermes: 'Hermes',
-  forge: 'Forge',
-  pi: 'Pi',
-  openclaw: 'OpenClaw',
-  acp: 'ACP',
-  'cli-base': 'CLI',
+/** Each harness's name, which the trigger shows, and the qualifier its menu row
+ *  adds beneath it. Unknown ids fall back to the raw value so a new backend
+ *  still renders a usable label. */
+const HARNESS_LABELS: Partial<Record<Harness, readonly [name: string, description?: string]>> = {
+  opencode: ['OpenCode', 'Any model'],
+  'claude-code': ['Claude Code', 'Anthropic models'],
+  codex: ['Codex', 'OpenAI models'],
+  'kimi-code': ['Kimi', 'Moonshot models'],
+  amp: ['Amp'],
+  'factory-droids': ['Factory Droids'],
+  cursor: ['Cursor'],
+  hermes: ['Hermes'],
+  forge: ['Forge'],
+  pi: ['Pi'],
+  openclaw: ['OpenClaw'],
+  acp: ['ACP'],
+  'cli-base': ['CLI'],
 }
 
-function harnessLabel(h: Harness): string {
-  return HARNESS_LABELS[h] ?? h
-}
+const harnessLabel = (h: Harness): string => HARNESS_LABELS[h]?.[0] ?? h
 
 function ChevronDown({ className }: { className?: string }) {
   return (
@@ -110,9 +109,9 @@ function GearGlyph({ className }: { className?: string }) {
  * marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
  * shipped, vendored inline).
  *
- * The chip is the shared `CHIP_PICKER_TRIGGER`, not `rounded-lg` at whatever
+ * The chip is the shared `PickerTrigger` (a `Chip`), not `rounded-lg` at whatever
  * height the padding gives: this pill sits beside `ModelPicker` and
- * `EffortPicker` in both layouts, all three 32px pills. A single odd-shaped control
+ * `EffortPicker` in both layouts, all three the same Chip. A single odd-shaped control
  * is what made the compact popover read as a pile of unrelated widgets rather
  * than one selector stack. The `quiet` variant holds the same rule the other
  * way: its 28px text-button geometry comes from the one
@@ -179,14 +178,15 @@ export function HarnessPicker({
   const showHint = () => setHintOpen(true)
   const hideHint = () => setHintOpen(false)
   const label = value ? harnessLabel(value) : defaultOption?.label ?? 'Select harness'
+  const glyph = value ? <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
+    : <GearGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
   const choose = (next: Harness | '') => {
     onChange(next)
     setOpen(false)
   }
   return (
     <div ref={containerRef} className={pickerRootClass(fullWidth || field)}>
-      <button
-        type="button"
+      <PickerTrigger variant={variant} icon={glyph}
         {...triggerProps}
         id={id}
         disabled={disabled}
@@ -207,15 +207,11 @@ export function HarnessPicker({
             ? fieldPickerTriggerClass({ interactive: !locked && !disabled })
             : variant === 'quiet'
             ? `${quietPickerTriggerClass({ interactive: !locked })} w-full justify-between`
-            : `${CHIP_PICKER_TRIGGER} w-full justify-between ${locked ? 'cursor-default' : 'hover:bg-accent'}`
+            : `w-full ${locked ? 'cursor-default hover:bg-transparent' : ''}`
         }
       >
         <span className={`flex min-w-0 items-center ${field ? 'flex-1 gap-2' : 'gap-1.5'}`}>
-          {/* Quiet inherits the trigger's tone, so the mark lifts with the
-              label on hover instead of staying at full foreground. */}
-          {value
-            ? <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
-            : <GearGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          {variant !== 'chip' && glyph}
           <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{label}</span>
         </span>
         {locked ? (
@@ -223,7 +219,7 @@ export function HarnessPicker({
         ) : (
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         )}
-      </button>
+      </PickerTrigger>
       {locked && (
         <>
           <span id={reasonId} className="sr-only">
@@ -278,7 +274,7 @@ export function HarnessPicker({
               }`}
             >
               <HarnessGlyph harness={h} className="h-4 w-4 shrink-0 text-foreground" />
-              <span className="truncate">{harnessLabel(h)}</span>
+              <span className="min-w-0"><span className="block truncate">{harnessLabel(h)}</span>{HARNESS_LABELS[h]?.[1] && <span className="block truncate text-xs font-normal text-muted-foreground">{HARNESS_LABELS[h]?.[1]}</span>}</span>
               {h === value && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
