@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.10
+
+- fix(web-react): one 32px chip trigger for harness, effort and profile pills; accept sandbox-ui 8.0.4 (#1503)
+
 ## 3.0.9
 
 - test(sandbox): the sidecar doubles announce dispatchGuard and refuse a guarded POST as the sidecar does (#1502)
