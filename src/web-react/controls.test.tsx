@@ -445,12 +445,12 @@ describe('picker trigger variant', () => {
     expect(classes).not.toContain('py-1.5')
   })
 
-  it('a full-width EffortPicker keeps the 36px settings-panel row', () => {
+  it('a full-width EffortPicker draws the same 32px chip', () => {
     render(<EffortPicker value="medium" onChange={() => {}} fullWidth />)
     const classes = classesOf(trigger())
-    expect(classes).toContain('min-h-[36px]')
+    expect(classes).not.toContain('min-h-[36px]')
     expect(classes).toContain('w-full')
-    expect(classes).not.toContain('h-[var(--control-height-sm,2rem)]')
+    expect(classes).toContain('h-[var(--control-height-sm,2rem)]')
   })
 
   it('EffortPicker quiet draws no border, no card fill, no pill radius', () => {

@@ -57,4 +57,13 @@ describe('AgentSessionControls locked harness', () => {
     expect(props.onModelChange).toHaveBeenCalledWith('openai/gpt-5.2')
     expect(props.onHarnessChange).not.toHaveBeenCalled()
   })
+
+  it('draws model, harness and effort as one row of 32px chips', () => {
+    render(<AgentSessionControls models={MODELS} model="anthropic/claude-opus-4-8" onModelChange={vi.fn()} harness="claude-code"
+      onHarnessChange={vi.fn()} availableHarnesses={['claude-code', 'codex']} effort="medium" onEffortChange={vi.fn()} />)
+    const triggers = screen.getAllByRole('button', { expanded: false })
+    expect(triggers.map((t) => t.title)).toContain('Harness')
+    for (const t of triggers) expect(t.className.split(/\s+/)).toEqual(expect.arrayContaining(['h-[var(--control-height-sm,2rem)]', 'rounded-full']))
+    for (const t of triggers) expect(t.className).not.toMatch(/min-h-\[36px\]|py-1\.5/)
+  })
 })
