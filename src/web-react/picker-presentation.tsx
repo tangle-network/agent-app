@@ -1,4 +1,6 @@
 /** Shared picker geometry, focus, and theme presentation. */
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { Chip } from '@tangle-network/ui/primitives'
 import { fieldPresentation, fieldSizes, fieldTouchText } from '@tangle-network/ui/presentation'
 
 /**
@@ -76,11 +78,12 @@ export function fieldPickerTriggerClass({ interactive = true }: { interactive?: 
     interactive ? 'data-[state=open]:border-[var(--ix-hover-border)] data-[state=open]:shadow-[var(--ix-after)]' : 'cursor-default'}`
 }
 
-/** The one chip trigger every picker draws, full width or not: a fixed 32px
- *  height (no vertical padding, so the 20px line and the border cannot push it
- *  to 34px). */
-export const CHIP_PICKER_TRIGGER =
-  'inline-flex h-[var(--control-height-sm,2rem)] items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-card px-3 text-sm font-medium text-foreground transition'
+/** A picker's trigger. `chip` IS `@tangle-network/ui`'s md outline `Chip`, `icon` its glyph and the caret in its
+ *  label, so pickers beside a product's Chips are one grammar; `quiet`/`field` are a button holding their own glyph. */
+export const PickerTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement> & { variant: PickerVariant; icon?: ReactNode }>(
+  ({ variant, icon, children, className, ...props }, ref) => variant === 'chip'
+    ? <Chip ref={ref} size="md" emphasis="outline" icon={icon} className={`[&>span:last-child]:inline-flex [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:justify-between [&>span:last-child]:gap-1.5 ${className ?? ''}`} {...props}>{children}</Chip>
+    : <button ref={ref} type="button" className={className} {...props}>{children}</button>)
 
 /** The quiet trigger at rest: geometry, type, and keyboard focus. */
 const QUIET_PICKER_TRIGGER_BASE =

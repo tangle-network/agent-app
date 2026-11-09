@@ -2,7 +2,7 @@
 import { useId, useState } from 'react'
 import { BrainGlyph, ChevronDown, CheckGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
-import { CHIP_PICKER_TRIGGER, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
 /** One reasoning-budget level: the engine `id` is unchanged (the value the
  *  product sends to the loop); only the user-facing `label` is renamed to the
@@ -211,8 +211,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
 
   return (
     <div ref={containerRef} className={pickerRootClass(fullWidth || field)}>
-      <button
-        type="button"
+      <PickerTrigger variant={variant} icon={<BrainGlyph className="h-3.5 w-3.5 shrink-0" />}
         {...triggerProps}
         id={id}
         disabled={disabled}
@@ -226,10 +225,10 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
             ? fieldPickerTriggerClass({ interactive: !disabled })
             : variant === 'quiet'
             ? quietPickerTriggerClass()
-            : `${CHIP_PICKER_TRIGGER} shrink-0 hover:bg-accent`
+            : ''
         } ${fullWidth ? 'w-full' : ''}`}
       >
-        <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {variant !== 'chip' && <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         {/* Full width gives the label the slack, so the meter and chevron park
             on the trailing edge and the glyph stays against the text. */}
         <span className={fullWidth || field ? 'flex-1 truncate text-left' : undefined}>
@@ -245,7 +244,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
           />
         )}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      </button>
+      </PickerTrigger>
       <PopoverSurface
         open={open}
         id={panelId}
