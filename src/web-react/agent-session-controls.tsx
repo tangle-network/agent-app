@@ -77,14 +77,6 @@ const HARNESS_LABELS: Partial<Record<Harness, readonly [name: string, descriptio
 
 const harnessLabel = (h: Harness): string => HARNESS_LABELS[h]?.[0] ?? h
 
-function ChevronDown({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  )
-}
-
 /** lucide `lock` — the closed padlock on a pinned harness trigger. */
 function LockGlyph({ className }: { className?: string }) {
   return (
@@ -105,9 +97,10 @@ function GearGlyph({ className }: { className?: string }) {
 }
 
 /**
- * Pill-styled harness picker — inline, no sandbox-ui dependency. The brand
- * marks come from `./harness-glyphs` (the set the legacy sandbox-ui picker
- * shipped, vendored inline).
+ * A single-choice picker: the shared `PickerTrigger` and a menu of rows, each a
+ * label over an optional one-line muted description that ends in an ellipsis
+ * when it does not fit (the row's `title` carries the full text). `HarnessPicker`
+ * is this picker over the harness set.
  *
  * The chip is the shared `PickerTrigger` (a `Chip`), not `rounded-lg` at whatever
  * height the padding gives: this pill sits beside `ModelPicker` and
@@ -135,36 +128,29 @@ function GearGlyph({ className }: { className?: string }) {
  *    the compact panel is an `overflow-y-auto` box, which clips a positioned
  *    descendant, and that surface is this package's answer to exactly that.
  */
-export interface HarnessPickerProps {
-  /** The selected harness, or `''` for none when {@link HarnessPickerProps.defaultOption} is offered. */
-  value: Harness | ''
-  onChange: (h: Harness | '') => void
-  /** Harnesses to offer; defaults to the labeled set. */
-  available?: ReadonlyArray<Harness>
+/** `description` is one muted line under the label, truncated with an ellipsis; the row's title carries the full text. */
+export interface ChoiceOption { value: string; label: string; description?: string; icon?: ReactNode }
+
+export interface ChoicePickerProps {
+  value: string
+  onChange: (value: string) => void
+  options: readonly ChoiceOption[]
+  /** The trigger's text when `value` matches no option. */
+  placeholder?: string
   fullWidth?: boolean
   /** Pin the control and say why; see the component notes. */
   lockReason?: string
   variant?: PickerVariant
-  /** Offer "no selection" as the first row; choosing it calls `onChange('')`. */
-  defaultOption?: { label: string }
   /** Disable the trigger; unlike `lockReason` it explains nothing. */
   disabled?: boolean
   id?: string
+  title?: string
+  'aria-label'?: string
   'aria-describedby'?: string
 }
 
-export function HarnessPicker({
-  value,
-  onChange,
-  available,
-  fullWidth = false,
-  lockReason,
-  variant = 'chip',
-  defaultOption,
-  disabled = false,
-  id,
-  'aria-describedby': ariaDescribedBy,
-}: HarnessPickerProps) {
+export function ChoicePicker({ value, onChange, options, placeholder = '', fullWidth = false, lockReason, variant = 'chip', disabled = false,
+  id, title, 'aria-label': ariaLabel, 'aria-describedby': ariaDescribedBy }: ChoicePickerProps) {
   const [requestedOpen, setOpen] = useState(false)
   const open = requestedOpen && !disabled
   const [hintOpen, setHintOpen] = useState(false)
@@ -174,22 +160,20 @@ export function HarnessPicker({
   const reasonId = useId()
   const locked = lockReason !== undefined
   const field = variant === 'field'
-  const options = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
   const showHint = () => setHintOpen(true)
   const hideHint = () => setHintOpen(false)
-  const label = value ? harnessLabel(value) : defaultOption?.label ?? 'Select harness'
-  const glyph = value ? <HarnessGlyph harness={value} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
-    : <GearGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-  const choose = (next: Harness | '') => {
+  const selected = options.find((o) => o.value === value)
+  const choose = (next: string) => {
     onChange(next)
     setOpen(false)
   }
   return (
     <div ref={containerRef} className={pickerRootClass(fullWidth || field)}>
-      <PickerTrigger variant={variant} icon={glyph}
+      <PickerTrigger variant={variant} icon={selected?.icon} trailing={locked ? <LockGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : undefined}
         {...triggerProps}
         id={id}
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-haspopup={locked ? undefined : true}
         aria-expanded={locked ? undefined : open}
         aria-controls={!locked && open ? panelId : undefined}
@@ -200,7 +184,7 @@ export function HarnessPicker({
         onMouseLeave={locked ? hideHint : undefined}
         onFocus={locked ? showHint : undefined}
         onBlur={locked ? hideHint : undefined}
-        title="Harness"
+        title={title}
         data-state={!locked && open ? 'open' : 'closed'}
         className={
           field
@@ -211,14 +195,9 @@ export function HarnessPicker({
         }
       >
         <span className={`flex min-w-0 items-center ${field ? 'flex-1 gap-2' : 'gap-1.5'}`}>
-          {variant !== 'chip' && glyph}
-          <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{label}</span>
+          {variant !== 'chip' && selected?.icon}
+          <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{selected?.label ?? placeholder}</span>
         </span>
-        {locked ? (
-          <LockGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        )}
       </PickerTrigger>
       {locked && (
         <>
@@ -245,42 +224,50 @@ export function HarnessPicker({
         panelRef={panelRef}
         matchTriggerWidth
         side={field ? 'below' : undefined}
-        className={`max-h-64 min-w-[248px] overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
+        className={`max-h-64 min-w-[248px] max-w-[min(24rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-card-edge bg-popover p-1 ${OVERLAY_SHADOW}`}
       >
-          {defaultOption && (
+          {options.map((o) => (
             <button
+              key={o.value}
               type="button"
               role="menuitemradio"
-              aria-checked={value === ''}
-              onClick={() => choose('')}
+              aria-checked={o.value === value}
+              title={o.description ? `${o.label} — ${o.description}` : o.label}
+              onClick={() => choose(o.value)}
               className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
-                value === '' ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+                o.value === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
               }`}
             >
-              <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="truncate">{defaultOption.label}</span>
-              {value === '' && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
-            </button>
-          )}
-          {options.map((h) => (
-            <button
-              key={h}
-              type="button"
-              role="menuitemradio"
-              aria-checked={h === value}
-              onClick={() => choose(h)}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition ${
-                h === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
-              }`}
-            >
-              <HarnessGlyph harness={h} className="h-4 w-4 shrink-0 text-foreground" />
-              <span className="min-w-0"><span className="block truncate">{harnessLabel(h)}</span>{HARNESS_LABELS[h]?.[1] && <span className="block truncate text-xs font-normal text-muted-foreground">{HARNESS_LABELS[h]?.[1]}</span>}</span>
-              {h === value && <CheckGlyph className="ml-auto h-3.5 w-3.5 shrink-0 text-primary" />}
+              {o.icon}
+              <span className="min-w-0 flex-1"><span className="block truncate">{o.label}</span>{o.description && <span className="block truncate text-xs font-normal text-muted-foreground">{o.description}</span>}</span>
+              {o.value === value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
       </PopoverSurface>
     </div>
   )
+}
+
+export type HarnessPickerProps = Omit<ChoicePickerProps, 'value' | 'onChange' | 'options' | 'placeholder' | 'title'> & {
+  /** The selected harness, or `''` for none when {@link HarnessPickerProps.defaultOption} is offered. */
+  value: Harness | ''
+  onChange: (h: Harness | '') => void
+  /** Harnesses to offer; defaults to the labeled set. */
+  available?: ReadonlyArray<Harness>
+  /** Offer "no selection" as the first row; choosing it calls `onChange('')`. */
+  defaultOption?: { label: string }
+}
+
+/** {@link ChoicePicker} over the harness set, each row its brand mark (from `./harness-glyphs`), name and qualifier. */
+export function HarnessPicker({ value, onChange, available, defaultOption, variant = 'chip', ...rest }: HarnessPickerProps) {
+  // Quiet inherits the trigger's tone, so the mark lifts with the label on hover.
+  const glyph = (h: Harness) => <HarnessGlyph harness={h} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
+  const ids = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
+  const options = [
+    ...(defaultOption ? [{ value: '', label: defaultOption.label, icon: <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" /> }] : []),
+    ...(value && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h) })),
+  ]
+  return <ChoicePicker {...rest} variant={variant} value={value} onChange={(v) => onChange(v as Harness | '')} options={options} placeholder="Select harness" title="Harness" />
 }
 
 export interface AgentSessionControlsProps {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { ProviderLogo } from './provider-logo'
 import { StatusPill } from '@tangle-network/ui/primitives'
 import { MAX_RECOMMENDED_MODELS, sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
-import { ChevronDown, CheckGlyph, SearchGlyph, SparkleGlyph } from './control-glyphs'
+import { CheckGlyph, SearchGlyph, SparkleGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
 import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
@@ -305,7 +305,6 @@ export function ModelPicker({
           <span className={variant === 'field' ? `min-w-0 flex-1 truncate ${value ? '' : 'text-muted-foreground'}` : 'max-w-[160px] truncate'}>
             {selectedLabel || defaultOption?.label || 'Select model'}</span>
         </span>}
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </PickerTrigger>
       {describeValue && value && <span id={valueId} className="sr-only">Selected model: {selectedLabel}</span>}
 

@@ -1,6 +1,6 @@
 /** Reasoning-level selection and effort-meter presentation. */
 import { useId, useState } from 'react'
-import { BrainGlyph, ChevronDown, CheckGlyph } from './control-glyphs'
+import { BrainGlyph, CheckGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
 import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
@@ -243,7 +243,6 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
             className={variant === 'quiet' ? 'shrink-0' : 'shrink-0 text-foreground'}
           />
         )}
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </PickerTrigger>
       <PopoverSurface
         open={open}

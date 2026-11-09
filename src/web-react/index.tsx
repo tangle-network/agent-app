@@ -94,6 +94,8 @@ export {
   EFFORT_METER_SEGMENTS,
   OVERLAY_SHADOW,
   fieldPickerTriggerClass,
+  PickerTrigger,
+  type PickerTriggerProps,
   type ModelPickerProps,
   type EffortPickerProps,
   type EffortLevel,
@@ -102,8 +104,11 @@ export {
 } from './controls'
 export {
   AgentSessionControls,
+  ChoicePicker,
   HarnessPicker,
   type AgentSessionControlsProps,
+  type ChoiceOption,
+  type ChoicePickerProps,
   type HarnessPickerProps,
 } from './agent-session-controls'
 export type { CatalogModel } from '../runtime/model-catalog'
