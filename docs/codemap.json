@@ -30691,8 +30691,8 @@
         {
           "name": "responseErrorMessage",
           "kind": "function",
-          "signature": "(res: Response) => Promise<{ code?: string | undefined; message: string; }>",
-          "doc": "Extracts the most specific error message a route returned."
+          "signature": "(res: Response, fallback?: string) => Promise<{ code?: string | undefined; message: string; }>",
+          "doc": "Extracts the most specific error message a route returned: `error`, `error.message` (the durable turn lock's refusal), then `message`."
         },
         {
           "name": "restoreChatInteractions",

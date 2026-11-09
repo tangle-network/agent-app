@@ -3168,10 +3168,10 @@ interface ResourceFileLimits
 
 ### `responseErrorMessage`
 
-`function` — Extracts the most specific error message a route returned.
+`function` — Extracts the most specific error message a route returned: `error`, `error.message` (the durable turn lock's refusal), then `message`.
 
 ```ts
-(res: Response) => Promise<{ code?: string | undefined; message: string; }>
+(res: Response, fallback?: string) => Promise<{ code?: string | undefined; message: string; }>
 ```
 
 ### `restoreChatInteractions`
