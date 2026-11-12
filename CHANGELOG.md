@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.16
+
+- fix(peers): accept sandbox-ui 9 (#1511)
+
 ## 3.0.15
 
 - chat-stream: show the turn-lock refusal's message and keep its code on the thrown Error (#1509)
