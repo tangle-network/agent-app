@@ -106,7 +106,17 @@ export async function main(argv: readonly string[]): Promise<number> {
       if (!journey || !label) throw new UsageError('frames needs a journey and a context label')
       const config = await loadJourneysConfig()
       const dir = journeyDir(config, journey)
-      console.log(extractFrames(join(dir, 'video', `${label}-full.mp4`), join(dir, 'video', `${label}.srt`), dir, times.map(Number)).join('\n'))
+      const video = join(dir, 'video', `${label}-full.mp4`)
+      if (!existsSync(video)) {
+        console.error(`agent-app-journeys: frames read ${dir}, which has no video/${label}-full.mp4; pass the run's output folder, such as ${join(config.outDir, journey)}`)
+        return 1
+      }
+      const frames = extractFrames(video, join(dir, 'video', `${label}.srt`), dir, times.map(Number))
+      if (!frames.length) {
+        console.error(`agent-app-journeys: no frames from ${video}: video/${label}.srt is missing and no seconds were given`)
+        return 1
+      }
+      console.log(frames.join('\n'))
       return 0
     }
     case 'rebuild': {
