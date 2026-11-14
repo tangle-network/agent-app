@@ -53,8 +53,10 @@ export async function sessionUser(config: ResolvedJourneysConfig, state: string)
   try {
     const r = await ctx.get(config.auth.session, { maxRedirects: 0, timeout: 20_000 })
     if (!r.ok()) return null
-    const body = (await r.json().catch(() => null)) as { user?: { id?: string; name?: string; emailVerified?: boolean } } | null
-    const user = body?.user
+    type User = { id?: string; name?: string; emailVerified?: boolean }
+    const body = (await r.json().catch(() => null)) as (User & { user?: User }) | null
+    // better-auth answers `{ user }`; an app's own endpoint may answer with the user itself.
+    const user = body?.user ?? body
     if (!user?.id) return null
     return { id: user.id, name: user.name ?? null, emailVerified: user.emailVerified === true }
   } finally {
