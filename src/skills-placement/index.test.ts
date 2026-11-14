@@ -28,6 +28,8 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   hermes: null,
   forge: null,
   grok: null,
+  nanocode: null,
+  exo: null,
   openclaw: 'skills',
   acp: null,
   cursor: null,
