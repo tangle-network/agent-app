@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.21
+
+- docs: regenerate the code map for ChoicePicker and PickerTrigger (#1517)
+- fix(create-agent-app): pin the chat template's ui at 11.51.22 and brand at 1.31.11 (#1516)
+
 ## 3.0.20
 
 - fix(deps): adopt @tangle-network/agent-runtime 10.0.0 (#1515)
