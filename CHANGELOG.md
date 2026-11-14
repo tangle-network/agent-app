@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.20
+
+- fix(deps): adopt @tangle-network/agent-runtime 10.0.0 (#1515)
+
 ## 3.0.19
 
 - fix(journeys): accept a session endpoint that returns the user itself (#1513)
