@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.17
+
+- fix(journeys): frames exits 1 and names the folder it read when the video is missing (#1512)
+
 ## 3.0.16
 
 - fix(peers): accept sandbox-ui 9 (#1511)
