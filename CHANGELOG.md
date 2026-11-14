@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.19
+
+- fix(journeys): accept a session endpoint that returns the user itself (#1513)
+
 ## 3.0.18
 
 - fix(sandbox): carry an explicit model mode so a keyless OpenCode CLI model is sent as mode cli (#1514)
