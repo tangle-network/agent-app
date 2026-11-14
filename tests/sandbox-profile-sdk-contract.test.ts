@@ -41,4 +41,21 @@ describe('composed file profile through the published Sandbox SDK', () => {
     expect(sent.backend.profile.resources.knowledge).toBeUndefined()
     expect(base).not.toHaveProperty('resources')
   })
+
+  it('carries a keyless OpenCode CLI-owned model as backend.model.mode "cli"', async () => {
+    // Disco's director: OpenCode's own free model, no key. Without `mode: "cli"`
+    // the platform refuses: "missing backend.model.apiKey".
+    const backend = await resolveSandboxPromptBackend({
+      provider: { providerName: 'opencode', modelName: 'glm-5.3-flash-free', allowKeylessModel: true, mode: 'cli' },
+    }, { profile: { name: 'director', harness: 'opencode', prompt: { systemPrompt: 'Direct.' } } })
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json({ id: 'session-cli', status: 'running' }))
+    const runtime = createSandboxRuntimeClient({
+      baseUrl: 'https://sandbox.invalid', token: 'synthetic-scoped-token', fetch,
+    })
+    await runtime.createSession({ sessionId: 'session-cli', backend })
+    const sent = JSON.parse(String(fetch.mock.calls[0]![1]?.body))
+    expect(sent.backend.type).toBe('opencode')
+    expect(sent.backend.model).toEqual({ model: 'glm-5.3-flash-free', provider: 'opencode', mode: 'cli' })
+  })
 })

@@ -21,6 +21,10 @@ export interface ProviderResolutionConfig {
   // platform mints no Router key and the key value never passes through the
   // app. A raw `apiKey` (config or per-turn) takes precedence.
   apiKeyEnv?: string
+  // `cli`: the harness CLI owns provider resolution and auth (OpenCode's own
+  // provider catalog, e.g. a free model), so the platform mints no Router key
+  // and injects no managed credential. Sent as `backend.model.mode`.
+  mode?: 'api' | 'cli'
 }
 
 /** Represent a fully configured model with optional API key and base URL for sandbox platform integration */
@@ -31,7 +35,7 @@ export interface ProviderResolutionConfig {
  * drops a flat `modelId` from every turn.
  */
 export function backendModelFields(model: ResolvedModel): {
-  model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string };
+  model: { model: string; provider: string; apiKey?: string; apiKeyEnv?: string; baseUrl?: string; mode?: 'api' | 'cli' };
 } {
   return { model: {
     model: model.model,
@@ -39,6 +43,7 @@ export function backendModelFields(model: ResolvedModel): {
     ...(model.apiKey !== undefined ? { apiKey: model.apiKey } : {}),
     ...(model.apiKeyEnv !== undefined ? { apiKeyEnv: model.apiKeyEnv } : {}),
     ...(model.baseUrl !== undefined ? { baseUrl: model.baseUrl } : {}),
+    ...(model.mode !== undefined ? { mode: model.mode } : {}),
   } }
 }
 
@@ -51,6 +56,8 @@ export interface ResolvedModel {
   /** A stored-secret reference standing in for `apiKey`; see {@link ProviderResolutionConfig.apiKeyEnv}. */
   apiKeyEnv?: string
   baseUrl?: string
+  /** See {@link ProviderResolutionConfig.mode}. */
+  mode?: 'api' | 'cli'
 }
 
 /**
@@ -171,6 +178,7 @@ export function resolveModelSelection(
       provider,
       ...(apiKey ? { apiKey } : apiKeyEnv ? { apiKeyEnv } : {}),
       ...(explicitBaseUrl ? { baseUrl: explicitBaseUrl } : {}),
+      ...(c.mode ? { mode: c.mode } : {}),
     },
   }
 }
