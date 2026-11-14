@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.22
+
+- fix(deps): develop on ui 11.51.22 and brand 1.31.11, the chat template cohort (#1518)
+
 ## 3.0.21
 
 - docs: regenerate the code map for ChoicePicker and PickerTrigger (#1517)
