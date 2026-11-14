@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.18
+
+- fix(sandbox): carry an explicit model mode so a keyless OpenCode CLI model is sent as mode cli (#1514)
+
 ## 3.0.17
 
 - fix(journeys): frames exits 1 and names the folder it read when the video is missing (#1512)
