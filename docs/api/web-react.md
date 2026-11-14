@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-538 exports.
+543 exports.
 
 ### `acceptRejectionReason`
 
@@ -740,6 +740,30 @@ interface ChatTurnRequestPayload
 
 ```ts
 interface ChatUiMessage
+```
+
+### `ChoiceOption`
+
+`interface` — `description` is one muted line under the label, truncated with an ellipsis; the row's title carries the full text.
+
+```ts
+interface ChoiceOption
+```
+
+### `ChoicePicker`
+
+`function`
+
+```ts
+({ value, onChange, options, placeholder, fullWidth, lockReason, variant, disabled, id, title, "aria-label": ariaLabel,…
+```
+
+### `ChoicePickerProps`
+
+`interface`
+
+```ts
+interface ChoicePickerProps
 ```
 
 ### `CommandPalette`
@@ -1640,18 +1664,18 @@ interface HarnessGlyphProps
 
 ### `HarnessPicker`
 
-`function`
+`function` — {@link ChoicePicker} over the harness set, each row its brand mark (from `./harness-glyphs`), name and qualifier.
 
 ```ts
-({ value, onChange, available, fullWidth, lockReason, variant, defaultOption, disabled, id, "aria-describedby": ariaDes…
+({ value, onChange, available, optionsOverride, defaultOption, variant, ...rest }: HarnessPickerProps) => Element
 ```
 
 ### `HarnessPickerProps`
 
-`interface` — Pill-styled harness picker — inline, no sandbox-ui dependency.
+`type`
 
 ```ts
-interface HarnessPickerProps
+type HarnessPickerProps
 ```
 
 ### `hasSecretField`
@@ -2436,6 +2460,22 @@ type ParseInteractionResult
 
 ```ts
 () => string | undefined
+```
+
+### `PickerTrigger`
+
+`function` — A picker's trigger, also for a host-owned popover.
+
+```ts
+ForwardRefExoticComponent<ButtonHTMLAttributes<HTMLButtonElement> & { variant?: PickerVariant | undefined; icon?: React…
+```
+
+### `PickerTriggerProps`
+
+`type`
+
+```ts
+type PickerTriggerProps
 ```
 
 ### `PickerVariant`

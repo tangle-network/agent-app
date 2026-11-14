@@ -28871,6 +28871,24 @@
           "doc": "Describe the structure and properties of a chat message with roles, content, and optional metadata"
         },
         {
+          "name": "ChoiceOption",
+          "kind": "interface",
+          "signature": "interface ChoiceOption",
+          "doc": "`description` is one muted line under the label, truncated with an ellipsis; the row's title carries the full text."
+        },
+        {
+          "name": "ChoicePicker",
+          "kind": "function",
+          "signature": "({ value, onChange, options, placeholder, fullWidth, lockReason, variant, disabled, id, title, \"aria-label\": ariaLabel,…",
+          "doc": null
+        },
+        {
+          "name": "ChoicePickerProps",
+          "kind": "interface",
+          "signature": "interface ChoicePickerProps",
+          "doc": null
+        },
+        {
           "name": "CommandPalette",
           "kind": "function",
           "signature": "({ items, onSelect, open: controlledOpen, onOpenChange, hotkey, returnFocusTo, loading, initialQuery, onQueryChange, pl…",
@@ -29545,14 +29563,14 @@
         {
           "name": "HarnessPicker",
           "kind": "function",
-          "signature": "({ value, onChange, available, fullWidth, lockReason, variant, defaultOption, disabled, id, \"aria-describedby\": ariaDes…",
-          "doc": null
+          "signature": "({ value, onChange, available, optionsOverride, defaultOption, variant, ...rest }: HarnessPickerProps) => Element",
+          "doc": "{@link ChoicePicker} over the harness set, each row its brand mark (from `./harness-glyphs`), name and qualifier."
         },
         {
           "name": "HarnessPickerProps",
-          "kind": "interface",
-          "signature": "interface HarnessPickerProps",
-          "doc": "Pill-styled harness picker — inline, no sandbox-ui dependency."
+          "kind": "type",
+          "signature": "type HarnessPickerProps",
+          "doc": null
         },
         {
           "name": "hasSecretField",
@@ -30141,6 +30159,18 @@
           "kind": "function",
           "signature": "() => string | undefined",
           "doc": "The mime to ask the recorder for, or `undefined` to take the UA default."
+        },
+        {
+          "name": "PickerTrigger",
+          "kind": "function",
+          "signature": "ForwardRefExoticComponent<ButtonHTMLAttributes<HTMLButtonElement> & { variant?: PickerVariant | undefined; icon?: React…",
+          "doc": "A picker's trigger, also for a host-owned popover."
+        },
+        {
+          "name": "PickerTriggerProps",
+          "kind": "type",
+          "signature": "type PickerTriggerProps",
+          "doc": null
         },
         {
           "name": "PickerVariant",
