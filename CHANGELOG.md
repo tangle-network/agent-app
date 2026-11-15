@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.29
+
+- fix(sandbox-producer): a plainly worded failure's raw warning is fold… (#1527)
+
 ## 3.0.28
 
 - fix(chat-routes): a refused model key reads as plain words with its own code (#1526)
