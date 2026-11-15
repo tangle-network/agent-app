@@ -165,13 +165,15 @@ export interface PlatformBillingHttp {
   getUsageByProduct(userApiKey: string): Promise<PlatformUsageProductRow[]>
   /** GET /v1/billing/product-entitlement?product=<id> (user bearer). */
   getProductEntitlement(userApiKey: string, productId: string): Promise<ProductEntitlement>
-  /** POST /v1/billing/deduct (service token). */
+  /** POST /v1/billing/deduct (service token). Platform refuses a deduct without
+   *  `keyId`, the id of a key the charged user owns (their sign-in key). */
   deduct(input: {
     platformUserId: string
     amountUsd: number
     type: string
     description: string
     referenceId: string
+    keyId?: string
   }): Promise<void>
   /** Absolute URL of the platform's billing-management surface. */
   billingUrl(): string
@@ -294,6 +296,7 @@ export function createPlatformBillingHttp(opts: PlatformBillingHttpOptions): Pla
           product: opts.productSlug,
           description: input.description,
           referenceId: input.referenceId,
+          ...(input.keyId ? { keyId: input.keyId } : {}),
         }),
       }, headers)
     },

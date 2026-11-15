@@ -582,7 +582,7 @@ describe('createPlatformBillingHttp', () => {
 
   it('deduct authenticates as the service and names the user in the body', async () => {
     const { http, calls } = billingHttp({ '/v1/billing/deduct': { body: { success: true } } })
-    await http.deduct({ platformUserId: 'pu_1', amountUsd: 0.42, type: 'agent_turn', description: 'd', referenceId: 'r1' })
+    await http.deduct({ platformUserId: 'pu_1', amountUsd: 0.42, type: 'agent_turn', description: 'd', referenceId: 'r1', keyId: 'key_1' })
     const call = calls[0]!
     expect(call.method).toBe('POST')
     expect(call.headers.get('Authorization')).toBe('Bearer svc-token')
@@ -594,6 +594,7 @@ describe('createPlatformBillingHttp', () => {
       product: 'my-agent',
       description: 'd',
       referenceId: 'r1',
+      keyId: 'key_1',
     })
   })
 
