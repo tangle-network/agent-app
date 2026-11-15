@@ -298,6 +298,29 @@ function applyTerminalUsage(reported: ChatTurnUsage, usage: ChatTurnUsage): void
   if (reported.harnessCostUsd !== undefined) usage.harnessCostUsd = reported.harnessCostUsd
 }
 
+
+const utcTime = (at: Date) => `${at.toISOString().slice(11, 19)} UTC`
+
+/** One plain sentence for a harness's provider retry wait (OpenCode's `retry` status, forwarded raw): the
+ *  provider's own words and the time of the next attempt. Undefined for any other event. */
+export function providerRetryNotice(event: { type: string; data?: unknown }): string | undefined {
+  if (event.type !== 'raw') return undefined
+  const retry = asRecord(asRecord(event.data)?.event)
+  const next = Number(retry?.next)
+  if (retry?.type !== 'retry' || !Number.isFinite(next) || next <= 0) return undefined
+  const cause = asString(retry.message)?.trim() || 'the model provider refused the call'
+  return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(next))}.`
+}
+
+/** The terminal error of a provider wait too long to sleep through (`…, reset at <ISO>`), as one plain sentence. */
+export function providerResetSentence(message: string): string | undefined {
+  const reset = message.match(/reset at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/)?.[1]
+  const at = reset ? new Date(reset) : undefined
+  if (!at || Number.isNaN(at.getTime())) return undefined
+  const cause = message.split(/; the provider asked/)[0]?.trim() || 'the model provider refused the call'
+  return `The model provider refused the call (${cause}); try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
+}
+
 function sandboxStreamErrorMessage(data: unknown): string {
   const record = asRecord(data)
   const message = asString(record?.message) ?? asString(record?.error)
@@ -336,7 +359,7 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
       diagnosticText = '[unserializable diagnostics]'
     }
   }
-  const userMessage = [
+  const userMessage = providerResetSentence(message) ?? [
     'The sandbox model stream stopped before a clean completion.',
     `Error: ${message}`,
     'Please retry. If it repeats, send these support details to the team.',
@@ -380,6 +403,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const { timedParts, drainModelNotices, tracker, recordPersistedPart, reasoningClock, partMap, announcedToolArgs, settledTools, usage, promotedFileParts, emitFinalUsage, emitTerminalizedTools, emitErrorNotice, partOrder } = createSandboxProjection(projectionState, pendingModelNotices)
 
   let observedSourceEvent = false
+  let lastRetryNotice: string | undefined
   let preflightRefused = false
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
@@ -476,6 +500,18 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           continue
         }
 
+        // A provider's retry wait is otherwise silent: the harness sleeps it out and the
+        // person sees nothing until the first-answer deadline (66 s on disco, 2026-11-15).
+        // OpenCode's retry status reaches here as a raw event; say the cause and the time now.
+        const retry = providerRetryNotice(event)
+        if (retry && retry !== lastRetryNotice) {
+          lastRetryNotice = retry
+          projectionState.warningCount += 1
+          const notice = noticePart('warning', `warning-${projectionState.warningCount}`, retry)
+          recordPersistedPart(notice, undefined, noticePartKey(notice.id))
+          yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: retry }
+        }
+
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           if (message) {
@@ -538,9 +574,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
         if (event.type === 'error') {
           const message = sandboxStreamErrorMessage(event.data)
-          const errorContent = projectionState.fullText.trim()
+          const errorContent = providerResetSentence(message) ?? (projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
-            : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`
+            : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
           if (options.errorNotice) {
             yield* emitErrorNotice(errorContent, sandboxStreamErrorCode(event.data))
           } else if (options.includeErrorText !== false) {
