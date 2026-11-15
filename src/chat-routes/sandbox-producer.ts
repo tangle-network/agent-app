@@ -348,6 +348,20 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
 
+/** A failure event the person can read: when its reason is one the producer words plainly (a reset provider, a refused
+ *  key), every reason field carries that sentence and the raw text moves to `details.raw`. The client prints an error
+ *  event's `message` and the route's failure card reads `message`/`error`/`reason`: on 2026-11-15 a stranger saw the
+ *  plain notice between "OPENCODE_ERROR: Invalid API key" and "opencode execution failed: Invalid API key (exit code 1)". */
+function plainFailureEvent(event: JsonRecord): JsonRecord {
+  const data = asRecord(event.data)
+  if (!data || (event.type !== 'error' && event.type !== 'done' && event.type !== 'session.run.failed')) return event
+  const reasons = (['message', 'error', 'reason'] as const).filter((key) => typeof data[key] === 'string' && data[key])
+  const raw = reasons.map((key) => data[key] as string).join(' | ')
+  const plain = raw ? providerResetSentence(raw) ?? modelKeyRefusedSentence(raw) : undefined
+  if (!plain) return event
+  return { ...event, data: { ...data, ...Object.fromEntries(reasons.map((key) => [key, plain])), details: { ...asRecord(data.details), raw } } }
+}
+
 function sandboxStreamFailureDiagnostic(error: unknown): {
   userMessage: string
   failureNote: string
@@ -571,7 +585,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             yield* emitFinalUsage()
           }
           yield* emitTerminalizedTools()
-          yield toProducerWireEvent(record)
+          yield toProducerWireEvent(plainFailureEvent(record))
           continue
         }
 
@@ -591,13 +605,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
           projectionState.interactionOutcome = 'expired'
           yield* emitTerminalizedTools()
-          yield toProducerWireEvent(record)
+          yield toProducerWireEvent(plainFailureEvent(record))
           continue
         }
 
         // Remaining lifecycle events forward verbatim; the client parser ignores
         // unknown types.
-        yield toProducerWireEvent(record)
+        yield toProducerWireEvent(plainFailureEvent(record))
       }
       // A model that fell over and then produced nothing never entered the loop
       // body; the downgrade must still be recorded.
