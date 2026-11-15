@@ -138,7 +138,7 @@ describe('profile turn pin', () => {
     const releaseA: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Ask one question, then halt and wait.' } }
     const releaseB: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Deliver the ask first.' } }
     const ownText: AgentProfile = { ...releaseA, prompt: { systemPrompt: 'Always cite the brief.' } }
-    const byProduct = (revision: ProfileRevision) => revision.author.id === 'app-release'
+    const byProduct = (author: ProfileRevision['author']) => author.id === 'app-release'
     const write = (workspaceId: string, parent: ProfileRevision | null, profile: AgentProfile, authorId: string) =>
       proposeRevision({ store, workspaceId, profileId: 'director', expectedRevisionId: parent?.id ?? null, profile,
         knowledgeText: '', planDigest: PLAN, author: { kind: 'person', id: authorId }, actorRole: 'owner', reason: 'Step' })
@@ -150,16 +150,27 @@ describe('profile turn pin', () => {
       // A person wrote their own prompt, and a later product step carried it forward unchanged.
       const edited = await write('edited', await write('edited', null, releaseA, 'app-release'), ownText, 'member')
       const carried = await write('edited', edited, { ...ownText, description: 'Carried' }, 'app-release')
+      // A product revision whose parent row is gone proves nothing about its text.
+      const orphan = { ...untouched, id: 'orphan', workspaceId: 'orphaned', parentId: 'gone' }
+      expect(await store.appendRevision(orphan, null, true)).toBe(true)
+      // Fifty remembered facts on top of the import: the prompt is still release A's.
+      let remembered = await write('remembered', null, releaseA, 'app-release')
+      for (let fact = 1; fact < 50; fact++) remembered = await write('remembered', remembered, { ...releaseA, description: `Fact ${fact}` }, 'member')
 
       expect((await run(untouched)).prompt?.systemPrompt).toBe('Deliver the ask first.')
       expect(await run(renamed)).toMatchObject({ name: 'Mine', prompt: { systemPrompt: 'Deliver the ask first.' } })
       expect((await run(edited)).prompt?.systemPrompt).toBe('Always cite the brief.')
       expect((await run(carried)).prompt?.systemPrompt).toBe('Always cite the brief.')
+      expect((await run(orphan)).prompt?.systemPrompt).toBe('Ask one question, then halt and wait.')
+      const beforeChain = trips.count
+      expect((await run(remembered)).prompt?.systemPrompt).toBe('Deliver the ask first.')
+      expect(trips.count - beforeChain).toBeLessThanOrEqual(2)
       // Nothing stored changed, and a revision's history is read once per isolate.
       expect((await store.getActiveRevision('untouched', 'director'))?.profile.prompt?.systemPrompt).toBe('Ask one question, then halt and wait.')
       const before = trips.count
       await run(renamed)
       await run(carried)
+      await run(remembered)
       expect(trips.count).toBe(before)
     } finally { sqlite.close() }
   })

@@ -2,6 +2,7 @@
 import { snapshotAgentProfile } from '@tangle-network/agent-interface/profile-snapshot'
 import {
   parseProfileRevisionDiff,
+  PROFILE_PROMPT_HISTORY_MAX,
   ProfileConflictError,
   serializeProfileRevisionDiff,
   type ProfileBinding,
@@ -326,6 +327,21 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
     getBinding,
     getSwitchReceipt,
     getTurnPin,
+    async readPromptHistory(workspaceId, profileId, revisionId) {
+      // One round trip; the depth bound keeps a corrupt parent cycle finite, and a cut history reads as incomplete.
+      const rows = await db.prepare(`WITH RECURSIVE history(revision_id, parent_id, author_kind, author_id, system_prompt, depth) AS (
+          SELECT revision_id, parent_id, author_kind, author_id, json_extract(profile_json, '$.prompt.systemPrompt'), 0
+          FROM agent_profile_revision WHERE workspace_id = ? AND profile_id = ? AND revision_id = ?
+          UNION ALL
+          SELECT r.revision_id, r.parent_id, r.author_kind, r.author_id, json_extract(r.profile_json, '$.prompt.systemPrompt'), h.depth + 1
+          FROM history h JOIN agent_profile_revision r ON r.revision_id = h.parent_id AND r.workspace_id = ? AND r.profile_id = ?
+          WHERE h.depth < ${PROFILE_PROMPT_HISTORY_MAX - 1})
+        SELECT revision_id, parent_id, author_kind, author_id, system_prompt FROM history ORDER BY depth`)
+        .bind(workspaceId, profileId, revisionId, workspaceId, profileId)
+        .all<Pick<RevisionRow, 'revision_id' | 'parent_id' | 'author_kind' | 'author_id'> & { system_prompt: string | null }>()
+      return rows.results.map(row => ({ id: row.revision_id, parentId: row.parent_id,
+        author: { kind: row.author_kind, id: row.author_id }, systemPrompt: row.system_prompt }))
+    },
     async listKnowledgeEvents(workspaceId, profileId) {
       const rows = await db.prepare(`SELECT * FROM agent_profile_knowledge_event
         WHERE workspace_id = ? AND profile_id = ? ORDER BY created_at, event_id`)

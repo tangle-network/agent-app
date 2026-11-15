@@ -120,6 +120,17 @@ export interface ProfileRevisionStore {
   getTurnPin(key: ProfileBindingKey, messageId: string, inputHash: string): Promise<ProfileTurnPin | null>
   listKnowledgeEvents(workspaceId: string, profileId: string): Promise<ProfileKnowledgeEvent[]>
   appendKnowledgeEvent(event: ProfileKnowledgeEvent): Promise<void>
+  /** A revision and its ancestors, newest first, in one read; it ends early at a missing ancestor.
+   *  Without it, `followProductRelease` reads the history one `getRevision` at a time. */
+  readPromptHistory?(workspaceId: string, profileId: string, revisionId: string): Promise<ProfilePromptHistoryEntry[]>
+}
+
+/** One revision of a profile's history, reduced to what decides whether its system prompt is product text. */
+export interface ProfilePromptHistoryEntry {
+  id: string
+  parentId: string | null
+  author: ProfileRevision['author']
+  systemPrompt: string | null
 }
 
 export class ProfileConflictError extends Error {
