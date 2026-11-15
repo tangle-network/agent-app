@@ -62,7 +62,7 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
   }
 }
 
-export function defaultChatShell(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend): SandboxRuntimeConfig {
+export function defaultChatShell<TContext, TResource>(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend<TContext, TResource>): SandboxRuntimeConfig {
   return config.shell ?? {
     credentials: () => env.SANDBOX_API_KEY?.trim() && env.SANDBOX_GATEWAY_URL?.trim()
       ? { apiKey: env.SANDBOX_API_KEY.trim(), baseUrl: env.SANDBOX_GATEWAY_URL.trim() } : null,
