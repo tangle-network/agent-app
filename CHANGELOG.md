@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.23
+
+- feat(chat-routes): the default backend runs a model on its own provider when the product names one (#1519)
+
 ## 3.0.22
 
 - fix(deps): develop on ui 11.51.22 and brand 1.31.11, the chat template cohort (#1518)
