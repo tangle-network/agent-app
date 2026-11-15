@@ -106,7 +106,9 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false
       && (Boolean(config.funding) || Boolean(env.TANGLE_API_KEY?.trim())) && !turnCarriesFiles(args.prompt)
       // The Router can cap total output but not a separate reasoning subset.
-      && !(args.executionLimits?.maxReasoningTokens),
+      && !(args.executionLimits?.maxReasoningTokens)
+      // A model with its own provider (`providers`) runs where that provider does: the sandbox lane.
+      && !config.providers?.[args.body.model ?? env.MODEL_NAME ?? config.model ?? ''],
     async router(args: ChatTurnProduceArgs<TContext, TResource>): Promise<ChatTurnHybridConfiguration> {
       const model = modelFor(args)
       if (modelPolicy) await assertPolicy({ kind: 'model', id: model, ...modelPolicy })
