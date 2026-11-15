@@ -317,6 +317,17 @@ export function providerResetSentence(message: string): string | undefined {
   return `The model provider refused the call (${cause}); try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
 }
 
+/** The typed code for a harness whose model refused its key, so a product can tell it from other stream failures. */
+export const MODEL_KEY_REFUSED_CODE = 'model.key_refused'
+
+/** A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words, true
+ *  both for a newly started box whose harness called the model before its minted key was in place (it recovers within
+ *  minutes) and for a key that is wrong. The raw error goes to the log and the failure note, never to the person. */
+export function modelKeyRefusedSentence(message: string): string | undefined {
+  if (!/\binvalid api key\b|\b401\b[^\n]*\b(?:unauthori[sz]ed|api key)\b/i.test(message)) return undefined
+  return "The assistant's model refused its access key, so this message was not answered. If the assistant has just started, send it again in a minute; if this repeats, tell the team."
+}
+
 function sandboxStreamErrorMessage(data: unknown): string {
   const record = asRecord(data)
   const message = asString(record?.message) ?? asString(record?.error)
@@ -355,7 +366,8 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
       diagnosticText = '[unserializable diagnostics]'
     }
   }
-  const userMessage = providerResetSentence(message) ?? [
+  const keyRefused = modelKeyRefusedSentence(message)
+  const userMessage = providerResetSentence(message) ?? keyRefused ?? [
     'The sandbox model stream stopped before a clean completion.',
     `Error: ${message}`,
     'Please retry. If it repeats, send these support details to the team.',
@@ -371,6 +383,7 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
   } else if (error instanceof ModelFailoverExhaustedError) {
     code = error.upstreamCode ?? code
   }
+  if (keyRefused) code = MODEL_KEY_REFUSED_CODE
   return { userMessage, failureNote, code }
 }
 
@@ -564,11 +577,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
         if (event.type === 'error') {
           const message = sandboxStreamErrorMessage(event.data)
-          const errorContent = providerResetSentence(message) ?? (projectionState.fullText.trim()
+          const keyRefused = modelKeyRefusedSentence(message)
+          if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
+          const errorContent = providerResetSentence(message) ?? keyRefused ?? (projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
           if (options.errorNotice) {
-            yield* emitErrorNotice(errorContent, sandboxStreamErrorCode(event.data))
+            yield* emitErrorNotice(errorContent, keyRefused ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data))
           } else if (options.includeErrorText !== false) {
             const errorDelta = projectionState.fullText ? `\n\n---\n${errorContent}` : errorContent
             projectionState.fullText += errorDelta
