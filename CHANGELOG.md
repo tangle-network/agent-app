@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.25
+
+- fix(billing): deduct sends the caller's key id (#1521)
+
 ## 3.0.24
 
 - fix(chat-routes): a model with its own provider stays on the sandbox lane (#1520)
