@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.24
+
+- fix(chat-routes): a model with its own provider stays on the sandbox lane (#1520)
+
 ## 3.0.23
 
 - feat(chat-routes): the default backend runs a model on its own provider when the product names one (#1519)
