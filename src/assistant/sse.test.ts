@@ -12,6 +12,29 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
 }
 
 describe("readSSEEvents", () => {
+  it("preserves frame boundaries and trailing events when every byte arrives separately", async () => {
+    const bytes = new TextEncoder().encode(
+      '\uFEFFevent: delta\r\nid: first\r\ndata: {"text":\r\ndata: "😀"}\r\n\r\n' +
+      ': keepalive\r\nevent: ignored\r\nid: stale\r\n\r\n' +
+      'data: raw payload\n\n' +
+      'event: done\ndata: {"ok":true}',
+    );
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+        controller.close();
+      },
+    });
+    const events: unknown[] = [];
+    await readSSEEvents(body, (event) => events.push(event));
+    expect(events).toEqual([
+      { data: { text: "😀" }, rawData: '{"text":\n"😀"}', eventId: "first", eventType: "delta" },
+      { data: "raw payload", rawData: "raw payload", eventId: undefined, eventType: undefined },
+      { data: { ok: true }, rawData: '{"ok":true}', eventId: undefined, eventType: "done" },
+    ]);
+    expect(body.locked).toBe(false);
+  });
+
   it("emits each event with its name and parsed data, in order", async () => {
     const events: Array<{ type?: string; data: unknown }> = [];
     await readSSEEvents(
