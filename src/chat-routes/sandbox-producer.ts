@@ -348,13 +348,13 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
 
-/** A failure event the person can read: when its reason is one the producer words plainly (a reset provider, a refused
+/** A failure event the person can read (`error`, `warning`, `done`, `session.run.failed`): when its reason is one the producer words plainly (a reset provider, a refused
  *  key), every reason field carries that sentence and the raw text moves to `details.raw`. The client prints an error
  *  event's `message` and the route's failure card reads `message`/`error`/`reason`: on 2026-11-15 a stranger saw the
  *  plain notice between "OPENCODE_ERROR: Invalid API key" and "opencode execution failed: Invalid API key (exit code 1)". */
 function plainFailureEvent(event: JsonRecord): JsonRecord {
   const data = asRecord(event.data)
-  if (!data || (event.type !== 'error' && event.type !== 'done' && event.type !== 'session.run.failed')) return event
+  if (!data || !['error', 'warning', 'done', 'session.run.failed'].includes(String(event.type))) return event
   const reasons = (['message', 'error', 'reason'] as const).filter((key) => typeof data[key] === 'string' && data[key])
   const raw = reasons.map((key) => data[key] as string).join(' | ')
   const plain = raw ? providerResetSentence(raw) ?? modelKeyRefusedSentence(raw) : undefined
@@ -531,7 +531,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
-          if (message) {
+          // A failure the producer words plainly arrives as its error event next; its raw warning is logged, not shown.
+          const plainFailure = message && (providerResetSentence(message) ?? modelKeyRefusedSentence(message))
+          if (plainFailure) log('[chat-routes] failure warning folded into its error notice', { code: asString(event.data?.code), error: message })
+          if (message && !plainFailure) {
             projectionState.warningCount += 1
             const code = asString(event.data?.code)
             const text = code ? `${code}: ${message}` : message
@@ -541,7 +544,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
           // The flattened notice is additive; existing raw-warning consumers keep
           // receiving the original event too.
-          yield toProducerWireEvent(record)
+          yield toProducerWireEvent(plainFailureEvent(record))
           continue
         }
 
