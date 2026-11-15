@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.28
+
+- fix(chat-routes): a refused model key reads as plain words with its own code (#1526)
+
 ## 3.0.27
 
 - fix(chat-routes): a per-turn provider resolves before the box and the stream (#1524)
