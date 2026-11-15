@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.27
+
+- fix(chat-routes): a per-turn provider resolves before the box and the stream (#1524)
+
 ## 3.0.26
 
 - feat(chat-routes): a provider retry wait is said at once, with its cause and UTC retry time (#1522)
