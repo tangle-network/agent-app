@@ -43,8 +43,10 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
   shell?: SandboxRuntimeConfig
   /** A model's own provider, keyed by the exact model id a turn carries; any other model runs on the shell's. The box is
    *  created on the shell's provider, and only an api-mode keyless provider there gets the box its own Router key, so a
-   *  pool of an OpenCode free model and a Router model puts the Router member on the shell and the free one here. */
-  providers?: Readonly<Record<string, ProviderResolutionConfig>>
+   *  pool of an OpenCode free model and a Router model puts the Router member on the shell and the free one here.
+   *  A function is resolved for each turn, so a turn can carry its own key, e.g. a child of the caller's linked key. */
+  providers?: Readonly<Record<string, ProviderResolutionConfig
+    | ((args: ChatTurnProduceArgs<TContext, TResource>) => ProviderResolutionConfig | Promise<ProviderResolutionConfig>)>>
   /** Explicitly keep every turn on the sandbox lane. */
   router?: false
   /** Who pays for the Router model call: the turn's key, or a per-turn lease (`createDelegatedTurnKeys`) the
@@ -60,7 +62,7 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
   }
 }
 
-export function defaultChatShell(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend): SandboxRuntimeConfig {
+export function defaultChatShell<TContext, TResource>(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend<TContext, TResource>): SandboxRuntimeConfig {
   return config.shell ?? {
     credentials: () => env.SANDBOX_API_KEY?.trim() && env.SANDBOX_GATEWAY_URL?.trim()
       ? { apiKey: env.SANDBOX_API_KEY.trim(), baseUrl: env.SANDBOX_GATEWAY_URL.trim() } : null,
@@ -140,9 +142,12 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
       // openEvents: producer construction failure can never leave native work running.
       const box = await acquire(args)
       return { model, modelPolicy, modelFailover: false as const, errorNotice: true,
-        openEvents: ({ model, signal }: { model: string; signal: AbortSignal }) => streamSandboxPrompt(
-          config.providers?.[model] ? { ...shell, provider: config.providers[model] } : shell, box,
-          normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal }),
+        openEvents: async function* ({ model, signal }: { model: string; signal: AbortSignal }) {
+          const own = config.providers?.[model]
+          const provider = typeof own === 'function' ? await own(args) : own
+          yield* streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
+            normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal })
+        },
       }
     },
   }
