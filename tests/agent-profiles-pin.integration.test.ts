@@ -5,9 +5,11 @@
  * trips per turn here (production, 2026-10-22); the pre-read and the separate read-back were two of them.
  */
 import { DatabaseSync } from 'node:sqlite'
+import type { AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import { AGENT_PROFILE_D1_SCHEMA_SQL, createD1ProfileRevisionStore, type ProfileD1Database, type ProfileD1Statement } from '../src/agent-profiles/d1'
-import { admitProfileTurn, proposeRevision, readProfileAdmission, switchProfile, ProfileConflictError } from '../src/agent-profiles/index'
+import { admitProfileTurn, followProductRelease, proposeRevision, readProfileAdmission, switchProfile, ProfileConflictError,
+  type ProfileRevision } from '../src/agent-profiles/index'
 
 const PLAN = `sha256:${'a'.repeat(64)}`
 
@@ -126,4 +128,39 @@ describe('profile turn pin', () => {
     } finally { sqlite.close() }
   })
 
+  // Creative workspace 086e977d imported its prompt on 2026-11-13 and still ran it on 2026-11-15, two prompt
+  // releases later ("Then halt and wait"); each app's import was the only time product text reached a workspace.
+  it('runs the release prompt where the stored one is product text and keeps the text a person wrote', async () => {
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const { database, trips } = d1(sqlite)
+    const store = createD1ProfileRevisionStore(database)
+    const releaseA: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Ask one question, then halt and wait.' } }
+    const releaseB: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Deliver the ask first.' } }
+    const ownText: AgentProfile = { ...releaseA, prompt: { systemPrompt: 'Always cite the brief.' } }
+    const byProduct = (revision: ProfileRevision) => revision.author.id === 'app-release'
+    const write = (workspaceId: string, parent: ProfileRevision | null, profile: AgentProfile, authorId: string) =>
+      proposeRevision({ store, workspaceId, profileId: 'director', expectedRevisionId: parent?.id ?? null, profile,
+        knowledgeText: '', planDigest: PLAN, author: { kind: 'person', id: authorId }, actorRole: 'owner', reason: 'Step' })
+    const run = (revision: ProfileRevision) => followProductRelease(store, revision, releaseB, byProduct)
+    try {
+      const untouched = await write('untouched', null, releaseA, 'app-release')
+      // A person renamed it; the prompt is still the one release A shipped.
+      const renamed = await write('renamed', await write('renamed', null, releaseA, 'app-release'), { ...releaseA, name: 'Mine' }, 'member')
+      // A person wrote their own prompt, and a later product step carried it forward unchanged.
+      const edited = await write('edited', await write('edited', null, releaseA, 'app-release'), ownText, 'member')
+      const carried = await write('edited', edited, { ...ownText, description: 'Carried' }, 'app-release')
+
+      expect((await run(untouched)).prompt?.systemPrompt).toBe('Deliver the ask first.')
+      expect(await run(renamed)).toMatchObject({ name: 'Mine', prompt: { systemPrompt: 'Deliver the ask first.' } })
+      expect((await run(edited)).prompt?.systemPrompt).toBe('Always cite the brief.')
+      expect((await run(carried)).prompt?.systemPrompt).toBe('Always cite the brief.')
+      // Nothing stored changed, and a revision's history is read once per isolate.
+      expect((await store.getActiveRevision('untouched', 'director'))?.profile.prompt?.systemPrompt).toBe('Ask one question, then halt and wait.')
+      const before = trips.count
+      await run(renamed)
+      await run(carried)
+      expect(trips.count).toBe(before)
+    } finally { sqlite.close() }
+  })
 })
