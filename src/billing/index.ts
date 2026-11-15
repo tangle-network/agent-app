@@ -195,7 +195,7 @@ export interface PlatformBillingClient<Plan extends string> {
   /** Per-product usage rows for the user (via their platform key). */
   getUsageByProduct(apiKey: string): Promise<PlatformProductUsage[]>
   /** Deduct spend against the user's balance (service-token write). */
-  deduct(input: { platformUserId: string; amountUsd: number; type: string; description: string; referenceId: string }): Promise<void>
+  deduct(input: { platformUserId: string; amountUsd: number; type: string; description: string; referenceId: string; keyId?: string }): Promise<void>
 }
 
 /** Define shared billing state including user ID, plan, balances, concurrency, and overage permission */
@@ -274,7 +274,7 @@ export interface PlatformBalanceManager<Plan extends string> {
   canStartBillableTurn(userId: string): Promise<{ allowed: boolean; state: SharedBillingState<Plan> }>
   /** Deduct `amountUsd` against the user's platform balance. Throws when the
    *  user is not platform-linked. */
-  deduct(userId: string, params: { amountUsd: number; type: string; description: string; referenceId: string }): Promise<void>
+  deduct(userId: string, params: { amountUsd: number; type: string; description: string; referenceId: string; keyId?: string }): Promise<void>
   /** This product's spend for the user (drives a usage panel). */
   getProductUsage(userId: string): Promise<{ spentUsd: number; transactionCount: number }>
 }
@@ -314,6 +314,7 @@ export function createPlatformBalanceManager<Plan extends string>(
       type: params.type,
       description: params.description,
       referenceId: params.referenceId,
+      keyId: params.keyId,
     })
   }
 
