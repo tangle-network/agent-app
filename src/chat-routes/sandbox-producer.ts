@@ -301,23 +301,20 @@ function applyTerminalUsage(reported: ChatTurnUsage, usage: ChatTurnUsage): void
 
 const utcTime = (at: Date) => `${at.toISOString().slice(11, 19)} UTC`
 
-/** One plain sentence for a harness's provider retry wait (OpenCode's `retry` status, forwarded raw): the
- *  provider's own words and the time of the next attempt. Undefined for any other event. */
+/** A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt. */
 export function providerRetryNotice(event: { type: string; data?: unknown }): string | undefined {
-  if (event.type !== 'raw') return undefined
-  const retry = asRecord(asRecord(event.data)?.event)
+  const retry = event.type === 'raw' ? asRecord(asRecord(event.data)?.event) : undefined
   const next = Number(retry?.next)
-  if (retry?.type !== 'retry' || !Number.isFinite(next) || next <= 0) return undefined
-  const cause = asString(retry.message)?.trim() || 'the model provider refused the call'
+  if (retry?.type !== 'retry' || !(next > 0)) return undefined
+  const cause = asString(retry.message)?.trim() || 'no reason given'
   return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(next))}.`
 }
 
-/** The terminal error of a provider wait too long to sleep through (`…, reset at <ISO>`), as one plain sentence. */
+/** A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence. */
 export function providerResetSentence(message: string): string | undefined {
-  const reset = message.match(/reset at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/)?.[1]
-  const at = reset ? new Date(reset) : undefined
-  if (!at || Number.isNaN(at.getTime())) return undefined
-  const cause = message.split(/; the provider asked/)[0]?.trim() || 'the model provider refused the call'
+  const at = new Date(message.match(/reset at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/)?.[1] ?? NaN)
+  if (Number.isNaN(at.getTime())) return undefined
+  const cause = message.split('; the provider asked')[0]?.trim()
   return `The model provider refused the call (${cause}); try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
 }
 
@@ -500,18 +497,14 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           continue
         }
 
-        // A provider's retry wait is otherwise silent: the harness sleeps it out and the
-        // person sees nothing until the first-answer deadline (66 s on disco, 2026-11-15).
-        // OpenCode's retry status reaches here as a raw event; say the cause and the time now.
+        // OpenCode sleeps out a provider wait of up to 300 s in silence; its retry status arrives raw.
         const retry = providerRetryNotice(event)
         if (retry && retry !== lastRetryNotice) {
           lastRetryNotice = retry
-          projectionState.warningCount += 1
-          const notice = noticePart('warning', `warning-${projectionState.warningCount}`, retry)
+          const notice = noticePart('warning', `warning-${++projectionState.warningCount}`, retry)
           recordPersistedPart(notice, undefined, noticePartKey(notice.id))
           yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: retry }
         }
-
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           if (message) {
