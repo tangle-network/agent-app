@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.26
+
+- feat(chat-routes): a provider retry wait is said at once, with its cause and UTC retry time (#1522)
+- feat(chat-routes): a model's provider can be resolved for each turn (#1523)
+
 ## 3.0.25
 
 - fix(billing): deduct sends the caller's key id (#1521)
