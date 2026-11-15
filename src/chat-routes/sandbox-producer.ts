@@ -304,10 +304,9 @@ const utcTime = (at: Date) => `${at.toISOString().slice(11, 19)} UTC`
 /** A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt. */
 export function providerRetryNotice(event: { type: string; data?: unknown }): string | undefined {
   const retry = event.type === 'raw' ? asRecord(asRecord(event.data)?.event) : undefined
-  const next = Number(retry?.next)
-  if (retry?.type !== 'retry' || !(next > 0)) return undefined
+  if (retry?.type !== 'retry' || !(Number(retry.next) > 0)) return undefined
   const cause = asString(retry.message)?.trim() || 'no reason given'
-  return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(next))}.`
+  return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(Number(retry.next)))}.`
 }
 
 /** A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence. */
@@ -400,7 +399,6 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const { timedParts, drainModelNotices, tracker, recordPersistedPart, reasoningClock, partMap, announcedToolArgs, settledTools, usage, promotedFileParts, emitFinalUsage, emitTerminalizedTools, emitErrorNotice, partOrder } = createSandboxProjection(projectionState, pendingModelNotices)
 
   let observedSourceEvent = false
-  let lastRetryNotice: string | undefined
   let preflightRefused = false
   async function* stream(): AsyncGenerator<ProducerWireEvent, void, unknown> {
     try {
@@ -497,10 +495,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           continue
         }
 
-        // OpenCode sleeps out a provider wait of up to 300 s in silence; its retry status arrives raw.
+        // OpenCode sleeps out a provider wait of up to 300 s in silence; each retry status arrives raw, once per attempt.
         const retry = providerRetryNotice(event)
-        if (retry && retry !== lastRetryNotice) {
-          lastRetryNotice = retry
+        if (retry) {
           const notice = noticePart('warning', `warning-${++projectionState.warningCount}`, retry)
           recordPersistedPart(notice, undefined, noticePartKey(notice.id))
           yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: retry }
