@@ -140,14 +140,14 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
       if (modelPolicy) await assertPolicy({ kind: 'model', id: model, ...modelPolicy })
       // Resolve the box before the producer, but dispatch only when the route pulls
       // openEvents: producer construction failure can never leave native work running.
+      // A per-turn provider resolves here, before the box and the stream: a refused mint fails the producer's
+      // construction, which never leaves native work running, so the turn lock is released, not parked.
+      const own = config.providers?.[model]
+      const provider = typeof own === 'function' ? await own(args) : own
       const box = await acquire(args)
       return { model, modelPolicy, modelFailover: false as const, errorNotice: true,
-        openEvents: async function* ({ model, signal }: { model: string; signal: AbortSignal }) {
-          const own = config.providers?.[model]
-          const provider = typeof own === 'function' ? await own(args) : own
-          yield* streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
-            normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal })
-        },
+        openEvents: ({ signal }: { model: string; signal: AbortSignal }) => streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
+          normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal }),
       }
     },
   }
