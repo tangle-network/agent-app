@@ -320,15 +320,12 @@ export function providerResetSentence(message: string): string | undefined {
 /** The typed code for a harness whose model refused its key, so a product can tell it from other stream failures. */
 export const MODEL_KEY_REFUSED_CODE = 'model.key_refused'
 
-/** A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words.
- *  On a newly started box the harness can call the model before its minted key is in place and recovers by itself
- *  within minutes, so the person is told to send again; a repeat means the key itself is wrong. */
+/** A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words, true
+ *  both for a newly started box whose harness called the model before its minted key was in place (it recovers within
+ *  minutes) and for a key that is wrong. The raw error goes to the log and the failure note, never to the person. */
 export function modelKeyRefusedSentence(message: string): string | undefined {
   if (!/\binvalid api key\b|\b401\b[^\n]*\b(?:unauthori[sz]ed|api key)\b/i.test(message)) return undefined
-  return [
-    'The assistant is still starting: its model refused the first call (Invalid API key). Send your message again in a minute.',
-    `If it repeats, the assistant's model key is wrong; send these details to the team. Error: ${message}`,
-  ].join('\n\n')
+  return "The assistant's model refused its access key, so this message was not answered. If the assistant has just started, send it again in a minute; if this repeats, tell the team."
 }
 
 function sandboxStreamErrorMessage(data: unknown): string {
@@ -581,6 +578,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'error') {
           const message = sandboxStreamErrorMessage(event.data)
           const keyRefused = modelKeyRefusedSentence(message)
+          if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
           const errorContent = providerResetSentence(message) ?? keyRefused ?? (projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
