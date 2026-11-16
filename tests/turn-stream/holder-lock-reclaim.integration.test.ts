@@ -58,10 +58,7 @@ let skew = 0
 const clock = () => Date.now() + skew
 /** Move the injected clock so the `held` lock is `ageMs` old. */
 const age = (held: DurableTurnLock, ageMs: number) => { skew = held.startedAt + ageMs - Date.now() }
-const store = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL).d1, { now: clock })
-const { listRunning } = store
-if (!listRunning) throw new Error('the D1 turn store lists running turns')
-const turns = { ...store, listRunning }
+const turns = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL).d1, { now: clock })
 const durable = createMemoryTurnStreamHarness()
 const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
 const boxed = new Set(['busy', 'finished', 'older', 'down', 'slow'])
