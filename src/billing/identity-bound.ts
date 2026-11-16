@@ -46,7 +46,7 @@ export interface DurableWorkspaceKeyRecord {
   idempotencyKey?: string | null
   keyId: string
   keyEncrypted: string
-  /** 0 for a spend-through child: it has no budget of its own and spends its source's cap. */
+  /** A provisioning row keeps the requested budget. An active row: 0 for a confirmed spend-through child, which spends its source's cap. */
   budgetUsd: number
   expiresAt: Date
   status: WorkspaceKeyStatus
@@ -61,7 +61,10 @@ export interface DurableWorkspaceKeyProvisioningRecord extends DurableWorkspaceK
   status: 'provisioning'
 }
 
-type DurableWorkspaceKeyCreateResult = Awaited<ReturnType<KeyProvisioner['createKey']>> & { budgetUsd?: number | null; expiresAt?: string | null }
+/** `spendThrough: true` confirms the child has no budget of its own; without it the child is sized at the requested budget. */
+type DurableWorkspaceKeyCreateResult = Awaited<ReturnType<KeyProvisioner['createKey']>> & {
+  budgetUsd?: number | null; spendThrough?: true; expiresAt?: string | null
+}
 
 /** The exact request identity that must be reused when recovering a create. */
 export interface DurableWorkspaceKeyCreateInput {
@@ -101,13 +104,7 @@ export interface DurableWorkspaceKeyConditionalWrites {
   /** Return false when the row was no longer provisioning. */
   markProvisioningRemote(input: { id: string; keyId: string }): Promise<boolean>
   /** Return false when the row was no longer provisioning. */
-  markActive(input: {
-    id: string
-    keyId: string
-    keyEncrypted: string
-    expiresAt: Date
-    budgetUsd: number
-  }): Promise<boolean>
+  markActive(input: Parameters<DurableWorkspaceKeyStore['markActive']>[0]): Promise<boolean>
 }
 
 /** Persistence operations for identity-bound key lifecycle state. */
@@ -363,6 +360,11 @@ function isProvisioningId(value: string): boolean {
  */
 function placeholderName(keyId: string): string | undefined {
   return isProvisioningId(keyId) ? keyId.split(':').slice(2).join(':').trim() || undefined : undefined
+}
+
+/** A spend-through mint marks its placeholder (`provisioning:<operation>+spend-through:<name>`); 4.0.14 wrote budget 0. */
+function requestedSpendThrough(row: DurableWorkspaceKeyRecord): boolean {
+  return row.budgetUsd === 0 || (isProvisioningId(row.keyId) && row.keyId.split(':')[1]!.endsWith('+spend-through'))
 }
 
 async function markProvisioningRemote(store: DurableWorkspaceKeyStore, input: { id: string; keyId: string }): Promise<boolean> {
@@ -742,7 +744,7 @@ function createWorkspaceKeyRecovery(
         name,
         product: row.product,
         budgetUsd: row.budgetUsd,
-        ...(row.budgetUsd === 0 ? { spendThrough: true as const } : {}),
+        ...(requestedSpendThrough(row) ? { spendThrough: true as const } : {}),
         expiresAt: row.expiresAt.toISOString(),
         idempotencyKey,
       })
@@ -867,9 +869,10 @@ function createWorkspaceKeyMinter(
       sourceKeyFingerprint: identity.sourceKeyFingerprint,
       name,
       idempotencyKey,
-      keyId: `provisioning:${mintOperationId}:${name}`,
+      // Recovery replays this exact create, so the row keeps the requested budget and the placeholder marks spend-through.
+      keyId: `provisioning:${mintOperationId}${spendThrough ? '+spend-through' : ''}:${name}`,
       keyEncrypted: '',
-      budgetUsd: spendThrough ? 0 : budgetUsd,
+      budgetUsd,
       expiresAt,
       status: 'provisioning',
       revocationAttempts: 0,
@@ -946,8 +949,8 @@ function createWorkspaceKeyMinter(
       const remoteExpiresAt = created.expiresAt?.trim()
       const activeExpiresAt = remoteExpiresAt ? new Date(remoteExpiresAt) : expiresAt
       if (!Number.isFinite(activeExpiresAt.getTime())) throw new Error('remote child key expiry is malformed')
-      // A child minted without a budget spends through its source (0); one with a budget is sized, whatever was asked.
-      const activeBudgetUsd = created.budgetUsd ?? provisioningRow.budgetUsd
+      // Spend-through (0) only when the provisioner confirms it; a provisioner that ignores the flag minted a sized child.
+      const activeBudgetUsd = spendThrough && created.spendThrough === true ? 0 : created.budgetUsd ?? budgetUsd
       if (!Number.isFinite(activeBudgetUsd) || activeBudgetUsd < 0) throw new Error('remote child key budget is malformed')
       const activated = await markActive(options.store, {
         id: rowId,
