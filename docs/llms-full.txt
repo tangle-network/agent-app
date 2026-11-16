@@ -1,4 +1,4 @@
-# agent-app — full API surface
+# aa-docs — full API surface
 
 > Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.
 
@@ -176,7 +176,7 @@ interface CreateDrizzleAgentEnrollmentStoreOptions
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · depends on `tools`
+Source: `src/agent-profiles/index.ts` · depends on `runtime`, `tools`
 
 ### `admitProfileTurn`
 
@@ -234,6 +234,14 @@ Source: `src/agent-profiles/index.ts` · depends on `tools`
 interface CreateTextProfileInput
 ```
 
+### `followProductRelease`
+
+`function` — The profile a turn runs for `revision`: the stored profile with the release's system prompt where the stored prompt is one the product shipped into its history (`promptShippedByProduct`, revisions wh…
+
+```ts
+(store: ProfileRevisionStore, revision: ProfileRevision, release: AgentProfile, productAuthorIds: readonly string[]) =>…
+```
+
 ### `handleProfileSwitchText`
 
 `function` — Call before dispatching a chat message; a recognized command is never sent to the model.
@@ -264,6 +272,14 @@ interface MountProfileChangeResult
 
 ```ts
 (name: string) => string
+```
+
+### `overlayOnRelease`
+
+`function` — Resolve a stored profile over the release.
+
+```ts
+(stored: AgentProfile, shipped: readonly AgentProfile[], release: AgentProfile) => { profile: AgentProfile; updates: Pr…
 ```
 
 ### `parseProfileRevisionDiff`
@@ -304,6 +320,14 @@ interface ProductSelfMountConfig
 
 ```ts
 "/memories/workspace/"
+```
+
+### `PROFILE_PROMPT_HISTORY_MAX`
+
+`const` — The longest history read; a longer one reads as incomplete, so its prompt is kept.
+
+```ts
+1000
 ```
 
 ### `ProfileAccessError`
@@ -402,6 +426,22 @@ interface ProfileKnowledgeEvent
 interface ProfileMemoryStore
 ```
 
+### `ProfilePromptHistoryEntry`
+
+`interface` — One revision of a profile's history, reduced to what decides whether the newest one's system prompt is product text.
+
+```ts
+interface ProfilePromptHistoryEntry
+```
+
+### `ProfileReleaseUpdates`
+
+`interface` — How a stored profile's text compares with the current release; `customized` text is the workspace's own and stays.
+
+```ts
+interface ProfileReleaseUpdates
+```
+
 ### `ProfileRevision`
 
 `interface`
@@ -455,7 +495,7 @@ interface ProfileToolContext
 `function` — Shared self-edit tools; only the authenticated active turn can name the profile.
 
 ```ts
-<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]
+<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => (McpToolDefinition<Record<string, never>> & Pick…
 ```
 
 ### `ProfileToolTurn`
@@ -482,6 +522,14 @@ interface ProfileTurnPin
 (input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; revisionId: string; actorRole: "member"…
 ```
 
+### `promptShippedByProduct`
+
+`function` — Whether a revision's system prompt is one the product shipped into its history: some revision by a product author has that prompt and differs from its parent's (an import, or a release refresh).
+
+```ts
+(store: ProfileRevisionStore, revision: ProfileRevision, productAuthorIds: readonly string[]) => Promise<boolean>
+```
+
 ### `proposeRevision`
 
 `function` — All authors use one immutable write path.
@@ -504,6 +552,14 @@ interface ProposeRevisionInput
 
 ```ts
 (store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…
+```
+
+### `refreshBuiltinSkills`
+
+`function` — The active profile's skills with built-ins brought to the release.
+
+```ts
+(active: AgentProfile, shipped: readonly AgentProfileResourceRef[], release: AgentProfile) => { skills: AgentProfileRes…
 ```
 
 ### `SelfMountSkillEntry`
@@ -557,7 +613,7 @@ interface SwitchProfileInput
 
 ## `./agent-profiles/d1`
 
-Source: `src/agent-profiles/d1.ts` · depends on `tools`
+Source: `src/agent-profiles/d1.ts` · depends on `runtime`, `tools`
 
 ### `AGENT_PROFILE_D1_SCHEMA_SQL`
 
@@ -626,7 +682,7 @@ interface ProfileD1Statement
 
 ## `./agent-profiles/drizzle`
 
-Source: `src/agent-profiles/drizzle.ts` · depends on `tools`
+Source: `src/agent-profiles/drizzle.ts` · depends on `runtime`, `tools`
 
 ### `createAgentProfileTables`
 
@@ -639,7 +695,7 @@ Source: `src/agent-profiles/drizzle.ts` · depends on `tools`
 
 ## `./agent-profiles/switch`
 
-Source: `src/agent-profiles/switch.ts` · depends on `tools`
+Source: `src/agent-profiles/switch.ts` · depends on `runtime`, `tools`
 
 ### `normalizeProfileName`
 
@@ -3213,7 +3269,7 @@ interface EntryComposerProps
 
 ## `./chat-routes`
 
-Source: `src/chat-routes/index.ts` · depends on `chat-store`, `harness`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`
+Source: `src/chat-routes/index.ts` · depends on `chat-store`, `harness`, `interactions`, `launch-invariants`, `model-resolution`, `object-store`, `plans`, `policy-filters`, `redact`, `runtime`, `sandbox`, `stream`, `tools`, `turn-stream`, `turn-trace`, `web`, `workspace-export`
 
 ### `AbortAttachmentWriteFn`
 
@@ -3537,7 +3593,7 @@ type AttachmentWriteResult
 
 ### `boundNativeCompletionReceipt`
 
-`function` — Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
+`function` — Assert the aggregate serialized UTF-8 bound without changing native facts.
 
 ```ts
 (receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt
@@ -4703,6 +4759,14 @@ number
 (path: string) => ChatMentionKind
 ```
 
+### `MODEL_KEY_REFUSED_CODE`
+
+`const` — The typed code for a harness whose model refused its key, so a product can tell it from other stream failures.
+
+```ts
+"model.key_refused"
+```
+
 ### `ModelAttemptTimeoutCode`
 
 `type` — Structured timeout codes surfaced by the producer on final exhaustion.
@@ -4743,9 +4807,17 @@ class ModelFailoverTimeoutError
 interface ModelFallbackInfo
 ```
 
+### `modelKeyRefusedSentence`
+
+`function` — A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words, true both for a newly started box whose harness called the model before its minted key…
+
+```ts
+(message: string) => string | undefined
+```
+
 ### `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`
 
-`const` — Serialized UTF-8 budget for one terminal receipt.
+`const` — Serialized UTF-8 budget for inline native completion checkpoints and final Workflow output.
 
 ```ts
 number
@@ -5199,6 +5271,22 @@ type PromptInputPart
 interface ProtectedRuntimeChatOptions
 ```
 
+### `providerResetSentence`
+
+`function` — A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence.
+
+```ts
+(message: string) => string | undefined
+```
+
+### `providerRetryNotice`
+
+`function` — A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt.
+
+```ts
+(event: { type: string; data?: unknown; }) => string | undefined
+```
+
 ### `RawAgentFilePart`
 
 `interface` — Define the structure for a raw file part with optional metadata and media type information
@@ -5269,6 +5357,14 @@ interface ReconcileStaleTurnLockResult
 
 ```ts
 (message: SessionMessage) => DetachedTurnFinal
+```
+
+### `redactEvents`
+
+`function` — Every event of a stream, redacted.
+
+```ts
+<T>(source: AsyncIterable<T>, redact: ValueRedactor) => AsyncGenerator<T, any, any>
 ```
 
 ### `resolveChatAttachments`
@@ -5781,6 +5877,22 @@ interface UploadedChatFile
 
 ```ts
 (path: unknown) => SandboxMentionPathCheck
+```
+
+### `valueRedactor`
+
+`function` — A redactor for these values, or undefined when none qualifies: object keys and string values alike.
+
+```ts
+(values: readonly string[] | undefined) => ValueRedactor | undefined
+```
+
+### `ValueRedactor`
+
+`type`
+
+```ts
+type ValueRedactor
 ```
 
 ### `withDurableChatProjection`
@@ -19319,6 +19431,14 @@ interface NativeCompletionPayload
 interface NativeCompletionTimingSource
 ```
 
+### `NativeCompletionTranscriptReference`
+
+`interface` — Large final output points at the transcript the product already persisted.
+
+```ts
+interface NativeCompletionTranscriptReference
+```
+
 ### `nativeCompletionWorkflowId`
 
 `function`
@@ -19341,6 +19461,14 @@ interface NativeCompletionWorkflowOptions
 
 ```ts
 interface NativeCompletionWorkflowPayload
+```
+
+### `NativeCompletionWorkflowResult`
+
+`type`
+
+```ts
+type NativeCompletionWorkflowResult
 ```
 
 ### `PRESET_MIGRATION_SQL`
@@ -20630,7 +20758,7 @@ interface AssembleSystemPromptInput
 
 ## `./public-consultation`
 
-Source: `src/public-consultation/index.ts` · depends on `chat-routes`, `stream`, `tools`
+Source: `src/public-consultation/index.ts` · depends on `chat-routes`, `runtime`, `stream`, `tools`
 
 ### `ConsultationAgent`
 
@@ -21827,6 +21955,14 @@ interface LoopToolCall
 interface ModelCatalog
 ```
 
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
+```
+
 ### `normalizeModelId`
 
 `function` — Strip provider prefix, :free suffix, and trailing date stamps.
@@ -22470,6 +22606,14 @@ interface CheckpointWorkspaceStore
 
 ```ts
 number
+```
+
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
 ```
 
 ### `perTurnPrefixBytes`
@@ -23336,6 +23480,14 @@ type ForegroundSandboxSingleFlightEvent
 
 ```ts
 interface ForegroundSandboxSingleFlightOptions
+```
+
+### `forgetBootstrap`
+
+`function` — Remove this box's bootstrap markers, so its next start runs the bootstrap again.
+
+```ts
+(box: SandboxInstance) => Promise<boolean>
 ```
 
 ### `formatSandboxProvisioningSupportDetails`

@@ -1,8 +1,8 @@
 {
   "generator": "agent-docs",
-  "title": "agent-app",
+  "title": "aa-docs",
   "source": "tsup.config `entry`",
-  "slug": "tangle-network/agent-app",
+  "slug": null,
   "entries": [
     {
       "id": "./agent-enrollment",
@@ -148,6 +148,7 @@
       "id": "./agent-profiles",
       "source": "src/agent-profiles/index.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -195,6 +196,12 @@
           "doc": null
         },
         {
+          "name": "followProductRelease",
+          "kind": "function",
+          "signature": "(store: ProfileRevisionStore, revision: ProfileRevision, release: AgentProfile, productAuthorIds: readonly string[]) =>…",
+          "doc": "The profile a turn runs for `revision`: the stored profile with the release's system prompt where the stored prompt is one the product shipped into its history (`promptShippedByProduct`, revisions wh…"
+        },
+        {
           "name": "handleProfileSwitchText",
           "kind": "function",
           "signature": "(input: Omit<SwitchProfileInput, \"choice\">) => Promise<ProfileSwitchReceipt | null>",
@@ -217,6 +224,12 @@
           "kind": "function",
           "signature": "(name: string) => string",
           "doc": null
+        },
+        {
+          "name": "overlayOnRelease",
+          "kind": "function",
+          "signature": "(stored: AgentProfile, shipped: readonly AgentProfile[], release: AgentProfile) => { profile: AgentProfile; updates: Pr…",
+          "doc": "Resolve a stored profile over the release."
         },
         {
           "name": "parseProfileRevisionDiff",
@@ -247,6 +260,12 @@
           "kind": "const",
           "signature": "\"/memories/workspace/\"",
           "doc": "Workspace-shared memories live under this prefix in the workspace store."
+        },
+        {
+          "name": "PROFILE_PROMPT_HISTORY_MAX",
+          "kind": "const",
+          "signature": "1000",
+          "doc": "The longest history read; a longer one reads as incomplete, so its prompt is kept."
         },
         {
           "name": "ProfileAccessError",
@@ -321,6 +340,18 @@
           "doc": "The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses."
         },
         {
+          "name": "ProfilePromptHistoryEntry",
+          "kind": "interface",
+          "signature": "interface ProfilePromptHistoryEntry",
+          "doc": "One revision of a profile's history, reduced to what decides whether the newest one's system prompt is product text."
+        },
+        {
+          "name": "ProfileReleaseUpdates",
+          "kind": "interface",
+          "signature": "interface ProfileReleaseUpdates",
+          "doc": "How a stored profile's text compares with the current release; `customized` text is the workspace's own and stays."
+        },
+        {
           "name": "ProfileRevision",
           "kind": "interface",
           "signature": "interface ProfileRevision",
@@ -359,7 +390,7 @@
         {
           "name": "profileTools",
           "kind": "function",
-          "signature": "<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]",
+          "signature": "<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => (McpToolDefinition<Record<string, never>> & Pick…",
           "doc": "Shared self-edit tools; only the authenticated active turn can name the profile."
         },
         {
@@ -381,6 +412,12 @@
           "doc": null
         },
         {
+          "name": "promptShippedByProduct",
+          "kind": "function",
+          "signature": "(store: ProfileRevisionStore, revision: ProfileRevision, productAuthorIds: readonly string[]) => Promise<boolean>",
+          "doc": "Whether a revision's system prompt is one the product shipped into its history: some revision by a product author has that prompt and differs from its parent's (an import, or a release refresh)."
+        },
+        {
           "name": "proposeRevision",
           "kind": "function",
           "signature": "(input: ProposeRevisionInput) => Promise<ProfileRevision>",
@@ -397,6 +434,12 @@
           "kind": "function",
           "signature": "(store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…",
           "doc": "Read what admitting a message needs: its prior pin and the binding together, then a pinned revision."
+        },
+        {
+          "name": "refreshBuiltinSkills",
+          "kind": "function",
+          "signature": "(active: AgentProfile, shipped: readonly AgentProfileResourceRef[], release: AgentProfile) => { skills: AgentProfileRes…",
+          "doc": "The active profile's skills with built-ins brought to the release."
         },
         {
           "name": "SelfMountSkillEntry",
@@ -440,6 +483,7 @@
       "id": "./agent-profiles/d1",
       "source": "src/agent-profiles/d1.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -498,6 +542,7 @@
       "id": "./agent-profiles/drizzle",
       "source": "src/agent-profiles/drizzle.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -514,6 +559,7 @@
       "id": "./agent-profiles/switch",
       "source": "src/agent-profiles/switch.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -2547,7 +2593,8 @@
         "tools",
         "turn-stream",
         "turn-trace",
-        "web"
+        "web",
+        "workspace-export"
       ],
       "error": null,
       "exports": [
@@ -2795,7 +2842,7 @@
           "name": "boundNativeCompletionReceipt",
           "kind": "function",
           "signature": "(receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt",
-          "doc": "Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}."
+          "doc": "Assert the aggregate serialized UTF-8 bound without changing native facts."
         },
         {
           "name": "buildDispatchParts",
@@ -3668,6 +3715,12 @@
           "doc": "`image` when the path's extension is in the known image set (the same table {@link mediaTypeForMentionPath} reads), `file` otherwise."
         },
         {
+          "name": "MODEL_KEY_REFUSED_CODE",
+          "kind": "const",
+          "signature": "\"model.key_refused\"",
+          "doc": "The typed code for a harness whose model refused its key, so a product can tell it from other stream failures."
+        },
+        {
           "name": "ModelAttemptTimeoutCode",
           "kind": "type",
           "signature": "type ModelAttemptTimeoutCode",
@@ -3698,10 +3751,16 @@
           "doc": "Fired when a model is abandoned and the next one is about to be tried."
         },
         {
+          "name": "modelKeyRefusedSentence",
+          "kind": "function",
+          "signature": "(message: string) => string | undefined",
+          "doc": "A harness whose model provider refused its key (\"Invalid API key\", OpenCode's `OPENCODE_ERROR`) as plain words, true both for a newly started box whose harness called the model before its minted key…"
+        },
+        {
           "name": "NATIVE_COMPLETION_RECEIPT_MAX_BYTES",
           "kind": "const",
           "signature": "number",
-          "doc": "Serialized UTF-8 budget for one terminal receipt."
+          "doc": "Serialized UTF-8 budget for inline native completion checkpoints and final Workflow output."
         },
         {
           "name": "NativeCompletionAdmission",
@@ -4040,6 +4099,18 @@
           "doc": null
         },
         {
+          "name": "providerResetSentence",
+          "kind": "function",
+          "signature": "(message: string) => string | undefined",
+          "doc": "A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence."
+        },
+        {
+          "name": "providerRetryNotice",
+          "kind": "function",
+          "signature": "(event: { type: string; data?: unknown; }) => string | undefined",
+          "doc": "A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt."
+        },
+        {
           "name": "RawAgentFilePart",
           "kind": "interface",
           "signature": "interface RawAgentFilePart",
@@ -4092,6 +4163,12 @@
           "kind": "function",
           "signature": "(message: SessionMessage) => DetachedTurnFinal",
           "doc": "Recover the durable content a Sandbox recorder attached to one assistant message."
+        },
+        {
+          "name": "redactEvents",
+          "kind": "function",
+          "signature": "<T>(source: AsyncIterable<T>, redact: ValueRedactor) => AsyncGenerator<T, any, any>",
+          "doc": "Every event of a stream, redacted."
         },
         {
           "name": "resolveChatAttachments",
@@ -4476,6 +4553,18 @@
           "kind": "function",
           "signature": "(path: unknown) => SandboxMentionPathCheck",
           "doc": "Validate a workspace-relative sandbox mention path."
+        },
+        {
+          "name": "valueRedactor",
+          "kind": "function",
+          "signature": "(values: readonly string[] | undefined) => ValueRedactor | undefined",
+          "doc": "A redactor for these values, or undefined when none qualifies: object keys and string values alike."
+        },
+        {
+          "name": "ValueRedactor",
+          "kind": "type",
+          "signature": "type ValueRedactor",
+          "doc": null
         },
         {
           "name": "withDurableChatProjection",
@@ -15017,6 +15106,12 @@
           "doc": null
         },
         {
+          "name": "NativeCompletionTranscriptReference",
+          "kind": "interface",
+          "signature": "interface NativeCompletionTranscriptReference",
+          "doc": "Large final output points at the transcript the product already persisted."
+        },
+        {
           "name": "nativeCompletionWorkflowId",
           "kind": "function",
           "signature": "(executionId: string, prefix: string) => Promise<string>",
@@ -15033,6 +15128,12 @@
           "kind": "interface",
           "signature": "interface NativeCompletionWorkflowPayload",
           "doc": "Stable identity required to resume a registered native completion."
+        },
+        {
+          "name": "NativeCompletionWorkflowResult",
+          "kind": "type",
+          "signature": "type NativeCompletionWorkflowResult",
+          "doc": null
         },
         {
           "name": "PRESET_MIGRATION_SQL",
@@ -16029,6 +16130,7 @@
       "source": "src/public-consultation/index.ts",
       "dependsOn": [
         "chat-routes",
+        "runtime",
         "stream",
         "tools"
       ],
@@ -16976,6 +17078,12 @@
           "doc": "Define a catalog containing models with a default ID and fetch timestamp"
         },
         {
+          "name": "narratesBefore",
+          "kind": "function",
+          "signature": "(tool: Pick<RouterTurnTool, \"effect\"> | undefined) => boolean",
+          "doc": "Whether text a round writes before calling `tool` narrates the work instead of answering."
+        },
+        {
           "name": "normalizeModelId",
           "kind": "function",
           "signature": "(id: string) => string",
@@ -17465,6 +17573,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
+        },
+        {
+          "name": "narratesBefore",
+          "kind": "function",
+          "signature": "(tool: Pick<RouterTurnTool, \"effect\"> | undefined) => boolean",
+          "doc": "Whether text a round writes before calling `tool` narrates the work instead of answering."
         },
         {
           "name": "perTurnPrefixBytes",
@@ -18137,6 +18251,12 @@
           "kind": "interface",
           "signature": "interface ForegroundSandboxSingleFlightOptions",
           "doc": null
+        },
+        {
+          "name": "forgetBootstrap",
+          "kind": "function",
+          "signature": "(box: SandboxInstance) => Promise<boolean>",
+          "doc": "Remove this box's bootstrap markers, so its next start runs the bootstrap again."
         },
         {
           "name": "formatSandboxProvisioningSupportDetails",

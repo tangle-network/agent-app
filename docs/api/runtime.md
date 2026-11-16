@@ -4,7 +4,7 @@
 
 Source: `src/runtime/index.ts`
 
-111 exports.
+112 exports.
 
 ### `AnySurfaceKind`
 
@@ -300,6 +300,14 @@ interface LoopToolCall
 
 ```ts
 interface ModelCatalog
+```
+
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
 ```
 
 ### `normalizeModelId`

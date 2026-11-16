@@ -4,7 +4,7 @@
 
 Source: `src/runtime/router-turn.ts`
 
-30 exports.
+31 exports.
 
 ### `asksForLanguage`
 
@@ -52,6 +52,14 @@ interface CheckpointWorkspaceStore
 
 ```ts
 number
+```
+
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
 ```
 
 ### `perTurnPrefixBytes`

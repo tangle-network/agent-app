@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-308 exports.
+309 exports.
 
 ### `adaptSandboxStream`
 
@@ -636,6 +636,14 @@ type ForegroundSandboxSingleFlightEvent
 
 ```ts
 interface ForegroundSandboxSingleFlightOptions
+```
+
+### `forgetBootstrap`
+
+`function` — Remove this box's bootstrap markers, so its next start runs the bootstrap again.
+
+```ts
+(box: SandboxInstance) => Promise<boolean>
 ```
 
 ### `formatSandboxProvisioningSupportDetails`
