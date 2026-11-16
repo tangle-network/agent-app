@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-309 exports.
+311 exports.
 
 ### `adaptSandboxStream`
 
@@ -670,6 +670,14 @@ interface ForegroundSandboxSingleFlightOptions
 (shell: SandboxRuntimeConfig) => Sandbox
 ```
 
+### `HOLDER_BOX_READ_TIMEOUT_MS`
+
+`const` — The cap on reading a held lock's box: the read runs inside a member's request.
+
+```ts
+5000
+```
+
 ### `InspectablePrewarmClaimStore`
 
 `interface` — A claim store that can distinguish a completed owner from a crashed owner.
@@ -1052,6 +1060,14 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ```ts
 <T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>
+```
+
+### `readHolderBoxSessions`
+
+`function` — Read the box a held lock's turn ran work on, for `reconcileTurnLockFromStoreAndBox`.
+
+```ts
+(find: () => Promise<Pick<SandboxInstance, "status" | "sessions"> | null | undefined>) => Promise<HolderBoxReport>
 ```
 
 ### `readSandboxBinaryBytes`
