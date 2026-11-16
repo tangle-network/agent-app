@@ -11,12 +11,9 @@ export interface ChatTurnStoreBindings {
   lock: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth }
 }
 
-/** Keep the workspace-channel identity, authentication and region the same in both routes. With the routes' turn
- *  store, a lock whose holder ran in its Worker is reclaimed once nothing renews that turn. */
-export function createDefaultTurnLock<TContext>(store: Pick<ChatTurnStoreBindings, 'lock' | 'region'>,
-  turnStore?: Pick<TurnEventStore, 'listRunning'>) {
-  return createDurableTurnLock<TContext>({ ...store.lock, locationHint: store.region, scopeOf: () => 'workspace',
-    ...(turnStore ? { turnStore } : {}) })
+/** Keep the workspace-channel identity, authentication and region the same in both routes. */
+export function createDefaultTurnLock<TContext>(store: Pick<ChatTurnStoreBindings, 'lock' | 'region'>) {
+  return createDurableTurnLock<TContext>({ ...store.lock, locationHint: store.region, scopeOf: () => 'workspace' })
 }
 
 export type ResolvedChatTurnRoutesOptions<TContext, TResource = unknown> = Omit<CreateChatTurnRoutesOptions<TContext, TResource>, 'turnStore' | 'turnLock' | 'produce'> & {
@@ -40,10 +37,9 @@ export function resolveTurnStorage<TContext, TResource>(options: CreateChatTurnR
   const lockBindings = bindings ?? (namespace && env?.TURN_STREAM_AUTH_SECRET ? {
     region: env.D1_REGION, lock: { namespace, auth: { secret: env.TURN_STREAM_AUTH_SECRET } },
   } : undefined)
-  const turnStore = 'append' in options.turnStore ? options.turnStore : createD1TurnEventStore(options.turnStore.db)
   return {
-    turnStore,
-    turnLock: options.turnLock === false ? undefined : options.turnLock ?? (lockBindings ? createDefaultTurnLock<TContext>(lockBindings, turnStore)
+    turnStore: 'append' in options.turnStore ? options.turnStore : createD1TurnEventStore(options.turnStore.db),
+    turnLock: options.turnLock === false ? undefined : options.turnLock ?? (lockBindings ? createDefaultTurnLock<TContext>(lockBindings)
       : env ? { acquire: () => ({ acquired: false as const, response: Response.json({ error: 'Durable turn locking is not configured', code: 'chat.lock_not_configured' }, { status: 503 }) }), release: () => {} } : undefined),
   }
 }

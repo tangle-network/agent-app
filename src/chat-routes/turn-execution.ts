@@ -177,8 +177,7 @@ async function runAdmittedTurn<TContext, TResource>({
   if (dispatched) early.add(dispatched.refuse)
   const turnLock = options.turnLock
   if (turnLock) {
-    // The lock records whether this Worker runs the turn, which decides how a dead holder is reclaimed.
-    const acquired = await trace.measure('admission.lock', 'admission', () => turnLock.acquire({ ...produceArgs, workerExecution: selected.router }))
+    const acquired = await trace.measure('admission.lock', 'admission', () => turnLock.acquire(produceArgs))
     if (!acquired.acquired) return acquired.response
     state.lockAcquired = true
     state.lockHandle = acquired.handle

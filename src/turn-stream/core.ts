@@ -196,9 +196,6 @@ export interface DurableTurnLock {
   releasePending?: boolean
   /** Optional Router control, owned by this exact lock generation. Stop never releases the lock. */
   cancellation?: { turnStreamId: string; requestedAt?: number }
-  /** The invocation that holds the lock runs the turn itself (the Router lane), so the turn dies with it and the
-   *  turn store's running row is its proof of life. Absent when a box or another owner may outlive the invocation. */
-  workerExecution?: true
 }
 
 /** Define input parameters required to acquire a turn-based lock in a workspace thread */
@@ -210,7 +207,6 @@ export interface TurnLockAcquireInput {
   lockId: string
   turnId?: string
   cancellation?: { turnStreamId: string }
-  workerExecution?: boolean
 }
 
 /** Resolve the result of attempting to acquire a turn lock indicating success or active lock status */
@@ -262,7 +258,6 @@ export function createTurnLock(input: TurnLockAcquireInput, now: number, ttlMs =
     expiresAt: now + ttlMs,
     ...(input.turnId ? { turnId: input.turnId } : {}),
     ...(input.cancellation ? { cancellation: { turnStreamId: input.cancellation.turnStreamId } } : {}),
-    ...(input.workerExecution ? { workerExecution: true as const } : {}),
   }
 }
 

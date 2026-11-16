@@ -534,8 +534,7 @@ export class TurnStreamDO {
 
     const lock = createTurnLock(
       { workspaceId, threadId, scope, executionId, lockId, ...(turnId ? { turnId } : {}),
-        ...(cancellation ? { cancellation: { turnStreamId: cancellation } } : {}),
-        ...(body?.workerExecution === true ? { workerExecution: true } : {}) },
+        ...(cancellation ? { cancellation: { turnStreamId: cancellation } } : {}) },
       Date.now(),
       this.options.lockTtlMs ?? TURN_LOCK_TTL_MS,
     )
