@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.4
+
+- fix(chat): bound streamed tool previews and retain live disclosure state (#1544)
+
 ## 4.0.3
 
 - feat(operator): report refused tool calls on a turn; conformance fails on one (#1542)
