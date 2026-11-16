@@ -155,7 +155,7 @@ async function fixture() {
       await steps.do('product:answer-interaction', async () => {
         const row = await store.getMessage(id)
         expect(row).not.toBeNull()
-        await store.updateMessage(id, { parts: toChatMessageParts([...(row!.parts ?? []), { type: 'notice', id: 'settled', noticeKind: 'info', text: 'Stored interaction answer' }]) })
+        await store.updateMessage(id, { parts: [...(row!.parts ?? []), { type: 'notice', id: 'settled', noticeKind: 'warning', text: 'Stored interaction answer' }] })
         sqlite.prepare("INSERT INTO effects VALUES ('answered')").run()
       })
       if (failSettlement) throw new Error('settlement dependency unavailable')
