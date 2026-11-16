@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.15
+
+- fix(chat): allowlist failure fields and shrink classification (#1552)
+- fix(billing): spend-through recovery replays its exact create; only a confirmed child spends through (#1555)
+
 ## 4.0.14
 
 - fix(billing): children of a budgeted source spend through its cap (#1554)
