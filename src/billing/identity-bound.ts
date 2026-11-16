@@ -87,7 +87,11 @@ export interface DurableWorkspaceKeyProvisioner {
     budgetSpent?: number
     expiresAt?: string | null
   }>
-  revokeKey: KeyProvisioner['revokeKey']
+  /**
+   * Retire one child. `slot` is the row that minted it: its name, its own source and Platform user, so a child minted
+   * under an earlier source is retired through that source's slot. A typed refusal carries `refusal.status`.
+   */
+  revokeKey(id: string, slot?: Pick<DurableWorkspaceKeyRecord, 'name' | 'sourceKeyId' | 'platformUserId'>): Promise<unknown>
   /** Find remote keys for a specific persisted provisioning attempt. */
   findCreatedKeys(input: {
     name: string
@@ -304,13 +308,31 @@ function sameIdentity(row: DurableWorkspaceKeyRecord, identity: WorkspaceKeyIden
     && row.sourceKeyFingerprint === identity.sourceKeyFingerprint
 }
 
-function sameRowIdentity(a: DurableWorkspaceKeyRecord, b: DurableWorkspaceKeyRecord): boolean {
-  return a.workspaceId === b.workspaceId
-    && a.ownerUserId === b.ownerUserId
-    && a.product === b.product
-    && a.platformUserId === b.platformUserId
-    && a.sourceKeyId === b.sourceKeyId
-    && a.sourceKeyFingerprint === b.sourceKeyFingerprint
+/**
+ * Whether an ACTIVE child may be reused: it belongs to its workspace, owner, product and Platform user, not to the
+ * source credential that minted it. Every sign-in presents a new source credential (sourceKeyId, sourceKeyFingerprint),
+ * so matching on it made the same member's second sign-in revoke the child a running turn held. The payer cannot
+ * differ for one Platform user: delegation refuses a child not paid by that user (`platform/delegated-keys.ts`:
+ * non-user payer and payer id checks). A revoked source takes its children with it: their read-back is a definite
+ * gone verdict. Cleanup goes through the row's own slot (`slotOf`). Recovery of a half-provisioned row still needs the
+ * exact minting source (`sameIdentity`).
+ */
+function sameOwner(row: DurableWorkspaceKeyRecord, owner: Pick<DurableWorkspaceKeyRecord, 'workspaceId' | 'ownerUserId' | 'platformUserId'>,
+  product: string): boolean {
+  return row.workspaceId === owner.workspaceId
+    && row.ownerUserId === owner.ownerUserId
+    && row.product === product
+    && row.platformUserId === owner.platformUserId
+}
+
+/** The slot a child was minted in, for the provisioner's revoke. Never the secret. */
+function slotOf(row: DurableWorkspaceKeyRecord): Pick<DurableWorkspaceKeyRecord, 'name' | 'sourceKeyId' | 'platformUserId'> {
+  return { name: row.name, sourceKeyId: row.sourceKeyId, platformUserId: row.platformUserId }
+}
+
+/** A refused cleanup of a live child waits for the child's own expiry and blocks no issuance meanwhile. */
+function waitsForExpiry(row: DurableWorkspaceKeyRecord): boolean {
+  return row.nextRevocationAt !== null && row.nextRevocationAt.getTime() >= row.expiresAt.getTime()
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -376,12 +398,21 @@ function defaultRemoteMissing(error: unknown): boolean {
   return value?.status === 404 || value?.code === 'not_found'
 }
 
+/** `<status> <code>` for a typed refusal Platform decided (a 4xx other than 408 and 429): a retry gets the same answer. */
+function definiteRefusal(error: unknown): string | null {
+  const refusal = (error as { refusal?: { status?: unknown; code?: unknown; platformCode?: unknown } } | null)?.refusal
+  const status = refusal?.status
+  if (typeof status !== 'number' || status < 400 || status > 499 || status === 408 || status === 429) return null
+  return `${status} ${String(refusal?.platformCode ?? refusal?.code ?? 'refused')}`
+}
+
 /**
  * Create a product-neutral manager for child-key issuance and cleanup.
  *
  * The provisioner must already be authenticated for the current source
- * credential. The manager persists only the source id and its non-secret
- * fingerprint, then refuses to reuse a row from another identity.
+ * credential. The manager persists the source id and its non-secret
+ * fingerprint with each row, reuses an active row for the same workspace,
+ * owner, product and Platform user, and cleans each row through its own slot.
  */
 export function createIdentityBoundWorkspaceKeyManager(
   options: DurableWorkspaceKeyManagerOptions,
@@ -448,7 +479,7 @@ export function createIdentityBoundWorkspaceKeyManager(
     })
     if (rows.some((row) => row.product === product
       && row.workspaceId === identity.workspaceId
-      && row.ownerUserId === identity.ownerUserId)) {
+      && row.ownerUserId === identity.ownerUserId && !waitsForExpiry(row))) {
       throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
     }
   }
@@ -496,10 +527,10 @@ export function createIdentityBoundWorkspaceKeyManager(
   async function readActive(identity: WorkspaceKeyIdentity): Promise<{ row: DurableWorkspaceKeyRecord; usage: WorkspaceKeyUsage } | null> {
     const row = await options.store.getActive(scopeFor(identity, product))
     if (!row) return null
-    if (!sameIdentity(row, identity, product)) {
+    if (!sameOwner(row, identity, product)) {
       await options.store.markRevocationPending({
         id: row.id,
-        error: 'active child key identity does not match the authenticated owner and source',
+        error: 'active child key belongs to another workspace owner or Platform user',
         nextAttemptAt: now(),
         incrementAttempts: false,
       })
@@ -607,6 +638,31 @@ function createWorkspaceKeyRecovery(
     })
   }
 
+  /**
+   * A refusal to revoke never blocks the scope. Missing is gone. After a definite refusal the child's own verdict
+   * decides: past its expiry, or unable to authenticate or spend, it is gone; live or refused for now, it is retired
+   * at its expiry. Null keeps today's retry: a transient failure, or a verdict read that failed transiently.
+   */
+  async function settleFailedRevoke(row: DurableWorkspaceKeyRecord, keyId: string, error: unknown): Promise<'gone' | 'waits' | null> {
+    if (isRemoteMissing(error)) return 'gone'
+    const refused = definiteRefusal(error)
+    if (!refused) return null
+    if (now().getTime() >= row.expiresAt.getTime()) return 'gone'
+    try {
+      if (usageFromRemote(row, await recoveryProvisioner.getKey(keyId), now()).exhausted) return 'gone'
+    } catch (readError) {
+      if (isRemoteMissing(readError)) return 'gone'
+      if (!definiteRefusal(readError)) return null
+    }
+    await options.store.markRevocationPending({
+      id: row.id,
+      error: errorMessage(new Error(`cleanup refused (${refused}); the child is retired at its expiry`), 'cleanup refused'),
+      nextAttemptAt: row.expiresAt,
+      incrementAttempts: true,
+    })
+    return 'waits'
+  }
+
   async function revokePending(row: DurableWorkspaceKeyRecord, identity?: WorkspaceKeyIdentity): Promise<boolean> {
     if (!row.keyId || isProvisioningId(row.keyId)) return cleanupProvisioning(row, identity)
     const active = await options.store.getActive({
@@ -619,14 +675,13 @@ function createWorkspaceKeyRecovery(
       return true
     }
     try {
-      await recoveryProvisioner.revokeKey(row.keyId)
+      await recoveryProvisioner.revokeKey(row.keyId, slotOf(row))
       await options.store.markRevoked(row.id, now())
       return true
     } catch (error) {
-      if (isRemoteMissing(error)) {
-        await options.store.markRevoked(row.id, now())
-        return true
-      }
+      const settled = await settleFailedRevoke(row, row.keyId, error)
+      if (settled === 'gone') await options.store.markRevoked(row.id, now())
+      if (settled) return true
       await options.store.markRevocationPending({
         id: row.id,
         error: errorMessage(error, 'remote key revocation failed'),
@@ -706,7 +761,7 @@ function createWorkspaceKeyRecovery(
 
     const scope = { workspaceId: row.workspaceId, ownerUserId: row.ownerUserId, product: row.product }
     const active = await options.store.getActive(scope)
-    const activeMatches = active && (identity ? sameIdentity(active, identity, product) : sameRowIdentity(active, row))
+    const activeMatches = active && sameOwner(active, identity ?? row, product)
     const activeKeyId = activeMatches ? active.keyId : null
     const toRevoke = candidates
       .map((candidate) => candidate.id.trim())
@@ -714,9 +769,11 @@ function createWorkspaceKeyRecovery(
 
     for (const keyId of toRevoke) {
       try {
-        await recoveryProvisioner.revokeKey(keyId)
+        await recoveryProvisioner.revokeKey(keyId, slotOf(row))
       } catch (error) {
-        if (isRemoteMissing(error)) continue
+        const settled = await settleFailedRevoke(row, keyId, error)
+        if (settled === 'gone') continue
+        if (settled) return true
         await options.store.markRevocationPending({
           id: row.id,
           error: errorMessage(error, 'remote provisioning cleanup failed'),
