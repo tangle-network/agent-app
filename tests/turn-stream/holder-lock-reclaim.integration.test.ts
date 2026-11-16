@@ -2,18 +2,21 @@ import { createServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
+import { createChatTurnRoutes, type ChatTurnProduceArgs, type CreateChatTurnRoutesOptions } from '../../src/chat-routes/index'
 import { DEFAULT_STALE_TURN_LOCK_GRACE_MS as BOUND, DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS as GRACE } from '../../src/chat-routes/stale-turn-lock'
 import { readHolderBoxSessions } from '../../src/sandbox/holder-box'
 import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
-import { acquireDurableTurnLock, createDurableTurnLock, parkDurableTurnLock, type DurableTurnLock } from '../../src/turn-stream/index'
+import { acquireDurableTurnLock, createDurableTurnLock, parkDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock,
+  type DurableTurnLock, type TurnLockReleaseInput } from '../../src/turn-stream/index'
 import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '../../src/turn-stream/memory'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
 /**
  * The default reclaim for a turn lock whose turn died without releasing it. The authenticated TurnStreamDO core, a
- * migrated SQLite D1 turn store, the public Sandbox SDK over a loopback HTTP peer and the shipped lock adapter with no
- * product reconcile; no SDK method or store is replaced. Time moves through the policy's injected clock (`now`), which
- * the turn store shares; a lock's start is the DO's own wall clock. The one real wait is the 5 s box read cap.
+ * migrated SQLite D1 turn store, the public Sandbox SDK over a loopback HTTP peer, the shipped lock adapter with no
+ * product reconcile and the shipped chat route; no SDK method or store is replaced. Time moves through the policy's
+ * injected clock (`now`), which the turn store shares; a lock's start is the DO's own wall clock. The one real wait is
+ * the 5 s box read cap.
  */
 
 // Each box's sessions as the peer serves them. The sidecar's verdict (hasActiveExecution) decides: a finished session
@@ -61,10 +64,11 @@ const age = (held: DurableTurnLock, ageMs: number) => { skew = held.startedAt + 
 const turns = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL).d1, { now: clock })
 const durable = createMemoryTurnStreamHarness()
 const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
-const boxed = new Set(['busy', 'finished', 'older', 'down', 'slow'])
-const lock = createDurableTurnLock<Record<string, never>>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace',
-  turnStore: turns, now: clock,
-  readHolderBox: active => readHolderBoxSessions(async () => boxed.has(active.workspaceId) ? client.get(`${active.workspaceId}-box`) : null) })
+// The box each workspace's holder ran work on; a workspace without one ran none.
+const boxOf: Record<string, string> = { busy: 'busy', finished: 'finished', older: 'older', down: 'down', slow: 'slow', stopdown: 'down' }
+const lock = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns, now: clock,
+  readHolderBox: active => readHolderBoxSessions(async () => boxOf[active.workspaceId] ? client.get(`${boxOf[active.workspaceId]}-box`) : null) })
+const storeOnly = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns, now: clock })
 
 /** A holder that took the lock and died: nothing renews or releases it. `durableStop` records what `cancellationOf` does. */
 const hold = async (workspaceId: string, { durableStop = false } = {}) => {
@@ -82,6 +86,30 @@ const ask = async (workspaceId: string, via = lock) => {
   seen[workspaceId] = body.error.diagnostics ?? {}
   return `${result.response.status} ${body.error.code}`
 }
+const lockOf = async (workspaceId: string) => (await peekDurableTurnLock(durable.namespace, { workspaceId, scope: 'workspace' }, auth))!
+
+/** One turn through the shipped chat route on the default lock and the turn store above. `done` reads it to the end. */
+function chatTurn(workspaceId: string, hooks: Pick<CreateChatTurnRoutesOptions<undefined>, 'beforeTurn' | 'contextGate' | 'produce'>) {
+  const rows: Array<{ id: string; threadId: string; role: 'user' | 'assistant'; content: string }> = []
+  const routes = createChatTurnRoutes({
+    projectId: 'reclaim', turnStore: turns, turnLock: lock,
+    authorize: async () => ({ ok: true as const, tenantId: workspaceId, userId: 'member', context: undefined }),
+    store: {
+      listMessages: async threadId => rows.filter(row => row.threadId === threadId),
+      appendMessage: async ({ threadId, role, content }) => {
+        const row = { id: `m${rows.length + 1}`, threadId, role, content }
+        rows.push(row)
+        return row
+      },
+    },
+    ...hooks,
+  })
+  const pending: Promise<unknown>[] = []
+  const turn = routes.turn(new Request('http://app.test/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threadId: `${workspaceId}-thread`, content: 'run' }) }), { waitUntil: work => void pending.push(work) })
+  return { turn, done: async () => { await (await turn).text(); await Promise.all(pending) } }
+}
+const answer = (text: string) => ({ stream: (async function* () { yield { type: 'text' as const, text } })(), finalText: () => text })
 
 it('releases a holder with no running turn and no box work only past the 60 s grace, so a turn writes its row within it', async () => {
   const dead = await hold('dead')
@@ -96,6 +124,52 @@ it('releases a holder with no running turn and no box work only past the 60 s gr
   age(starting, GRACE + 1_000)
   expect(await ask('starting')).toBe('409 workspace_turn_in_flight')
   expect(seen.starting).toMatchObject({ runningTurns: 1 })
+})
+
+it('holds a route turn still in beforeTurn past the grace: its running row is written at acquire and settled on release', async () => {
+  skew = 0
+  let entered!: () => void
+  let proceed!: () => void
+  const inBeforeTurn = new Promise<void>(resolve => { entered = resolve })
+  const gate = new Promise<void>(resolve => { proceed = resolve })
+  const slow = chatTurn('slowturn', { beforeTurn: async () => { entered(); await gate }, produce: () => answer('done') })
+  await inBeforeTurn
+  age(await lockOf('slowturn'), GRACE + 1_000)
+  expect(await ask('slowturn')).toBe('409 workspace_turn_in_flight')
+  expect(seen.slowturn).toMatchObject({ runningTurns: 1 })
+  proceed()
+  await slow.done()
+  expect(await turns.listRunning('slowturn-thread')).toEqual([])
+  // A turn its gate refuses releases before any tap, and leaves no running row behind.
+  const gated = chatTurn('gatedturn', { contextGate: () => ({ proceed: false, response: new Response('not ready', { status: 409 }) }),
+    produce: () => answer('unused') })
+  expect((await gated.turn).status).toBe(409)
+  await gated.done()
+  expect(await turns.listRunning('gatedturn-thread')).toEqual([])
+})
+
+it('keeps a handed-off turn locked while its native run goes on, until the native owner releases it', async () => {
+  skew = 0
+  let handedOff!: (handle: TurnLockReleaseInput) => void
+  let finishNative!: () => void
+  const handle = new Promise<TurnLockReleaseInput>(resolve => { handedOff = resolve })
+  const native = new Promise<void>(resolve => { finishNative = resolve })
+  const turn = chatTurn('handoff', { produce: (args: ChatTurnProduceArgs<undefined>) => ({ stream: (async function* () {
+    yield { type: 'text' as const, text: 'started' }
+    await args.handoffCompletion!()
+    handedOff(args.lock!() as TurnLockReleaseInput)
+    await native
+  })(), finalText: () => '' }) })
+  const finished = turn.done()
+  const held = await handle
+  // Six minutes on, the detached tap's running row has expired and no box is read: only the parked release holds it.
+  age(await lockOf('handoff'), 6 * 60_000)
+  expect(await ask('handoff', storeOnly)).toBe('409 workspace_turn_in_flight')
+  expect(seen.handoff).toMatchObject({ releasePending: true })
+  expect(await releaseDurableTurnLock(durable.namespace, held, auth)).toMatchObject({ released: true })
+  expect(await ask('handoff', storeOnly)).toBe('acquired')
+  finishNative()
+  await finished
 })
 
 it('holds while box work runs, by the sidecar verdict or an older sidecar active id, and while a release is parked', async () => {
@@ -118,9 +192,10 @@ it('holds while box work runs, by the sidecar verdict or an older sidecar active
   expect(seen.parked).toMatchObject({ releasePending: true })
 })
 
-it('judges a durable-Stop holder by the owner rule on the same evidence: dead is released past the grace, live holds', async () => {
+it('judges a durable-Stop holder by the owner rule on the same evidence: dead is released, live and unknown hold', async () => {
   const dead = await hold('stopdead', { durableStop: true })
   const live = await hold('stoplive', { durableStop: true })
+  const down = await hold('stopdown', { durableStop: true })
   age(dead, GRACE - 1_000)
   expect(await ask('stopdead')).toBe('409 workspace_turn_in_flight')
   expect(seen.stopdead).toMatchObject({ ownerStatus: 'abandoned', releaseWithheld: 'LOCK_WITHIN_TERMINAL_GRACE_PERIOD' })
@@ -130,13 +205,21 @@ it('judges a durable-Stop holder by the owner rule on the same evidence: dead is
   await turns.setStatus('stoplive-turn', 'running', 'stoplive-earlier')
   expect(await ask('stoplive')).toBe('409 workspace_turn_in_flight')
   expect(seen.stoplive).toMatchObject({ ownerStatus: 'live', runningTurns: 1 })
+  // A box that fails its read leaves the owner unknown, which holds even past the native unreachable bound.
+  age(down, BOUND + 1_000)
+  expect(await ask('stopdown')).toBe('409 workspace_turn_in_flight')
+  expect(seen.stopdown).toMatchObject({ ownerStatus: 'unknown', probeError: 'box_unreachable' })
 })
 
-it('reclaims from the turn store alone when the product reads no box', async () => {
-  const storeOnly = createDurableTurnLock<Record<string, never>>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace',
-    turnStore: turns, now: clock })
+it('reclaims from the turn store alone, and holds while that store cannot answer, past the unreachable bound too', async () => {
   age(await hold('storedead'), GRACE + 1_000)
   expect(await ask('storedead', storeOnly)).toBe('acquired')
+  // A real D1 store over a database without the turn tables: every read fails.
+  const unreadable = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', now: clock,
+    turnStore: createD1TurnEventStore(sqliteD1().d1, { now: clock }) })
+  age(await hold('nostore'), BOUND + 1_000)
+  expect(await ask('nostore', unreadable)).toBe('409 workspace_turn_in_flight')
+  expect(seen.nostore).toMatchObject({ probeError: 'turn_store_unreadable', sessionTerminal: false })
 })
 
 it('sends a failed box read and a read past the 5 s cap to the unreachable bound, each by its own class', async () => {

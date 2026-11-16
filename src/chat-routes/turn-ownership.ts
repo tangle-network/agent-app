@@ -1,6 +1,6 @@
 import type { AssistantDraftWriter } from './draft-persistence'
 import type { NativeCompletionHandoffOptions, NativeTimingTransfer } from './native-turn-timing'
-import type { BufferedTurnTap } from '../stream/index'
+import type { BufferedTurnTap, TurnEventStore } from '../stream/index'
 import type { ChatTurnLock, ChatTurnRouteProducer } from './turn-route-contracts'
 
 interface OwnershipState {
@@ -19,7 +19,8 @@ interface OwnershipState {
 /** One transfer of terminal authority, retaining the route only as a live projector. */
 export function createChatTurnOwnership(state: OwnershipState,
   log: (message: string, meta?: Record<string, unknown>) => void, turnStreamId: string,
-  options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release' | 'park'> },
+  options: { turnLock?: Pick<ChatTurnLock<unknown>, 'release' | 'park'>; turnStore?: Pick<TurnEventStore, 'setStatus'> },
+  scopeId?: string,
 ) {
   // A cleanup step that fails is logged and never stops the steps after it.
   const attempt = async (step: string, run: () => unknown): Promise<void> => {
@@ -31,6 +32,9 @@ export function createChatTurnOwnership(state: OwnershipState,
         // Product registration already owns this turn. A callback failure must never
         // restore the route's terminal authority or permit a second settlement.
         state.completionHandoff = true
+        // The owner releases this exact lock when it settles, which also completes a parked release. Parked until then,
+        // the lock reads as held to a reclaim after the tap below stops renewing the turn's running row.
+        if (state.lockAcquired) await attempt('turnLock.park at handoff', () => options.turnLock?.park?.(state.lockHandle))
         let registrationFailed = false
         try {
           await state.nativeTiming?.register(handoff)
@@ -68,5 +72,16 @@ export function createChatTurnOwnership(state: OwnershipState,
     await attempt('turn cancellation close', () => state.closeCancellation?.())
     await attempt('turnLock.release', () => options.turnLock!.release(state.lockHandle))
   }
-  return { handoffCompletion, releaseLock }
+  // The running row a lock reclaim reads: written at acquire so a turn still in `contextGate` or `beforeTurn` holds its
+  // lock, renewed by the tap from the turn marker on, and settled by any release before the tap takes over.
+  let runningRow: Promise<void> | undefined
+  const markRunning = () => (runningRow = options.turnStore?.setStatus(turnStreamId, 'running', scopeId))
+  const releaseBeforeTap = async (): Promise<void> => {
+    if (state.lockAcquired && !state.completionHandoff && !state.tap) {
+      await runningRow?.catch(() => {}) // a late `running` write must not land over the settle
+      await attempt('running row settle', () => options.turnStore?.setStatus(turnStreamId, 'error', scopeId))
+    }
+    await releaseLock()
+  }
+  return { handoffCompletion, releaseLock, markRunning, releaseBeforeTap }
 }

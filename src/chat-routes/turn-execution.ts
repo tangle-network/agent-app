@@ -142,7 +142,7 @@ async function runAdmittedTurn<TContext, TResource>({
     ...(state.firstTextAtMs === undefined ? {} : { firstTextMs: state.firstTextAtMs - state.turnStartedAtMs }),
   }), error => log('[chat-routes] native timing persistence failed', { turnId: turnStreamId,
     error: error instanceof Error ? error.message : String(error) }))
-  const { handoffCompletion, releaseLock } = createChatTurnOwnership(state, log, turnStreamId, options)
+  const { handoffCompletion, releaseLock, markRunning, releaseBeforeTap } = createChatTurnOwnership(state, log, turnStreamId, options, payload.threadId)
 
   let produceArgs: ChatTurnProduceArgs<TContext, TResource> = {
     lock: () => state.lockHandle,
@@ -207,8 +207,9 @@ async function runAdmittedTurn<TContext, TResource>({
   const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
 
   try {
-    if (state.lockAcquired && JSON.stringify(await trace.measure('admission.history_recheck', 'admission', readHistory)) !== historyBeforeLock) {
-      await releaseLock()
+    const [history] = state.lockAcquired ? await Promise.all([trace.measure('admission.history_recheck', 'admission', readHistory), markRunning()]) : []
+    if (state.lockAcquired && JSON.stringify(history) !== historyBeforeLock) {
+      await releaseBeforeTap()
       return Response.json({
         code: 'chat_history_changed',
         error: 'The conversation changed while this turn was acquiring its lock. Refresh the conversation before starting new work.',
@@ -246,14 +247,14 @@ async function runAdmittedTurn<TContext, TResource>({
     if (contextGate) {
       const gate = await trace.measure('admission.gate', 'admission', () => contextGate(produceArgs))
       if (gate.proceed === 'handoff') {
-        await releaseLock()
+        await releaseBeforeTap()
         state.legacyHandoff = true
         endTrace(false, undefined)
         exportTraceInBackground()
         return gate.response
       }
       if (!gate.proceed) {
-        await releaseLock()
+        await releaseBeforeTap()
         if (state.completionHandoff) {
           endTrace(false, undefined)
           exportTraceInBackground()
@@ -376,7 +377,7 @@ async function runAdmittedTurn<TContext, TResource>({
     // span) — the drain never ran to do it. Then release the lock, propagate.
     if (!state.completionHandoff) {
       if (state.turnStarted) await fireTerminalLifecycle(true, err)
-      await releaseLock()
+      await releaseBeforeTap()
     }
     // A turn that failed before it started, or after a durable owner took it, still ends its trace here.
     endTrace(true, err)

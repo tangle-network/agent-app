@@ -392,7 +392,8 @@ export interface CreateDurableTurnLockOptions<TContext> {
   /** Read the box the holder's turn ran work on (`readHolderBoxSessions` from `/sandbox`). Omit when turns run no box
    *  work: the default reclaim then reads the turn store alone. */
   readHolderBox?(active: DurableTurnLock): Promise<HolderBoxReport>
-  /** The default reclaim's clock (the stale-lock policy's `now`). Default `Date.now`. */
+  /** The stale-lock policy's clock for the default reclaim, for tests and simulations; the lock's own start stays the
+   *  Durable Object's wall clock. Default `Date.now`. */
   now?(): number
   /** Override the execution id the lock records (e.g. a follow-up reclaiming
    *  the execution it already dispatched). Default: the turn's own. */

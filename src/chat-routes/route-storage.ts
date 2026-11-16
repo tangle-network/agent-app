@@ -11,9 +11,11 @@ export interface ChatTurnStoreBindings {
   lock: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth }
 }
 
-/** Keep the workspace-channel identity, authentication and region the same in both routes. */
-export function createDefaultTurnLock<TContext>(store: Pick<ChatTurnStoreBindings, 'lock' | 'region'>) {
-  return createDurableTurnLock<TContext>({ ...store.lock, locationHint: store.region, scopeOf: () => 'workspace' })
+/** Keep the workspace-channel identity, authentication and region the same in both routes. With `db`, the store the
+ *  routes renew running turns in, a refused acquire reclaims a dead holder (`reconcileTurnLockFromStoreAndBox`). */
+export function createDefaultTurnLock<TContext>(store: Pick<ChatTurnStoreBindings, 'lock' | 'region'> & { db?: D1LikeForTurns }) {
+  return createDurableTurnLock<TContext>({ ...store.lock, locationHint: store.region, scopeOf: () => 'workspace',
+    ...(store.db ? { turnStore: createD1TurnEventStore(store.db) } : {}) })
 }
 
 export type ResolvedChatTurnRoutesOptions<TContext, TResource = unknown> = Omit<CreateChatTurnRoutesOptions<TContext, TResource>, 'turnStore' | 'turnLock' | 'produce'> & {
@@ -37,9 +39,11 @@ export function resolveTurnStorage<TContext, TResource>(options: CreateChatTurnR
   const lockBindings = bindings ?? (namespace && env?.TURN_STREAM_AUTH_SECRET ? {
     region: env.D1_REGION, lock: { namespace, auth: { secret: env.TURN_STREAM_AUTH_SECRET } },
   } : undefined)
+  // The lock reads running turns from `db` only when the routes renew them there, never beside a product's own store.
+  const lockStore = lockBindings && 'append' in options.turnStore ? { ...lockBindings, db: undefined } : lockBindings
   return {
     turnStore: 'append' in options.turnStore ? options.turnStore : createD1TurnEventStore(options.turnStore.db),
-    turnLock: options.turnLock === false ? undefined : options.turnLock ?? (lockBindings ? createDefaultTurnLock<TContext>(lockBindings)
+    turnLock: options.turnLock === false ? undefined : options.turnLock ?? (lockStore ? createDefaultTurnLock<TContext>(lockStore)
       : env ? { acquire: () => ({ acquired: false as const, response: Response.json({ error: 'Durable turn locking is not configured', code: 'chat.lock_not_configured' }, { status: 503 }) }), release: () => {} } : undefined),
   }
 }
