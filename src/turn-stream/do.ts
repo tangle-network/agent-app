@@ -183,10 +183,10 @@ export class TurnStreamDO {
    */
   private async authorizeRequest(request: Request): Promise<Response | null> {
     // A per-turn object (`newUniqueId`) has no name; with `turnRoutes`, its capability names its id.
-    const name = this.state.id?.name || (this.options.turnRoutes && this.state.id ? turnHostChannelKey(String(this.state.id)) : null)
+    const name = this.state.id?.name || (this.options.turnRoutes ? turnHostChannelKey(String(this.state.id)) : null)
     if (typeof name !== 'string' || !name) {
       return Response.json(
-        { error: 'turn-stream DO has no channel name; bind with idFromName so capability tokens can be bound to it, or pass turnRoutes to run turns' },
+        { error: 'turn-stream DO has no channel name; bind with idFromName so capability tokens can be bound to it' },
         { status: 500 },
       )
     }
@@ -236,11 +236,10 @@ export class TurnStreamDO {
     if (unauthorized) return unauthorized
 
     // A per-turn object runs only the browser's turn request it was sent, without its capability, under its own waitUntil.
-    const turnRoutes = this.options.turnRoutes
-    if (turnRoutes && !this.state.id?.name) {
+    if (this.options.turnRoutes && !this.state.id?.name) {
       const headers = new Headers(request.headers)
       headers.delete(TURN_STREAM_TOKEN_HEADER)
-      return turnRoutes(this.env).turn(new Request(request, { headers }), { waitUntil: this.state.waitUntil?.bind(this.state), hosted: true })
+      return this.options.turnRoutes(this.env).turn(new Request(request, { headers }), { waitUntil: this.state.waitUntil?.bind(this.state), hosted: true })
     }
 
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {

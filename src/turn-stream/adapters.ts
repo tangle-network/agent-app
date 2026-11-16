@@ -670,6 +670,5 @@ export async function forwardTurnToHost(host: TurnHost, request: Request): Promi
   const id = host.namespace.newUniqueId()
   const headers = new Headers(request.headers)
   headers.set(TURN_STREAM_TOKEN_HEADER, await mintTurnStreamToken(turnHostChannelKey(String(id)), host.auth.secret))
-  const stub = host.namespace.get(id, { locationHint: host.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT })
-  return stub.fetch(new Request(request, { headers }))
+  return host.namespace.get(id, { locationHint: host.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT }).fetch(new Request(request, { headers }))
 }
