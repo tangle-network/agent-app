@@ -42,6 +42,7 @@ import type { ChatMessageValues } from '../chat-store/core'
 import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import type { ChatTurnUsage } from './turn-routes'
 import { measuredUsage } from './sandbox-turn-usage'
+import { transformVisibleTextParts } from './visible-text'
 
 /** Message row shape the writer reads back when re-entering a turn. */
 export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatTurnUsage> {
@@ -248,15 +249,7 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
     let parts: ChatMessagePart[] | undefined
     if (snapshot.parts) {
       const capped = snapshot.parts.map((part) => capDraftToolOutput(part, maxToolOutput))
-      const redacted = transform
-        ? await Promise.all(
-            capped.map(async (part) =>
-              String((part as { type?: unknown }).type ?? '') === 'text'
-                ? { ...part, text: await transform(String((part as { text?: unknown }).text ?? '')) }
-                : part,
-            ),
-          )
-        : capped
+      const redacted = transform ? await transformVisibleTextParts(capped, transform) : capped
       parts = toChatMessageParts(redacted)
     }
     const usage = snapshot.usage ?? {}

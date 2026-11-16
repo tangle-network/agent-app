@@ -31,7 +31,7 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
       const body = JSON.parse((request.headers['content-encoding'] === 'gzip' ? gunzipSync(bytes) : bytes).toString())
       calls++
       const delta = calls === 1
-        ? { content: 'Let me look at the brief.', tool_calls: [{ index: 0, id: 'brief-1', type: 'function',
+        ? { content: 'Let me look at the brief for case ACME-1234.', tool_calls: [{ index: 0, id: 'brief-1', type: 'function',
           function: { name: 'read_brief', arguments: '{}' } }] }
         : { content: mode === 'answered' ? 'Here are three taglines that fit the brief.' : '' }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -67,6 +67,8 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
   try {
     const routes = createChatTurnRoutes({ projectId: 'router-narration', store,
       turnStore: createMemoryTurnEventStore(), turnTrace: false,
+      // A product redactor applies to every stored part a reader sees as words, the narration too.
+      transformFinalText: text => text.replaceAll(/ACME-\d+/g, '[REDACTED]'),
       authorize: async () => ({ ok: true as const, tenantId: 'workspace', userId: 'member', context: {} }),
       produce: { router: args => createRouterTurnProducer({ ...options, admitted: args.admitted }) },
     })
@@ -84,15 +86,15 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
     if (mode === 'answered') {
       expect(assistant!.content).toBe('Here are three taglines that fit the brief.')
       expect(parts).toEqual([
-        { type: 'reasoning', text: 'Let me look at the brief.' },
+        { type: 'reasoning', text: 'Let me look at the brief for case [REDACTED].' },
         { type: 'tool', status: 'completed' },
         { type: 'text', text: 'Here are three taglines that fit the brief.' },
       ])
     } else {
       // Nothing followed the failed tool, so the narration is the only text and stays the answer.
-      expect(assistant!.content).toBe('Let me look at the brief.')
+      expect(assistant!.content).toBe('Let me look at the brief for case [REDACTED].')
       expect(parts).toEqual([
-        { type: 'text', text: 'Let me look at the brief.' },
+        { type: 'text', text: 'Let me look at the brief for case [REDACTED].' },
         { type: 'tool', status: 'error' },
       ])
     }
