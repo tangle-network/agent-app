@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-36 exports.
+37 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -36,6 +36,14 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS`
+
+`const` — Default reuse floor: a 15 min turn plus a 5 min margin; this package sets no turn limit, so longer turns pass their own.
+
+```ts
+number
 ```
 
 ### `DurableWorkspaceKeyConditionalWrites`

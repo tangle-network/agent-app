@@ -1,4 +1,4 @@
-# aa — full API surface
+# agent-app — full API surface
 
 > Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.
 
@@ -2303,6 +2303,14 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS`
+
+`const` — Default reuse floor: a 15 min turn plus a 5 min margin; this package sets no turn limit, so longer turns pass their own.
+
+```ts
+number
 ```
 
 ### `DurableWorkspaceKeyConditionalWrites`
