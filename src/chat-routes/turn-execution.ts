@@ -42,6 +42,7 @@ import { addressAgents, composeAgentProducers } from './agent-producers'
 import { measuredUsage } from './sandbox-turn-usage'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 import type { AfterAuthorizeWork } from './early-turn-work'
+import { transformVisibleTextParts } from './visible-text'
 
 /** The thread's messages as the turn-identity resolver reads them. */
 async function readTurnHistory(store: CreateChatTurnRoutesOptions<unknown>['store'], threadId: string): Promise<PersistedChatMessageForTurn[]> {
@@ -808,13 +809,7 @@ function createTurnEngine<TContext, TResource>(
         const rawParts = state.producer?.assistantParts ? state.producer.assistantParts() : undefined
         const projected =
           rawParts && options.transformFinalText
-            ? await Promise.all(
-              rawParts.map(async (part) =>
-                String((part as { type?: unknown }).type ?? '') === 'text'
-                  ? { ...part, text: await options.transformFinalText!(String((part as { text?: unknown }).text ?? '')) }
-                  : part,
-              ),
-            )
+            ? await transformVisibleTextParts(rawParts, options.transformFinalText)
             : rawParts
         const parts = projected ? toChatMessageParts(projected) : undefined
         if (!finalText.trim() && (!parts || parts.length === 0)) {

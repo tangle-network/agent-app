@@ -114,8 +114,6 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
       const channelWriter = writer = channel.writable.getWriter()
       reader = channel.readable.getReader()
       const emit = (event: unknown) => channelWriter.write(event)
-      // Each model call's text, by segment. The answer is the last segment the model wrote.
-      const segments: string[] = []
       // The agent-interface root initializes every schema; only a protected turn needs it, so it loads here.
       const { profileMaterializationAxes } = await import('@tangle-network/agent-interface')
       execution = runProtectedRouterTurn({
@@ -128,7 +126,8 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         stream: false,
         maxToolCalls: options.maxToolCalls,
         maxToolTurns: options.grant.reserve.limits.maxModelCalls,
-        tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
+        // A tool definition here cannot declare an effect, so every tool is a lookup: the lane keeps main's rule.
+        tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, effect: 'lookup' as const,
           run: (args: Record<string, unknown>) => {
             const work = (async () => {
               signal.throwIfAborted()
@@ -152,9 +151,6 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
           } })),
         toolError: error => ({ code: 'tool_failed', message: error instanceof Error ? error.message : 'Tool failed' }),
         renderToolResult: (_toolName, outcome) => outcome.ok ? JSON.stringify(outcome.result) ?? 'null' : `error: ${outcome.message}`,
-        onEvent: event => {
-          if (event.type === 'text') segments[event.segment - 1] = (segments[event.segment - 1] ?? '') + event.delta
-        },
       }).then(async outcome => {
         if (outcome.settlement) {
           usage = { ...outcome.settlement.usage }
@@ -167,7 +163,8 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         }
         // A settlement check fails after the turn answered; the answer stands beside the failure.
         if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
-          const finalText = segments.filter(Boolean).at(-1) ?? ''
+          // The Router turn's own answer rule, so this lane and the Router lane store the same final text.
+          const finalText = outcome.answer
           if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
           await emit({ type: 'result', data: { finalText } })
         }

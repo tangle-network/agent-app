@@ -189,6 +189,18 @@ describe('createPlatformDelegatedKeyClient.verify, revoke and listChildren', () 
     await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ succeeded: false })
   })
 
+  it('falls through a refused 401 DELETE to revoke-slot, and reads a revoke-slot that revoked nothing as a refusal', async () => {
+    const { client, calls } = platform(
+      () => ({ status: 401, body: { success: false, error: { code: 'UNAUTHORIZED' } } }),
+      () => ({ status: 200, body: { success: true, data: { revoked: 0 } } }),
+    )
+    const slot = { userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router', sourceKeyId: 'key_source' }
+    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9', slot })).resolves.toEqual({ succeeded: false,
+      error: { status: 409, code: 'delegated_key.slot_not_revoked', message: 'Platform revoked nothing in this slot.' } })
+    expect(calls.map(call => `${call.method} ${new URL(call.url).pathname}`))
+      .toEqual(['DELETE /v1/keys/key_9', 'POST /v1/keys/auto-provisioned/revoke-slot'])
+  })
+
   it('lists live children in one canonical slot', async () => {
     const { client } = platform(() => ({ status: 200, body: { success: true, data: [
       { id: 'key_1', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router' },
@@ -230,6 +242,30 @@ describe('createDelegatedKeyProvisioner (for createIdentityBoundWorkspaceKeyMana
     const lapse = await keys.getKey('key_1').catch((e: unknown) => e)
     expect(lapse).toBeInstanceOf(DelegatedKeyRefusalError)
     expect(lapse).not.toBeInstanceOf(DelegatedKeyMissingError)
+  })
+
+  // Gone: a fact about this key id that nothing restores. A lapse: the same key works again once it is repaired.
+  it.each([
+    ...['key_hierarchy_too_deep', 'team_member_unrecorded', 'attribution_unresolved', 'billing_account_missing', 'account_not_found',
+      'product_mismatch', 'key_attribution_missing', 'key_provisioner_unknown', 'key_name_not_product_specific']
+      .map((reason): [string, string] => [reason, 'gone']),
+    ...['team_membership_missing', 'email_verification_required', 'paid_access_required', 'verify_product_not_permitted']
+      .map((reason): [string, string] => [reason, 'a lapse']),
+  ])('reads invalidReason %s as %s', async (reason, verdict) => {
+    const { client } = platform(() => ({ status: 200, body: { valid: false, invalidReason: reason, keyId: 'key_1' } }))
+    const error = await provisioner(client).getKey('key_1').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(verdict === 'gone' ? DelegatedKeyMissingError : DelegatedKeyRefusalError)
+  })
+
+  it("retires a child through its own row's slot, never the current source", async () => {
+    const { client, calls } = platform(
+      () => ({ status: 403, body: { success: false, error: { code: 'FORBIDDEN' } } }),
+      () => ({ status: 200, body: { success: true, data: { revoked: 1 } } }),
+    )
+    const keys = createDelegatedKeyProvisioner({ client, sourceKey: SOURCE, product: 'router', payerId: 'usr_payer', expect: { sourceKeyId: 'key_source_now' } })
+    await expect(keys.revokeKey('key_7', { name: 'ws-1:op-1', sourceKeyId: 'key_source_then', platformUserId: 'usr_payer' })).resolves.toBeNull()
+    expect(calls[1]!.body).toEqual({ userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router',
+      childKeyId: 'key_7', sourceKeyId: 'key_source_then' })
   })
 
   it('retires a key through revoke-slot when the SSO source may not DELETE it, even after a restart', async () => {

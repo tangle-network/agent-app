@@ -76,6 +76,8 @@ export {
   runNativeCompletionWorkflow,
   type NativeCompletionWorkflowOptions,
   type NativeCompletionWorkflowPayload,
+  type NativeCompletionWorkflowResult,
+  type NativeCompletionTranscriptReference,
 } from './native-completion-workflow'
 
 export * from './native-completion-store'

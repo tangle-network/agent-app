@@ -1,6 +1,6 @@
 {
   "generator": "agent-docs",
-  "title": "aa",
+  "title": "aa-docs",
   "source": "tsup.config `entry`",
   "slug": null,
   "entries": [
@@ -148,6 +148,7 @@
       "id": "./agent-profiles",
       "source": "src/agent-profiles/index.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -389,7 +390,7 @@
         {
           "name": "profileTools",
           "kind": "function",
-          "signature": "<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]",
+          "signature": "<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => (McpToolDefinition<Record<string, never>> & Pick…",
           "doc": "Shared self-edit tools; only the authenticated active turn can name the profile."
         },
         {
@@ -482,6 +483,7 @@
       "id": "./agent-profiles/d1",
       "source": "src/agent-profiles/d1.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -540,6 +542,7 @@
       "id": "./agent-profiles/drizzle",
       "source": "src/agent-profiles/drizzle.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -556,6 +559,7 @@
       "id": "./agent-profiles/switch",
       "source": "src/agent-profiles/switch.ts",
       "dependsOn": [
+        "runtime",
         "tools"
       ],
       "error": null,
@@ -2838,7 +2842,7 @@
           "name": "boundNativeCompletionReceipt",
           "kind": "function",
           "signature": "(receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt",
-          "doc": "Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}."
+          "doc": "Assert the aggregate serialized UTF-8 bound without changing native facts."
         },
         {
           "name": "buildDispatchParts",
@@ -3756,7 +3760,7 @@
           "name": "NATIVE_COMPLETION_RECEIPT_MAX_BYTES",
           "kind": "const",
           "signature": "number",
-          "doc": "Serialized UTF-8 budget for one terminal receipt."
+          "doc": "Serialized UTF-8 budget for inline native completion checkpoints and final Workflow output."
         },
         {
           "name": "NativeCompletionAdmission",
@@ -15102,6 +15106,12 @@
           "doc": null
         },
         {
+          "name": "NativeCompletionTranscriptReference",
+          "kind": "interface",
+          "signature": "interface NativeCompletionTranscriptReference",
+          "doc": "Large final output points at the transcript the product already persisted."
+        },
+        {
           "name": "nativeCompletionWorkflowId",
           "kind": "function",
           "signature": "(executionId: string, prefix: string) => Promise<string>",
@@ -15118,6 +15128,12 @@
           "kind": "interface",
           "signature": "interface NativeCompletionWorkflowPayload",
           "doc": "Stable identity required to resume a registered native completion."
+        },
+        {
+          "name": "NativeCompletionWorkflowResult",
+          "kind": "type",
+          "signature": "type NativeCompletionWorkflowResult",
+          "doc": null
         },
         {
           "name": "PRESET_MIGRATION_SQL",
@@ -16114,6 +16130,7 @@
       "source": "src/public-consultation/index.ts",
       "dependsOn": [
         "chat-routes",
+        "runtime",
         "stream",
         "tools"
       ],
@@ -17061,6 +17078,12 @@
           "doc": "Define a catalog containing models with a default ID and fetch timestamp"
         },
         {
+          "name": "narratesBefore",
+          "kind": "function",
+          "signature": "(tool: Pick<RouterTurnTool, \"effect\"> | undefined) => boolean",
+          "doc": "Whether text a round writes before calling `tool` narrates the work instead of answering."
+        },
+        {
           "name": "normalizeModelId",
           "kind": "function",
           "signature": "(id: string) => string",
@@ -17550,6 +17573,12 @@
           "kind": "const",
           "signature": "number",
           "doc": "Wall time a durable hop may plan for: a Durable Object alarm or Queue consumer gets 15 minutes."
+        },
+        {
+          "name": "narratesBefore",
+          "kind": "function",
+          "signature": "(tool: Pick<RouterTurnTool, \"effect\"> | undefined) => boolean",
+          "doc": "Whether text a round writes before calling `tool` narrates the work instead of answering."
         },
         {
           "name": "perTurnPrefixBytes",
@@ -18248,12 +18277,6 @@
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
-          "name": "HOLDER_BOX_READ_TIMEOUT_MS",
-          "kind": "const",
-          "signature": "5000",
-          "doc": "The cap on reading a held lock's box: the read runs inside a member's request."
-        },
-        {
           "name": "InspectablePrewarmClaimStore",
           "kind": "interface",
           "signature": "interface InspectablePrewarmClaimStore",
@@ -18540,12 +18563,6 @@
           "kind": "function",
           "signature": "<T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>",
           "doc": "Wait only for the platform typed planned-restart signal, within the caller budget."
-        },
-        {
-          "name": "readHolderBoxSessions",
-          "kind": "function",
-          "signature": "(find: () => Promise<Pick<SandboxInstance, \"status\" | \"sessions\"> | null | undefined>) => Promise<HolderBoxReport>",
-          "doc": "Read the box a held lock's turn ran work on, for `reconcileTurnLockFromStoreAndBox`."
         },
         {
           "name": "readSandboxBinaryBytes",
@@ -23315,13 +23332,13 @@
         {
           "name": "createD1TurnEventStore",
           "kind": "function",
-          "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => ListingTurnEventStore",
+          "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore",
           "doc": null
         },
         {
           "name": "createMemoryTurnEventStore",
           "kind": "function",
-          "signature": "(options?: TurnEventStoreOptions) => ListingTurnEventStore",
+          "signature": "(options?: TurnEventStoreOptions) => TurnEventStore",
           "doc": "In-memory store for tests and keyless local dev."
         },
         {
@@ -23395,12 +23412,6 @@
           "kind": "type",
           "signature": "type JsonRecord",
           "doc": "Represent a JSON-compatible object with string keys and values of any type"
-        },
-        {
-          "name": "ListingTurnEventStore",
-          "kind": "type",
-          "signature": "type ListingTurnEventStore",
-          "doc": "A store that lists running turns by scope, as the turn lock's default reclaim needs."
         },
         {
           "name": "mergePersistedPart",
@@ -26289,12 +26300,6 @@
           "doc": "The stored single-flight lock."
         },
         {
-          "name": "HolderBoxReport",
-          "kind": "type",
-          "signature": "type HolderBoxReport",
-          "doc": "What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer."
-        },
-        {
           "name": "interruptedReleaseApplies",
           "kind": "function",
           "signature": "(active: DurableTurnLock, input: { threadId: string; interruptedAt: number; turnId?: string | undefined; }) => boolean",
@@ -26365,12 +26370,6 @@
           "kind": "interface",
           "signature": "interface ReconcileStaleDurableTurnLockOptions",
           "doc": "Define options to reconcile stale durable turn locks with context, namespace, workspace, and active lock details"
-        },
-        {
-          "name": "reconcileTurnLockFromStoreAndBox",
-          "kind": "function",
-          "signature": "(input: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth; turnStore: Required<Pick<TurnEventStore, \"listRunni…",
-          "doc": "The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing, so without it the lock refuses every turn in its scope until its TTL."
         },
         {
           "name": "releaseDurableTurnLock",

@@ -57,6 +57,7 @@ export type DelegatedKeyCode =
   | 'delegated_key.failed'
   | 'delegated_key.response_invalid'
   | 'delegated_key.invalid_request'
+  | 'delegated_key.slot_not_revoked'
 
 export interface DelegatedKeyRefusal {
   status: number
@@ -159,8 +160,9 @@ export interface PlatformDelegatedKeyClient {
   verify(input: { keyId: string; product: string }): Promise<DelegatedKeyOutcome<DelegatedKeyVerdict>>
   /**
    * `DELETE /v1/keys/:id` with the source key; a key already gone counts as revoked. Platform refuses key
-   * mutations from a service-provisioned source (an app's SSO key) with 403; given `slot`, the client then
-   * retires the slot through `revoke-slot` with the service token.
+   * mutations from a service-provisioned source (an app's SSO key) or a sibling source with 403, and a source it no
+   * longer accepts with 401; given `slot`, the client then retires the slot through `revoke-slot` with the service
+   * token. A `revoke-slot` that revokes nothing is a 409 `delegated_key.slot_not_revoked` refusal.
    */
   revoke(input: { sourceKey: string; keyId: string; slot?: DelegatedKeySlotRef }): Promise<DelegatedKeyOutcome<null>>
   /** Children of the source key in one slot, from `GET /v1/keys` with the source key. */
@@ -387,7 +389,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       if (result.status === 404 || (result.status >= 200 && result.status < 300 && result.body?.success === true)) {
         return { succeeded: true, value: null }
       }
-      if (result.status === 403 && slot) {
+      if ((result.status === 403 || result.status === 401) && slot) {
         let { name, product, sourceKeyId } = slot
         if (!name || !product || !sourceKeyId) {
           const row = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'GET', bearer: sourceKey, service: false })
@@ -401,14 +403,20 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
           sourceKeyId ||= text(data?.parentKeyId)
           if (!name || !product) return { succeeded: false, error: refusal(row?.status ?? 503, null) }
         }
+        // Platform checks the `auto:` prefix before it canonicalizes, so a logical slot name is sent canonical.
         const retired = await call('/v1/keys/auto-provisioned/revoke-slot', {
           method: 'POST', bearer: serviceToken(), service: true, body: {
-            userId: slot.userId, name, product, childKeyId: keyId,
+            userId: slot.userId, name: canonicalDelegatedKeyName({ serviceName: options.serviceName, product, name }), product, childKeyId: keyId,
             ...(sourceKeyId ? { sourceKeyId } : {}),
           },
         })
         if (!retired) return { succeeded: false, error: refusal(503, null) }
-        if (retired.status >= 200 && retired.status < 300 && retired.body?.success === true) return { succeeded: true, value: null }
+        const ok = retired.status >= 200 && retired.status < 300 && retired.body?.success === true
+        // Nothing revoked: the slot named another source, or no live child matched. Never assumed done.
+        if (ok && record(retired.body?.data)?.revoked === 0) {
+          return failure<null>(409, 'delegated_key.slot_not_revoked', 'Platform revoked nothing in this slot.')
+        }
+        if (ok) return { succeeded: true, value: null }
         return { succeeded: false, error: refusal(retired.status, record(retired.body?.error)?.code) }
       }
       return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
@@ -438,7 +446,7 @@ export interface DelegatedKeyProvisioner {
     id: string; key: string; budgetUsd?: number | null; expiresAt?: string | null
   }>
   getKey(id: string): Promise<{ budgetUsd?: number | null; expiresAt?: string | null }>
-  revokeKey(id: string): Promise<unknown>
+  revokeKey(id: string, slot?: { name: string | null; sourceKeyId: string | null; platformUserId: string }): Promise<unknown>
   findCreatedKeys(input: { name: string; product: string; sourceKeyId?: string | null }): Promise<Array<{ id: string }>>
 }
 
@@ -460,11 +468,16 @@ export class DelegatedKeyRefusalError extends Error {
   }
 }
 
-/** Platform reasons that mean the key will never work again: the manager revokes the row and mints a fresh key. */
+/**
+ * Platform reasons that mean the key will never work again: the manager revokes the row and mints a fresh key.
+ * The rest are lapses the same key can recover from (funding, email, team seat, caller permission).
+ */
 const GONE_REASONS = new Set([
   'key_not_found', 'key_revoked', 'key_expired', 'key_lineage_revoked',
   'parent_key_not_found', 'parent_key_revoked', 'parent_key_expired', 'parent_key_lineage_revoked',
   'ancestor_key_not_found', 'ancestor_key_revoked', 'ancestor_key_expired', 'ancestor_key_lineage_revoked',
+  'key_hierarchy_too_deep', 'team_member_unrecorded', 'attribution_unresolved', 'billing_account_missing', 'account_not_found',
+  'product_mismatch', 'key_attribution_missing', 'key_provisioner_unknown', 'key_name_not_product_specific',
 ])
 const SPENT_REASONS = new Set(['budget_exhausted', 'monthly_budget_exhausted'])
 
@@ -488,7 +501,7 @@ export function createDelegatedKeyProvisioner(input: {
   monthlyBudgetUsd?: number
   rpmLimit?: number
   expect?: { payerId?: string; sourceKeyId?: string; originAppId?: string | null }
-  /** Enables the `revoke-slot` fallback when the source is an app's SSO key (Platform refuses its key mutations). */
+  /** The `revoke-slot` payer for a `revokeKey` call that carries no slot (Platform refuses an SSO key's key mutations). */
   payerId?: string
 }): DelegatedKeyProvisioner {
   const product = input.product
@@ -529,8 +542,12 @@ export function createDelegatedKeyProvisioner(input: {
       throw new DelegatedKeyRefusalError({ status: 403, code: 'delegated_key.refused',
         message: `Platform refused the key for now (${v.invalidReason ?? 'no reason'}).` })
     },
-    async revokeKey(id) {
-      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id, ...(slotOwner ? { slot: slotOwner } : {}) })
+    async revokeKey(id, slot) {
+      // A child is retired through its own slot: the source that minted it, never the current one (a sibling may not touch it).
+      const owner: DelegatedKeySlotRef | undefined = slot
+        ? { userId: slot.platformUserId, product, ...(slot.name ? { name: slot.name } : {}), ...(slot.sourceKeyId ? { sourceKeyId: slot.sourceKeyId } : {}) }
+        : slotOwner
+      const revoked = await input.client.revoke({ sourceKey: input.sourceKey, keyId: id, ...(owner ? { slot: owner } : {}) })
       if (!revoked.succeeded) throw new DelegatedKeyRefusalError(revoked.error)
       return null
     },

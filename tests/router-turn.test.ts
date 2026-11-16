@@ -80,7 +80,7 @@ describe('runRouterTurn', () => {
 
     const recovers = router(down, sse([text('Hello.')]))
     await expect(runRouterTurn({ apiKey: 'k', model: 'm', fetchImpl: recovers.fetchImpl, systemPrompt: 's', userMessage: 'u' }))
-      .resolves.toEqual({ text: 'Hello.', servedModel: 'served/model', toolCalls: [],
+      .resolves.toEqual({ text: 'Hello.', answer: 'Hello.', servedModel: 'served/model', toolCalls: [],
         usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, reasoning: { deltas: 0, chars: 0 }, toolEvents: [] })
   })
 

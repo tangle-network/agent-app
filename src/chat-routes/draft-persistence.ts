@@ -42,6 +42,7 @@ import type { ChatMessageValues } from '../chat-store/core'
 import { toChatMessageParts, type ChatMessagePart } from '../chat-store/parts'
 import type { ChatTurnUsage } from './turn-routes'
 import { measuredUsage } from './sandbox-turn-usage'
+import { transformVisibleTextParts } from './visible-text'
 
 /** Message row shape the writer reads back when re-entering a turn. */
 export interface DraftStoredMessage extends Pick<AssistantRowValues, keyof ChatTurnUsage> {
@@ -105,10 +106,13 @@ export interface DraftPersistenceTuning {
    *  interval. Default 262144 (256 KiB) -> interval x 2.5; ten times that ->
    *  interval x 5. The final write is never throttled. */
   backoffBytes?: number
-  /** Per-tool-part output cap applied to DRAFTS ONLY (bytes). A tool returning
-   *  a large blob would otherwise be rewritten in full on every draft. The
-   *  final write always carries the untruncated value. Default 32768 (32 KiB);
-   *  0 disables truncation. */
+  /** Per-tool-part output cap applied to DRAFTS ONLY, in serialized UTF-8
+   *  bytes (including JSON escaping and the preview marker). A tool returning
+   *  a large blob would otherwise be rewritten in full on every draft.
+   *  `draftTruncated` marks a clipped preview even if the cap cannot fit its
+   *  text marker; below 2 bytes the draft omits the output value. The final
+   *  write always carries the untruncated value. Default 32768 (32 KiB);
+   *  0 disables truncation. This is not a bound on the whole parts array. */
   maxDraftToolOutputBytes?: number
 }
 
@@ -181,15 +185,16 @@ const CONTENT_EVENT_TYPES: ReadonlySet<string> = new Set([
 const DEFAULT_INTERVAL_MS = 2000
 const DEFAULT_BACKOFF_BYTES = 262144
 const DEFAULT_MAX_DRAFT_TOOL_OUTPUT_BYTES = 32768
+const encoder = new TextEncoder()
 
 /** True when this event should arm a draft write. */
 export function isDraftContentEvent(event: { type?: unknown }): boolean {
   return typeof event?.type === 'string' && CONTENT_EVENT_TYPES.has(event.type)
 }
 
-/** Caps one tool part's `output` for a DRAFT write. The value is replaced by a
- *  truncated string plus a marker, so a reader can tell a clipped draft from a
- *  real short output; the final write restores the untruncated value. */
+/** Caps one tool part's `output` for a DRAFT write. Metadata marks every
+ *  clipped preview, with a text marker when it fits. Finalization restores the
+ *  untruncated value. */
 function capDraftToolOutput(part: Record<string, unknown>, maxBytes: number): Record<string, unknown> {
   if (maxBytes <= 0) return part
   if (String(part.type ?? '') !== 'tool') return part
@@ -197,18 +202,46 @@ function capDraftToolOutput(part: Record<string, unknown>, maxBytes: number): Re
   if (!state || typeof state !== 'object') return part
   const record = state as Record<string, unknown>
   const output = record.output
-  if (output === undefined || output === null) return part
-  const serialized = typeof output === 'string' ? output : safeStringify(output)
-  if (serialized.length <= maxBytes) return part
+  if (output === undefined) return part
+  const text = typeof output === 'string' ? output : safeStringify(output)
+  // A longer string cannot fit even before escaping. Avoid serializing and
+  // encoding the entire large tool body just to establish that lower bound.
+  const serialized = typeof output === 'string' && text.length <= maxBytes ? safeStringify(text) : text
+  if (serialized.length <= maxBytes && encoder.encode(serialized).byteLength <= maxBytes) return part
   const metadata = (record.metadata && typeof record.metadata === 'object' ? record.metadata : {}) as Record<string, unknown>
   return {
     ...part,
     state: {
       ...record,
-      output: `${serialized.slice(0, maxBytes)}…[draft-truncated ${serialized.length - maxBytes} chars]`,
+      output: draftOutputPreview(text, maxBytes),
       metadata: { ...metadata, draftTruncated: true },
     },
   }
+}
+
+/** A preview is a string even when the retained output is structured. Bound
+ *  that stored string, whose JSON escaping may expand the source a second
+ *  time. Never cut a valid surrogate pair while finding the fitting prefix. */
+function draftOutputPreview(text: string, maxBytes: number): string | undefined {
+  if (maxBytes < 2) return undefined
+  const marker = '…[draft-truncated]'
+  const suffix = serializedBytes(marker) <= maxBytes ? marker : ''
+  const prefix = (end: number): string => {
+    if (end > 0 && (text.codePointAt(end - 1) ?? 0) > 0xffff) end -= 1
+    return text.slice(0, end)
+  }
+  let low = 0
+  let high = Math.min(text.length, Math.floor(maxBytes))
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2)
+    if (serializedBytes(prefix(middle) + suffix) <= maxBytes) low = middle
+    else high = middle - 1
+  }
+  return prefix(low) + suffix
+}
+
+function serializedBytes(value: unknown): number {
+  return encoder.encode(safeStringify(value)).byteLength
 }
 
 function safeStringify(value: unknown): string {
@@ -248,15 +281,7 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
     let parts: ChatMessagePart[] | undefined
     if (snapshot.parts) {
       const capped = snapshot.parts.map((part) => capDraftToolOutput(part, maxToolOutput))
-      const redacted = transform
-        ? await Promise.all(
-            capped.map(async (part) =>
-              String((part as { type?: unknown }).type ?? '') === 'text'
-                ? { ...part, text: await transform(String((part as { text?: unknown }).text ?? '')) }
-                : part,
-            ),
-          )
-        : capped
+      const redacted = transform ? await transformVisibleTextParts(capped, transform) : capped
       parts = toChatMessageParts(redacted)
     }
     const usage = snapshot.usage ?? {}
@@ -324,7 +349,7 @@ export function createAssistantDraftWriter(options: AssistantDraftWriterOptions)
     inFlight = (async () => {
       try {
         const values = await projectValues(snapshot)
-        lastBlobBytes = values.parts ? safeStringify(values.parts).length : 0
+        lastBlobBytes = values.parts ? serializedBytes(values.parts) : 0
         await writeOnce(values)
       } catch (err) {
         // Best-effort by contract: a store outage degrades freshness for late

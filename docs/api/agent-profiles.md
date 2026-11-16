@@ -323,7 +323,7 @@ interface ProfileToolContext
 `function` — Shared self-edit tools; only the authenticated active turn can name the profile.
 
 ```ts
-<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]
+<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => (McpToolDefinition<Record<string, never>> & Pick…
 ```
 
 ### `ProfileToolTurn`

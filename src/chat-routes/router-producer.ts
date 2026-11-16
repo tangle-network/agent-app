@@ -8,7 +8,7 @@
  * `stream` generator drains in order, so a slow consumer never drops a frame
  * and the engine never waits on the consumer.
  */
-import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
+import { composeRouterTurnPromptSections, narratesBefore, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import { redactErrorMessage } from '../redact/index'
 import { noticePart } from '../interactions/contract'
@@ -64,6 +64,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
   const parts: Array<Record<string, unknown>> = []
   const toolParts = new Map<string, Record<string, unknown>>()
   let textPart: { type: 'text'; text: string } | null = null
+  // Text parts a lookup tool call followed: the round's narration of its work, not the answer.
+  const narration = new Set<Record<string, unknown>>()
   let textSegment = 0
   let reasoningPart: { type: 'reasoning'; text: string } | null = null
   // Each reasoning part's start and end, the same timing the sandbox producer persists.
@@ -111,6 +113,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
           // The model stopped reasoning when it called the tool.
           reasoningClock.settle(event.startedAt)
           if (event.status === 'running') {
+            if (textPart && narratesBefore(options.tools?.find(tool => tool.name === event.toolName))) narration.add(textPart)
+            textPart = null
             const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
               state: { status: 'running', input: event.input, time: { start: event.startedAt } } }
             toolParts.set(event.callId, part)
@@ -154,9 +158,15 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
       result.failure = { code: 'turn_deadline', message: 'The reply was stopped before it finished.' }
     }
     outcome = result
+    // Narration becomes a reasoning part only when the model answered after its last tool call;
+    // a turn whose only text narrated a failed tool keeps that text as its answer.
+    if (parts.some(part => part.type === 'text' && !narration.has(part) && String(part.text).trim())) {
+      for (const part of narration) part.type = 'reasoning'
+    }
     const final = await options.onOutcome?.(result)
     if (final && final.trailingText) {
       result.text += final.trailingText
+      result.answer += final.trailingText
       parts.push({ type: 'text', text: final.trailingText })
       push({ type: 'text', text: final.trailingText })
     }
@@ -218,7 +228,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
     stream: events,
     // The route tracks this continuation even when failure is visible before a pending key arrives.
     cleanup: run.then(retire, retire),
-    finalText: () => outcome?.text ?? '',
+    finalText: () => outcome?.answer ?? '',
     assistantParts: snapshot,
     draftParts: snapshot,
     usage,

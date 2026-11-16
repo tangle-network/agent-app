@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { normalizeProfileName, parseProfileSwitch } from './switch'
 export { normalizeProfileName, parseProfileSwitch }
 import type { McpToolDefinition } from '../tools'
+import type { RouterTurnTool } from '../runtime/router-turn'
 
 export type ProfileAuthorKind = 'person' | 'agent' | 'optimizer'
 export type ProfileRevisionState = 'active' | 'candidate' | 'pending-consent'
@@ -635,10 +636,11 @@ export const PROFILE_MEMORY_PREFIX = '/memories/workspace/'
 
 /** Shared self-edit tools; only the authenticated active turn can name the profile. */
 export function profileTools<TTurn extends ProfileToolTurn>(
-  context: ProfileToolContext<TTurn>): McpToolDefinition<Record<string, never>>[] {
+  context: ProfileToolContext<TTurn>): Array<McpToolDefinition<Record<string, never>> & Pick<RouterTurnTool, 'effect'>> {
   return [{
     name: 'profile.read',
     description: 'Read the active agent profile text and revision. Saved text applies on the next message.',
+    effect: 'lookup',
     inputSchema: z.toJSONSchema(z.object({}).strict(), { io: 'input' }) as Record<string, unknown>,
     async run(args) {
       z.object({}).strict().parse(args)

@@ -74,8 +74,11 @@ of being gated by another unconditional message read.
 Terminal observation costs follow the turn, not the run's history or the session.
 Message reads start ten minutes before registration, so a long session cannot push the turn past the 1,000-message page.
 An interrupted execution's event stream is replayed for its terminal result only when it has at most 2,000 events: the replay's CPU cost grows faster than the run and can exceed a Workflow step's 30 s CPU limit, so a longer run's receipt comes from the recorded message and the session's failure reason.
-A terminal receipt is bounded at 900 KiB: over it, long strings in tool payloads and reasoning are clipped with a marker and `receiptTruncated: true`, so a Workflow step result (1 MiB) and a D1 row (2 MB) always hold it.
-The answer text is kept whole unless it alone exceeds the budget.
+Native observation preserves the complete text, parts, usage and terminal facts. It never clips authoritative output to meet a storage limit. `boundNativeCompletionReceipt` checks the aggregate serialized UTF-8 size and rejects an oversized inline receipt without modifying it.
+
+The Workflow adapter keeps its non-stream checkpoints and final output within 900 KiB. Small receipts keep the inline path. Larger observations checkpoint their existing native session/attempt identity, a SHA-256 of the canonical text/parts JSON, and their original metadata. The body stays in the native runtime; no app receipt table or object-store copy is introduced. A replay uses `readReceipt`, an explicit read-only adapter over the same exact native result APIs. It must not run the product's polling callback, change stream status, renew admission, dispatch, or settle. `createNativeCompletionOwner` binds this read automatically; a custom observer must supply its corresponding `readReceipt`.
+
+Reloaded content must match the retained digest and attempt sequence before preparation runs. Missing, unreadable or changed references fail explicitly and retain the lock. Original usage and product proof metadata remain those of the checkpoint, even if a later native read omits optional fields. The mutable product transcript is never used as the authoritative native replay body.
 
 When using timing transfer, persist `args.timingFacts()` on the existing admission before registering the Workflow, using stable session, execution, and replay identities. The snapshot carries the original request epoch and lifecycle admission offset; it never predicts later visibility. Preserve the original served revision with this admission.
 Then call `await args.handoffCompletion({ persistTimingFacts })` from the assembled route's producer before native dispatch. The callback persists later first-visible/text observations on that same admission, including after it closes. Their durations remain relative to the lifecycle start. The route tracks these writes with `waitUntil` and flushes them when its live projection ends; it does not wait for a timing write before streaming each frame. A timing callback rejection after registration retains the Workflow's terminal authority and must prevent native dispatch.
@@ -99,6 +102,9 @@ await runNativeCompletionWorkflow({
     turnId: payload.turnId,
     registeredAt: payload.registeredAt,
   }),
+  // Read the same closed admission and exact native result, without any
+  // stream/admission mutations performed by a product polling wrapper.
+  readReceipt: readExactRetainedNativeReceipt,
   prepare: prepareProductOutput,
   persistTranscript: persistStableAssistantRow,
   settle: settleProductRecords,
@@ -115,10 +121,54 @@ Promote files before deciding whether an answer contains visible output.
 
 `prepare` and `settle` run outside enclosing Workflow steps so products can compose named steps without nesting `step.do`.
 Their effects must be idempotent.
-The step that observes a terminal state also writes that receipt with `persistTranscript`, so a failure in preparation, settlement or the Workflow itself cannot lose the answer.
-`persistTranscript` without a message id must therefore upsert the turn's one row; the transcript step later writes the prepared receipt over the checkpoint.
+For an inline receipt, the step that observes a terminal state also writes it with `persistTranscript`, so a preparation failure retains the answer in chat history. For an oversized receipt, the native reference is checkpointed first and the complete body reaches `prepare` outside the step. This lets the existing artifact owner promote inline files before the transcript write. A promotion failure retains the complete native output and records no successful settlement or lock release.
+`persistTranscript` without a message id must upsert the turn's one row. Product storage still owns its transcript row limit and artifact delivery; the Workflow byte budget is not permission to silently truncate that view. A view that cannot be stored must fail explicitly. Draft-only tool preview clipping remains a separate display/write-amplification policy and never applies to native terminal receipts.
+Preparation and settlement receive the full receipt. If the final receipt exceeds 900 KiB, the returned `NativeCompletionWorkflowResult` contains its metadata plus `transcriptReference: { messageId, omitted: ['text', 'parts'] }`, pointing at the row that was already persisted. Small return values remain full receipts. Consumers that need the final body read their existing authorized transcript API; they do not treat an omitted body as an empty answer.
 Observation waits 5 s between passes for two minutes, 15 s until thirty minutes, then 30 s, so a turn can run for more than forty hours inside Cloudflare's 10,000-step instance limit.
 The helper checkpoints transcript persistence, replay completion, and lock release.
 Settlement may return a revised receipt when reconciliation discovers a terminal failure.
 That receipt updates the assistant row before replay completion.
 A rejected settlement leaves the lock held for recovery.
+
+### Migrating to App 4 native completion
+
+App 4 removes terminal receipt truncation and makes large Workflow output explicit. A direct completion adapter binds `readReceipt` to its existing exact observer using a closed admission and read-only admission methods. Do not call a polling wrapper that marks the replay buffer running or performs other product effects.
+
+```ts
+readReceipt: async payload => {
+  const admission = await admissionStore.read(payload.executionId)
+  if (!admission || admission.state !== 'closed') return null
+  const observed = await observeNativeCompletion({
+    source: await resolveSandbox(payload),
+    executionId: payload.executionId,
+    sessionId: payload.sessionId,
+    turnId: payload.turnId,
+    registeredAt: payload.registeredAt,
+    admissionStore: {
+      read: async () => admission,
+      renew: async () => { throw new Error('Receipt replay cannot renew admission') },
+      closeExpired: async () => { throw new Error('Receipt replay cannot close admission') },
+    },
+  })
+  return observed.state === 'running' ? null : observed.receipt
+},
+```
+
+Products that already wrap the native observer to remap native identities or add execution proof reuse that exact adapter with the read-only admission store. The shared `createNativeCompletionOwner` binds the native reader for ordinary consumers; a consumer supplying `workflow({ observe })` also supplies `workflow({ readReceipt })` for its custom projection.
+
+An explicitly annotated Workflow return changes from `Promise<NativeCompletionReceipt>` to `Promise<NativeCompletionWorkflowResult<MessageId>>`. Narrow on the reference before reading the body:
+
+```ts
+const result = await runNativeCompletionWorkflow(options)
+if ('transcriptReference' in result) {
+  // Use the product's existing authorization and message lookup.
+  const message = await readAuthorizedMessage(result.transcriptReference.messageId)
+  if (!message) throw new Error('Completed transcript is unavailable')
+  return message
+}
+return { content: result.text, parts: result.parts }
+```
+
+Preparation and settlement callbacks still receive `NativeCompletionReceipt` with its complete body. A direct caller of `boundNativeCompletionReceipt` must handle an oversized inline value as a reference/storage requirement; it must not assume the function can make arbitrary authoritative content smaller. It returns an in-budget receipt unchanged and throws above the aggregate serialized UTF-8 budget.
+
+Reference recovery still needs the native body after transcript persistence, including a replay caused by a post-release trace/export failure. The native completed-turn owner stores identity-checked filesystem records, but this adapter promises no retention beyond the native sandbox/session lifecycle. A missing or modified body is an explicit recovery failure; it never authorizes another model run or substitutes the mutable transcript for native evidence.

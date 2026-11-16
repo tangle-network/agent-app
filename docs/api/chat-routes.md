@@ -328,7 +328,7 @@ type AttachmentWriteResult
 
 ### `boundNativeCompletionReceipt`
 
-`function` — Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
+`function` — Assert the aggregate serialized UTF-8 bound without changing native facts.
 
 ```ts
 (receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt
@@ -1552,7 +1552,7 @@ interface ModelFallbackInfo
 
 ### `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`
 
-`const` — Serialized UTF-8 budget for one terminal receipt.
+`const` — Serialized UTF-8 budget for inline native completion checkpoints and final Workflow output.
 
 ```ts
 number

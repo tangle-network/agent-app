@@ -3,6 +3,7 @@ import { createChatTurnRoutes, type ChatTurnExecutionLimits, type ChatTurnLock, 
 import { streamChatRouteAsSandboxEvents } from '../chat-routes/gateway-adapter'
 import type { TurnEventStore } from '../stream/turn-buffer'
 import type { McpToolDefinition } from '../tools/mcp-rpc'
+import type { RouterTurnTool } from '../runtime/router-turn'
 
 export interface PublishedKnowledgePage {
   readonly id: string
@@ -250,12 +251,12 @@ export function createPublicConsultation(options: PublicConsultationOptions) {
   }
 }
 
-function publicationTools(publication: KnowledgePublication, authorize: () => Promise<void>): McpToolDefinition[] {
+function publicationTools(publication: KnowledgePublication, authorize: () => Promise<void>): Array<McpToolDefinition & Pick<RouterTurnTool, 'effect'>> {
   return [
-    { name: 'knowledge_search', description: 'Search published consultation knowledge.',
+    { name: 'knowledge_search', description: 'Search published consultation knowledge.', effect: 'lookup',
       inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' } }, additionalProperties: false },
       run: async args => { await authorize(); return publication.search(singleArgument(args, 'query')) } },
-    { name: 'knowledge_read', description: 'Read a published page by its exact citation id.',
+    { name: 'knowledge_read', description: 'Read a published page by its exact citation id.', effect: 'lookup',
       inputSchema: { type: 'object', required: ['pageId'], properties: { pageId: { type: 'string' } }, additionalProperties: false },
       run: async args => { await authorize(); return publication.read(singleArgument(args, 'pageId')) } },
   ]

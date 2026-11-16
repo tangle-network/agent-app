@@ -187,6 +187,9 @@ export interface OperatorTurn {
   files: OperatorFileChange[]
   /** Decisions open on this turn's conversation. */
   approvals: OperatorApproval[]
+  /** Tool calls the harness refused in this turn (turn-health's `tool_call_rejected`), present only when there
+   *  were some: a refused call shows here even when the turn recovered and answered. */
+  refusedToolCalls?: Array<{ tool: string; error: string }>
 }
 
 export interface OperatorJournalEntry {

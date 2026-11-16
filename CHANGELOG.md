@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.0.5
+
+- docs: regenerate the codemap and API docs (#1543)
+
+## 4.0.4
+
+- fix(chat): bound streamed tool previews and retain live disclosure state (#1544)
+
+## 4.0.3
+
+- feat(operator): report refused tool calls on a turn; conformance fails on one (#1542)
+
+## 4.0.2
+
+- fix(chat): keep a Router turn's pre-tool narration out of its answer (#1536)
+
+## 4.0.1
+
+- feat(conformance): --computer none asks once (plain turn only) (#1541)
+
+## 4.0.0
+
+- fix!: preserve native completion payloads through bounded references (#1539)
+
 ## 3.0.37
 
 - fix(agent-profiles): profile self-edit and custom profiles use the text a turn runs (#1537)

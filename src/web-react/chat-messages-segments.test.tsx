@@ -434,7 +434,7 @@ describe('ChatMessages segmented turns', () => {
     expect(container.textContent).toContain('Validate workflow')
   })
 
-  it('does NOT collapse a 3+ run while the turn is still streaming (live activity stays visible)', () => {
+  it('keeps a live run disclosure and its open state as steps arrive and the turn settles', () => {
     const message: ChatUiMessage = {
       id: 'm1',
       role: 'assistant',
@@ -446,11 +446,82 @@ describe('ChatMessages segmented turns', () => {
       ],
     }
     // `loading` + last message → this turn is streaming.
-    const { container } = render(<ChatMessages messages={[message]} loading />)
+    const { container, getByText, rerender } = render(<ChatMessages messages={[message]} loading />)
+    const summary = getByText('Working · step 3').closest('summary')!
+    const disclosure = summary.parentElement as HTMLDetailsElement
+    expect(disclosure.tagName).toBe('DETAILS')
+    expect(disclosure.open).toBe(false)
+    fireEvent.click(summary)
+    summary.focus()
+    expect(disclosure.open).toBe(true)
+    const firstTool = disclosure.querySelector('.agent-arrive')
+
+    const next: ChatUiMessage = {
+      ...message,
+      segments: [
+        ...message.segments!.map(segment => segment.kind === 'tool'
+          ? { ...segment, call: { ...segment.call, status: 'done' as const } }
+          : segment),
+        { kind: 'tool', call: { id: 't4', name: 'list_workflows', status: 'running' } },
+      ],
+    }
+    rerender(<ChatMessages messages={[next]} loading />)
+    expect(getByText('Working · step 4').closest('details')).toBe(disclosure)
+    expect(disclosure.open).toBe(true)
+    expect(disclosure.querySelector('.agent-arrive')).toBe(firstTool)
+    expect(document.activeElement).toBe(summary)
+
+    const settled: ChatUiMessage = { ...next, segments: [
+      ...next.segments!.map(segment => segment.kind === 'tool'
+        ? { ...segment, call: { ...segment.call, status: 'done' as const } }
+        : segment),
+      { kind: 'text', content: 'All set.' },
+    ] }
+    rerender(<ChatMessages messages={[settled]} />)
+    expect(getByText('Worked through 4 steps').closest('details')).toBe(disclosure)
+    expect(disclosure.open).toBe(true)
+    expect(disclosure.querySelector('.agent-arrive')).toBe(firstTool)
+    expect(document.activeElement).toBe(summary)
+    expect(getByText('All set.').closest('details')).toBeNull()
+    fireEvent.click(summary)
+    expect(disclosure.open).toBe(false)
+    expect(container.textContent).toContain('All set.')
+  })
+
+  it('names concurrent active steps without presenting a finished tool run', () => {
+    const { container } = render(<ChatMessages loading messages={[{
+      id: 'parallel', role: 'assistant', content: '', segments: [
+        { kind: 'tool', call: { id: 't1', name: 'read_record', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'read_record', status: 'running' } },
+        { kind: 'tool', call: { id: 't3', name: 'read_record', status: 'running' } },
+      ],
+    }]} />)
+    expect(container.querySelector('summary')?.textContent).toBe('Working · 2 active steps')
     expect(container.textContent).not.toContain('Worked through')
   })
 
-  it('does NOT collapse a settled run containing a FAILED tool (a failure never hides)', () => {
+  it('surfaces a tool failure that arrives inside a closed live disclosure', () => {
+    const message: ChatUiMessage = {
+      id: 'changing-result', role: 'assistant', content: '', segments: [
+        { kind: 'tool', call: { id: 't1', name: 'get_workflow_schema', status: 'done' } },
+        { kind: 'tool', call: { id: 't2', name: 'validate_workflow', status: 'done' } },
+        { kind: 'tool', call: { id: 't3', name: 'create_workflow', status: 'running' } },
+      ],
+    }
+    const { container, rerender } = render(<ChatMessages messages={[message]} loading />)
+    expect(container.querySelector('details')?.open).toBe(false)
+    rerender(<ChatMessages loading messages={[{ ...message, segments: message.segments!.map(segment =>
+      segment.kind === 'tool' && segment.call.id === 't3'
+        ? { ...segment, call: { ...segment.call, status: 'done', result: { ok: false, message: 'Creation refused' } } }
+        : segment),
+    }]} />)
+    expect(container.querySelector('summary')).toBeNull()
+    expect(container.textContent).not.toContain('Worked through')
+    expect(container.textContent).not.toContain('Working ·')
+    expect(container.textContent).toContain('Create workflow')
+  })
+
+  it.each([false, true])('does NOT collapse a run containing a FAILED tool (streaming=%s)', loading => {
     const message: ChatUiMessage = {
       id: 'm1',
       role: 'assistant',
@@ -462,11 +533,11 @@ describe('ChatMessages segmented turns', () => {
         { kind: 'text', content: 'Done.' },
       ],
     }
-    const { container } = render(<ChatMessages messages={[message]} />)
+    const { container } = render(<ChatMessages messages={[message]} loading={loading} />)
     expect(container.textContent).not.toContain('Worked through')
   })
 
-  it('does NOT collapse a settled run containing a proposal awaiting approval', () => {
+  it.each([false, true])('does NOT collapse a run containing a proposal awaiting approval (streaming=%s)', loading => {
     const message: ChatUiMessage = {
       id: 'm1',
       role: 'assistant',
@@ -486,12 +557,12 @@ describe('ChatMessages segmented turns', () => {
       ],
     }
     const { container } = render(
-      <ChatMessages messages={[message]} approval={{ onApprove: vi.fn(), onReject: vi.fn() }} />,
+      <ChatMessages messages={[message]} loading={loading} approval={{ onApprove: vi.fn(), onReject: vi.fn() }} />,
     )
     expect(container.textContent).not.toContain('Worked through')
   })
 
-  it('does NOT collapse a settled run with a done tool that reported an ok:false outcome', () => {
+  it.each([false, true])('does NOT collapse a run with an ok:false outcome (streaming=%s)', loading => {
     const message: ChatUiMessage = {
       id: 'm1',
       role: 'assistant',
@@ -508,7 +579,7 @@ describe('ChatMessages segmented turns', () => {
         { kind: 'text', content: 'Done.' },
       ],
     }
-    const { container } = render(<ChatMessages messages={[message]} />)
+    const { container } = render(<ChatMessages messages={[message]} loading={loading} />)
     expect(container.textContent).not.toContain('Worked through')
   })
 

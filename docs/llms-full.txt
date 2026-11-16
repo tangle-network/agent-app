@@ -1,4 +1,4 @@
-# aa — full API surface
+# aa-docs — full API surface
 
 > Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.
 
@@ -176,7 +176,7 @@ interface CreateDrizzleAgentEnrollmentStoreOptions
 
 ## `./agent-profiles`
 
-Source: `src/agent-profiles/index.ts` · depends on `tools`
+Source: `src/agent-profiles/index.ts` · depends on `runtime`, `tools`
 
 ### `admitProfileTurn`
 
@@ -495,7 +495,7 @@ interface ProfileToolContext
 `function` — Shared self-edit tools; only the authenticated active turn can name the profile.
 
 ```ts
-<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => McpToolDefinition<Record<string, never>>[]
+<TTurn extends ProfileToolTurn>(context: ProfileToolContext<TTurn>) => (McpToolDefinition<Record<string, never>> & Pick…
 ```
 
 ### `ProfileToolTurn`
@@ -613,7 +613,7 @@ interface SwitchProfileInput
 
 ## `./agent-profiles/d1`
 
-Source: `src/agent-profiles/d1.ts` · depends on `tools`
+Source: `src/agent-profiles/d1.ts` · depends on `runtime`, `tools`
 
 ### `AGENT_PROFILE_D1_SCHEMA_SQL`
 
@@ -682,7 +682,7 @@ interface ProfileD1Statement
 
 ## `./agent-profiles/drizzle`
 
-Source: `src/agent-profiles/drizzle.ts` · depends on `tools`
+Source: `src/agent-profiles/drizzle.ts` · depends on `runtime`, `tools`
 
 ### `createAgentProfileTables`
 
@@ -695,7 +695,7 @@ Source: `src/agent-profiles/drizzle.ts` · depends on `tools`
 
 ## `./agent-profiles/switch`
 
-Source: `src/agent-profiles/switch.ts` · depends on `tools`
+Source: `src/agent-profiles/switch.ts` · depends on `runtime`, `tools`
 
 ### `normalizeProfileName`
 
@@ -3593,7 +3593,7 @@ type AttachmentWriteResult
 
 ### `boundNativeCompletionReceipt`
 
-`function` — Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
+`function` — Assert the aggregate serialized UTF-8 bound without changing native facts.
 
 ```ts
 (receipt: NativeCompletionReceipt, maxBytes?: number) => NativeCompletionReceipt
@@ -4817,7 +4817,7 @@ interface ModelFallbackInfo
 
 ### `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`
 
-`const` — Serialized UTF-8 budget for one terminal receipt.
+`const` — Serialized UTF-8 budget for inline native completion checkpoints and final Workflow output.
 
 ```ts
 number
@@ -19431,6 +19431,14 @@ interface NativeCompletionPayload
 interface NativeCompletionTimingSource
 ```
 
+### `NativeCompletionTranscriptReference`
+
+`interface` — Large final output points at the transcript the product already persisted.
+
+```ts
+interface NativeCompletionTranscriptReference
+```
+
 ### `nativeCompletionWorkflowId`
 
 `function`
@@ -19453,6 +19461,14 @@ interface NativeCompletionWorkflowOptions
 
 ```ts
 interface NativeCompletionWorkflowPayload
+```
+
+### `NativeCompletionWorkflowResult`
+
+`type`
+
+```ts
+type NativeCompletionWorkflowResult
 ```
 
 ### `PRESET_MIGRATION_SQL`
@@ -20742,7 +20758,7 @@ interface AssembleSystemPromptInput
 
 ## `./public-consultation`
 
-Source: `src/public-consultation/index.ts` · depends on `chat-routes`, `stream`, `tools`
+Source: `src/public-consultation/index.ts` · depends on `chat-routes`, `runtime`, `stream`, `tools`
 
 ### `ConsultationAgent`
 
@@ -21939,6 +21955,14 @@ interface LoopToolCall
 interface ModelCatalog
 ```
 
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
+```
+
 ### `normalizeModelId`
 
 `function` — Strip provider prefix, :free suffix, and trailing date stamps.
@@ -22582,6 +22606,14 @@ interface CheckpointWorkspaceStore
 
 ```ts
 number
+```
+
+### `narratesBefore`
+
+`function` — Whether text a round writes before calling `tool` narrates the work instead of answering.
+
+```ts
+(tool: Pick<RouterTurnTool, "effect"> | undefined) => boolean
 ```
 
 ### `perTurnPrefixBytes`
@@ -23482,14 +23514,6 @@ interface ForegroundSandboxSingleFlightOptions
 (shell: SandboxRuntimeConfig) => Sandbox
 ```
 
-### `HOLDER_BOX_READ_TIMEOUT_MS`
-
-`const` — The cap on reading a held lock's box: the read runs inside a member's request.
-
-```ts
-5000
-```
-
 ### `InspectablePrewarmClaimStore`
 
 `interface` — A claim store that can distinguish a completed owner from a crashed owner.
@@ -23872,14 +23896,6 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ```ts
 <T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>
-```
-
-### `readHolderBoxSessions`
-
-`function` — Read the box a held lock's turn ran work on, for `reconcileTurnLockFromStoreAndBox`.
-
-```ts
-(find: () => Promise<Pick<SandboxInstance, "status" | "sessions"> | null | undefined>) => Promise<HolderBoxReport>
 ```
 
 ### `readSandboxBinaryBytes`
@@ -30094,7 +30110,7 @@ interface ConsumeTurnStreamOptions
 `function`
 
 ```ts
-(db: D1LikeForTurns, options?: TurnEventStoreOptions) => ListingTurnEventStore
+(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore
 ```
 
 ### `createMemoryTurnEventStore`
@@ -30102,7 +30118,7 @@ interface ConsumeTurnStreamOptions
 `function` — In-memory store for tests and keyless local dev.
 
 ```ts
-(options?: TurnEventStoreOptions) => ListingTurnEventStore
+(options?: TurnEventStoreOptions) => TurnEventStore
 ```
 
 ### `D1BoundForTurns`
@@ -30199,14 +30215,6 @@ number
 
 ```ts
 type JsonRecord
-```
-
-### `ListingTurnEventStore`
-
-`type` — A store that lists running turns by scope, as the turn lock's default reclaim needs.
-
-```ts
-type ListingTurnEventStore
 ```
 
 ### `mergePersistedPart`
@@ -33908,14 +33916,6 @@ TurnStreamLocationHint
 interface DurableTurnLock
 ```
 
-### `HolderBoxReport`
-
-`type` — What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer.
-
-```ts
-type HolderBoxReport
-```
-
 ### `interruptedReleaseApplies`
 
 `function` — The interrupted/stale release fence.
@@ -34010,14 +34010,6 @@ interface MemoryTurnStreamSocket
 
 ```ts
 interface ReconcileStaleDurableTurnLockOptions
-```
-
-### `reconcileTurnLockFromStoreAndBox`
-
-`function` — The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing, so without it the lock refuses every turn in its scope until its TTL.
-
-```ts
-(input: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth; turnStore: Required<Pick<TurnEventStore, "listRunni…
 ```
 
 ### `releaseDurableTurnLock`

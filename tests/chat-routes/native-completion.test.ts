@@ -387,7 +387,7 @@ describe('observeNativeCompletion', () => {
     expect(sessions.flatMap((session) => session.messages.mock.calls)).toEqual([[{ limit: 1_000, since: 1_200_000 }]])
   })
 
-  it('fits a long turn inside the Workflow step and D1 row limits without touching the answer', () => {
+  it('refuses an oversized inline receipt without changing any native output', () => {
     const answer = 'The shortlist and four drafts are ready.'
     const receipt = {
       state: 'completed' as const,
@@ -404,15 +404,19 @@ describe('observeNativeCompletion', () => {
       ],
     }
 
-    const bounded = boundNativeCompletionReceipt(receipt)
+    const before = JSON.stringify(receipt)
+    expect(() => boundNativeCompletionReceipt(receipt)).toThrow(/exact native result reference/)
+    expect(JSON.stringify(receipt)).toBe(before)
+  })
 
-    expect(new TextEncoder().encode(JSON.stringify(bounded)).length).toBeLessThanOrEqual(NATIVE_COMPLETION_RECEIPT_MAX_BYTES)
-    expect(bounded.text).toBe(answer)
-    expect(bounded.parts.at(-1)).toEqual({ type: 'text', id: 'text-1', text: answer })
-    expect(bounded.parts).toHaveLength(302)
-    const tool = bounded.parts[0] as { state: { status: string; input: unknown; output: string; metadata: Record<string, unknown> } }
-    expect(tool.state).toMatchObject({ status: 'completed', input: { command: 'step 0' }, metadata: { receiptTruncated: true } })
-    expect(tool.state.output).toContain('the Sandbox session keeps the full value')
+  it.each([
+    ['five answer copies', 'a'.repeat(230_500), 4],
+    ['multibyte answers', '😀'.repeat(115_250), 1],
+    ['JSON-escaped answers', '\u0000'.repeat(230_500), 1],
+  ] as const)('measures the aggregate serialized UTF-8 bytes for %s', (_name, text, copies) => {
+    const receipt = { state: 'completed' as const, text, parts: Array.from({ length: copies }, () => ({ type: 'text', text })), usage: {}, completedTurnIds: ['turn-1'] }
+    expect(new TextEncoder().encode(JSON.stringify(receipt)).byteLength).toBeGreaterThan(NATIVE_COMPLETION_RECEIPT_MAX_BYTES)
+    expect(() => boundNativeCompletionReceipt(receipt)).toThrow(/exact native result reference/)
   })
 
   it('returns a receipt under the budget unchanged', () => {
