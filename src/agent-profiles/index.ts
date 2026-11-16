@@ -295,10 +295,13 @@ export async function createTextProfile(input: CreateTextProfileInput): Promise<
   const profileId = `custom-${sha256Utf8(`${input.workspaceId}\0${normalizedName}`).slice(7, 39)}`
   const addedInstruction = input.instructions.trim()
   const text = input.followRelease ? await input.followRelease(baseline) : baseline.profile
-  // Following releases, the new profile stores no system prompt: an absent one runs the release's at every turn
-  // (followProductRelease), where a copy of today's would stop following at the next release.
-  const { systemPrompt: _followed, ...withoutPrompt } = text.prompt ?? {}
-  const prompt = input.followRelease ? withoutPrompt : text.prompt
+  // Where the baseline runs the release's system prompt, the new profile stores none: an absent one runs the
+  // release's at every turn (followProductRelease), where a copy of today's would stop following at the next release.
+  // A prompt a person wrote on the baseline is copied. The release's is what the baseline runs with no prompt of its own.
+  const { systemPrompt: followed, ...withoutPrompt } = text.prompt ?? {}
+  const release = input.followRelease
+    && (await input.followRelease({ ...baseline, profile: { ...baseline.profile, prompt: withoutPrompt } })).prompt?.systemPrompt
+  const prompt = input.followRelease && followed === release ? withoutPrompt : text.prompt
   const profile = bindProfileText(baseline.profile, {
     ...text, name,
     prompt: {

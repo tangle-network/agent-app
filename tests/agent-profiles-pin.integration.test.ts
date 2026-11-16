@@ -241,6 +241,18 @@ describe('profile turn pin', () => {
       expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask, then offer one next step.')
       release = prompt('Deliver the ask with its sources.')
       expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask with its sources.')
+
+      // A prompt that differs from the shown one is the person's: stored, and kept at later releases and in a copy.
+      const shown = await run('profile.read', {})
+      const french = await run('profile.update', { expectedRevisionId: shown.revisionId, changes: { systemPrompt: 'Answer in French.' } })
+      const own = await store.getRevision(workspaceId, 'director', french.revisionId as string)
+      expect(own?.profile.prompt?.systemPrompt).toBe('Answer in French.')
+      release = prompt('Deliver the ask, then stop.')
+      expect((await followRelease(own!)).prompt?.systemPrompt).toBe('Answer in French.')
+      const copy = await createTextProfile({ store, workspaceId, baselineProfileId: 'director',
+        existingProfiles: [{ name: 'Director' }, { name: 'Brief' }], name: 'Brief FR', instructions: '', authorId: 'owner',
+        actorRole: 'owner', planDigest: () => PLAN, followRelease })
+      expect(copy.profile.prompt?.systemPrompt).toBe('Answer in French.')
     } finally { sqlite.close() }
   })
 })
