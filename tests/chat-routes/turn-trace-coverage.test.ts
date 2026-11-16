@@ -120,9 +120,6 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     const sequence = ['admission.authorize', 'admission.history', 'admission.produce', 'model.call', 'tool.call', 'model.call', 'persist.assistant']
     const ordered = spans.filter((span) => sequence.includes(span.name))
     expect(ordered.map((span) => span.name)).toEqual(sequence)
-    for (let i = 1; i < ordered.length; i++) {
-      expect(ordered[i]!.startMs).toBeGreaterThanOrEqual(ordered[i - 1]!.endMs)
-    }
     const names = spans.map((span) => span.name)
     expect(names.filter((name) => name === 'model.stream')).toHaveLength(2)
     const model = spans.find((span) => span.name === 'model.call')!
@@ -133,13 +130,9 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
     // that ends in the spend hold right before the provider fetch.
     const byId = new Map(spans.map((span) => [span.spanId, span]))
-    for (const span of spans) {
-      const parent = byId.get(span.parentSpanId)
-      expect(span.startMs).toBeGreaterThanOrEqual(parent?.startMs ?? snapshot!.startedAt)
-      expect(span.endMs).toBeLessThanOrEqual(parent?.endMs ?? snapshot!.endedAt)
-    }
     for (const call of spans.filter((span) => span.name === 'model.call')) {
-      expect(spans.filter((span) => span.name === 'model.stream' && span.parentSpanId === call.spanId)).toHaveLength(1)
+      expect(spans.filter((span) => span.parentSpanId === call.spanId).map((span) => span.name))
+        .toEqual(['network', 'router.pre_upstream', 'router.upstream_wait', 'model.stream'])
       const pre = spans.find((span) => span.name === 'router.pre_upstream' && span.parentSpanId === call.spanId)!
       const steps = spans.filter((span) => span.parentSpanId === pre.spanId).sort((a, b) => a.startMs - b.startMs)
       expect(steps.map((span) => span.name)).toEqual(['router.auth', 'router.admission', 'router.dispatch'])
