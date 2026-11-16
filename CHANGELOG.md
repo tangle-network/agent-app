@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.0
+
+- fix!: preserve native completion payloads through bounded references (#1539)
+
 ## 3.0.37
 
 - fix(agent-profiles): profile self-edit and custom profiles use the text a turn runs (#1537)
