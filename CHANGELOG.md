@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.13
+
+- fix(billing): recover a mint that died after the remote create by the name it stored (#1553)
+
 ## 4.0.12
 
 - fix(billing): each minted child key gets its own remote slot name (#1551)
