@@ -347,6 +347,8 @@ describe('createD1TurnHealthSource — an error row is not an answer', () => {
   }
 
   it('pins the shell error openers to the strings the producer actually writes', async () => {
+    expect(SHELL_ERROR_REPLY_PREFIXES).toContain("This assistant's spending budget is used up.")
+    expect(SHELL_ERROR_REPLY_PREFIXES).toContain('The model provider asked us to wait.')
     // These are agent-app's OWN words, not product domain — the sandbox
     // producer composes them. If someone rewords the producer without
     // updating the list, dead threads start looking answered, so this fails
