@@ -151,7 +151,7 @@ describe('profile turn pin', () => {
       const edited = await write('edited', await write('edited', null, releaseA, 'app-release'), ownText, 'member')
       const carried = await write('edited', edited, { ...ownText, description: 'Carried' }, 'app-release')
       // A product revision whose parent row is gone proves nothing about its text.
-      const orphan = { ...untouched, id: 'orphan', workspaceId: 'orphaned', parentId: 'gone' }
+      const orphan = { ...untouched, id: crypto.randomUUID(), workspaceId: 'orphaned', parentId: 'gone' }
       expect(await store.appendRevision(orphan, null, true)).toBe(true)
       // Fifty remembered facts on top of the import: the prompt is still release A's.
       let remembered = await write('remembered', null, releaseA, 'app-release')
@@ -185,14 +185,17 @@ describe('profile turn pin', () => {
     const insert = sqlite.prepare(`INSERT INTO agent_profile_revision (revision_id, workspace_id, profile_id, parent_id,
       profile_json, knowledge_text, author_kind, author_id, reason, diff_json, authority_digest, plan_digest, state, created_at)
       VALUES (?, 'long', 'director', ?, ?, '', 'person', ?, 'Step', '[]', ?, ?, 'active', ?)`)
+    // Fresh ids each run: answers are cached per revision for the isolate, and a retry must read again.
+    const run = crypto.randomUUID()
+    const id = (n: number) => `${run}-${n}`
     try {
       // An import, then a remembered fact per revision; revision n has n + 1 revisions of history.
       for (let n = 0; n <= PROFILE_PROMPT_HISTORY_MAX; n++) {
-        insert.run(`rev-${n}`, n ? `rev-${n - 1}` : null, JSON.stringify({ name: 'Director', description: `Fact ${n}`,
+        insert.run(id(n), n ? id(n - 1) : null, JSON.stringify({ name: 'Director', description: `Fact ${n}`,
           prompt: { systemPrompt: shipped } }), n ? 'member' : 'app-release', PLAN, PLAN, n)
       }
-      const bounded = await store.getRevision('long', 'director', `rev-${PROFILE_PROMPT_HISTORY_MAX - 1}`)
-      const longer = await store.getRevision('long', 'director', `rev-${PROFILE_PROMPT_HISTORY_MAX}`)
+      const bounded = await store.getRevision('long', 'director', id(PROFILE_PROMPT_HISTORY_MAX - 1))
+      const longer = await store.getRevision('long', 'director', id(PROFILE_PROMPT_HISTORY_MAX))
       const before = trips.count
       expect((await followProductRelease(store, bounded!, release, ['app-release'])).prompt?.systemPrompt).toBe('Deliver the ask first.')
       expect(trips.count - before).toBe(1)
