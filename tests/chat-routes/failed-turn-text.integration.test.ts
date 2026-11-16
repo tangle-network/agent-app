@@ -220,6 +220,7 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   it.each([
+    ['a data.error string', { type: 'error', data: { error: HARNESS_FAILURE } }],
     ['a raw error', { type: 'raw', data: { backend: 'opencode', event: { type: 'error', error: { name: 'UnknownError', data: { message: HARNESS_FAILURE } } } } }],
     ['a raw turn.failed', { type: 'raw', data: { backend: 'codex', event: { type: 'turn.failed',
       error: { message: `stream error: POST /v1/responses returned HTTP 500 Internal Server Error. ${TOOL_LIST}` } } } }],
