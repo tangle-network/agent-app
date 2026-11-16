@@ -121,6 +121,7 @@ export { PYPI_EGRESS_DOMAINS, buildProductEgressPolicy } from './product-egress'
 export { readSandboxModelPolicy, sandboxModelWithinPolicy, type SandboxModelPolicy } from './router-model-policy'
 
 export { dropTrustedBox, getClient, resetClientCache } from './runtime-cache'
+export { forgetBootstrap } from './existing-box'
 
 export {
   buildAppToolMcpServers,
