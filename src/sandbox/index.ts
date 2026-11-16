@@ -171,6 +171,7 @@ export {
 export type { ProvisionProfileSection, ProvisionPayloadSections } from './payload-limits'
 
 export { peekWorkspaceSandbox } from './workspace-boxes'
+export { HOLDER_BOX_READ_TIMEOUT_MS, readHolderBoxSessions } from './holder-box'
 
 export type { PeekWorkspaceSandboxOutcome } from './workspace-boxes'
 

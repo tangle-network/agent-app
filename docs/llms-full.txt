@@ -1,4 +1,4 @@
-# aa-docs — full API surface
+# aa — full API surface
 
 > Build agent applications with typed chat, tools, sandboxes, integrations, billing, and evaluation.
 
@@ -16739,7 +16739,7 @@ interface UseOpenUIActionsOptions
 
 ## `./operator`
 
-Source: `src/operator/index.ts` · depends on `chat-routes`, `crypto`, `platform`, `stream`, `web`
+Source: `src/operator/index.ts` · depends on `chat-routes`, `crypto`, `platform`, `stream`, `turn-health`, `web`
 
 ### `ChatOperatorAdapterOptions`
 
@@ -23514,6 +23514,14 @@ interface ForegroundSandboxSingleFlightOptions
 (shell: SandboxRuntimeConfig) => Sandbox
 ```
 
+### `HOLDER_BOX_READ_TIMEOUT_MS`
+
+`const` — The cap on reading a held lock's box: the read runs inside a member's request.
+
+```ts
+5000
+```
+
 ### `InspectablePrewarmClaimStore`
 
 `interface` — A claim store that can distinguish a completed owner from a crashed owner.
@@ -23896,6 +23904,14 @@ readonly ["pypi.org", "files.pythonhosted.org", "pypi.python.org"]
 
 ```ts
 <T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>
+```
+
+### `readHolderBoxSessions`
+
+`function` — Read the box a held lock's turn ran work on, for `reconcileTurnLockFromStoreAndBox`.
+
+```ts
+(find: () => Promise<Pick<SandboxInstance, "status" | "sessions"> | null | undefined>) => Promise<HolderBoxReport>
 ```
 
 ### `readSandboxBinaryBytes`
@@ -30110,7 +30126,7 @@ interface ConsumeTurnStreamOptions
 `function`
 
 ```ts
-(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore
+(db: D1LikeForTurns, options?: TurnEventStoreOptions) => ListingTurnEventStore
 ```
 
 ### `createMemoryTurnEventStore`
@@ -30118,7 +30134,7 @@ interface ConsumeTurnStreamOptions
 `function` — In-memory store for tests and keyless local dev.
 
 ```ts
-(options?: TurnEventStoreOptions) => TurnEventStore
+(options?: TurnEventStoreOptions) => ListingTurnEventStore
 ```
 
 ### `D1BoundForTurns`
@@ -30215,6 +30231,14 @@ number
 
 ```ts
 type JsonRecord
+```
+
+### `ListingTurnEventStore`
+
+`type` — A store that lists running turns by scope, as the turn lock's default reclaim needs.
+
+```ts
+type ListingTurnEventStore
 ```
 
 ### `mergePersistedPart`
@@ -33916,6 +33940,14 @@ TurnStreamLocationHint
 interface DurableTurnLock
 ```
 
+### `HolderBoxReport`
+
+`type` — What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer.
+
+```ts
+type HolderBoxReport
+```
+
 ### `interruptedReleaseApplies`
 
 `function` — The interrupted/stale release fence.
@@ -34010,6 +34042,14 @@ interface MemoryTurnStreamSocket
 
 ```ts
 interface ReconcileStaleDurableTurnLockOptions
+```
+
+### `reconcileTurnLockFromStoreAndBox`
+
+`function` — The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing, so without it the lock refuses every turn in its scope until its TTL.
+
+```ts
+(input: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth; turnStore: Required<Pick<TurnEventStore, "listRunni…
 ```
 
 ### `releaseDurableTurnLock`

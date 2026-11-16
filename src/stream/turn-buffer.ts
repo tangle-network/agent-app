@@ -633,13 +633,16 @@ export const TURN_STATUS_LEASE_MIGRATION_SQL = 'ALTER TABLE turn_status ADD COLU
 export const TURN_STATUS_RETENTION_MIGRATION_SQL = 'CREATE INDEX IF NOT EXISTS idx_turn_status_retention ON turn_status (status, updatedAt);'
 
 /** Resolve a TurnEventStore that appends and reads turn events using a D1-like database interface */
+/** A store that lists running turns by scope, as the turn lock's default reclaim needs. */
+export type ListingTurnEventStore = TurnEventStore & Required<Pick<TurnEventStore, 'listRunning'>>
+
 /** 100 D1 variables per statement, three per row. */
 const D1_APPEND_CHUNK = 33
 
 export function createD1TurnEventStore(
   db: D1LikeForTurns,
   options: TurnEventStoreOptions = {},
-): TurnEventStore {
+): ListingTurnEventStore {
   const now = options.now ?? Date.now
   const runningTurnLeaseMs = Math.max(
     1,
@@ -763,7 +766,7 @@ export function createD1TurnEventStore(
 /** In-memory store for tests and keyless local dev. */
 export function createMemoryTurnEventStore(
   options: TurnEventStoreOptions = {},
-): TurnEventStore {
+): ListingTurnEventStore {
   const events = new Map<string, BufferedTurnEvent[]>()
   const status = new Map<string, TurnStatus>()
   const scopes = new Map<string, string>()

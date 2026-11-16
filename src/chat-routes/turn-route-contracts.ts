@@ -425,6 +425,9 @@ export interface ChatTurnLock<TContext, TResource = unknown> {
   release(handle: unknown): void | Promise<void>
   /** Record a release for the durable owner to complete without freeing the lock; absent or false, the lock stays held. */
   park?(handle: unknown): Promise<boolean>
+  /** Keep the lock held for the durable owner a turn hands off to (`handoffCompletion`), for a lock whose stale-lock
+   *  reclaim would read the turn as dead once the route stops renewing it. The owner's release still frees it. */
+  holdForHandoff?(handle: unknown): Promise<boolean>
   /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
    *  and while `prepareTurn` and the history read run. Never awaited; a failure
    *  is logged and the turn goes on to `acquire` as usual. */
@@ -674,7 +677,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  - `{proceed:'handoff'}` releases the route-acquired lock, returns the
    *    product's accepted `Response`, and transfers execution and lifecycle
    *    ownership to the product's durable owner. The route runs no producer
-   *    or lifecycle hook.
+   *    or lifecycle hook. With a lock that uses the default reclaim, the route
+   *    wrote a running row for `args.turnStreamId` at acquire; the owner
+   *    settles it (or it lapses with its lease).
    *  - Always returning `{proceed:true}` is supported, not a misuse: the seam
    *    doubles as the one place that runs after the user row exists and before
    *    the producer, which is where per-turn analytics and readiness

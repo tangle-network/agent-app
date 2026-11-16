@@ -1,6 +1,6 @@
 {
   "generator": "agent-docs",
-  "title": "aa-docs",
+  "title": "aa",
   "source": "tsup.config `entry`",
   "slug": null,
   "entries": [
@@ -13010,6 +13010,7 @@
         "crypto",
         "platform",
         "stream",
+        "turn-health",
         "web"
       ],
       "error": null,
@@ -18277,6 +18278,12 @@
           "doc": "Resolve a synchronous sandbox client from provided runtime configuration credentials"
         },
         {
+          "name": "HOLDER_BOX_READ_TIMEOUT_MS",
+          "kind": "const",
+          "signature": "5000",
+          "doc": "The cap on reading a held lock's box: the read runs inside a member's request."
+        },
+        {
           "name": "InspectablePrewarmClaimStore",
           "kind": "interface",
           "signature": "interface InspectablePrewarmClaimStore",
@@ -18563,6 +18570,12 @@
           "kind": "function",
           "signature": "<T>(read: () => Promise<T>, deadline: number) => Promise<{ value: T; waited: boolean; }>",
           "doc": "Wait only for the platform typed planned-restart signal, within the caller budget."
+        },
+        {
+          "name": "readHolderBoxSessions",
+          "kind": "function",
+          "signature": "(find: () => Promise<Pick<SandboxInstance, \"status\" | \"sessions\"> | null | undefined>) => Promise<HolderBoxReport>",
+          "doc": "Read the box a held lock's turn ran work on, for `reconcileTurnLockFromStoreAndBox`."
         },
         {
           "name": "readSandboxBinaryBytes",
@@ -23332,13 +23345,13 @@
         {
           "name": "createD1TurnEventStore",
           "kind": "function",
-          "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore",
+          "signature": "(db: D1LikeForTurns, options?: TurnEventStoreOptions) => ListingTurnEventStore",
           "doc": null
         },
         {
           "name": "createMemoryTurnEventStore",
           "kind": "function",
-          "signature": "(options?: TurnEventStoreOptions) => TurnEventStore",
+          "signature": "(options?: TurnEventStoreOptions) => ListingTurnEventStore",
           "doc": "In-memory store for tests and keyless local dev."
         },
         {
@@ -23412,6 +23425,12 @@
           "kind": "type",
           "signature": "type JsonRecord",
           "doc": "Represent a JSON-compatible object with string keys and values of any type"
+        },
+        {
+          "name": "ListingTurnEventStore",
+          "kind": "type",
+          "signature": "type ListingTurnEventStore",
+          "doc": "A store that lists running turns by scope, as the turn lock's default reclaim needs."
         },
         {
           "name": "mergePersistedPart",
@@ -26300,6 +26319,12 @@
           "doc": "The stored single-flight lock."
         },
         {
+          "name": "HolderBoxReport",
+          "kind": "type",
+          "signature": "type HolderBoxReport",
+          "doc": "What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer."
+        },
+        {
           "name": "interruptedReleaseApplies",
           "kind": "function",
           "signature": "(active: DurableTurnLock, input: { threadId: string; interruptedAt: number; turnId?: string | undefined; }) => boolean",
@@ -26370,6 +26395,12 @@
           "kind": "interface",
           "signature": "interface ReconcileStaleDurableTurnLockOptions",
           "doc": "Define options to reconcile stale durable turn locks with context, namespace, workspace, and active lock details"
+        },
+        {
+          "name": "reconcileTurnLockFromStoreAndBox",
+          "kind": "function",
+          "signature": "(input: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth; turnStore: Required<Pick<TurnEventStore, \"listRunni…",
+          "doc": "The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing, so without it the lock refuses every turn in its scope until its TTL."
         },
         {
           "name": "releaseDurableTurnLock",

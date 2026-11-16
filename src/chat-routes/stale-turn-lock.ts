@@ -168,17 +168,24 @@ export async function reconcileStaleTurnLock(
   options: ReconcileStaleTurnLockOptions,
 ): Promise<ReconcileStaleTurnLockResult> {
   if (options.owner) return reconcileTurnOwner(options)
+  // Snapshot the clock BEFORE the probes and use that one instant for BOTH the
+  // grace decision and the release fence on every branch: the release is only
+  // valid against the lock as it was when the state was observed, not after an
+  // arbitrarily slow round trip. Re-reading the clock after a probe would let a
+  // slow round trip age the lock past the grace on paper, and would hand the
+  // store a fence newer than a successor lock acquired meanwhile.
+  const observedAt = (options.now ?? Date.now)()
   let sandbox: StaleTurnLockSandboxProbeResult
   try {
     sandbox = await options.probeSandbox()
   } catch (err) {
-    return forceReleaseUnreachable(options, {
+    return forceReleaseUnreachable(options, observedAt, {
       unreachableReason: 'SANDBOX_PROBE_FAILED',
       unreachableDetail: messageOf(err),
     })
   }
   if (sandbox.status !== 'running') {
-    return forceReleaseUnreachable(options, {
+    return forceReleaseUnreachable(options, observedAt, {
       unreachableReason: sandbox.status === 'absent' ? 'SANDBOX_ABSENT' : 'SANDBOX_NOT_RUNNING',
       ...(sandbox.status === 'not-running' && sandbox.state !== undefined
         ? { sandboxState: sandbox.state }
@@ -186,24 +193,17 @@ export async function reconcileStaleTurnLock(
     })
   }
 
-  // Snapshot the clock BEFORE the probe and use that one instant for BOTH the
-  // grace decision and the release fence: the release is only valid against the
-  // lock as it was when the state was observed, not after an arbitrarily slow
-  // round trip. Re-reading the clock after the probe would let a slow round
-  // trip age the lock past the grace on paper, and would hand the store a fence
-  // newer than a successor lock acquired meanwhile.
-  const observedAt = (options.now ?? Date.now)()
   let session: StaleTurnLockSessionProbeResult
   try {
     session = await options.probeSession()
   } catch (err) {
-    return forceReleaseUnreachable(options, {
+    return forceReleaseUnreachable(options, observedAt, {
       unreachableReason: 'SESSION_PROBE_FAILED',
       unreachableDetail: messageOf(err),
     })
   }
   if (!session.reachable) {
-    return forceReleaseUnreachable(options, {
+    return forceReleaseUnreachable(options, observedAt, {
       unreachableReason: 'SESSION_UNREACHABLE',
       ...(session.reason !== undefined ? { sessionProbeError: session.reason } : {}),
     })
@@ -275,17 +275,17 @@ async function reconcileTurnOwner(options: ReconcileStaleTurnLockOptions): Promi
  * box — and say so either way, with the reason, the lock's age, and the grace
  * period it was measured against.
  *
- * One clock read (`at`) serves as the age gate AND the release fence here too,
- * for the same reason the terminal branch uses `observedAt` for both.
+ * The caller's pre-probe clock read (`observedAt`) serves as the age gate AND
+ * the release fence here too, exactly as on the terminal branch.
  */
 async function forceReleaseUnreachable(
   options: ReconcileStaleTurnLockOptions,
+  observedAt: number,
   reason: Record<string, unknown> & { unreachableReason: string },
 ): Promise<ReconcileStaleTurnLockResult> {
   const log = options.log ?? ((message, meta) => console.warn(message, meta))
   const graceMs = options.graceMs ?? DEFAULT_STALE_TURN_LOCK_GRACE_MS
-  const at = (options.now ?? Date.now)()
-  const lockAgeMs = at - options.lockStartedAt
+  const lockAgeMs = observedAt - options.lockStartedAt
   const diagnostics: Record<string, unknown> = {
     ...reason,
     sandboxReachable: false,
@@ -301,7 +301,7 @@ async function forceReleaseUnreachable(
     return { released: false, diagnostics: { ...diagnostics, forceReleaseWithheld: 'LOCK_WITHIN_GRACE_PERIOD' } }
   }
 
-  const released = await options.release({ observedAt: at })
+  const released = await options.release({ observedAt })
   log('[chat-routes] force-released stale turn lock: sandbox unreachable, no turn can be executing', {
     ...(options.context ?? {}),
     ...diagnostics,

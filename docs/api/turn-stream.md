@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-68 exports.
+70 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -134,6 +134,14 @@ TurnStreamLocationHint
 interface DurableTurnLock
 ```
 
+### `HolderBoxReport`
+
+`type` — What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer.
+
+```ts
+type HolderBoxReport
+```
+
 ### `interruptedReleaseApplies`
 
 `function` — The interrupted/stale release fence.
@@ -228,6 +236,14 @@ interface MemoryTurnStreamSocket
 
 ```ts
 interface ReconcileStaleDurableTurnLockOptions
+```
+
+### `reconcileTurnLockFromStoreAndBox`
+
+`function` — The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing, so without it the lock refuses every turn in its scope until its TTL.
+
+```ts
+(input: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth; turnStore: Required<Pick<TurnEventStore, "listRunni…
 ```
 
 ### `releaseDurableTurnLock`
