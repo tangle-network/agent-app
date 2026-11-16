@@ -220,7 +220,8 @@ describe('profile turn pin', () => {
         author: { kind: 'person', id: 'app-release' }, actorRole: 'owner', reason: 'Import' })
       const tools = profileTools({ store, followRelease, planDigest: async () => PLAN,
         activeTurn: async () => ({ workspaceId, profileId: 'director', revisionId: imported.id, memberId: 'owner', role: 'owner' as const }) })
-      const run = (name: string, args: object) => tools.find(tool => tool.name === name)!.run(args as never) as Promise<Record<string, unknown>>
+      const run = (name: string, args: object) =>
+        tools.find(tool => tool.name === name)!.run(args as never, {} as never) as Promise<Record<string, unknown>>
 
       const read = await run('profile.read', {})
       expect(read.systemPrompt).toBe('Deliver the ask first.')
