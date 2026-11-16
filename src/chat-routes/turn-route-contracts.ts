@@ -271,6 +271,8 @@ export interface ChatTurnAgentsOptions<TContext> {
 
 /** Define the arguments required to produce a chat turn with context and messaging details */
 export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
+  /** Set for the turn lock's acquire: the selected producer runs in this Worker (the Router lane). */
+  workerExecution?: boolean
   /** The agent this producer answers as, when the turn was addressed to one
    *  or more agents by mention. The route calls `produce` once per responder,
    *  all at once, each with the same thread history and none seeing another's

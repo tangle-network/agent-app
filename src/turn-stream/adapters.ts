@@ -164,6 +164,8 @@ export interface AcquireDurableTurnLockInput {
   /** Supply to reclaim/retry with a stable id; default mints a UUID. */
   lockId?: string
   cancellation?: { turnStreamId: string }
+  /** The holder runs the turn in this Worker; see {@link DurableTurnLock.workerExecution}. */
+  workerExecution?: boolean
 }
 
 /** Acquire a durable turn lock in the specified namespace with given input parameters */
@@ -294,6 +296,38 @@ export async function reconcileStaleDurableTurnLock(
   })
 }
 
+/**
+ * The default reclaim for a lock whose holder ran in its Worker (the Router lane). Such a turn dies with its
+ * invocation, and a cancelled invocation (a closed tab, a runtime limit) releases nothing, so without this a single
+ * cancel refused every turn in the lock's scope for the 30 minute TTL. The turn store is the authority: a live turn
+ * renews its running row every 30 s, so a holder thread with no unexpired running turn has nothing running, and the
+ * policy releases it past the terminal grace. A lock a box may outlive (no `workerExecution`), a parked release and a
+ * store that cannot answer all hold; those need the product's own box and session probes.
+ */
+export async function reconcileWorkerTurnLock(input: {
+  namespace: TurnStreamNamespaceLike
+  auth: TurnStreamAuth
+  turnStore: Pick<TurnEventStore, 'listRunning'>
+  active: DurableTurnLock
+}): Promise<{ released: boolean; diagnostics: Record<string, unknown> }> {
+  const { active, turnStore } = input
+  if (!active.workerExecution || !turnStore.listRunning) return { released: false, diagnostics: { reconciliation: 'holder_not_worker_run' } }
+  return reconcileStaleDurableTurnLock({
+    namespace: input.namespace, auth: input.auth, workspaceId: active.workspaceId, threadId: active.threadId, active,
+    context: { workspaceId: active.workspaceId, threadId: active.threadId, executionId: active.executionId, lockId: active.lockId },
+    probeSandbox: async () => ({ status: 'running' }),
+    probeSession: async () => {
+      if (active.releasePending) return { reachable: true, terminal: false, diagnostics: { releasePending: true } }
+      try {
+        const running = await turnStore.listRunning!(active.threadId)
+        return { reachable: true, terminal: running.length === 0, diagnostics: { runningTurns: running.length } }
+      } catch (error) {
+        return { reachable: true, terminal: false, diagnostics: { listRunningError: error instanceof Error ? error.message : String(error) } }
+      }
+    },
+  })
+}
+
 // ── ChatTurnLock adapter (the turnLock seam) ────────────────────────────────
 
 /** The subset of `ChatTurnProduceArgs` the lock adapter reads — structural,
@@ -305,6 +339,8 @@ export interface TurnLockSeamArgs<TContext> {
   turnStreamId?: string
   context: TContext
   body: { turnId?: string }
+  /** Set by the routes when the selected producer runs in this Worker (the Router lane). */
+  workerExecution?: boolean
 }
 
 /** Verdict shape of the vertical's `turnLock.acquire`. */
@@ -325,6 +361,9 @@ export interface CreateDurableTurnLockOptions<TContext> {
   scopeOf(args: TurnLockSeamArgs<TContext>): TurnLockScope
   /** Opt the existing lock into durable Stop. Leave native/durable completion lanes on their existing owner. */
   cancellationOf?(args: TurnLockSeamArgs<TContext>): boolean
+  /** The store the routes renew running turns in. With it and no `reconcile`, a lock whose holder ran in its Worker
+   *  is reclaimed once nothing renews the holder's turn ({@link reconcileWorkerTurnLock}). */
+  turnStore?: Pick<TurnEventStore, 'listRunning'>
   /** Override the execution id the lock records (e.g. a follow-up reclaiming
    *  the execution it already dispatched). Default: the turn's own. */
   lockExecutionIdOf?(args: TurnLockSeamArgs<TContext>): string | undefined
@@ -335,7 +374,7 @@ export interface CreateDurableTurnLockOptions<TContext> {
    * Attempt stale-lock recovery after a refused acquire. Return whether the
    * held lock was released (the adapter then retries the acquire once).
    * Products wire {@link reconcileStaleDurableTurnLock} with their sandbox +
-   * session probes here. Omit → a refused acquire is final.
+   * session probes here. Omit → {@link reconcileWorkerTurnLock} when `turnStore` is given, else a refused acquire is final.
    */
   reconcile?(
     args: TurnLockSeamArgs<TContext>,
@@ -412,12 +451,17 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
         executionId,
         ...(turnId ? { turnId } : {}),
         ...(cancellable ? { cancellation: { turnStreamId: args.turnStreamId! } } : {}),
+        ...(args.workerExecution ? { workerExecution: true } : {}),
       }
 
       let acquired = await acquireDurableTurnLock(namespace, input, options.auth)
       let diagnostics: Record<string, unknown> | undefined
-      if (!acquired.acquired && options.reconcile) {
-        const reconciled = await options.reconcile(args, acquired.active)
+      const turnStore = options.turnStore
+      const reconcile = options.reconcile ?? (turnStore
+        ? (_args: TurnLockSeamArgs<TContext>, active: DurableTurnLock) => reconcileWorkerTurnLock({ namespace, auth: options.auth, turnStore, active })
+        : undefined)
+      if (!acquired.acquired && reconcile) {
+        const reconciled = await reconcile(args, acquired.active)
         diagnostics = reconciled.diagnostics
         if (reconciled.released) {
           acquired = await acquireDurableTurnLock(namespace, input, options.auth)
