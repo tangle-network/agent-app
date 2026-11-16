@@ -309,6 +309,8 @@ type HolderEvidence = { status: 'live' | 'abandoned' | 'unknown'; diagnostics: R
  * write its running row within that grace of taking the lock. A parked release and a store that cannot answer hold. A
  * box that does not answer sends a lock to the policy's unreachable bound; a durable-Stop lock goes through the owner
  * rule on the same evidence, where an unanswered read is `unknown` and holds. The 409 carries counts and classes only.
+ * Enable it through `createDurableTurnLock`'s `turnStore` rather than as a product `reconcile`: only that lock makes the
+ * routes write the early running row and hold a handed-off lock, which this evidence relies on.
  */
 export async function reconcileTurnLockFromStoreAndBox(input: {
   namespace: TurnStreamNamespaceLike

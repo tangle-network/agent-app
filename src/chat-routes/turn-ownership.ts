@@ -55,11 +55,12 @@ export function createChatTurnOwnership(state: OwnershipState,
         // A lock whose reclaim would read the handed-off turn as dead once nothing renews its row holds for the owner,
         // whose release of the exact lock frees it.
         if (state.lockAcquired && options.turnLock?.holdForHandoff) {
-          // Nothing renews a handed-off turn's row, so an unheld lock could be reclaimed under the native run: retry.
-          let held = false
-          for (let tries = 0; tries < 3 && !held; tries++) {
+          // Nothing renews a handed-off turn's row, so an unheld lock could be reclaimed under the native run: a failed
+          // call is retried; a `false` (the lock is gone or fenced) is final.
+          let held: boolean | undefined
+          for (let tries = 0; tries < 3 && held === undefined; tries++) {
             if (tries) await new Promise(resolve => setTimeout(resolve, 250 * tries))
-            held = await Promise.resolve().then(() => options.turnLock!.holdForHandoff!(state.lockHandle)).catch(() => false)
+            held = await Promise.resolve().then(() => options.turnLock!.holdForHandoff!(state.lockHandle)).then(Boolean, () => undefined)
           }
           if (!held) log('[chat-routes] turn lock hand-off hold failed', { turnId: turnStreamId, class: 'turn_lock_handoff_hold_failed' })
         }

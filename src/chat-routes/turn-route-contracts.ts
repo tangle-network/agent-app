@@ -677,7 +677,9 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  - `{proceed:'handoff'}` releases the route-acquired lock, returns the
    *    product's accepted `Response`, and transfers execution and lifecycle
    *    ownership to the product's durable owner. The route runs no producer
-   *    or lifecycle hook.
+   *    or lifecycle hook. With a lock that uses the default reclaim, the route
+   *    wrote a running row for `args.turnStreamId` at acquire; the owner
+   *    settles it (or it lapses with its lease).
    *  - Always returning `{proceed:true}` is supported, not a misuse: the seam
    *    doubles as the one place that runs after the user row exists and before
    *    the producer, which is where per-turn analytics and readiness
