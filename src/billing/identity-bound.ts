@@ -234,7 +234,7 @@ export interface DurableWorkspaceKeyManagerOptions {
   revocationRetryBaseMs?: number
   /** Maximum delay for a failed remote revoke. */
   revocationRetryMaxMs?: number
-  /** Stable remote name. The operation id makes the default crash-safe. */
+  /** Remote name; the mint's operation id is appended when absent, as a create under a held name revokes its key. */
   nameForIdentity?: (identity: WorkspaceKeyIdentity, operationId: string) => string
   /** Resolve names for rows written before `name` became durable. Null blocks issuance safely. */
   legacyNameForRecord?: (record: DurableWorkspaceKeyRecord) => string | null | undefined
@@ -851,8 +851,9 @@ function createWorkspaceKeyMinter(
     const mintOperationId = operationId()
     const createdAt = now()
     const expiresAt = new Date(createdAt.getTime() + keyLifetimeMs)
-    const name = (options.nameForIdentity?.(identity, mintOperationId) ?? defaultKeyName(identity, product, mintOperationId)).trim()
-    if (!name) throw new Error('workspace child key remote name is required')
+    const named = (options.nameForIdentity?.(identity, mintOperationId) ?? defaultKeyName(identity, product, mintOperationId)).trim()
+    if (!named) throw new Error('workspace child key remote name is required')
+    const name = named.includes(mintOperationId) ? named : `${named}:${mintOperationId}`
     const rowId = operationId()
     const idempotencyKey = `workspace-key:${rowId}`
     const provisioningRow: DurableWorkspaceKeyProvisioningRecord = {
