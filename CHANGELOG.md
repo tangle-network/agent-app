@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.34
+
+- fix(agent-profiles): a stored profile runs the product's current prompt where its own is product text (#1530)
+
 ## 3.0.33
 
 - feat(chat-routes): completionOwner on the shared sandbox backend hands a turn to a durable owner; owner redacts stored transcript (#1533)
