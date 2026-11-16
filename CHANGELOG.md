@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.36
+
+- journeys: the trace keeps no screencast frames; the video holds the pixels (#1534)
+
 ## 3.0.35
 
 - fix(sandbox): a reused box skips the product bootstrap it already ran under the same build (#1535)
