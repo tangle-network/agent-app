@@ -442,6 +442,7 @@ export function createWorkspaceKeyManager(opts: WorkspaceKeyManagerOptions): Wor
 
 export {
   createIdentityBoundWorkspaceKeyManager,
+  DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS,
   type DurableWorkspaceKeyManager,
   type DurableWorkspaceKeyManagerOptions,
   type DurableWorkspaceKeyCreateInput,

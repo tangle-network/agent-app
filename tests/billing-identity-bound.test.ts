@@ -501,6 +501,62 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.remote.values()].filter((key) => !key.revoked)).toHaveLength(1)
   })
 
+  // A turn holds the key it was handed until it ends. A key reused with less remaining life than one turn can expire
+  // mid-turn, so reuse requires a remaining-life floor; below it a fresh key is minted and the old one is retired at its
+  // own expiry, never revoked under a turn that still holds it.
+  const REUSE_FLOOR_MS = 20 * 60_000
+
+  it('mints a fresh key when the active key has less remaining life than the reuse floor, and never revokes the old one', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - REUSE_FLOOR_MS + 1)
+
+    const next = await manager.ensureKey(h.identity())
+    expect(next.refreshed).toBe(true)
+    expect(next.usage.keyId).not.toBe(first.usage.keyId)
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).not.toBe('active')
+    expect(old.nextRevocationAt?.getTime()).toBe(old.expiresAt.getTime())
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
+    expect([...h.rows.values()].filter((row) => row.status === 'active').map((row) => row.keyId)).toEqual([next.usage.keyId])
+
+    // The retired key never blocks the next request, which reuses the fresh key.
+    expect((await manager.ensureKey(h.identity())).usage.keyId).toBe(next.usage.keyId)
+
+    // A turn admitted just under the floor runs a whole floor-length turn on the fresh key, past the old key's expiry.
+    h.advance(REUSE_FLOOR_MS)
+    const turnEnd = Date.parse(first.usage.expiresAt) + 1
+    expect(Date.parse(h.remote.get(next.usage.keyId)!.expiresAt)).toBeGreaterThan(turnEnd)
+    await expect(h.provisioner.getKey(next.usage.keyId)).resolves.toMatchObject({ expiresAt: next.usage.expiresAt })
+
+    // At its own expiry the old key is retired through the ordinary cleanup.
+    expect(await manager.retryPendingRevocations({ workspaceId: 'workspace-1', ownerUserId: 'owner-1' })).toBe(1)
+    expect(old.status).toBe('revoked')
+  })
+
+  it('reuses the active key while its remaining life is at or above the reuse floor', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - REUSE_FLOOR_MS)
+
+    const again = await manager.ensureKey(h.identity())
+    expect(again.refreshed).toBe(false)
+    expect(again.usage.keyId).toBe(first.usage.keyId)
+    expect(h.rowFor(first.usage.keyId)?.status).toBe('active')
+    expect([...h.remote.values()]).toHaveLength(1)
+  })
+
+  it('takes a per-app reuse floor shorter than the key lifetime', async () => {
+    const h = makeHarness()
+    expect(() => h.manager('router', { keyLifetimeMs: 30 * 60_000, minRemainingLifetimeMs: 30 * 60_000 })).toThrow('shorter than keyLifetimeMs')
+    const manager = h.manager('router', { minRemainingLifetimeMs: 40 * 60_000 })
+    const first = await manager.ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - 40 * 60_000 + 1)
+    expect((await manager.ensureKey(h.identity())).usage.keyId).not.toBe(first.usage.keyId)
+  })
+
   // A read-back that cannot answer is not evidence about the key: one bad Platform minute must not rotate every
   // workspace's key and kill every running reply.
   it('neither rotates nor revokes the active key when its read-back cannot answer', async () => {
