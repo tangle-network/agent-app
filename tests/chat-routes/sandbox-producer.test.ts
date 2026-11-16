@@ -788,17 +788,13 @@ describe('createSandboxChatProducer', () => {
     expect(persisted.some((p) => 'url' in p)).toBe(false)
   })
 
-  it('notices a warning in its own words, withholds a harness warning, and forwards both', async () => {
+  it('notices and forwards a warning in its own words, and drops a withheld harness warning', async () => {
     const harnessWarning = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
     const refusal = { type: 'warning', data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance for this request.' } }
     const producer = createSandboxChatProducer({ events: feed([harnessWarning, refusal]), log: () => {} })
     const notice = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: 'PAYMENT_REQUIRED: The account has no balance for this request.' }
 
-    expect(onWire(await drain(producer.stream))).toEqual([
-      { type: 'warning', data: { code: 'FILE_DENIED', message: FAILED } },
-      notice,
-      refusal,
-    ])
+    expect(onWire(await drain(producer.stream))).toEqual([notice, refusal])
     expect(producer.assistantParts?.()).toEqual([notice])
   })
 

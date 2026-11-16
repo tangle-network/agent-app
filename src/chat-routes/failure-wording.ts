@@ -87,6 +87,9 @@ export function sandboxStreamErrorCode(data: unknown): string {
 
 export const FAILED_TURN_TEXT = 'That answer stopped before it finished. Please send your question again.'
 
+/** What the person reads when a charged answer's settlement check fails after it: sending again would charge again. */
+const ANSWER_COMPLETE_TEXT = 'The answer above is complete.'
+
 /** Refusals that fail the same way again, whose product-written words and code the person acts on: a payment refusal;
  *  a model-policy refusal (`MODEL_REFUSED` from the box, `model_policy_denied` when the policy admits no model in the
  *  chain); and the protected lane's refusal of its model, its activation or its profile. */
@@ -94,7 +97,7 @@ const REFUSAL_CODES: ReadonlySet<string> = new Set(['PAYMENT_REQUIRED', 'MODEL_R
   'grant_model_unsupported', 'grant_activation_missing', 'profile_unsupported'])
 
 /** Event types that carry a failure reason; `done` and `status` do too when their status is `failed`. */
-const FAILURE_TYPES: ReadonlySet<string> = new Set(['error', 'warning', 'session.run.failed'])
+const FAILURE_TYPES: ReadonlySet<string> = new Set(['error', 'warning', 'session.run.failed', 'session.error'])
 
 /** Detail fields a client renders as text (`supportDetails`, `hint`) or that carry the raw reason. */
 const TEXT_DETAILS: ReadonlySet<string> = new Set(['supportDetails', 'hint', 'failureNote', 'raw'])
@@ -125,11 +128,13 @@ export function failureText(view: FailureView, partialAnswer: string): string {
   return `${lead}\n\nError: ${view.shown}`
 }
 
-/** The reason a failure event carries: in `data`, else at the top level, else (for `error`) the whole data. */
+/** The reason a failure event carries: in `data` (a session error nests it under `properties.error`), else at the top
+ *  level, else (for `error`) the whole data. */
 function failureReason(event: JsonRecord): string | undefined {
   const data = asRecord(event.data)
   const prose = (value: unknown) => typeof value === 'string' && value && !CODE_VALUE.test(value) ? value : undefined
   return asString(data?.message) ?? asString(data?.error) ?? asString(data?.detail) ?? prose(data?.reason)
+    ?? asString(asRecord(data?.error)?.message) ?? asString(asRecord(asRecord(data?.properties)?.error)?.message)
     ?? asString(event.error) ?? asString(asRecord(event.error)?.message) ?? asString(event.details)
     ?? (event.type === 'error' ? sandboxStreamErrorMessage(data) : undefined)
 }
@@ -139,7 +144,16 @@ function failureReason(event: JsonRecord): string | undefined {
 function shownFailure(event: JsonRecord, shown: string, reason: string): JsonRecord {
   const data = asRecord(event.data) ?? {}
   const visible: JsonRecord = { ...data }
-  for (const key of ['message', 'error', 'detail']) if (typeof visible[key] === 'string') visible[key] = shown
+  // An error object keeps only its code beside the shown message.
+  const shownError = (value: unknown): unknown => {
+    const error = asRecord(value)
+    if (typeof value === 'string') return shown
+    return error ? { ...(typeof error.code === 'string' ? { code: error.code } : {}), message: shown } : value
+  }
+  for (const key of ['message', 'detail']) if (typeof visible[key] === 'string') visible[key] = shown
+  if ('error' in visible) visible.error = shownError(visible.error)
+  const properties = asRecord(data.properties)
+  if (properties && 'error' in properties) visible.properties = { ...properties, error: shownError(properties.error) }
   if (typeof visible.reason === 'string' && !CODE_VALUE.test(visible.reason)) visible.reason = shown
   if (event.type === 'error' || event.type === 'session.run.failed') visible.message = shown
   const details = Object.entries(asRecord(data.details) ?? {}).filter(([key]) => !TEXT_DETAILS.has(key))
@@ -147,8 +161,7 @@ function shownFailure(event: JsonRecord, shown: string, reason: string): JsonRec
   if (details.length > 0) visible.details = Object.fromEntries(details)
   const original = typeof data.message === 'string' ? data : { ...data, message: reason }
   const out: JsonRecord = { ...event, data: Object.assign(visible, { [WITHHELD_FAILURE]: original }) }
-  if (typeof event.error === 'string') out.error = shown
-  else if (asRecord(event.error)) out.error = { message: shown }
+  if ('error' in event) out.error = shownError(event.error)
   delete out.details
   return out
 }
@@ -183,17 +196,21 @@ export function personFacing(options: { log?: Log; failedTurnText: string }) {
       const warn = options.log ?? console.warn
       warn('[chat-routes] turn failure withheld from the person', { failureClass: 'runtime_failure', code, error: reason, ...meta })
     }
+    // A settlement check that fails after a charged answer leaves that answer whole: sending again would charge again.
+    if (code?.startsWith('settlement_')) return { kind: 'plain', shown: ANSWER_COMPLETE_TEXT }
     return { kind: 'withheld', shown: options.failedTurnText }
   }
-  const event = (event: JsonRecord): JsonRecord => {
+  /** An event as it may reach the client, or `undefined` for a withheld warning, which leaves nothing to show. */
+  const event = (event: JsonRecord): JsonRecord | undefined => {
     const data = asRecord(event.data)
     if (event.type === 'raw') return shownRaw(event, (reason) => view(reason, undefined, undefined, failureIds(data)))
     const failed = (event.type === 'done' || event.type === 'status') && data?.status === 'failed'
     if (!failed && !FAILURE_TYPES.has(String(event.type))) return event
     const reason = failureReason(event)
     if (!reason) return event
-    const shown = view(reason, asString(data?.code), data?.statusCode ?? (failed ? undefined : data?.status), failureIds(data)).shown
-    return shownFailure(event, shown, reason)
+    const shown = view(reason, asString(data?.code), data?.statusCode ?? (failed ? undefined : data?.status), failureIds(data))
+    if (event.type === 'warning' && shown.kind === 'withheld') return undefined
+    return shownFailure(event, shown.shown, reason)
   }
   return { view, event }
 }
@@ -230,7 +247,7 @@ export function sandboxStreamFailureDiagnostic(error: unknown): { failureNote: s
     code = error.code
   } else if (error instanceof ModelFailoverExhaustedError) {
     code = noModelAllowed(error) ? 'model_policy_denied' : error.upstreamCode ?? code
-  } else if (ownCode && REFUSAL_CODES.has(ownCode)) {
+  } else if (ownCode && (REFUSAL_CODES.has(ownCode) || ownCode.startsWith('settlement_'))) {
     code = ownCode
   }
   if (modelKeyRefusedSentence(message)) code = MODEL_KEY_REFUSED_CODE

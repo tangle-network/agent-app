@@ -168,18 +168,15 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
             reasoningTokens: usage.reasoningTokens, toolTokens: 0,
             toolCallCount: toolCalls, budgetEnforced: outcome.settlement.budgetEnforced } })
         }
-        // A settlement check fails after the turn answered: the answer stands, charged, and the failure goes to the server
-        // log only. A failure notice would ask the person to send again, and a second send would be charged again.
-        const settledAfterAnswer = outcome.failure?.code.startsWith('settlement_') ?? false
-        if (!outcome.failure || settledAfterAnswer) {
+        // A settlement check fails after the turn answered; the answer stands beside the failure.
+        if (!outcome.failure || outcome.failure.code.startsWith('settlement_')) {
           // The Router turn's own answer rule, so this lane and the Router lane store the same final text.
           const finalText = outcome.answer
           if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
           await emit({ type: 'result', data: { finalText } })
         }
-        if (settledAfterAnswer) console.warn('[chat-routes] protected turn settlement failed after its answer', { ...outcome.failure })
         // The code goes with the message, so a refusal reads as its own words and a runtime failure is withheld.
-        else if (outcome.failure) throw Object.assign(new Error(outcome.failure.message), { code: outcome.failure.code })
+        if (outcome.failure) throw Object.assign(new Error(outcome.failure.message), { code: outcome.failure.code })
         await channelWriter.close()
       }).catch(error => channelWriter.abort(error))
       for (;;) {

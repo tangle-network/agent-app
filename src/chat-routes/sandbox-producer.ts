@@ -317,15 +317,18 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
 
-/** The producer's stream with every event passed through `shown` just before it leaves; next, return and throw reach
- *  the source unchanged, so cancellation and error injection behave as on the source itself. */
+/** The producer's stream with every event passed through `shown` just before it leaves, and an event `shown` drops
+ *  skipped; next, return and throw reach the source unchanged, so cancellation and error injection behave as on the
+ *  source itself. */
 function shownStream(
   source: AsyncGenerator<ProducerWireEvent, void, unknown>,
-  shown: (event: JsonRecord) => JsonRecord,
+  shown: (event: JsonRecord) => JsonRecord | undefined,
 ): AsyncGenerator<ProducerWireEvent, void, unknown> {
   const map = async (step: Promise<IteratorResult<ProducerWireEvent, void>>): Promise<IteratorResult<ProducerWireEvent, void>> => {
     const result = await step
-    return result.done ? result : { done: false, value: toProducerWireEvent(shown(result.value as unknown as JsonRecord)) }
+    if (result.done) return result
+    const value = shown(result.value as unknown as JsonRecord)
+    return value ? { done: false, value: toProducerWireEvent(value) } : map(source.next())
   }
   return {
     [Symbol.asyncIterator]() { return this },
@@ -468,7 +471,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           const code = asString(event.data?.code)
-          // A plainly worded failure arrives as its error event next, and a withheld one is logged by `person`: only a
+          // A plainly worded failure arrives as its error event next, and `person` logs and drops a withheld one: only a
           // warning in its own words becomes a notice.
           const view = message ? person.view(message, code, undefined, failureIds(event.data)) : undefined
           if (view?.kind === 'plain') log('[chat-routes] failure warning folded into its error notice', { code, error: message })
@@ -558,10 +561,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       preflightRefused = !observedSourceEvent && openAttempts() === 1
         && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
-      // Logged once: a withheld reason by `person`, with its failure note; any other by this line.
+      // Logged once: a withheld or settlement reason by `person`, with its failure note; any other by this line.
       const view = person.view(diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status,
         { ...failureIds(asRecord(streamErr)?.diagnostics), failureNote: diagnostic.failureNote })
-      if (view.kind !== 'withheld') log('[chat-routes] sandbox stream failed', {
+      if (view.kind !== 'withheld' && !diagnostic.code.startsWith('settlement_')) log('[chat-routes] sandbox stream failed', {
         failureNote: diagnostic.failureNote,
         error: streamErr instanceof Error ? streamErr.message : String(streamErr),
       })

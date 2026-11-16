@@ -67,6 +67,7 @@ async function turn(events: unknown[], options: {
   const thread = await store.createThread({ workspaceId: 'ws1', title: 'T' })
   const pending: Promise<unknown>[] = []
   let failureReason: string | undefined
+  let failed: boolean | undefined
   const routes = createChatTurnRoutes({
     projectId: 'failed-turn-text',
     authorize: async () => ({ ok: true, tenantId: 'ws1', userId: 'u1', context: undefined }),
@@ -78,7 +79,7 @@ async function turn(events: unknown[], options: {
       ...(options.serverLog === 'default' ? {} : { log: () => {} }),
     })),
     ...(options.redactValues ? { redactValues: () => options.redactValues! } : {}),
-    onTurnComplete: async (input) => { failureReason = input.failureReason },
+    onTurnComplete: async (input) => { failureReason = input.failureReason; failed = input.failed },
     log: () => {},
   })
   const response = await routes.turn(new Request('http://app.test/api/chat', {
@@ -97,6 +98,7 @@ async function turn(events: unknown[], options: {
     error: streamed.find((event) => event.type === 'error')?.data,
     row: rows.find((row) => row.role === 'assistant'),
     failureReason,
+    failed,
   }
 }
 
@@ -134,12 +136,24 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason(result)
   })
 
+  it('drops a withheld harness warning from the wire and the stored row, while the terminal error reads the plain sentence', async () => {
+    const result = await turn([{ type: 'warning', data: { code: 'OPENCODE_ERROR', message: HARNESS_FAILURE } }, terminalError])
+
+    expect(result.streamed.filter((event) => event.type === 'warning' || event.type === 'notice')).toEqual([])
+    expect(JSON.stringify(result.row?.parts)).not.toContain('OPENCODE_ERROR')
+    expect(result.error?.message).toBe(PLAIN)
+    expect(result.text).toBe(PLAIN)
+    expect(result.row?.content).toBe(PLAIN)
+    expectNoRawReason(result)
+  })
+
   it.each([
-    ['a warning', { type: 'warning', data: { code: 'OPENCODE_ERROR', message: HARNESS_FAILURE } }],
     ['a raw error', { type: 'raw', data: { backend: 'opencode', event: { type: 'error', error: { name: 'UnknownError', data: { message: HARNESS_FAILURE } } } } }],
     ['a failed status', { type: 'status', data: { status: 'failed', detail: HARNESS_FAILURE } }],
     ['a failed done', { type: 'done', data: { status: 'failed', message: HARNESS_FAILURE } }],
     ['a session.run.failed', { type: 'session.run.failed', data: { message: HARNESS_FAILURE } }],
+    ['a session.error', { type: 'session.error', data: { type: 'session.error',
+      properties: { sessionID: 'session-1', error: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE } } } }],
   ])('carries no reason on %s before the terminal error, live or stored, and adds no notice', async (_kind, before) => {
     const result = await turn([before, terminalError])
 
@@ -290,7 +304,7 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason({ wire: buffered, row: result })
   })
 
-  it('keeps a charged answer whole when its settlement fails afterwards, with no failure or send-again text', async () => {
+  it('keeps a charged answer whole when its settlement fails afterwards: the turn fails, the person reads that it is complete', async () => {
     const model = 'anthropic/claude-haiku-4-5-20251001'
     const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' as const
     // The model grant service: it settles the answer's call, then reports usage beyond the grant's limits.
@@ -320,12 +334,17 @@ describe('a failed turn never shows the person the raw failure reason', () => {
           deadlineAtMs: Date.now() + 20_000 },
       }) })
 
+      // The full answer stands; the turn still ends failed, so billing treats it as main does.
       expect(result.text).toBe('Completed work.')
       expect(result.row?.content).toBe('Completed work.')
-      expect(result.streamed.filter((event) => event.type === 'error' || event.type === 'notice')).toEqual([])
-      expect(result.wire).not.toContain('send your question again')
-      expect(warn).toHaveBeenCalledWith('[chat-routes] protected turn settlement failed after its answer',
-        expect.objectContaining({ code: 'settlement_over_limit' }))
+      expect(result.failed).toBe(true)
+      expect(result.error).toMatchObject({ code: 'settlement_over_limit', message: 'The answer above is complete.' })
+      expect(result.streamed.filter((event) => event.type === 'notice').map((event) => event.text)).toEqual(['The answer above is complete.'])
+      expect(result.wire).not.toMatch(/\bsend\b/i)
+      expect(JSON.stringify(result.row)).not.toMatch(/\bsend\b/i)
+      expectNoRawReason(result, ['exceeded execution limits'])
+      expect(warn).toHaveBeenCalledWith('[chat-routes] turn failure withheld from the person',
+        expect.objectContaining({ code: 'settlement_over_limit', error: expect.stringContaining('exceeded execution limits') }))
     } finally {
       warn.mockRestore()
       vi.unstubAllGlobals()
