@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.37
+
+- fix(agent-profiles): profile self-edit and custom profiles use the text a turn runs (#1537)
+
 ## 3.0.36
 
 - journeys: the trace keeps no screencast frames; the video holds the pixels (#1534)
