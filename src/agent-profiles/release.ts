@@ -15,7 +15,6 @@ import type { ProfilePromptHistoryEntry, ProfileRevision, ProfileRevisionStore }
 
 type SkillRef = NonNullable<NonNullable<AgentProfile['resources']>['skills']>[number]
 type Specialist = NonNullable<AgentProfile['subagents']>[string]
-type IsProductAuthor = (author: ProfileRevision['author']) => boolean
 
 /** How a stored profile's text compares with the current release; `customized` text is the workspace's own and stays. */
 export interface ProfileReleaseUpdates {
@@ -31,7 +30,7 @@ export interface ProfileReleaseUpdates {
 }
 
 /** The longest history read; a longer one reads as incomplete, so its prompt is kept. */
-export const PROFILE_PROMPT_HISTORY_MAX = 500
+export const PROFILE_PROMPT_HISTORY_MAX = 10_000
 
 const skillName = (skill: SkillRef) => skill.name ?? (skill.kind === 'github' ? skill.path : '')
 const digest = (value: unknown) => canonicalCandidateDigest(value ?? null)
@@ -116,64 +115,66 @@ export function overlayOnRelease(stored: AgentProfile, shipped: readonly AgentPr
 
 async function promptHistory(store: ProfileRevisionStore, revision: ProfileRevision): Promise<ProfilePromptHistoryEntry[]> {
   if (store.readPromptHistory) return store.readPromptHistory(revision.workspaceId, revision.profileId, revision.id)
+  const newest = revision.profile.prompt?.systemPrompt
   const history: ProfilePromptHistoryEntry[] = []
+  let child: string | undefined
   for (let current: ProfileRevision | null = revision; current && history.length < PROFILE_PROMPT_HISTORY_MAX;) {
+    const prompt = current.profile.prompt?.systemPrompt
     history.push({ id: current.id, parentId: current.parentId, author: current.author,
-      systemPrompt: current.profile.prompt?.systemPrompt ?? null })
+      sameAsNewest: prompt === newest, sameAsChild: history.length ? prompt === child : null })
+    child = prompt
     current = current.parentId ? await store.getRevision(revision.workspaceId, revision.profileId, current.parentId) : null
   }
   return history
 }
 
 /**
- * The system prompts the product wrote into a revision's history: each revision by a product author whose prompt
- * differs from its parent's (an import, or a release refresh). A product revision that carries its parent's prompt
- * forward ships nothing, so a person's text a release copied stays theirs. `null` when the history is incomplete
- * (a missing ancestor, or a longer history than `PROFILE_PROMPT_HISTORY_MAX`): no prompt in it is then shown to be
- * the product's.
+ * Whether a revision's system prompt is one the product shipped into its history: some revision by a product author
+ * has that prompt and differs from its parent's (an import, or a release refresh). A product revision that carries
+ * its parent's prompt forward ships nothing, so a person's text a release copied stays theirs. An incomplete history
+ * (a missing ancestor, or a longer one than `PROFILE_PROMPT_HISTORY_MAX`) shows nothing to be the product's.
  */
-export async function shippedSystemPrompts(store: ProfileRevisionStore, revision: ProfileRevision,
-  isProductAuthor: IsProductAuthor): Promise<string[] | null> {
+export async function promptShippedByProduct(store: ProfileRevisionStore, revision: ProfileRevision,
+  productAuthorIds: readonly string[]): Promise<boolean> {
   const history = await promptHistory(store, revision)
-  const shipped: string[] = []
+  let shipped = false
   for (const [index, entry] of history.entries()) {
     const parent = history[index + 1]
-    if (entry.parentId !== null && parent?.id !== entry.parentId) return null
-    if (entry.systemPrompt !== null && isProductAuthor(entry.author) &&
-        (entry.parentId === null || parent?.systemPrompt !== entry.systemPrompt)) shipped.push(entry.systemPrompt)
+    if (entry.parentId !== null && parent?.id !== entry.parentId) return false
+    if (entry.sameAsNewest && productAuthorIds.includes(entry.author.id) &&
+        (entry.parentId === null || parent?.sameAsChild === false)) shipped = true
   }
   return shipped
 }
 
-/** Per product-author rule, whether a revision's stored prompt is product text. Revisions and their history are
+/** Whether a revision's stored prompt is product text, per product author ids. Revisions and their history are
  *  immutable, so an answer never changes. */
-const productPromptRevisions = new WeakMap<IsProductAuthor, Map<string, boolean>>()
+const productPromptRevisions = new Map<string, boolean>()
 const PRODUCT_PROMPT_REVISIONS_MAX = 10_000
 
 /**
  * The profile a turn runs for `revision`: the stored profile with the release's system prompt where the stored prompt
- * is one the product shipped into its history (`shippedSystemPrompts`) or absent; unchanged, and returned as is,
- * where a person wrote it. Only the system prompt moves; authority, name, description and instructions stay. The
- * history is read once per revision and isolate, in one round trip on the D1 store, and not at all when the stored
- * prompt already is the release's. A plan digest computed from the result moves with each release, so a product's
- * `verifyEffectivePlan` must compute it from this function's result too.
+ * is one the product shipped into its history (`promptShippedByProduct`, revisions whose author id is in
+ * `productAuthorIds`) or absent; unchanged, and returned as is, where a person wrote it. Only the system prompt
+ * moves; authority, name, description and instructions stay. The history is read once per revision and isolate, in
+ * one round trip on the D1 store, and not at all when the stored prompt already is the release's. A plan digest
+ * computed from the result moves with each release, so a product's `verifyEffectivePlan` must compute it from this
+ * function's result too.
  */
 export async function followProductRelease(store: ProfileRevisionStore, revision: ProfileRevision,
-  release: AgentProfile, isProductAuthor: IsProductAuthor): Promise<AgentProfile> {
+  release: AgentProfile, productAuthorIds: readonly string[]): Promise<AgentProfile> {
   const stored = revision.profile
   const storedPrompt = stored.prompt?.systemPrompt
   const releasePrompt = release.prompt?.systemPrompt
   if (storedPrompt === releasePrompt) return stored
   if (storedPrompt !== undefined) {
-    let decisions = productPromptRevisions.get(isProductAuthor)
-    if (!decisions) productPromptRevisions.set(isProductAuthor, decisions = new Map())
-    const key = `${revision.workspaceId}\0${revision.profileId}\0${revision.id}`
-    let product = decisions.get(key)
+    const key = JSON.stringify([[...productAuthorIds].sort(), revision.workspaceId, revision.profileId, revision.id])
+    let product = productPromptRevisions.get(key)
     if (product === undefined) {
-      product = (await shippedSystemPrompts(store, revision, isProductAuthor))?.includes(storedPrompt) ?? false
-      decisions.set(key, product)
-      const oldest = decisions.keys().next().value
-      if (decisions.size > PRODUCT_PROMPT_REVISIONS_MAX && oldest !== undefined) decisions.delete(oldest)
+      product = await promptShippedByProduct(store, revision, productAuthorIds)
+      productPromptRevisions.set(key, product)
+      const oldest = productPromptRevisions.keys().next().value
+      if (productPromptRevisions.size > PRODUCT_PROMPT_REVISIONS_MAX && oldest !== undefined) productPromptRevisions.delete(oldest)
     }
     if (!product) return stored
   }

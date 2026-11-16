@@ -138,11 +138,11 @@ describe('profile turn pin', () => {
     const releaseA: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Ask one question, then halt and wait.' } }
     const releaseB: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Deliver the ask first.' } }
     const ownText: AgentProfile = { ...releaseA, prompt: { systemPrompt: 'Always cite the brief.' } }
-    const byProduct = (author: ProfileRevision['author']) => author.id === 'app-release'
     const write = (workspaceId: string, parent: ProfileRevision | null, profile: AgentProfile, authorId: string) =>
       proposeRevision({ store, workspaceId, profileId: 'director', expectedRevisionId: parent?.id ?? null, profile,
         knowledgeText: '', planDigest: PLAN, author: { kind: 'person', id: authorId }, actorRole: 'owner', reason: 'Step' })
-    const run = (revision: ProfileRevision) => followProductRelease(store, revision, releaseB, byProduct)
+    // A fresh id list per call, as an adopter writing it inline would pass.
+    const run = (revision: ProfileRevision) => followProductRelease(store, revision, releaseB, ['app-release'])
     try {
       const untouched = await write('untouched', null, releaseA, 'app-release')
       // A person renamed it; the prompt is still the one release A shipped.

@@ -125,12 +125,16 @@ export interface ProfileRevisionStore {
   readPromptHistory?(workspaceId: string, profileId: string, revisionId: string): Promise<ProfilePromptHistoryEntry[]>
 }
 
-/** One revision of a profile's history, reduced to what decides whether its system prompt is product text. */
+/** One revision of a profile's history, reduced to what decides whether the newest one's system prompt is product
+ *  text. Prompts are compared where they are stored, so the history carries no prompt text. */
 export interface ProfilePromptHistoryEntry {
   id: string
   parentId: string | null
   author: ProfileRevision['author']
-  systemPrompt: string | null
+  /** Its system prompt equals the newest entry's. */
+  sameAsNewest: boolean
+  /** Its system prompt equals the entry before it, its child's; `null` on the newest entry. */
+  sameAsChild: boolean | null
 }
 
 export class ProfileConflictError extends Error {
