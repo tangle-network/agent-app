@@ -24,6 +24,8 @@ export interface ReuseChecks {
   env?: { digest: string; at: number }
   /** The deferred corpus the box was last found to hold, by its hash. */
   corpus?: { hash: string; at: number }
+  /** The declared build, harness and egress policy the product bootstrap last ran under, as one digest. */
+  bootstrapped?: { digest: string; at: number }
 }
 
 export interface SharedReuseState {
@@ -72,6 +74,8 @@ function parseState(value: unknown): SharedReuseState | null {
   if (env) parsed.env = { digest: env.text, at: env.at }
   const corpus = stamped(checks.corpus, 'hash')
   if (corpus) parsed.corpus = { hash: corpus.text, at: corpus.at }
+  const bootstrapped = stamped(checks.bootstrapped, 'digest')
+  if (bootstrapped) parsed.bootstrapped = { digest: bootstrapped.text, at: bootstrapped.at }
   return { boxId: value.boxId, checks: parsed }
 }
 

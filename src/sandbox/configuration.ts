@@ -196,6 +196,14 @@ export interface SandboxRuntimeConfig {
   // One-shot post-running bootstrap, on BOTH create and reuse paths (idempotency
   // is the closure's job — it owns the marker check).
   bootstrap?: (box: SandboxInstance, scope: SandboxScope) => Promise<Outcome<void>>
+  /**
+   * The served build this bootstrap belongs to, such as the deploy sha. A reuse
+   * skips {@link bootstrap} when this box already ran it under the same build,
+   * harness and egress policy within the reuse trust window; a new release runs
+   * it again on every box. Without it, the bootstrap runs on every reuse.
+   * Declare the build id, never a hash of the bootstrap's own files.
+   */
+  bootstrapDigest?: (scope: SandboxScope) => string | Promise<string>
   // Reuse health gate + sidecar liveness probe.
   livenessProbe?: LivenessProbeConfig
   // Enable browser terminal endpoints on newly-created sandboxes.

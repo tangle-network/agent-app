@@ -190,12 +190,35 @@ export async function finalizeExistingBox(
     if (!renewed.succeeded) throw renewed.error
   }
   if (shell.bootstrap) {
-    const boot = await shell.bootstrap(finalBox, scope)
-    if (!boot.succeeded) {
-      throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
+    const key = await bootstrapKey(shell, scope, harness)
+    if (key === undefined || !hasBootstrapped(finalBox, key)) {
+      const boot = await shell.bootstrap(finalBox, scope)
+      if (!boot.succeeded) {
+        throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
+      }
+      if (key !== undefined) recordCheck(finalBox, { bootstrapped: { digest: key, at: Date.now() } })
     }
   }
   return finalBox
+}
+
+/**
+ * What a bootstrap on this box would repeat: the build the product declares, the
+ * harness and the egress policy. A product that declares no build has none, so its
+ * bootstrap runs on every reuse.
+ */
+async function bootstrapKey(shell: SandboxRuntimeConfig, scope: SandboxScope, harness: Harness): Promise<string | undefined> {
+  if (!shell.bootstrapDigest) return undefined
+  const build = await shell.bootstrapDigest(scope)
+  if (!build) return undefined
+  const egress = shell.egressPolicy ? normalizedEgressPolicy(shell.egressPolicy) : null
+  return createHash('sha256').update(JSON.stringify([build, harness, egress]), 'utf8').digest('hex')
+}
+
+/** This identity of the box ran the bootstrap under `key` within the reuse trust window. */
+function hasBootstrapped(box: SandboxInstance, key: string): boolean {
+  const ran = checksFor(box)?.bootstrapped
+  return isRecent(ran?.at, TRUSTED_REUSE_TTL_MS) && ran?.digest === key
 }
 
 function canonicalizeJson(value: unknown): unknown {
