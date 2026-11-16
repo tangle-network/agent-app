@@ -1,6 +1,16 @@
 /** Stream framing, event inspection and cancellation around a chat producer. */
 import type { ChatRouteEvent } from './turn-route-contracts'
 
+/** The original data of a failure event whose reason a producer withheld from the person. A Symbol key: JSON, and so
+ *  the wire and the turn buffer, drops it, while the route's own hooks read it through {@link serverFailureData}. */
+export const WITHHELD_FAILURE: unique symbol = Symbol('withheld failure')
+
+/** A failure event's data as the server records it: the withheld original when a producer kept one, else as streamed. */
+export function serverFailureData(data: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  const original = (data as { [WITHHELD_FAILURE]?: unknown } | undefined)?.[WITHHELD_FAILURE]
+  return original !== null && typeof original === 'object' ? original as Record<string, unknown> : data
+}
+
 /** Best-effort human-readable cause from a terminal `error` /
  *  `session.run.failed` event's `data`. */
 export function failureReasonOf(data: Record<string, unknown> | undefined): string | undefined {

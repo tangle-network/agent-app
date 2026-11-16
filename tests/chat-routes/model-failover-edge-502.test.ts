@@ -292,7 +292,7 @@ describe('summarizeFailoverReason — the notice a customer actually reads', () 
     expect(summarizeFailoverReason('   ')).toBe('upstream unavailable')
   })
 
-  it('the PRODUCER notice is condensed while the attempt trail keeps the full text', async () => {
+  it('the PRODUCER notice names both models and no reason, while the attempt trail keeps the full text', async () => {
     const opened: string[] = []
     const produced = createSandboxChatProducer({
       model: 'gemini-2.5-pro',
@@ -311,13 +311,12 @@ describe('summarizeFailoverReason — the notice a customer actually reads', () 
 
     const wire: string[] = []
     for await (const event of produced.stream) wire.push(JSON.stringify(event))
-    const notice = wire.find((line) => line.includes('was unavailable'))
+    const notice = wire.find((line) => line.includes('"type":"notice"'))
 
     expect(opened).toEqual(['gemini-2.5-pro', 'gemini-2.5-flash-lite'])
-    expect(notice).toBeTruthy()
-    // What the customer reads: both models named, the cause named, no markup.
-    expect(notice).toContain('gemini-2.5-pro was unavailable (HTTP 502)')
-    expect(notice).toContain('answered with gemini-2.5-flash-lite instead')
+    // What the customer reads: both models named, and none of the upstream's own text.
+    expect(notice).toContain('The model gemini-2.5-pro stopped; trying gemini-2.5-flash-lite.')
+    expect(notice).not.toContain('HTTP 502')
     expect(notice).not.toContain('DOCTYPE')
     // What the operator gets: the verbatim text, untouched.
     const trail = produced.modelFailover?.()
@@ -422,10 +421,10 @@ describe('the money guards — what the rescue must NOT do', () => {
       { promptTokens: 1144, completionTokens: 10, reasoningTokens: 0, providerCostUsd: 0 },
       { promptTokens: 1144, completionTokens: 10, reasoningTokens: 0, providerCostUsd: 0 },
     ])
-    // What DOES reach the client is the notice, and it carries the cause: the
-    // edge 502 is named, so a downgrade is never mistaken for a normal turn.
-    expect(wire).toContain('gemini-2.5-flash was unavailable')
-    expect(wire).toContain('error code: 502')
+    // What DOES reach the client is the notice naming both models, so a
+    // downgrade is never mistaken for a normal turn; the edge's text stays off.
+    expect(wire).toContain('The model gemini-2.5-flash stopped; trying gemini-2.5-flash-lite.')
+    expect(wire).not.toContain('error code: 502')
     // The downgrade is still attributed, never silent.
     expect(receipt?.modelFailover).toMatchObject({
       model: 'gemini-2.5-flash-lite',

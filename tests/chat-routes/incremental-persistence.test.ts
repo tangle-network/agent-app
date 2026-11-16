@@ -411,9 +411,9 @@ describe('incremental assistant persistence — write cadence', () => {
     await settle()
 
     // Billing branches on this, and drafting must not have changed it.
-    // The typed code rides along, so a product can record why it failed; the raw reason stays in the server log.
+    // The typed reason rides along, so a product can record why it failed; the row shows only the plain sentence.
     const plain = 'That answer stopped before it finished. Please send your question again.'
-    expect(completions).toEqual([{ failed: true, failureReason: plain, failureCode: 'provider_quota_exhausted' }])
+    expect(completions).toEqual([{ failed: true, failureReason: 'model quota exhausted', failureCode: 'provider_quota_exhausted' }])
     // The partial answer is kept as ONE row carrying the visible error text —
     // not a second row, and not an empty one.
     const assistants = (await rows(store, threadId)).filter((row) => row.role === 'assistant')

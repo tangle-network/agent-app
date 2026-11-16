@@ -45,21 +45,32 @@ import {
   type JsonRecord,
   type StreamEvent,
 } from '../stream/index'
-import {
-  ModelFailoverExhaustedError,
-  type ModelFailoverAttempt,
-} from '../model-resolution/failover'
+import type { ModelFailoverAttempt } from '../model-resolution/failover'
 import type { ModelPolicy } from '../policy-filters/index'
 import { isTerminalPromptEvent } from '../sandbox/prompt-events'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
-import { getChatFundingRecovery } from '../web/turn-funding-recovery'
 import {
-  ModelFailoverTimeoutError,
-  type EmptyTurnRetryInfo,
-  type ModelFallbackInfo,
-  type OpenModelStream,
+  failureIds,
+  FAILED_TURN_TEXT,
+  modelKeyRefusedSentence,
+  MODEL_KEY_REFUSED_CODE,
+  plainFailureEvent,
+  plainFailureSentence,
+  providerRetryNotice,
+  sandboxStreamErrorCode,
+  sandboxStreamErrorMessage,
+  sandboxStreamFailureDiagnostic,
+  withheld,
+  withheldFailureEvent,
+  withoutToolList,
+} from './failure-wording'
+import type {
+  EmptyTurnRetryInfo,
+  ModelFallbackInfo,
+  OpenModelStream,
 } from './model-failover-stream'
 import { createReasoningClock, type ReasoningRunTime } from './reasoning-clock'
+export { MODEL_KEY_REFUSED_CODE, modelKeyRefusedSentence, providerResetSentence, providerRetryNotice } from './failure-wording'
 import type {
   ChatTurnRouteProducer,
   ChatTurnUsage,
@@ -304,128 +315,8 @@ function applyTerminalUsage(reported: ChatTurnUsage, usage: ChatTurnUsage): void
 }
 
 
-const utcTime = (at: Date) => `${at.toISOString().slice(11, 19)} UTC`
-
-/** A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt. */
-export function providerRetryNotice(event: { type: string; data?: unknown }): string | undefined {
-  const retry = event.type === 'raw' ? asRecord(asRecord(event.data)?.event) : undefined
-  if (retry?.type !== 'retry' || !(Number(retry.next) > 0)) return undefined
-  const cause = asString(retry.message)?.trim() || 'no reason given'
-  return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(Number(retry.next)))}.`
-}
-
-/** A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence. */
-export function providerResetSentence(message: string): string | undefined {
-  const at = new Date(message.match(/reset at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/)?.[1] ?? NaN)
-  if (Number.isNaN(at.getTime())) return undefined
-  const cause = message.split('; the provider asked')[0]?.trim()
-  return `The model provider refused the call (${cause}); try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
-}
-
-/** The typed code for a harness whose model refused its key, so a product can tell it from other stream failures. */
-export const MODEL_KEY_REFUSED_CODE = 'model.key_refused'
-
-/** A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words, true
- *  both for a newly started box whose harness called the model before its minted key was in place (it recovers within
- *  minutes) and for a key that is wrong. The raw error goes to the log and the failure note, never to the person. */
-export function modelKeyRefusedSentence(message: string): string | undefined {
-  if (!/\binvalid api key\b|\b401\b[^\n]*\b(?:unauthori[sz]ed|api key)\b/i.test(message)) return undefined
-  return "The assistant's model refused its access key, so this message was not answered. If the assistant has just started, send it again in a minute; if this repeats, tell the team."
-}
-
-function sandboxStreamErrorMessage(data: unknown): string {
-  const record = asRecord(data)
-  const message = asString(record?.message) ?? asString(record?.error)
-  if (message) return message
-  try {
-    return JSON.stringify(data) || 'Sandbox stream returned an error event without details.'
-  } catch {
-    return 'Sandbox stream returned an error event without details.'
-  }
-}
-
-/** The typed reason a sandbox `error` event carries, or a generic stream-error code. */
-function sandboxStreamErrorCode(data: unknown): string {
-  return asString(asRecord(data)?.code) ?? 'sandbox.stream_error'
-}
-
 function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
-}
-
-/** A failure event the person can read (`error`, `warning`, `done`, `session.run.failed`): when its reason is one the producer words plainly (a reset provider, a refused
- *  key), every reason field carries that sentence and the raw text moves to `details.raw`. The client prints an error
- *  event's `message` and the route's failure card reads `message`/`error`/`reason`: on 2026-11-15 a stranger saw the
- *  plain notice between "OPENCODE_ERROR: Invalid API key" and "opencode execution failed: Invalid API key (exit code 1)". */
-function plainFailureEvent(event: JsonRecord): JsonRecord {
-  const data = asRecord(event.data)
-  if (!data || !['error', 'warning', 'done', 'session.run.failed'].includes(String(event.type))) return event
-  const reasons = (['message', 'error', 'reason'] as const).filter((key) => typeof data[key] === 'string' && data[key])
-  const raw = reasons.map((key) => data[key] as string).join(' | ')
-  const plain = raw ? providerResetSentence(raw) ?? modelKeyRefusedSentence(raw) : undefined
-  if (!plain) return event
-  return { ...event, data: { ...data, ...Object.fromEntries(reasons.map((key) => [key, plain])), details: { ...asRecord(data.details), raw } } }
-}
-
-const FAILED_TURN_TEXT = 'That answer stopped before it finished. Please send your question again.'
-
-/** True when a terminal failure's reason (a harness error, a tool list, a call loop, a stack) is withheld: the person
- *  reads the failed-turn text and the server log (`log`, else `console.warn`) keeps the reason under one class. Passing
- *  through as before: a provider reset or refused model key, worded plainly; HTTP 402 or `PAYMENT_REQUIRED`; a
- *  `MODEL_REFUSED` policy refusal, whose words let the person pick another model; and what the client's recovery UI
- *  reads (`getChatFundingRecovery`: `insufficient_credits`, `paid_access_required`, `funding_required`, or its words). */
-function withheld(log: SandboxChatProducerOptions['log'], reason: string, code: string | undefined, status: unknown): boolean {
-  const passes = toFiniteNumber(status) === 402 || code === 'PAYMENT_REQUIRED' || code === 'MODEL_REFUSED'
-    || providerResetSentence(reason) || modelKeyRefusedSentence(reason)
-    || getChatFundingRecovery({ code, message: reason })
-  if (!passes) (log ?? console.warn)('[chat-routes] turn failure withheld from the person', { failureClass: 'runtime_failure', code, error: reason })
-  return !passes
-}
-
-/** A failure event whose reason is withheld: `message`, and `error` when present, read `text`, never the raw reason. */
-function withheldFailureEvent(event: JsonRecord, text: string): JsonRecord {
-  const data = asRecord(event.data)
-  return { ...event, data: { ...data, ...(typeof data?.error === 'string' ? { error: text } : {}), message: text } }
-}
-
-function sandboxStreamFailureDiagnostic(error: unknown): {
-  userMessage: string
-  failureNote: string
-  code: string
-  reason: string
-} {
-  const streamMessage = (error as { streamMessage?: unknown })?.streamMessage
-  const message = typeof streamMessage === 'string'
-    ? streamMessage
-    : error instanceof Error ? error.message : 'Sandbox stream failed'
-  const diagnostics = asRecord((error as { diagnostics?: unknown })?.diagnostics)
-  let diagnosticText: string | undefined
-  if (diagnostics) {
-    try {
-      diagnosticText = JSON.stringify(diagnostics)
-    } catch {
-      diagnosticText = '[unserializable diagnostics]'
-    }
-  }
-  const keyRefused = modelKeyRefusedSentence(message)
-  const userMessage = providerResetSentence(message) ?? keyRefused ?? [
-    'The sandbox model stream stopped before a clean completion.',
-    `Error: ${message}`,
-    'Please retry. If it repeats, send these support details to the team.',
-  ].join('\n\n')
-  const failureNote = diagnosticText
-    ? `sandbox-stream: ${message}; ${diagnosticText}`
-    : `sandbox-stream: ${message}`
-  let code = 'sandbox.stream_failed'
-  if (error instanceof SandboxRunError) {
-    code = error.code
-  } else if (error instanceof ModelFailoverTimeoutError) {
-    code = error.code
-  } else if (error instanceof ModelFailoverExhaustedError) {
-    code = error.upstreamCode ?? code
-  }
-  if (keyRefused) code = MODEL_KEY_REFUSED_CODE
-  return { userMessage, failureNote, code, reason: message }
 }
 
 /** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
@@ -560,7 +451,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           // A failure the producer words plainly arrives as its error event next; its raw warning is logged, not shown.
-          const plainFailure = message && (providerResetSentence(message) ?? modelKeyRefusedSentence(message))
+          const plainFailure = message && plainFailureSentence(message)
           if (plainFailure) log('[chat-routes] failure warning folded into its error notice', { code: asString(event.data?.code), error: message })
           if (message && !plainFailure) {
             projectionState.warningCount += 1
@@ -624,8 +515,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           const message = sandboxStreamErrorMessage(event.data)
           const keyRefused = modelKeyRefusedSentence(message)
           if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
-          const hidden = withheld(options.log, message, asString(event.data?.code), event.data?.statusCode ?? event.data?.status)
-          const errorContent = hidden ? failedTurnText : providerResetSentence(message) ?? keyRefused ?? (projectionState.fullText.trim()
+          const hidden = withheld(options.log, message, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
+          const errorContent = hidden ? failedTurnText : plainFailureSentence(message) ?? (projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
           if (options.errorNotice) {
@@ -654,11 +545,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       preflightRefused = !observedSourceEvent && openAttempts() === 1
         && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
-      log('[chat-routes] sandbox stream failed', {
+      // Logged once: a withheld reason by `withheld`, with its failure note; any other by this line.
+      const hidden = withheld(options.log, diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status,
+        { ...failureIds(asRecord(streamErr)?.diagnostics), failureNote: diagnostic.failureNote })
+      if (!hidden) log('[chat-routes] sandbox stream failed', {
         failureNote: diagnostic.failureNote,
         error: streamErr instanceof Error ? streamErr.message : String(streamErr),
       })
-      const hidden = withheld(options.log, diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status)
       const userMessage = hidden ? failedTurnText : diagnostic.userMessage
       if (options.errorNotice) {
         yield* emitErrorNotice(userMessage, diagnostic.code)
@@ -671,14 +564,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       }
       projectionState.interactionOutcome = 'expired'
       yield* emitTerminalizedTools()
-      yield {
-        type: 'error',
-        data: {
-          message: userMessage,
-          code: diagnostic.code,
-          ...(hidden ? {} : { details: { failureNote: diagnostic.failureNote } }),
-        },
-      }
+      const failure = { type: 'error', data: { message: hidden ? diagnostic.reason : userMessage, code: diagnostic.code,
+        details: { failureNote: diagnostic.failureNote } } }
+      yield toProducerWireEvent(hidden ? withheldFailureEvent(failure, failedTurnText) : failure)
     } finally {
       reasoningClock.settle()
     }
@@ -868,7 +756,8 @@ async function* projectSandboxMessagePart(
 
     if (partType === 'tool') {
       reasoningClock.settle()
-      recordPersistedPart(part, undefined)
+      // The stored part, and the tool_call and tool_result read from it, never carry the list of every tool.
+      recordPersistedPart(withoutToolList(part), undefined)
       const persisted = partMap.get(getPartKey(part))
       const state = asRecord(persisted?.state)
       const toolId = String(persisted?.id ?? '')

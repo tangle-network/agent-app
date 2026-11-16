@@ -278,12 +278,10 @@ it.each([
     await Promise.all(pending)
     expect(events.find(event => event.type === 'session.run.failed')?.data.code).toBe(code)
     expect(events.some(event => event.type === 'session.run.completed')).toBe(false)
-    // A model-policy refusal keeps its words; a runtime failure's raw reason is withheld from the stream the route
-    // reads, so its code is recorded with the plain sentence and the log keeps the reason.
-    const shown = code === 'MODEL_REFUSED' ? message : 'That answer stopped before it finished. Please send your question again.'
     expect(sqlite.prepare('SELECT failed, failure_code FROM rollout_turn_timing').get()).toEqual({
       failed: 1,
-      failure_code: failureCode === 'product.refused' ? failureCode : `${code}: ${shown}`,
+      failure_code: failureCode === 'product.refused' ? failureCode
+        : `${code}: ${message}`,
     })
   } finally { sqlite.close() }
 })

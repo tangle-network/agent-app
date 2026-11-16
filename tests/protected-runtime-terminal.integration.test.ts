@@ -180,7 +180,9 @@ describe('protected local HTTP terminal ownership', { concurrent: false }, () =>
       expect(peer.settled).toHaveLength(1)
       expect(peer.settled[0]?.calls).toEqual([])
       expect(events.some(event => event.type === 'error')).toBe(true)
-      expect(JSON.stringify(events)).toContain('The model service did not answer.')
+      // A runtime failure reads as the plain sentence; its own words stay on the server.
+      expect(JSON.stringify(events)).toContain('That answer stopped before it finished.')
+      expect(JSON.stringify(events)).not.toContain('The model service did not answer.')
       expect(JSON.stringify(events)).not.toContain('FINAL_AFTER_TOOL')
       expect(producer.finalText()).toBe('')
       expect(producer.assistantParts?.()).toEqual(expect.arrayContaining([

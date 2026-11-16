@@ -869,7 +869,7 @@ describe('createSandboxChatProducer — failover wiring', () => {
       expect(terminal?.data?.code).toBe('provider_first_response_timeout')
       // The failure note names the silent models for the operator, in the server log and not on the wire.
       expect(terminal?.data?.details).toBeUndefined()
-      expect(String(logged.find((entry) => entry.message === '[chat-routes] sandbox stream failed')?.meta?.failureNote)).toContain('silent-b')
+      expect(String(logged.find((entry) => entry.message === '[chat-routes] turn failure withheld from the person')?.meta?.failureNote)).toContain('silent-b')
       expect(closed).toEqual(['silent-a', 'silent-b'])
       expect([...signals.values()].every((signal) => signal.aborted)).toBe(true)
       expect(producer.modelFailover?.().attempts.map((attempt) => attempt.model)).toEqual([

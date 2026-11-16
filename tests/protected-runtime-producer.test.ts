@@ -93,13 +93,12 @@ describe('protected Runtime chat producer', () => {
   it('refuses a provider whose protected Chat Completions semantics are unverified', async () => {
     const { options, settle } = fixture('google')
     vi.stubGlobal('fetch', vi.fn())
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const events = await drain(createProtectedRuntimeChatProducer(options))
     expect(fetch).not.toHaveBeenCalled()
     expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
-    // The refusal reaches the server log; the person reads the plain sentence.
-    expect(events.some(event => event.type === 'error')).toBe(true)
-    expect(JSON.stringify(warn.mock.calls)).toContain('requires an Anthropic or OpenAI model without reasoning')
+    // A refusal that would fail the same way again reads as its own words, with its code.
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: {
+      code: 'grant_model_unsupported', message: expect.stringContaining('requires an Anthropic or OpenAI model without reasoning') } })
   })
 
   it('sends one buffered completion per model call with the profile ceilings and reasoning effort', async () => {
@@ -171,11 +170,9 @@ describe('protected Runtime chat producer', () => {
     change(options.profile)
     const reserve = vi.spyOn(options.grant.port, 'reserveGrant')
     vi.stubGlobal('fetch', vi.fn())
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const events = await drain(createProtectedRuntimeChatProducer(options))
-    // The refusal names the axis in the server log; the person reads the plain sentence.
-    expect(events.some(event => event.type === 'error')).toBe(true)
-    expect(JSON.stringify(warn.mock.calls)).toContain(named)
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { code: 'profile_unsupported' } })
+    expect(JSON.stringify(events.find(event => event.type === 'error'))).toContain(named)
     expect(reserve).not.toHaveBeenCalled()
     expect(settle).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()

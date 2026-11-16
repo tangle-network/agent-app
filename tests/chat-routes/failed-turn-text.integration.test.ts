@@ -1,8 +1,8 @@
 /**
  * A failed turn shows the person one plain sentence, live and after a reload, and never the harness's own failure
- * text: its loop report, the refused tool and the list of every tool it has. Funding, billing, admission and
- * model-policy refusals keep their words, because the person or the client's recovery UI acts on them, and the server
- * log keeps the real reason.
+ * text: its loop report, the refused tool and the list of every tool it has, in the answer or in a tool part. Funding,
+ * billing, admission and model-policy refusals keep their words, because the person or the client's recovery UI acts on
+ * them. The server keeps the real reason: in its log and in the route's own failure hooks, never on the wire.
  *
  * Driven through the real `createChatTurnRoutes` assembly, the real `createSandboxChatProducer` and the real chat store
  * over SQLite. Only the box is stood in for, at its event boundary: the events its sidecar sends, or a severed stream.
@@ -19,10 +19,10 @@ import { openDatabase, workspacesTable } from '../teams/db-helper'
 
 const PLAIN = 'That answer stopped before it finished. Please send your question again.'
 
+const TOOL_LIST = 'Available tools: lookup_lookup, bash, edit, ledger_ledger, list_facts_list_facts.'
 /** What a box harness reports when it stops a turn after the model repeats a refused tool call. */
 const HARNESS_FAILURE = 'opencode execution failed: opencode sent the same save_fact call 3 times and every one was rejected. '
-  + "The turn stopped before it ran the model again: Model tried to call unavailable tool 'save_fact'. "
-  + 'Available tools: lookup_lookup, bash, edit, ledger_ledger, list_facts_list_facts. (killed by SIGTERM)'
+  + `The turn stopped before it ran the model again: Model tried to call unavailable tool 'save_fact'. ${TOOL_LIST} (killed by SIGTERM)`
 const RAW_FRAGMENTS = ['execution failed', 'save_fact', 'Available tools', 'list_facts_list_facts', 'SIGTERM']
 
 const tables = createChatTables({ workspaceTable: workspacesTable })
@@ -40,6 +40,7 @@ async function turn(events: unknown[], options: { severed?: Error; serverLog?: '
     if (options.severed) throw options.severed
   }
   const pending: Promise<unknown>[] = []
+  let failureReason: string | undefined
   const routes = createChatTurnRoutes({
     projectId: 'failed-turn-text',
     authorize: async () => ({ ok: true, tenantId: 'ws1', userId: 'u1', context: undefined }),
@@ -50,6 +51,7 @@ async function turn(events: unknown[], options: { severed?: Error; serverLog?: '
       model: 'm',
       ...(options.serverLog === 'default' ? {} : { log: () => {} }),
     }),
+    onTurnComplete: async (input) => { failureReason = input.failureReason },
     log: () => {},
   })
   const response = await routes.turn(new Request('http://app.test/api/chat', {
@@ -66,11 +68,12 @@ async function turn(events: unknown[], options: { severed?: Error; serverLog?: '
     text: streamed.filter((event) => event.type === 'text').map((event) => event.text).join(''),
     error: streamed.find((event) => event.type === 'error')?.data,
     row: rows.find((row) => row.role === 'assistant'),
+    failureReason,
   }
 }
 
-function expectNoRawReason(result: Awaited<ReturnType<typeof turn>>): void {
-  for (const fragment of RAW_FRAGMENTS) {
+function expectNoRawReason(result: Awaited<ReturnType<typeof turn>>, fragments = RAW_FRAGMENTS): void {
+  for (const fragment of fragments) {
     expect(result.wire).not.toContain(fragment)
     expect(JSON.stringify(result.row)).not.toContain(fragment)
   }
@@ -79,11 +82,13 @@ function expectNoRawReason(result: Awaited<ReturnType<typeof turn>>): void {
 describe('a failed turn never shows the person the raw failure reason', () => {
   it.each(['error event', 'severed stream'] as const)('a harness failure before any text reads as one plain sentence, live and stored (%s)', async (carrier) => {
     const result = carrier === 'error event'
-      ? await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE, reason: 'provider_error' } }])
+      ? await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE, reason: 'provider_error',
+        details: { supportDetails: HARNESS_FAILURE, hint: 'Call save_fact once more.' } } }])
       : await turn([], { severed: new Error(HARNESS_FAILURE) })
 
     expect(result.text).toBe(PLAIN)
     expect(result.error?.message).toBe(PLAIN)
+    // The detail fields a client renders as text are dropped with the reason.
     expect(result.error?.details).toBeUndefined()
     // The failure's class still reaches the client as a code.
     expect(result.error?.code).toBe(carrier === 'error event' ? 'AGENT_EXECUTION_FAILED' : 'sandbox.stream_failed')
@@ -104,12 +109,44 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason(result)
   })
 
+  it('never carries the tool list in a tool part, live or stored, and words the repair tool plainly', async () => {
+    const refused = `Model tried to call unavailable tool 'save_fact'. ${TOOL_LIST}`
+    const answer = 'Here is the answer.'
+    const result = await turn([
+      // The harness's repair tool stands in for the call to a tool the model does not have.
+      { type: 'message.part.updated', data: { part: { type: 'tool', id: 'call-1', tool: 'invalid', state: { status: 'completed',
+        input: { tool: 'save_fact', error: refused }, output: `The arguments provided to the tool are invalid: ${refused}` } } } },
+      // The loop guard's stop message, in another tool's error field.
+      { type: 'message.part.updated', data: { part: { type: 'tool', id: 'call-2', tool: 'bash', state: { status: 'error',
+        input: { command: 'ls' }, error: `The same call repeated 3 times. ${TOOL_LIST}` } } } },
+      { type: 'message.part.updated', data: { part: { type: 'text', id: 't1', text: answer }, delta: answer } },
+      { type: 'result', data: { finalText: answer } },
+    ])
+
+    expectNoRawReason(result, ['Available tools', 'list_facts_list_facts', 'lookup_lookup'])
+    expect(result.row?.content).toBe(answer)
+    for (const shown of [result.wire, JSON.stringify(result.row?.parts)]) {
+      expect(shown).toContain("That tool isn't available.")
+      expect(shown).toContain('The same call repeated 3 times.')
+    }
+  })
+
+  it('shows a Router budget refusal as the Router\'s own sentence, without the harness wrapper', async () => {
+    const sentence = "This key's lifetime budget is exhausted. Increase the cap on id.tangle.tools."
+    const result = await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED',
+      message: `opencode execution failed: ${sentence} (exit code 1)` } }])
+
+    expect(result.text).toBe(sentence)
+    expect(result.error?.message).toBe(sentence)
+    expect(result.row?.content).toBe(sentence)
+  })
+
   it.each([
     { kind: 'funding', card: true, data: { code: 'insufficient_credits', message: 'Insufficient credits. Add funds to continue.' } },
     { kind: 'admission', card: true,
       data: { message: 'opencode execution failed: Inference requires verified paid access. Add funds or activate a paid seat.' } },
     { kind: 'billing', card: false,
-      data: { code: 'AGENT_EXECUTION_FAILED', statusCode: 402, message: "opencode execution failed: This key's budget is exhausted. Raise its cap." } },
+      data: { code: 'AGENT_EXECUTION_FAILED', statusCode: 402, message: 'opencode execution failed: The provider refused payment for this call.' } },
     { kind: 'payment', card: false, data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance or plan for this request.' } },
     { kind: 'model policy', card: false, data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the allowed models.' } },
   ])('the $kind refusal keeps its words, live and stored, where the person and the recovery UI read them', async ({ data, card }) => {
@@ -128,19 +165,23 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expect(failed.row?.content).toBe(PLAIN)
   })
 
-  it('sends the real reason to the server log at warn, under one fixed class', async () => {
+  it('keeps the real reason for the server: its warn log and the route failure hooks, never the wire', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const result = await turn(
-        [{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE } }],
+        [{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE, sessionId: 'session-1', executionId: 'execution-1' } }],
         { serverLog: 'default' },
       )
 
       expect(result.row?.content).toBe(PLAIN)
+      expectNoRawReason(result)
+      expect(result.failureReason).toBe(HARNESS_FAILURE)
       expect(warn).toHaveBeenCalledWith('[chat-routes] turn failure withheld from the person', {
         failureClass: 'runtime_failure',
         code: 'AGENT_EXECUTION_FAILED',
         error: HARNESS_FAILURE,
+        sessionId: 'session-1',
+        executionId: 'execution-1',
       })
     } finally {
       warn.mockRestore()

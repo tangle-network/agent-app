@@ -4,6 +4,8 @@ import { createSandboxChatProducer } from '../../src/chat-routes/index'
 import { buildInteractionRequest } from '../test-utils/interaction-request'
 
 const FAILED = 'That answer stopped before it finished. Please send your question again.'
+/** Events as the client receives them: JSON drops the withheld original kept under a Symbol key for the server. */
+const onWire = (value: unknown): unknown => JSON.parse(JSON.stringify(value))
 
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
@@ -818,7 +820,7 @@ describe('createSandboxChatProducer', () => {
     })
 
     const events = await drain(producer.stream)
-    expect(events).toEqual([
+    expect(onWire(events)).toEqual([
       { type: 'text', text: 'Partial answer' },
       { type: 'text', text: `\n\n---\n${FAILED}` },
       { type: 'error', data: { message: FAILED, retryable: false } },
@@ -831,7 +833,7 @@ describe('createSandboxChatProducer', () => {
     const rawError = { type: 'error', data: { error: 'model rejected' } }
     const producer = createSandboxChatProducer({ events: feed([rawError]), log: () => {} })
 
-    expect(await drain(producer.stream)).toEqual([
+    expect(onWire(await drain(producer.stream))).toEqual([
       { type: 'text', text: FAILED },
       { type: 'error', data: { error: FAILED, message: FAILED } },
     ])
@@ -938,7 +940,7 @@ describe('createSandboxChatProducer', () => {
     })
 
     const events = await drain(producer.stream)
-    expect(events).toEqual([
+    expect(onWire(events)).toEqual([
       { type: 'tool_call', call: { toolCallId: 'call-2', toolName: 'search', args: { q: 'x' } } },
       expect.objectContaining({ type: 'text' }),
       {
@@ -1007,9 +1009,11 @@ describe('createSandboxChatProducer', () => {
       }),
     ])
     expect(structuredError.type).toBe('error')
-    // The person reads the plain sentence; the support details stay in the server log.
-    expect(structuredError.data).toEqual({ message: FAILED, code: 'sandbox.stream_failed' })
-    const failureNote = String(logged.find((entry) => entry.message === '[chat-routes] sandbox stream failed')?.meta?.failureNote)
+    // The person reads the plain sentence; the support details stay in the server log, logged once with the session.
+    expect(onWire(structuredError.data)).toEqual({ message: FAILED, code: 'sandbox.stream_failed' })
+    expect(logged.map((entry) => entry.message)).toEqual(['[chat-routes] turn failure withheld from the person'])
+    expect(logged[0]?.meta).toMatchObject({ failureClass: 'runtime_failure', sessionId: 's-1', error: 'sandbox stream disconnected' })
+    const failureNote = String(logged[0]?.meta?.failureNote)
     expect(failureNote).toContain('sandbox stream disconnected')
     expect(failureNote).toContain('"lastEventId":"evt-9"')
     expect(producer.finalText()).toBe(`Partial\n\n---\n${FAILED}`)

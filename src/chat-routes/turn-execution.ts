@@ -25,7 +25,10 @@ import {
 import { dispatchFirstFor, selectTurnProducer } from './dispatch-first'
 import { observeTurnCancellation } from './cancellation'
 import { admissionServerTiming, errorResponse, userPartsWithFiles, type AdmittedTurn, type TurnProgressCallback } from './turn-admission'
-import { abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, tapRawEvents, withStreamHeartbeat } from './turn-event-stream'
+import {
+  abortOnSignal, concatStreams, failureCodeOf, failureReasonOf, isVisibleOutput, isVisibleText, serverFailureData, tapRawEvents,
+  withStreamHeartbeat,
+} from './turn-event-stream'
 import type {
   ChatTurnLifecycleComplete,
   ChatTurnModelAttribution,
@@ -779,7 +782,7 @@ function createTurnEngine<TContext, TResource>(
         }
         if (event.type === 'session.run.failed' || event.type === 'error') {
           state.runFailed = true
-          state.lastFailureData = event.data
+          state.lastFailureData = serverFailureData(event.data)
         }
         await state.tap!.onEvent(event)
         // Synchronous bookkeeping; the write it may start is fire-and-
