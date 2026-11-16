@@ -110,6 +110,22 @@ describe('chat operator adapter', () => {
     expect(thread).toMatchObject({ succeeded: true, value: { latestTurn: { turnId: '1f0c5a3e-9b7d-4c21-8e6f-0a1b2c3d4e5f', state: 'succeeded' } } })
   })
 
+  it('reports a tool call the harness refused even when the turn recovered and answered', async () => {
+    // The part legal-agent production stored (turn-health classify.ts): a completed `invalid` call carrying the refusal.
+    const refusal = "Model tried to call unavailable tool 'submit_proposal'. Available tools: bash, read, submit_proposal_submit_proposal."
+    const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [
+      { type: 'tool', tool: 'invalid', state: { status: 'completed', input: { tool: 'submit_proposal', error: refusal } } },
+      { type: 'text', text: `Done: ${content}` },
+    ] }) })
+
+    const started = await client.startTurn('ws-a', { content: 'Draft the proposal' })
+
+    expect(started).toMatchObject({ succeeded: true, value: {
+      state: 'succeeded', reply: { content: 'Done: Draft the proposal' },
+      refusedToolCalls: [{ tool: 'submit_proposal', error: refusal }],
+    } })
+  })
+
   it('reports the token usage stored on the reply row, and none when the row has none', async () => {
     const { client } = setup({ reply: (content) => ({ content: `Done: ${content}`, parts: [],
       ...(content === 'Metered' ? { usage: { inputTokens: 1200, cacheReadTokens: 800, outputTokens: 0, reasoningTokens: 40 } } : {}),
