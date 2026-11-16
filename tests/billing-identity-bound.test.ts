@@ -948,6 +948,46 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.getCreateInputs()[1]?.idempotencyKey).toBe(row.idempotencyKey)
   })
 
+  it('replays a failed spend-through create with exactly its original request', async () => {
+    const h = makeHarness()
+    // A provisioner that refuses a different request under an idempotency key it has already seen.
+    const seen = new Map<string, string>()
+    const strict = h.manager('router', { provisioner: { ...h.provisioner, findCreatedKeys: async () => [],
+      async createKey(input) {
+        const request = JSON.stringify(Object.entries(input).sort())
+        if ((seen.get(input.idempotencyKey) ?? request) !== request) throw new Error('idempotency key reused with a different request')
+        seen.set(input.idempotencyKey, request)
+        return h.provisioner.createKey(input)
+      } } })
+    const failure = new Error('request timed out after remote commit')
+    h.failCreate(failure)
+
+    await expect(strict.ensureKey(h.identity(), { budgetUsd: 10, spendThrough: true })).rejects.toBe(failure)
+    const [original, replay] = h.getCreateInputs()
+    expect(original).toMatchObject({ budgetUsd: 10, spendThrough: true })
+    expect(replay).toEqual(original)
+    expect(h.remote.get('remote-1')?.revoked).toBe(true)
+    expect([...h.rows.values()][0]?.status).toBe('revoked')
+    expect((await strict.ensureKey(h.identity(), { budgetUsd: 10, spendThrough: true })).refreshed).toBe(true)
+  })
+
+  it('rotates an exhausted child from a provisioner that ignores spendThrough and returns only its id and key', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router', { provisioner: { ...h.provisioner,
+      async createKey(input) {
+        const created = await h.provisioner.createKey(input)
+        return { id: created.id, key: created.key }
+      } } })
+    const first = await manager.ensureKey(h.identity(), { budgetUsd: 10, spendThrough: true })
+    expect(first.usage).toMatchObject({ budgetUsd: 10, exhausted: false })
+    h.remote.get(first.usage.keyId)!.budgetSpent = 10
+
+    const second = await manager.ensureKey(h.identity(), { budgetUsd: 10, spendThrough: true })
+    expect(second.refreshed).toBe(true)
+    expect(second.usage.keyId).not.toBe(first.usage.keyId)
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(true)
+  })
+
   it('keeps a legacy empty row pending instead of inventing a new create identity', async () => {
     const h = makeHarness()
     const row = h.insertProvisioning()
