@@ -208,7 +208,9 @@ async function runAdmittedTurn<TContext, TResource>({
   const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
 
   try {
-    const [history] = state.lockAcquired ? await Promise.all([trace.measure('admission.history_recheck', 'admission', readHistory), markRunning()]) : []
+    // The running row is written beside the history recheck, inside its span.
+    const [history] = state.lockAcquired
+      ? await trace.measure('admission.history_recheck', 'admission', () => Promise.all([readHistory(), markRunning()])) : []
     if (state.lockAcquired && JSON.stringify(history) !== historyBeforeLock) {
       await releaseBeforeDrain('error')
       return Response.json({
