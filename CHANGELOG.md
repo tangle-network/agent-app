@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.33
+
+- feat(chat-routes): completionOwner on the shared sandbox backend hands a turn to a durable owner; owner redacts stored transcript (#1533)
+
 ## 3.0.32
 
 - fix(chat-routes): redact registered values in object keys too (#1532)
