@@ -126,7 +126,8 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
         stream: false,
         maxToolCalls: options.maxToolCalls,
         maxToolTurns: options.grant.reserve.limits.maxModelCalls,
-        tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema,
+        // A tool definition here cannot declare an effect, so every tool is a lookup: the lane keeps main's rule.
+        tools: options.tools.map(tool => ({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, effect: 'lookup' as const,
           run: (args: Record<string, unknown>) => {
             const work = (async () => {
               signal.throwIfAborted()
