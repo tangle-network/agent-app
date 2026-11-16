@@ -150,6 +150,7 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   it.each([
+    { error: HARNESS_FAILURE },
     { message: HARNESS_FAILURE, code: 'AGENT_EXECUTION_FAILED', name: 'TimeoutError', origin: 'runtime', endpoint: '/agents/run/stream' },
     { message: HARNESS_FAILURE, stack: `Error: ${HARNESS_FAILURE}\n at run (/srv/runtime.js:1:1)` },
     { message: HARNESS_FAILURE, turnId: { message: HARNESS_FAILURE }, code: { message: HARNESS_FAILURE },
@@ -220,7 +221,6 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   it.each([
-    ['a data.error string', { type: 'error', data: { error: HARNESS_FAILURE } }],
     ['a raw error', { type: 'raw', data: { backend: 'opencode', event: { type: 'error', error: { name: 'UnknownError', data: { message: HARNESS_FAILURE } } } } }],
     ['a raw turn.failed', { type: 'raw', data: { backend: 'codex', event: { type: 'turn.failed',
       error: { message: `stream error: POST /v1/responses returned HTTP 500 Internal Server Error. ${TOOL_LIST}` } } } }],
