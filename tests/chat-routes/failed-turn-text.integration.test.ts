@@ -22,6 +22,7 @@ import {
 } from '../../src/chat-routes/index'
 import { recoverSandboxAssistantMessage } from '../../src/chat-routes/completed-sandbox-turn'
 import { personFacing } from '../../src/chat-routes/failure-wording'
+import { ModelFailoverExhaustedError } from '../../src/model-resolution/failover'
 import { createProtectedRuntimeChatProducer } from '../../src/chat-routes/protected-runtime-producer'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { createChatTables } from '../../src/chat-store/schema'
@@ -52,7 +53,7 @@ const REPAIR_PART = { type: 'tool', id: 'call-1', tool: 'invalid', state: { stat
 
 const tables = createChatTables({ workspaceTable: workspacesTable })
 
-type WireEvent = { type: string; text?: string; noticeKind?: string; data?: { message?: string; code?: string; details?: unknown } }
+type WireEvent = { type: string; turnId?: string; text?: string; noticeKind?: string; data?: { message?: string; code?: string; details?: unknown } }
 
 const textPart = (text: string) => ({ type: 'message.part.updated', data: { part: { type: 'text', id: 't1', text }, delta: text } })
 const terminalError = { type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE } }
@@ -75,13 +76,14 @@ async function turn(events: unknown[], options: {
   const store = createChatStore(db, tables)
   const thread = await store.createThread({ workspaceId: 'ws1', title: 'T' })
   const pending: Promise<unknown>[] = []
+  const turnStore = createMemoryTurnEventStore()
   let failureReason: string | undefined
   let failed: boolean | undefined
   const routes = createChatTurnRoutes({
     projectId: 'failed-turn-text',
     authorize: async () => ({ ok: true, tenantId: 'ws1', userId: 'u1', context: undefined }),
     store: store as unknown as ChatTurnMessageStore,
-    turnStore: createMemoryTurnEventStore(),
+    turnStore,
     produce: options.produce ?? (() => createSandboxChatProducer({
       events: box(events, options.severed),
       model: 'm',
@@ -102,6 +104,7 @@ async function turn(events: unknown[], options: {
   const rows = (await store.listMessages(thread.id)) as unknown as Array<{ role: string; content: string; parts: unknown }>
   return {
     wire,
+    buffered: (await turnStore.read(streamed.find((event) => event.type === 'turn')!.turnId!, 0)).map((row) => row.event).join('\n'),
     streamed,
     text: streamed.filter((event) => event.type === 'text').map((event) => event.text).join(''),
     error: streamed.find((event) => event.type === 'error')?.data,
@@ -111,9 +114,10 @@ async function turn(events: unknown[], options: {
   }
 }
 
-function expectNoRawReason(result: { wire: string; row?: unknown }, fragments = RAW_FRAGMENTS): void {
+function expectNoRawReason(result: { wire: string; buffered?: string; row?: unknown }, fragments = RAW_FRAGMENTS): void {
   for (const fragment of fragments) {
     expect(result.wire).not.toContain(fragment)
+    expect(result.buffered ?? '').not.toContain(fragment)
     expect(JSON.stringify(result.row ?? null)).not.toContain(fragment)
   }
 }
@@ -142,6 +146,37 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expect(result.text).toBe(`${answer}\n\n---\n${PLAIN}`)
     expect(result.error?.message).toBe(PLAIN)
     expect(result.row?.content).toBe(`${answer}\n\n---\n${PLAIN}`)
+    expectNoRawReason(result)
+  })
+
+  it.each([
+    { message: HARNESS_FAILURE, code: 'AGENT_EXECUTION_FAILED', name: 'TimeoutError', origin: 'runtime', endpoint: '/agents/run/stream' },
+    { message: HARNESS_FAILURE, stack: `Error: ${HARNESS_FAILURE}\n at run (/srv/runtime.js:1:1)` },
+    { message: HARNESS_FAILURE, turnId: { message: HARNESS_FAILURE }, code: { message: HARNESS_FAILURE },
+      status: { message: HARNESS_FAILURE }, statusCode: { message: HARNESS_FAILURE }, retryable: { message: HARNESS_FAILURE },
+      retryAt: { message: HARNESS_FAILURE }, resetAt: { message: HARNESS_FAILURE }, reason: 'private_failure_identifier',
+      usage: { inputTokens: { message: HARNESS_FAILURE }, [HARNESS_FAILURE]: 1 },
+      tokenUsage: { outputTokens: { message: HARNESS_FAILURE } }, details: { code: { message: HARNESS_FAILURE }, class: HARNESS_FAILURE } },
+  ])('allows only typed failure data on the wire, in the buffer and in the row (%j)', async (data) => {
+    const result = await turn([{ type: 'error', stack: HARNESS_FAILURE, data }])
+
+    expect(result.text).toBe(PLAIN)
+    expect(result.error?.message).toBe(PLAIN)
+    expect(result.row?.content).toBe(PLAIN)
+    expect(result.buffered).toContain(PLAIN)
+    expectNoRawReason(result, [...RAW_FRAGMENTS, 'TimeoutError', 'runtime', '/agents/run/stream', '/srv/', 'private_failure_identifier'])
+  })
+
+  it('keeps typed retry fields and numeric usage, while withholding error metadata', async () => {
+    const values = { turnId: 'turn-1', threadId: 'thread-1', sessionId: 'session-1', executionId: 'execution-1',
+      code: 'AGENT_EXECUTION_FAILED', statusCode: 503, retryable: true, retryAt: 2_000, resetAt: 3_000, reason: 'provider_error',
+      usage: { inputTokens: 4, outputTokens: 2 }, tokenUsage: { inputTokens: 4, outputTokens: 2, cost: 0.01 },
+      details: { code: 'E1', retryable: false } }
+    const result = await turn([{ type: 'error', data: { ...values, message: HARNESS_FAILURE } }])
+
+    expect(result.error).toEqual({ ...values, message: PLAIN })
+    expect(result.text).toBe(PLAIN)
+    expect(result.row?.content).toBe(PLAIN)
     expectNoRawReason(result)
   })
 
@@ -190,6 +225,9 @@ describe('a failed turn never shows the person the raw failure reason', () => {
       error: { message: `stream error: POST /v1/responses returned HTTP 500 Internal Server Error. ${TOOL_LIST}` } } } }],
     ['a raw error item', { type: 'raw', data: { backend: 'codex', event: { type: 'item.completed',
       item: { id: 'item-1', type: 'error', message: HARNESS_FAILURE } } } }],
+    ['a raw failure with tool and SDK metadata', { type: 'raw', stack: HARNESS_FAILURE,
+      data: { stack: HARNESS_FAILURE, event: { type: HARNESS_FAILURE, part: REPAIR_PART,
+        error: { message: HARNESS_FAILURE }, endpoint: '/v1/responses', stack: HARNESS_FAILURE } } }],
     ['a failed status', { type: 'status', data: { status: 'failed', detail: HARNESS_FAILURE } }],
     ['a failed done', { type: 'done', data: { status: 'failed', message: HARNESS_FAILURE } }],
     ['a session.run.failed', { type: 'session.run.failed', data: { message: HARNESS_FAILURE } }],
@@ -299,6 +337,88 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason(result, ['execution failed', 'exit code', 'example.test', 'Increase the cap', 'Top up'])
   })
 
+  it.each([undefined, 402])('shows a monthly spending cap as budget, without a billing card (HTTP %s)', async (statusCode) => {
+    const result = await turn([{ type: 'error', data: { code: 'budget_exceeded', statusCode,
+      message: 'Monthly budget exceeded (used: 8, limit: 8)' } }])
+
+    expect(result.error?.message).toBe(BUDGET)
+    expect(result.error?.code).toBe('budget_exceeded')
+    expect(result.text).toBe(BUDGET)
+    expect(result.row?.content).toBe(BUDGET)
+    expect(getChatFundingRecovery({ code: result.error?.code, message: result.error?.message })).toBe(null)
+    expect(getChatFundingRecovery(result.row?.content)).toBe(null)
+    expectNoRawReason(result, ['Monthly budget exceeded', 'used: 8'])
+  })
+
+  it('classifies the monthly budget phrase when a harness replaces the Router code', async () => {
+    const result = await turn([{ type: 'error', data: { message: 'Monthly budget exceeded (used: 8, limit: 8)' } }])
+    expect(result.error?.message).toBe(BUDGET)
+    expect(result.text).toBe(BUDGET)
+    expect(result.row?.content).toBe(BUDGET)
+  })
+
+  it('keeps a typed budget cap ahead of HTTP 402 funding when the reason is unrecognized', async () => {
+    const result = await turn([{ type: 'error', data: { code: 'budget_exceeded', statusCode: 402, message: 'The request was refused.' } }])
+    expect(result.error?.message).toBe(BUDGET)
+    expect(result.text).toBe(BUDGET)
+    expect(result.row?.content).toBe(BUDGET)
+    expect(getChatFundingRecovery({ code: result.error?.code, message: result.error?.message })).toBe(null)
+  })
+
+  it.each(['error', 'session.error', 'raw'])('keeps a nested funding code on the %s carrier', async (type) => {
+    const error = { code: 'insufficient_credits', message: 'Payment required' }
+    const data = type === 'raw' ? { event: { type: 'error', error, stack: HARNESS_FAILURE } }
+      : type === 'session.error' ? { properties: { error } } : { error }
+    const result = await turn([{ type, data }, ...(type === 'error' ? [] : [{ type: 'error', data: { error } }])])
+
+    expect(result.error?.message).toBe(FUNDING)
+    expect(result.error?.code).toBe('insufficient_credits')
+    expect(result.text).toBe(led(FUNDING))
+    expect(result.row?.content).toBe(led(FUNDING))
+    if (type === 'raw') expect(result.streamed.find((event) => event.type === 'raw')?.data).toMatchObject({
+      code: 'insufficient_credits', event: { code: 'insufficient_credits', message: FUNDING },
+    })
+    expectNoRawReason(result, ['Payment required', ...RAW_FRAGMENTS])
+  })
+
+  it.each(['insufficient_credits', 'paid_access_required', 'funding_required'])('keeps a thrown own funding code %s', async (code) => {
+    const result = await turn([], { severed: Object.assign(new Error('Payment required'), { code }) })
+    const shown = code === 'insufficient_credits' ? FUNDING : PAID
+    expect(result.error?.message).toBe(shown)
+    expect(result.error?.code).toBe(code)
+    expect(result.text).toBe(led(shown))
+    expect(result.row?.content).toBe(led(shown))
+    expectNoRawReason(result, ['Payment required'])
+  })
+
+  it.each([
+    { code: 'MODEL_REFUSED', message: 'Insufficient credits; reset at 2030-01-02T03:04:05Z', shown: POLICY },
+    { code: 'paid_access_required', message: "This key's monthly budget is exhausted", shown: PAID },
+  ])('classifies typed $code before conflicting phrases', async ({ code, message, shown }) => {
+    const result = await turn([{ type: 'error', data: { code, message } }])
+    expect(result.error?.message).toBe(shown)
+    expect(result.text).toBe(led(shown))
+    expect(result.row?.content).toBe(led(shown))
+  })
+
+  it.each([
+    { last: { reason: 'connection reset', errorCode: undefined }, shown: PLAIN, code: 'sandbox.stream_failed' },
+    { last: { reason: 'unclassified refusal | earlier text: Insufficient credits', errorCode: 'MODEL_REFUSED' }, shown: POLICY, code: 'MODEL_REFUSED' },
+    { last: { reason: 'Monthly budget exceeded (used: 8, limit: 8)', errorCode: 'budget_exceeded' }, shown: BUDGET, code: 'budget_exceeded' },
+  ])('classifies a thrown failover by its structured final attempt ($code)', async ({ last, shown, code }) => {
+    const error = new ModelFailoverExhaustedError([
+      { model: 'model-a', ok: false, reason: 'Insufficient credits', errorCode: 'insufficient_credits' },
+      { model: 'model-b', ok: false, ...last },
+    ])
+    const result = await turn([], { severed: error })
+
+    expect(result.error?.message).toBe(shown)
+    expect(result.error?.code).toBe(code)
+    expect(result.text).toBe(shown === POLICY ? led(shown) : shown)
+    expect(result.row?.content).toBe(result.text)
+    expectNoRawReason(result, ['model-a', 'model-b', 'connection reset', 'unclassified refusal', 'Monthly budget exceeded'])
+  })
+
   it('reads a thrown 402 on the wire as in the text, as the funding sentence, logged under the funding class', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
@@ -329,6 +449,15 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expect(result.text).toBe(answer ? `${answer}\n\n---\n${shown}` : shown)
     expect(result.failed).toBe(true)
     expectNoRawReason(result, ['exceeded execution limits'])
+  })
+
+  it('keeps a completed answer when a settlement reason contains funding words', async () => {
+    const answer = 'Here is the full answer.'
+    const result = await turn([textPart(answer), { type: 'error', data: { code: 'settlement_over_limit', message: 'Insufficient credits' } }])
+    expect(result.error?.message).toBe('The answer above is complete.')
+    expect(result.text).toBe(`${answer}\n\n---\nThe answer above is complete.`)
+    expect(result.row?.content).toBe(result.text)
+    expectNoRawReason(result, ['Insufficient credits'])
   })
 
   // A model failover trail: an earlier attempt's route, status and model id, then the last attempt's reason.

@@ -51,13 +51,13 @@ import { isTerminalPromptEvent } from '../sandbox/prompt-events'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
 import {
   failureIds,
+  failureCode,
   failureReason,
   failureText,
   FAILED_TURN_TEXT,
   MODEL_KEY_REFUSED_CODE,
   personFacing,
   providerRetryNotice,
-  sandboxStreamErrorCode,
   sandboxStreamFailureDiagnostic,
   withoutToolList,
 } from './failure-wording'
@@ -529,10 +529,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'error') {
           // The same reason the wire's error event carries, so the text and the event read the same sentence.
           const reason = failureReason(record)
-          const view = person.view(reason, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
+          const view = person.view(reason, failureCode(record), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
           const errorContent = failureText(view, projectionState.fullText)
           if (options.errorNotice) {
-            const code = view.class === 'model_key_refused' ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data)
+            const code = view.class === 'model_key_refused' ? MODEL_KEY_REFUSED_CODE : failureCode(record) ?? 'sandbox.stream_error'
             yield* emitErrorNotice(errorContent, code)
           } else if (options.includeErrorText !== false) {
             const errorDelta = projectionState.fullText ? `\n\n---\n${errorContent}` : errorContent

@@ -197,7 +197,7 @@ export interface DetachedTurnResult {
   /** True when the preferred model did not serve. Makes an autonomous
    *  downgrade — which no human watched happen — attributable after the fact. */
   usedModelFallback?: boolean
-  /** Every model tried, in order, with the reason each was abandoned. */
+  /** Every model tried, in order. Each attempt's raw `reason` is server-only; never render or send it to a client. */
   modelAttempts?: ModelFailoverAttempt[]
 }
 
