@@ -17,6 +17,7 @@ import type {
 } from './contract.js'
 import { OperatorError, type OperatorAdapter, type OperatorContext } from './server.js'
 import { sha256Hex } from '../crypto/digest'
+import { classifyTurnOutcome } from '../turn-health/classify.js'
 
 /** The message fields the adapter reads; agent-app's chat-store rows satisfy it. */
 export interface ChatOperatorMessage {
@@ -319,6 +320,10 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
         }
         const completedAt = iso(assistant.createdAt)
         if (completedAt && (state === 'succeeded' || state === 'failed')) turn.completedAt = completedAt
+        // A recovered turn still carries a refused tool call in its parts; say so.
+        const refused = classifyTurnOutcome({ finalText: assistant.content, parts: assistant.parts as readonly unknown[] | null })
+          .reasons.flatMap(reason => reason.kind === 'tool_call_rejected' ? [{ tool: reason.tool, error: reason.error }] : [])
+        if (refused.length > 0) turn.refusedToolCalls = refused
       }
     } else if (state !== 'working' && terminal && (!latest || status === 'error' || status === 'complete')) {
       state = 'failed'
