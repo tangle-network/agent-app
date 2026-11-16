@@ -548,6 +548,15 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.remote.values()]).toHaveLength(1)
   })
 
+  it('takes a per-app reuse floor shorter than the key lifetime', async () => {
+    const h = makeHarness()
+    expect(() => h.manager('router', { keyLifetimeMs: 30 * 60_000, minRemainingLifetimeMs: 30 * 60_000 })).toThrow('shorter than keyLifetimeMs')
+    const manager = h.manager('router', { minRemainingLifetimeMs: 40 * 60_000 })
+    const first = await manager.ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - 40 * 60_000 + 1)
+    expect((await manager.ensureKey(h.identity())).usage.keyId).not.toBe(first.usage.keyId)
+  })
+
   // A read-back that cannot answer is not evidence about the key: one bad Platform minute must not rotate every
   // workspace's key and kill every running reply.
   it('neither rotates nor revokes the active key when its read-back cannot answer', async () => {

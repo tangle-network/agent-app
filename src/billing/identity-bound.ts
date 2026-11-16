@@ -217,6 +217,11 @@ export interface DurableWorkspaceKeyManagerOptions {
   now?: () => Date
   /** Local lifetime used when the remote response omits an expiry. */
   keyLifetimeMs?: number
+  /**
+   * Least remaining life a reused key needs: the app's longest turn plus a margin, shorter than `keyLifetimeMs`. Below
+   * it a fresh key is minted and the old one retired at its own expiry, never revoked under a turn that holds it.
+   */
+  minRemainingLifetimeMs?: number
   /** Lease lifetime for remote operations. */
   leaseMs?: number
   /** Maximum time to wait for another issuer to release the scope lease. */
@@ -238,6 +243,8 @@ export interface DurableWorkspaceKeyManagerOptions {
 }
 
 const DEFAULT_KEY_LIFETIME_MS = 55 * 60_000
+/** Default reuse floor: a 15 min turn plus a 5 min margin; this package sets no turn limit, so longer turns pass their own. */
+export const DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS = 20 * 60_000
 const DEFAULT_LEASE_MS = 60_000
 const DEFAULT_LEASE_WAIT_MS = 15_000
 const DEFAULT_LEASE_POLL_MS = 50
@@ -425,6 +432,11 @@ export function createIdentityBoundWorkspaceKeyManager(
   if (!product) throw new Error('workspace child key product is required')
   const defaultBudgetUsd = requirePositive(options.defaultBudgetUsd, 'defaultBudgetUsd')
   const keyLifetimeMs = requirePositive(options.keyLifetimeMs ?? DEFAULT_KEY_LIFETIME_MS, 'keyLifetimeMs')
+  const minRemainingLifetimeMs = requireNonNegative(
+    options.minRemainingLifetimeMs ?? Math.min(DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS, Math.floor(keyLifetimeMs / 2)),
+    'minRemainingLifetimeMs',
+  )
+  if (minRemainingLifetimeMs >= keyLifetimeMs) throw new Error('minRemainingLifetimeMs must be shorter than keyLifetimeMs')
   const leaseMs = requirePositive(options.leaseMs ?? DEFAULT_LEASE_MS, 'leaseMs')
   const leaseWaitMs = requireNonNegative(options.leaseWaitMs ?? DEFAULT_LEASE_WAIT_MS, 'leaseWaitMs')
   const leasePollMs = requirePositive(options.leasePollMs ?? DEFAULT_LEASE_POLL_MS, 'leasePollMs')
@@ -580,12 +592,15 @@ export function createIdentityBoundWorkspaceKeyManager(
       if (active) {
         const key = await options.crypto.decrypt(active.row.keyEncrypted)
         if (!key.trim()) throw new Error('workspace child key secret is empty')
-        // The decrypt is awaited after the expiry check; a key that expired meanwhile is never handed out.
-        if (Date.parse(active.usage.expiresAt) > now().getTime()) return { key, usage: active.usage, refreshed: false }
+        // Checked after the awaited decrypt: a key handed out must outlive the turn that takes it.
+        const remainingMs = Date.parse(active.usage.expiresAt) - now().getTime()
+        if (remainingMs > 0 && remainingMs >= minRemainingLifetimeMs) return { key, usage: active.usage, refreshed: false }
+        // A running turn may hold a key below the floor: retire it at its expiry (`waitsForExpiry`), never revoke it.
         await options.store.markRevocationPending({
           id: active.row.id,
-          error: 'active child key expired while it was read',
-          nextAttemptAt: now(),
+          error: remainingMs > 0 ? 'active child key is below the reuse floor; it is retired at its expiry'
+            : 'active child key expired while it was read',
+          nextAttemptAt: remainingMs > 0 ? active.row.expiresAt : now(),
           incrementAttempts: false,
         })
       }
