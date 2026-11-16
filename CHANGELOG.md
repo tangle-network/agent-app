@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.1
+
+- feat(conformance): --computer none asks once (plain turn only) (#1541)
+
 ## 4.0.0
 
 - fix!: preserve native completion payloads through bounded references (#1539)
