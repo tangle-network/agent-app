@@ -374,19 +374,33 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.remote.values()]).toHaveLength(1)
   })
 
-  it('refuses to reuse a row after source id or fingerprint changes', async () => {
+  // Incident 3 (2026-11-16): the same member's second sign-in presented a new source credential, and the child key a
+  // running turn held was revoked mid-reply. A new sign-in by the same Platform user reuses the active child.
+  it('keeps the active key when the same Platform user signs in with a new source credential', async () => {
     const h = makeHarness()
     const manager = h.manager('router')
-    const firstIdentity = h.identity()
-    const first = await manager.ensureKey(firstIdentity)
+    const first = await manager.ensureKey(h.identity())
 
     h.setCurrentSourceKeyId('source-2')
-    const changed = await manager.ensureKey(h.identity({ sourceKeyFingerprint: firstIdentity.sourceKeyFingerprint }))
-    expect(changed.usage.keyId).not.toBe(first.usage.keyId)
-    expect([...h.rows.values()].find((row) => row.keyId === first.usage.keyId)?.status).toBe('revoked')
+    const again = await manager.ensureKey(h.identity({ sourceKeyId: 'source-2', sourceKeyFingerprint: 'fingerprint-source-2' }))
+    expect(again.usage.keyId).toBe(first.usage.keyId)
+    expect(again.key).toBe(first.key)
+    expect([...h.rows.values()].filter((row) => row.status === 'active')).toHaveLength(1)
+    expect([...h.rows.values()].find((row) => row.keyId === first.usage.keyId)?.status).toBe('active')
+    expect([...h.remote.values()].filter((key) => !key.revoked)).toHaveLength(1)
+  })
 
-    const fingerprintChanged = await manager.ensureKey(h.identity({ sourceKeyId: 'source-2', sourceKeyFingerprint: 'rotated-again' }))
-    expect(fingerprintChanged.usage.keyId).not.toBe(changed.usage.keyId)
+  // A read-back that cannot answer is not evidence about the key: one bad Platform minute must not rotate every
+  // workspace's key and kill every running reply.
+  it('neither rotates nor revokes the active key when its read-back cannot answer', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    const outage = h.manager('router', { provisioner: { ...h.provisioner,
+      async getKey() { throw Object.assign(new Error('Platform answered HTTP 503'), { status: 503 }) } } })
+    await expect(outage.ensureKey(h.identity())).rejects.toThrow('503')
+    expect([...h.rows.values()].find((row) => row.keyId === first.usage.keyId)?.status).toBe('active')
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBeFalsy()
+    expect([...h.remote.values()]).toHaveLength(1)
   })
 
   it('refuses incomplete identities and a mismatched platform owner', async () => {

@@ -304,13 +304,21 @@ function sameIdentity(row: DurableWorkspaceKeyRecord, identity: WorkspaceKeyIden
     && row.sourceKeyFingerprint === identity.sourceKeyFingerprint
 }
 
-function sameRowIdentity(a: DurableWorkspaceKeyRecord, b: DurableWorkspaceKeyRecord): boolean {
-  return a.workspaceId === b.workspaceId
-    && a.ownerUserId === b.ownerUserId
-    && a.product === b.product
-    && a.platformUserId === b.platformUserId
-    && a.sourceKeyId === b.sourceKeyId
-    && a.sourceKeyFingerprint === b.sourceKeyFingerprint
+/**
+ * Whether an ACTIVE child may be reused: it belongs to its workspace, owner, product and Platform user, not to the
+ * source credential that minted it. Every sign-in presents a new source credential (sourceKeyId, sourceKeyFingerprint),
+ * so matching on it made the same member's second sign-in revoke the child a running turn held (Incident 3,
+ * 2026-11-16). The payer cannot differ for one Platform user: delegation refuses a child not paid by that user
+ * (`platform/delegated-keys.ts`: non-user payer and payer id checks). A revoked source takes its children with it:
+ * their read-back is a definite gone verdict. Recovery of a half-provisioned row still needs the exact minting source
+ * (`sameIdentity`).
+ */
+function sameOwner(row: DurableWorkspaceKeyRecord, owner: Pick<DurableWorkspaceKeyRecord, 'workspaceId' | 'ownerUserId' | 'platformUserId'>,
+  product: string): boolean {
+  return row.workspaceId === owner.workspaceId
+    && row.ownerUserId === owner.ownerUserId
+    && row.product === product
+    && row.platformUserId === owner.platformUserId
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -496,7 +504,7 @@ export function createIdentityBoundWorkspaceKeyManager(
   async function readActive(identity: WorkspaceKeyIdentity): Promise<{ row: DurableWorkspaceKeyRecord; usage: WorkspaceKeyUsage } | null> {
     const row = await options.store.getActive(scopeFor(identity, product))
     if (!row) return null
-    if (!sameIdentity(row, identity, product)) {
+    if (!sameOwner(row, identity, product)) {
       await options.store.markRevocationPending({
         id: row.id,
         error: 'active child key identity does not match the authenticated owner and source',
@@ -706,7 +714,7 @@ function createWorkspaceKeyRecovery(
 
     const scope = { workspaceId: row.workspaceId, ownerUserId: row.ownerUserId, product: row.product }
     const active = await options.store.getActive(scope)
-    const activeMatches = active && (identity ? sameIdentity(active, identity, product) : sameRowIdentity(active, row))
+    const activeMatches = active && sameOwner(active, identity ?? row, product)
     const activeKeyId = activeMatches ? active.keyId : null
     const toRevoke = candidates
       .map((candidate) => candidate.id.trim())
