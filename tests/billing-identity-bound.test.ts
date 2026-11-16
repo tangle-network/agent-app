@@ -840,6 +840,7 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     it(`recovers a mint that died after Platform's create within one lease, by the name the mint stored (${naming} name)`, async () => {
       const h = makeHarness()
       let dead = false
+      let crashedOnce = false
       const alive = <A extends unknown[], R>(fn: (...args: A) => Promise<R>) => async (...args: A): Promise<R> => {
         if (dead) throw new Error('process died')
         return fn(...args)
@@ -861,7 +862,8 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
       const provisioner: DurableWorkspaceKeyProvisioner = {
         async createKey(input) {
           const created = await alive(p.createKey)(input)
-          dead = true
+          dead = !crashedOnce
+          crashedOnce = true
           return created
         },
         getKey: alive(p.getKey), revokeKey: alive(p.revokeKey), findCreatedKeys: alive(p.findCreatedKeys),
