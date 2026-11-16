@@ -270,9 +270,10 @@ export interface CreateTextProfileInput {
   actorRole: 'owner' | 'manager' | 'member' | 'viewer'
   /** Product computes ADC's hashWorkspacePlan for the complete authored snapshot. */
   planDigest: (profile: AgentProfile) => string | Promise<string>
-  /** The profile a turn runs for a stored revision (usually {@link followProductRelease}). With it, the new profile
-   *  stores no system prompt, so it runs the product's current one at every release, not the baseline's stored copy;
-   *  a read path that shows the prompt must read it through the same function. */
+  /** The profile a turn runs for a stored revision (usually {@link followProductRelease}). With it, a new profile
+   *  whose baseline runs the release's system prompt stores none, so it runs the product's current one at every
+   *  release, not a stored copy; a system prompt a person wrote on the baseline is copied. A read path that shows the
+   *  prompt must read it through the same function. */
   followRelease?: (revision: ProfileRevision) => Promise<AgentProfile>
   now?: number
 }
