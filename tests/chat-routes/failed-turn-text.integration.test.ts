@@ -225,6 +225,28 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     }
   })
 
+  it.each(['tool_result', 'tool.result'])('filters a flat %s before it is streamed and stored', async (type) => {
+    const answer = 'Here is the answer.'
+    const result = await turn([
+      { type, data: { id: 'call-failed', name: 'bash', status: 'error',
+        error: `The same call repeated 3 times. ${TOOL_LIST}`, output: `Call refused. ${TOOL_LIST}` } },
+      { type, data: { id: 'call-invalid', name: 'invalid', output: REFUSED_CALL } },
+      textPart(answer),
+      { type: 'result', data: { finalText: answer } },
+    ])
+
+    expectNoRawReason(result, LIST_FRAGMENTS)
+    const outcomes = result.streamed.filter((event) => event.type === 'tool_result')
+    expect(outcomes).toEqual([
+      { type: 'tool_result', toolCallId: 'call-failed', toolName: 'bash',
+        outcome: { ok: false, result: 'Call refused.', message: 'The same call repeated 3 times.' } },
+      { type: 'tool_result', toolCallId: 'call-invalid', toolName: 'invalid',
+        outcome: { ok: true, result: "That tool isn't available." } },
+    ])
+    expect(JSON.stringify(result.row?.parts)).toContain("That tool isn't available.")
+    expect(result.row?.content).toBe(answer)
+  })
+
   it('never carries the tool list in a raw harness tool event', async () => {
     const answer = 'Here is the answer.'
     const result = await turn([

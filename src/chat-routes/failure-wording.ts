@@ -299,8 +299,9 @@ function withoutToolListTail(text: string): string {
  *  of every tool, and the harness's `invalid` repair tool, which stands in for a call to a tool the model does not have,
  *  reads one sentence. Inputs, metadata and a completed call's output (a document it read) stay whole. */
 export function withoutToolList(part: JsonRecord): JsonRecord {
-  const state = asRecord(part.state)
-  if (!state) return part
+  // Bare tool_result events have flat fields until recordPersistedPart normalizes them.
+  const nested = asRecord(part.state)
+  const state = nested ?? part
   const invalid = part.tool === 'invalid'
   const shown: JsonRecord = { ...state }
   for (const key of ['error', 'output']) {
@@ -308,5 +309,5 @@ export function withoutToolList(part: JsonRecord): JsonRecord {
     shown[key] = invalid ? UNAVAILABLE_TOOL_TEXT : withoutToolListTail(shown[key] as string)
   }
   if (invalid) shown.input = { ...asRecord(state.input), error: UNAVAILABLE_TOOL_TEXT }
-  return { ...part, state: shown }
+  return nested ? { ...part, state: shown } : shown
 }
