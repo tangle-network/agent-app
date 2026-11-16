@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-70 exports.
+73 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -132,6 +132,14 @@ TurnStreamLocationHint
 
 ```ts
 interface DurableTurnLock
+```
+
+### `forwardTurnToHost`
+
+`function` — Send a browser's turn request, unread and with its cookies, to a new object of the host binding, and return that object's streamed response.
+
+```ts
+(host: TurnHost, request: Request) => Promise<Response>
 ```
 
 ### `HolderBoxReport`
@@ -364,6 +372,22 @@ class TurnControlUnavailableError
 
 ```ts
 (seq: number) => string
+```
+
+### `TurnHost`
+
+`interface` — The turn-stream binding chat turns run in (`createChatTurnRoutes`' `turnHost`); its `TurnStreamDO` subclass passes `turnRoutes`.
+
+```ts
+interface TurnHost
+```
+
+### `turnHostChannelKey`
+
+`function` — The capability name of a per-turn object, which `newUniqueId` leaves without a channel name.
+
+```ts
+(objectId: string) => string
 ```
 
 ### `TurnLockAcquireInput`
