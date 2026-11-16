@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.12
+
+- fix(billing): each minted child key gets its own remote slot name (#1551)
+
 ## 4.0.11
 
 - fix(billing): reuse a child key only while it outlives one turn (#1550)
