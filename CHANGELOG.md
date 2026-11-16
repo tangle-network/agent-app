@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.3
+
+- feat(operator): report refused tool calls on a turn; conformance fails on one (#1542)
+
 ## 4.0.2
 
 - fix(chat): keep a Router turn's pre-tool narration out of its answer (#1536)
