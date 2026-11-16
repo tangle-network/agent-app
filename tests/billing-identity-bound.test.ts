@@ -836,6 +836,61 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.rows.get(row.id)?.status).toBe('revoked')
   })
 
+  for (const naming of ['default', 'stable custom'] as const) {
+    it(`recovers a mint that died after Platform's create within one lease, by the name the mint stored (${naming} name)`, async () => {
+      const h = makeHarness()
+      let dead = false
+      const alive = <A extends unknown[], R>(fn: (...args: A) => Promise<R>) => async (...args: A): Promise<R> => {
+        if (dead) throw new Error('process died')
+        return fn(...args)
+      }
+      // A store with no name or create-identity column, and a process that dies once Platform's create returns.
+      type S = DurableWorkspaceKeyStore
+      const bare = <T extends DurableWorkspaceKeyRecord | null>(row: T): T => (row && { ...row, name: null, idempotencyKey: undefined }) as T
+      const s = h.store
+      const store: S = {
+        getActive: alive(async (scope: Parameters<S['getActive']>[0]) => bare(await s.getActive(scope))),
+        listProvisioning: alive(async (scope: Parameters<S['listProvisioning']>[0]) => (await s.listProvisioning(scope)).map((row) => bare(row))),
+        listPendingRevocations: alive(async (input: Parameters<S['listPendingRevocations']>[0]) => (await s.listPendingRevocations(input)).map((row) => bare(row))),
+        insertProvisioning: alive(s.insertProvisioning), markProvisioningRemote: alive(s.markProvisioningRemote),
+        markActive: alive(s.markActive), markRevocationPending: alive(s.markRevocationPending), markRevoked: alive(s.markRevoked),
+        markOrphaned: alive(s.markOrphaned), acquireLease: alive(s.acquireLease), renewLease: alive(s.renewLease),
+        releaseLease: alive(s.releaseLease),
+      }
+      const p = h.provisioner
+      const provisioner: DurableWorkspaceKeyProvisioner = {
+        async createKey(input) {
+          const created = await alive(p.createKey)(input)
+          dead = true
+          return created
+        },
+        getKey: alive(p.getKey), revokeKey: alive(p.revokeKey), findCreatedKeys: alive(p.findCreatedKeys),
+      }
+      let namings = 0
+      let legacyNamings = 0
+      const names = naming === 'default' ? { nameForIdentity: undefined } : {
+        nameForIdentity: (identity: WorkspaceKeyIdentity) => { namings += 1; return `router:${identity.workspaceId}` },
+        // The pre-suffix name a consumer would rebuild without the mint's operation id; recovery must not need it.
+        legacyNameForRecord: () => { legacyNamings += 1; return 'router:workspace-1' },
+      }
+
+      await expect(h.manager('router', { store, provisioner, ...names }).ensureKey(h.identity())).rejects.toThrow('process died')
+      const [crashed] = [...h.remote.values()]
+      expect(crashed?.revoked).toBe(false)
+      dead = false
+      namings = 0
+      h.advance(60_000)
+
+      const result = await h.manager('router', { store, provisioner, ...names }).ensureKey(h.identity())
+      expect(result.refreshed).toBe(true)
+      expect(h.remote.get(crashed!.id)?.revoked).toBe(true)
+      expect([...h.remote.values()].filter((key) => !key.revoked).map((key) => key.id)).toEqual([result.usage.keyId])
+      expect(result.key).toBe(h.remote.get(result.usage.keyId)?.key)
+      expect(legacyNamings).toBe(0)
+      expect(namings).toBe(naming === 'default' ? 0 : 1)
+    })
+  }
+
   it('keeps an undiscovered committed child pending when creation is not idempotent', async () => {
     const h = makeHarness()
     const row = h.insertProvisioning()
