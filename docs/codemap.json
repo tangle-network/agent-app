@@ -4102,13 +4102,13 @@
           "name": "providerResetSentence",
           "kind": "function",
           "signature": "(message: string) => string | undefined",
-          "doc": "A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence."
+          "doc": "A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence with its time."
         },
         {
           "name": "providerRetryNotice",
           "kind": "function",
           "signature": "(event: { type: string; data?: unknown; }) => string | undefined",
-          "doc": "A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt."
+          "doc": "A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence with its next attempt's time."
         },
         {
           "name": "RawAgentFilePart",
@@ -28483,6 +28483,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -31767,6 +31768,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -32059,6 +32061,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
@@ -32127,6 +32130,7 @@
         "session-shell",
         "theme",
         "trace",
+        "web",
         "work-product"
       ],
       "error": null,
