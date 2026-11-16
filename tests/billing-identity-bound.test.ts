@@ -1,3 +1,5 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { describe, expect, it } from 'vitest'
 import {
   createIdentityBoundWorkspaceKeyManager,
@@ -9,6 +11,7 @@ import {
   type WorkspaceKeyIdentity,
   type DurableWorkspaceKeyProvisioningRecord,
 } from '../src/billing/index'
+import { createDelegatedKeyProvisioner, createPlatformDelegatedKeyClient, DelegatedKeyRefusalError } from '../src/platform/delegated-keys'
 
 type RemoteKey = {
   id: string
@@ -16,6 +19,7 @@ type RemoteKey = {
   name: string
   product: string
   sourceKeyId: string | null
+  platformUserId?: string
   budgetUsd: number
   budgetSpent: number
   expiresAt: string
@@ -30,6 +34,11 @@ function missingRemoteKey(): Error & { status: number; code: string } {
   return Object.assign(new Error('missing remote key'), { status: 404, code: 'not_found' })
 }
 
+function platformRefusal(status: number, platformCode: string): DelegatedKeyRefusalError {
+  return new DelegatedKeyRefusalError({ status, code: status === 403 ? 'delegated_key.refused' : 'delegated_key.failed',
+    message: `Platform declined (${platformCode}).`, platformCode })
+}
+
 function makeHarness() {
   const rows = new Map<string, DurableWorkspaceKeyRecord>()
   const remote = new Map<string, RemoteKey>()
@@ -38,6 +47,10 @@ function makeHarness() {
   let rowNumber = 0
   let keyNumber = 0
   let currentSourceKeyId: string | null = 'source-1'
+  let currentPlatformUserId = 'platform-1'
+  const endedSources = new Set<string>()
+  let refuseRevokeSlot = false
+  const slotRevocations: Array<{ keyId: string; name: string | null; sourceKeyId: string | null; platformUserId: string }> = []
   let createDelayMs = 0
   let createFailure: Error | null = null
   let returnMissingId = false
@@ -158,6 +171,10 @@ function makeHarness() {
   }
 
   const createdByIdentity = new Map<string, RemoteKey>()
+  // Platform's rules for agent-app's provisioner, bound to the current source: `getKey` is verify-by-id under the
+  // service authority (any child; an ended source ends its children); a DELETE with the source reaches only that
+  // source's own children (else 403); revoke-slot under the service authority retires only the child's own slot
+  // (Platform user, name, minting source; else 409); listing with the source finds only that source's children.
   const provisioner: DurableWorkspaceKeyProvisioner = {
     supportsIdempotentCreate: true,
     async createKey(input) {
@@ -177,6 +194,7 @@ function makeHarness() {
         name: input.name,
         product: input.product,
         sourceKeyId: currentSourceKeyId,
+        platformUserId: currentPlatformUserId,
         budgetUsd: input.budgetUsd,
         budgetSpent: 0,
         expiresAt: input.expiresAt,
@@ -191,22 +209,28 @@ function makeHarness() {
     },
     async getKey(id) {
       const key = remote.get(id)
-      if (!key || key.revoked) throw missingRemoteKey()
+      if (!key || key.revoked || (key.sourceKeyId !== null && endedSources.has(key.sourceKeyId))) throw missingRemoteKey()
       return { budgetUsd: key.budgetUsd, budgetSpent: key.budgetSpent, expiresAt: key.expiresAt }
     },
-    async revokeKey(id) {
+    async revokeKey(id, slot) {
       if (id === failNextRevocationFor) {
         failNextRevocationFor = null
         throw revocationFailure
       }
       const key = remote.get(id)
       if (!key || key.revoked) throw missingRemoteKey()
+      if (key.sourceKeyId !== currentSourceKeyId) {
+        if (!slot) throw platformRefusal(403, 'FORBIDDEN')
+        slotRevocations.push({ keyId: id, ...slot })
+        if (refuseRevokeSlot || slot.platformUserId !== key.platformUserId || slot.name !== key.name
+          || slot.sourceKeyId !== key.sourceKeyId) throw platformRefusal(409, 'SLOT_IDENTITY_MISMATCH')
+      }
       key.revoked = true
     },
     async findCreatedKeys(input) {
       return [...remote.values()]
-        .filter((key) => !key.revoked && key.name === input.name && key.product === input.product)
-        .filter((key) => input.sourceKeyId === undefined || input.sourceKeyId === null || key.sourceKeyId === input.sourceKeyId)
+        .filter((key) => !key.revoked && key.name === input.name && key.product === input.product
+          && key.sourceKeyId === currentSourceKeyId)
         .map((key) => ({ id: key.id }))
     },
   }
@@ -220,7 +244,7 @@ function makeHarness() {
     return {
       workspaceId: 'workspace-1',
       ownerUserId: 'owner-1',
-      platformUserId: 'platform-1',
+      platformUserId: currentPlatformUserId,
       sourceKeyId: currentSourceKeyId,
       sourceKeyFingerprint: currentSourceKeyId ? `fingerprint-${currentSourceKeyId}` : 'fingerprint-none',
       ...overrides,
@@ -278,6 +302,11 @@ function makeHarness() {
     setNow(value: number) { nowMs = value },
     advance(ms: number) { nowMs += ms },
     setCurrentSourceKeyId(value: string | null) { currentSourceKeyId = value },
+    setCurrentPlatformUserId(value: string) { currentPlatformUserId = value },
+    endSource(value: string) { endedSources.add(value) },
+    setRefuseRevokeSlot(value: boolean) { refuseRevokeSlot = value },
+    getSlotRevocations() { return slotRevocations },
+    rowFor(keyId: string) { return [...rows.values()].find((row) => row.keyId === keyId) },
     setCreateDelay(value: number) { createDelayMs = value },
     setRenewalDelay(value: number) { renewalDelayMs = value },
     setFailRenewal(value: boolean) { failRenewal = value },
@@ -291,6 +320,76 @@ function makeHarness() {
     waitForCreateStart() { return new Promise<void>((resolve) => { createStartedResolve = resolve }) },
     getRenewalCount() { return renewalCount },
   }
+}
+
+type PeerKey = { id: string; userId: string; name: string; product: string; parentKeyId: string | null; budgetUsd: number
+  expiresAt: string; revoked: boolean; spent: boolean }
+
+/** A loopback Platform serving the routes agent-app's delegated-key client calls, with Platform's key access rules. */
+async function loopbackPlatform() {
+  const keys = new Map<string, PeerKey>()
+  for (const source of ['a', 'b', 'c']) keys.set(`key_src_${source}`, { id: `key_src_${source}`, userId: 'usr_1', name: 'default',
+    product: 'router', parentKeyId: null, budgetUsd: 100, expiresAt: new Date(START + 86_400_000).toISOString(), revoked: false, spent: false })
+  const peer = { keys, calls: [] as string[], slotRequests: [] as unknown[], refuseRevokeSlot: false, url: '', close: async () => {} }
+  let minted = 0
+  const server = createServer((request, response) => {
+    let raw = ''
+    request.on('data', (chunk) => { raw += chunk })
+    request.on('end', () => {
+      const json = (status: number, value: unknown) => { response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(value)) }
+      const refuse = (status: number, code: string) => json(status, { success: false, error: { code } })
+      const body = (raw ? JSON.parse(raw) : {}) as Record<string, any>
+      const path = new URL(request.url!, 'http://peer').pathname
+      const byId = /^\/v1\/keys\/([A-Za-z0-9_]+)$/.exec(path)
+      if (byId && (request.method === 'DELETE' || request.method === 'GET')) {
+        const source = /^Bearer sk-tan-source-([abc])$/.exec(request.headers.authorization ?? '')?.[1]
+        const key = keys.get(byId[1]!)
+        // An API key may reach only itself and its descendants.
+        const status = !source ? 401 : !key ? 404 : key.id === `key_src_${source}` || key.parentKeyId === `key_src_${source}` ? 200 : 403
+        peer.calls.push(`${request.method} ${byId[1]} ${status}`)
+        if (status !== 200) return refuse(status, status === 403 ? 'FORBIDDEN' : 'NOT_FOUND')
+        if (request.method === 'GET') return json(200, { success: true, data: { ...key, revokedAt: key!.revoked ? new Date(START).toISOString() : null } })
+        key!.revoked = true
+        return json(200, { success: true })
+      }
+      if (request.headers.authorization !== 'Bearer svc-token' || request.headers['x-service-name'] !== 'tax-agent') return refuse(401, 'UNAUTHORIZED')
+      peer.calls.push(`${request.method} ${path}`)
+      if (path === '/v1/keys/delegate') {
+        const parentKeyId = `key_src_${/^sk-tan-source-([abc])$/.exec(String(body.sourceKey))?.[1]}`
+        if (!keys.has(parentKeyId)) return refuse(403, 'SOURCE_KEY_INVALID')
+        const id = `key_child_${++minted}`
+        keys.set(id, { id, userId: 'usr_1', name: body.name, product: body.product, parentKeyId, budgetUsd: body.budgetUsd,
+          expiresAt: body.expiresAt, revoked: false, spent: false })
+        return json(201, { success: true, data: { id, key: `sk-tan-child${minted}xxxxxxxxxxxx`, prefix: `sk-tan-child${minted}`,
+          name: body.name, provisionedByService: 'tax-agent', product: body.product, scopes: null, budgetUsd: body.budgetUsd,
+          attribution: { version: 1, targetService: body.product, delegatedFromKeyId: parentKeyId, payerType: 'user', payerId: 'usr_1',
+            resourceType: null, resourceId: null, expiresAt: body.expiresAt } } })
+      }
+      if (path === '/v1/keys/verify-by-id') {
+        const key = keys.get(String(body.keyId))
+        const invalidReason = !key ? 'key_not_found' : key.revoked ? 'key_revoked'
+          : keys.get(key.parentKeyId ?? '')?.revoked ? 'parent_key_revoked' : key.spent ? 'budget_exhausted' : undefined
+        if (invalidReason) return json(200, { valid: false, invalidReason, keyId: body.keyId, budgetUsd: key?.budgetUsd })
+        return json(200, { valid: true, keyId: key!.id, budgetUsd: key!.budgetUsd, budgetRemaining: key!.budgetUsd, expiresAt: key!.expiresAt })
+      }
+      if (path === '/v1/keys/auto-provisioned/revoke-slot') {
+        peer.slotRequests.push(body)
+        if (peer.refuseRevokeSlot) return refuse(403, 'FORBIDDEN')
+        if (!body.sourceKeyId || !body.product) return refuse(400, 'SLOT_IDENTITY_REQUIRED')
+        if (!String(body.name).startsWith('auto:')) return refuse(400, 'INVALID_NAME')
+        // The exact child in its own slot; a slot naming another source of the same user matches nothing.
+        const heads = [...keys.values()].filter((key) => key.id === body.childKeyId && key.userId === body.userId
+          && key.name === body.name && key.product === body.product && key.parentKeyId === body.sourceKeyId && !key.revoked)
+        for (const key of heads) key.revoked = true
+        return json(200, { success: true, data: { revoked: heads.length } })
+      }
+      return refuse(404, 'NOT_FOUND')
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  peer.url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  peer.close = () => new Promise<void>((resolve) => server.close(() => resolve()))
+  return peer
 }
 
 describe('createIdentityBoundWorkspaceKeyManager', () => {
@@ -374,8 +473,8 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.remote.values()]).toHaveLength(1)
   })
 
-  // Incident 3 (2026-11-16): the same member's second sign-in presented a new source credential, and the child key a
-  // running turn held was revoked mid-reply. A new sign-in by the same Platform user reuses the active child.
+  // The same member's second sign-in presented a new source credential, and the child key a running turn held was
+  // revoked mid-reply. A new sign-in by the same Platform user reuses the active child.
   it('keeps the active key when the same Platform user signs in with a new source credential', async () => {
     const h = makeHarness()
     const manager = h.manager('router')
@@ -401,6 +500,126 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect([...h.rows.values()].find((row) => row.keyId === first.usage.keyId)?.status).toBe('active')
     expect(h.remote.get(first.usage.keyId)?.revoked).toBeFalsy()
     expect([...h.remote.values()]).toHaveLength(1)
+  })
+
+  // The reused child belongs to the earlier source; the current source may not delete it.
+  it('retires a spent child of an earlier source through its own slot and mints again', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    expect((await manager.ensureKey(h.identity())).usage.keyId).toBe(first.usage.keyId)
+    const child = h.remote.get(first.usage.keyId)!
+    child.budgetSpent = child.budgetUsd
+
+    const next = await manager.ensureKey(h.identity())
+    expect(next.usage.keyId).not.toBe(first.usage.keyId)
+    expect(h.remote.get(next.usage.keyId)?.sourceKeyId).toBe('source-2')
+    expect(child.revoked).toBe(true)
+    expect(h.getSlotRevocations()).toEqual([{ keyId: first.usage.keyId, name: child.name, sourceKeyId: 'source-1', platformUserId: 'platform-1' }])
+    expect(h.rowFor(first.usage.keyId)?.status).toBe('revoked')
+  })
+
+  it('retires a spent child at once when Platform refuses its cleanup, and issues without waiting', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    await manager.ensureKey(h.identity())
+    const child = h.remote.get(first.usage.keyId)!
+    child.budgetSpent = child.budgetUsd
+    h.setRefuseRevokeSlot(true)
+
+    const next = await manager.ensureKey(h.identity())
+    expect(next.usage.keyId).not.toBe(first.usage.keyId)
+    // Platform kept the child, but it can no longer spend: nothing is left to wait for.
+    expect(child.revoked).toBe(false)
+    expect(h.rowFor(first.usage.keyId)?.status).toBe('revoked')
+  })
+
+  it('retires a live child whose cleanup Platform refuses at its own expiry, and issues meanwhile', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    h.setRefuseRevokeSlot(true)
+
+    const other = await manager.ensureKey(h.identity())
+    expect(other.usage.keyId).not.toBe(first.usage.keyId)
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).toBe('revocation_pending')
+    expect(old.nextRevocationAt?.getTime()).toBe(old.expiresAt.getTime())
+    expect(old.lastRevocationError).toContain('409 SLOT_IDENTITY_MISMATCH')
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
+    expect((await manager.ensureKey(h.identity())).usage.keyId).toBe(other.usage.keyId)
+
+    h.setNow(old.expiresAt.getTime())
+    expect(await manager.retryPendingRevocations({ workspaceId: 'workspace-1', ownerUserId: 'owner-1' })).toBe(1)
+    expect(old.status).toBe('revoked')
+  })
+
+  it('revokes the old child at once, through its own slot, when a different Platform user takes the workspace', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+
+    const other = await manager.ensureKey(h.identity())
+    expect(other.usage.keyId).not.toBe(first.usage.keyId)
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(true)
+    expect(h.rowFor(first.usage.keyId)?.status).toBe('revoked')
+    expect(h.getSlotRevocations()).toMatchObject([{ keyId: first.usage.keyId, sourceKeyId: 'source-1', platformUserId: 'platform-1' }])
+  })
+
+  it('mints again when the source that minted the active child is revoked', async () => {
+    const h = makeHarness()
+    const manager = h.manager('router')
+    const first = await manager.ensureKey(h.identity())
+    h.endSource('source-1')
+    h.setCurrentSourceKeyId('source-2')
+
+    const next = await manager.ensureKey(h.identity())
+    expect(next.usage.keyId).not.toBe(first.usage.keyId)
+    expect(h.rowFor(first.usage.keyId)?.status).toBe('revoked')
+    expect(h.getSlotRevocations()).toHaveLength(0)
+  })
+
+  // agent-app's own client and provisioner, unchanged, against a loopback Platform that applies the key rules the
+  // provisioner depends on: a source deletes and reads only its own children; revoke-slot (service token) retires only
+  // the child's own slot and answers 200 with nothing revoked for a same-user slot that names another source.
+  it('retires a reused child through its own revoke-slot over HTTP, and a refused cleanup never blocks issuance', async () => {
+    const peer = await loopbackPlatform()
+    try {
+      const h = makeHarness()
+      const client = createPlatformDelegatedKeyClient({ platformUrl: peer.url, serviceName: 'tax-agent', serviceToken: 'svc-token', now: () => START })
+      const signIn = (source: 'a' | 'b' | 'c') => h.manager('router', {
+        provisioner: createDelegatedKeyProvisioner({ client, sourceKey: `sk-tan-source-${source}`, product: 'router',
+          expect: { payerId: 'usr_1', sourceKeyId: `key_src_${source}` }, payerId: 'usr_1' }),
+      }).ensureKey(h.identity({ platformUserId: 'usr_1', sourceKeyId: `key_src_${source}`, sourceKeyFingerprint: `fingerprint-${source}` }))
+
+      const first = await signIn('a')
+      expect(first).toMatchObject({ refreshed: true, usage: { keyId: 'key_child_1' } })
+      expect(await signIn('b')).toMatchObject({ refreshed: false, key: first.key, usage: { keyId: 'key_child_1' } })
+
+      peer.keys.get('key_child_1')!.spent = true
+      const second = await signIn('b')
+      expect(second.usage.keyId).toBe('key_child_2')
+      expect(peer.keys.get('key_child_1')?.revoked).toBe(true)
+      expect(peer.keys.get('key_child_2')?.parentKeyId).toBe('key_src_b')
+      expect(peer.slotRequests).toEqual([{ userId: 'usr_1', name: peer.keys.get('key_child_1')!.name, product: 'router',
+        childKeyId: 'key_child_1', sourceKeyId: 'key_src_a' }])
+
+      peer.keys.get('key_child_2')!.spent = true
+      peer.refuseRevokeSlot = true
+      expect((await signIn('c')).usage.keyId).toBe('key_child_3')
+      expect(peer.keys.get('key_child_2')?.revoked).toBe(false)
+      expect(h.rowFor('key_child_2')?.status).toBe('revoked')
+      expect(peer.calls.filter((call) => call.startsWith('DELETE'))).toEqual(['DELETE key_child_1 403', 'DELETE key_child_2 403'])
+    } finally {
+      await peer.close()
+    }
   })
 
   it('refuses incomplete identities and a mismatched platform owner', async () => {
