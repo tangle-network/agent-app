@@ -1,28 +1,59 @@
 /**
  * What a person reads when a sandbox turn fails. A reason the producer can word plainly (a provider wait, a refused
  * model key, the Router's own budget or balance refusal) becomes that sentence. A refusal that would fail the same way
- * again, and a funding, billing or admission refusal the client's recovery UI reads, keep their own words, without the
- * harness's wrapper. Any other reason (a harness error, a tool list, a repeated-call loop, a stack) is withheld: the
- * person reads one plain sentence and the server keeps the reason, in its log and under a Symbol key the route's own
- * failure hooks read. `personFacing` applies this to every event the sandbox producer yields.
+ * again, and a funding, billing or admission refusal the client's recovery UI reads, keep their own words, cleaned of
+ * everything a person should not read: the harness's wrapper, a tool list, a request's method and path, a URL, an API
+ * path, an HTTP status. A model failover trail is read for its last attempt only, never its model ids. Any other reason
+ * (a harness error, a tool list, a repeated-call loop, a stack) is withheld: the person reads one plain sentence and
+ * the server keeps the reason, in its log and under a Symbol key the route's own failure hooks read. `personFacing`
+ * applies this to every event the sandbox producer yields.
  */
 
 import { ModelFailoverExhaustedError } from '../model-resolution/failover'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
 import { asRecord, asString, type JsonRecord } from '../stream/index'
 import { getChatFundingRecovery } from '../web/turn-funding-recovery'
-import { ModelFailoverTimeoutError } from './model-failover-stream'
+import { ModelFailoverTimeoutError, summarizeFailoverReason } from './model-failover-stream'
 import { WITHHELD_FAILURE } from './turn-event-stream'
 
 type Log = (message: string, meta?: Record<string, unknown>) => void
 
 const utcTime = (at: Date) => `${at.toISOString().slice(11, 19)} UTC`
 
+/** The list of every tool a harness appends to a refused or repeated tool call, to the end of its text. */
+const TOOL_LIST_TAIL = /\s*Available tools:[\s\S]*$/
+
+/** A request's method and path, a URL and a bare API path. */
+const REQUEST_DETAIL = /\b(?:GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) \/\S*|https?:\/\/\S+|(?<![\w.])\/(?:v\d+|api)\/\S*/g
+
+const STATUS_TEXT = 'Bad Gateway|Service Unavailable|Gateway Timeout|Internal Server Error|Too Many Requests|Payment Required'
+  + '|Bad Request|Unauthorized|Forbidden|Not Found'
+
+/** An HTTP status (`HTTP 502`, `(status 503)`, `status code 429`) with its text, and a bare status beside its text. */
+const STATUS_DETAIL = new RegExp(`\\(?\\b(?:HTTP(?:\\/\\d(?:\\.\\d)?)?|status(?: code)?)\\s*\\d{3}\\b\\)?(?:\\s+(?:${STATUS_TEXT}))?`
+  + `|\\b[45]\\d\\d\\s+(?:${STATUS_TEXT})`, 'gi')
+
+/** A reason as a person may read it: without the harness's wrapper (its `<harness> execution failed:` prefix, a tool
+ *  list, an exit status), a request's method and path, a URL, an API path, an HTTP status, or the model id a policy
+ *  refusal names. */
+function cleaned(text: string): string {
+  const shown = text.replace(/^[\w.-]+ execution failed:\s*/, '').replace(TOOL_LIST_TAIL, '')
+    .replace(/\s*\((?:exit code|killed by)[^)]*\)\s*$/, '')
+    .replace(/\bmodel "[^"]+" (?=is not admitted by policy)/g, 'the model ')
+    .replace(REQUEST_DETAIL, ' ').replace(STATUS_DETAIL, ' ')
+    .replace(/\(\s*\)/g, ' ').replace(/\s+/g, ' ').trim().replace(/\s+([.,;:])/g, '$1')
+    // Words left hanging where a removed path or status stood.
+    .replace(/\s+(?:at|to|from|on|via|returned|with)(?=[.,;:]|$)/g, '')
+    .replace(/^(?:[\s.,;:-]|returned\b|with\b)+/, '').replace(/[\s,;:-]+$/, '')
+  return shown.charAt(0).toUpperCase() + shown.slice(1)
+}
+
 /** A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt. */
 export function providerRetryNotice(event: { type: string; data?: unknown }): string | undefined {
   const retry = event.type === 'raw' ? asRecord(asRecord(event.data)?.event) : undefined
   if (retry?.type !== 'retry' || !(Number(retry.next) > 0)) return undefined
-  const cause = asString(retry.message)?.trim() || 'no reason given'
+  const message = asString(retry.message)?.trim()
+  const cause = (message && cleaned(summarizeFailoverReason(message))) || 'no reason given'
   return `The model provider refused the call (${cause}), so the turn retries at ${utcTime(new Date(Number(retry.next)))}.`
 }
 
@@ -30,8 +61,8 @@ export function providerRetryNotice(event: { type: string; data?: unknown }): st
 export function providerResetSentence(message: string): string | undefined {
   const at = new Date(message.match(/reset at (\d{4}-\d{2}-\d{2}T[\d:.]+Z)/)?.[1] ?? NaN)
   if (Number.isNaN(at.getTime())) return undefined
-  const cause = message.split('; the provider asked')[0]?.trim()
-  return `The model provider refused the call (${cause}); try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
+  const cause = cleaned(message.split('; the provider asked')[0] ?? '')
+  return `The model provider refused the call${cause ? ` (${cause})` : ''}; try again after ${utcTime(at)} on ${at.toISOString().slice(0, 10)}.`
 }
 
 /** The typed code for a harness whose model refused its key, so a product can tell it from other stream failures. */
@@ -46,15 +77,6 @@ export function modelKeyRefusedSentence(message: string): string | undefined {
     + 'If the assistant has just started, send it again in a minute; if this repeats, tell the team.'
 }
 
-/** The list of every tool a harness appends to a refused or repeated tool call, to the end of its text. */
-const TOOL_LIST_TAIL = /\s*Available tools:[\s\S]*$/
-
-/** A reason without the harness's wrapper: its `<harness> execution failed:` prefix, a tool list and an exit status. */
-function unwrapped(reason: string): string {
-  return reason.replace(/^[\w.-]+ execution failed:\s*/, '').replace(TOOL_LIST_TAIL, '')
-    .replace(/\s*\((?:exit code|killed by)[^)]*\)\s*$/, '').trim()
-}
-
 /** The Router's budget and balance refusals: a key's monthly or lifetime budget is exhausted, or the remaining budget
  *  or balance is below the cost of one answer. */
 const ROUTER_REFUSAL = new RegExp([
@@ -62,11 +84,22 @@ const ROUTER_REFUSAL = new RegExp([
   "(?:This key's remaining budget|Your available balance), after other in-flight requests, is below \\$",
 ].join('|'))
 
-/** A failure reason as the plain sentence the person reads, when the producer has one for it. */
+/** A failure reason as the plain sentence the person reads, when the producer has one for it. The Router's refusal is
+ *  its own first sentence, cleaned. */
 function plainFailureSentence(message: string): string | undefined {
-  const router = message.search(ROUTER_REFUSAL)
+  const router = message.slice(Math.max(0, message.search(ROUTER_REFUSAL)))
+  const end = router.indexOf('. ')
   return providerResetSentence(message) ?? modelKeyRefusedSentence(message)
-    ?? (router < 0 ? undefined : unwrapped(message.slice(router).split('\n')[0]!))
+    ?? (ROUTER_REFUSAL.test(message) ? cleaned(end < 0 ? router.split('\n')[0]! : router.slice(0, end + 1)) : undefined)
+}
+
+/** A model failover trail: `All N model(s) failed. <model>: <reason> | <model>: <reason>`. */
+const FAILOVER_TRAIL = /^All \d+ model\(s\) failed\. /
+
+/** A failover trail read for its last attempt only, without its model id; any other reason as it is. */
+function lastAttempt(reason: string): string {
+  if (!FAILOVER_TRAIL.test(reason)) return reason
+  return reason.replace(FAILOVER_TRAIL, '').split(' | ').at(-1)!.replace(/^\S+?: /, '')
 }
 
 export function sandboxStreamErrorMessage(data: unknown): string {
@@ -96,6 +129,16 @@ const ANSWER_COMPLETE_TEXT = 'The answer above is complete.'
 const REFUSAL_CODES: ReadonlySet<string> = new Set(['PAYMENT_REQUIRED', 'MODEL_REFUSED', 'model_policy_denied',
   'grant_model_unsupported', 'grant_activation_missing', 'profile_unsupported'])
 
+/** Own words shorter than this, once cleaned, say nothing: the person reads the failed-turn text and the code stays. */
+const MIN_SHOWN_LENGTH = 12
+
+/** Harness text a warning never shows: the harness's wrapper, a tool list, a stack, a request's method and path, a URL
+ *  or API path, or a model failover trail. */
+const HARNESS_TEXT = new RegExp([
+  '\\b[\\w.-]+ execution failed:', '\\((?:exit code|killed by)[^)]*\\)', 'Available tools:', '\\n\\s+at \\S',
+  '\\b(?:GET|POST|PUT|PATCH|DELETE) \\/', 'https?:\\/\\/', '(?<![\\w.])\\/(?:v\\d+|api)\\/', FAILOVER_TRAIL.source,
+].join('|'))
+
 /** Event types that carry a failure reason; `done` and `status` do too when their status is `failed`. */
 const FAILURE_TYPES: ReadonlySet<string> = new Set(['error', 'warning', 'session.run.failed', 'session.error'])
 
@@ -109,6 +152,19 @@ const CODE_VALUE = /^[a-z0-9_.]+$/
 export interface FailureView {
   kind: 'plain' | 'own' | 'withheld'
   shown: string
+}
+
+/** A reason the person may read: its last attempt as a plain sentence, or in its own words when it passes (HTTP 402, a
+ *  {@link REFUSAL_CODES} refusal, or what the client's recovery UI reads: `getChatFundingRecovery`'s
+ *  `insufficient_credits`, `paid_access_required`, `funding_required` or its words). `undefined` when it is withheld. */
+function classify(reason: string, code: string | undefined, status: unknown): FailureView | undefined {
+  const last = lastAttempt(reason)
+  const plain = plainFailureSentence(last)
+  if (plain) return { kind: 'plain', shown: plain }
+  const passes = Number(status) === 402 || REFUSAL_CODES.has(code ?? '')
+    || getChatFundingRecovery({ code, message: last })
+  const own = passes ? cleaned(last) : ''
+  return own.length >= MIN_SHOWN_LENGTH ? { kind: 'own', shown: own } : undefined
 }
 
 /** The turn, thread, session and execution ids a record carries, for the server log. */
@@ -166,7 +222,8 @@ function shownFailure(event: JsonRecord, shown: string, reason: string): JsonRec
   return out
 }
 
-/** A harness's raw event as the person may read it: a raw tool part without its tool list, a raw error behind `view`. */
+/** A harness's raw event as the person may read it: a raw tool part without its tool list, and any raw error (an `error`,
+ *  `error.message`, or an error item) behind `view`. */
 function shownRaw(event: JsonRecord, view: (reason: string) => FailureView): JsonRecord {
   const data = asRecord(event.data)
   const raw = asRecord(data?.event)
@@ -174,33 +231,47 @@ function shownRaw(event: JsonRecord, view: (reason: string) => FailureView): Jso
   const part = asRecord(raw.part)
   if (part?.type === 'tool') return { ...event, data: { ...data, event: { ...raw, part: withoutToolList(part) } } }
   const error = asRecord(raw.error)
-  const reason = raw.type === 'error'
-    ? asString(raw.error) ?? asString(asRecord(error?.data)?.message) ?? asString(error?.message) : undefined
-  return reason ? { ...event, data: { ...data, event: { ...raw, error: { message: view(reason).shown } } } } : event
+  const item = asRecord(raw.item)?.type === 'error' ? asRecord(raw.item) : undefined
+  const reason = asString(raw.error) ?? asString(asRecord(error?.data)?.message) ?? asString(error?.message) ?? asString(item?.message)
+  if (!reason) return event
+  const shown = view(reason).shown
+  return { ...event, data: { ...data, event: { ...raw, ...('error' in raw ? { error: { message: shown } } : {}),
+    ...(item ? { item: { ...item, message: shown } } : {}) } } }
 }
 
 /** One turn's person-facing filter. `view` says how a failure reason reads to the person; a withheld reason is logged
- *  once, at warn (`log`, else `console.warn`), under one class with the ids the failure carries. `event` is every event
- *  the producer yields as it may reach the client. Passing through: a plainly worded reason; HTTP 402; a
- *  {@link REFUSAL_CODES} refusal; and what the client's recovery UI reads (`getChatFundingRecovery`:
- *  `insufficient_credits`, `paid_access_required`, `funding_required`, or its words). */
-export function personFacing(options: { log?: Log; failedTurnText: string }) {
-  const logged = new Set<string>()
+ *  once, at warn (`log`, else `console.warn`), under one class with the ids the failure carries, and the same reason
+ *  reads the same wherever it appears. `warning` says how a warning reads. `event` is every event the producer yields as
+ *  it may reach the client. `hasAnswer` says whether the turn already shows answer text. */
+export function personFacing(options: { log?: Log; failedTurnText: string; hasAnswer?: () => boolean }) {
+  const views = new Map<string, FailureView>()
+  const droppedWarnings = new Set<string>()
+  const warn = (message: string, meta: Record<string, unknown>) => (options.log ?? console.warn)(message, meta)
   const view = (reason: string, code?: string, status?: unknown, meta: Record<string, unknown> = {}): FailureView => {
-    const plain = plainFailureSentence(reason)
-    if (plain) return { kind: 'plain', shown: plain }
-    if (Number(status) === 402 || REFUSAL_CODES.has(code ?? '')
-      || getChatFundingRecovery({ code, message: reason })) return { kind: 'own', shown: unwrapped(reason) || reason }
-    if (!logged.has(reason)) {
-      logged.add(reason)
-      const warn = options.log ?? console.warn
+    const key = [reason, code, Number(status) === 402].join('\n')
+    let seen = views.get(key) ?? classify(reason, code, status)
+    if (!seen) {
       warn('[chat-routes] turn failure withheld from the person', { failureClass: 'runtime_failure', code, error: reason, ...meta })
+      seen = { kind: 'withheld', shown: options.failedTurnText }
+      // A settlement check that fails after a charged answer leaves that answer whole: sending again would charge again.
+      if (code?.startsWith('settlement_') && options.hasAnswer?.()) seen = { kind: 'plain', shown: ANSWER_COMPLETE_TEXT }
     }
-    // A settlement check that fails after a charged answer leaves that answer whole: sending again would charge again.
-    if (code?.startsWith('settlement_')) return { kind: 'plain', shown: ANSWER_COMPLETE_TEXT }
-    return { kind: 'withheld', shown: options.failedTurnText }
+    views.set(key, seen)
+    return seen
   }
-  /** An event as it may reach the client, or `undefined` for a withheld warning, which leaves nothing to show. */
+  /** A warning that words a failure plainly or in its own words reads as that text; one that carries harness text is
+   *  dropped (`undefined`) and logged once as a harness warning, never as a turn failure; any other reads as it came. */
+  const warning = (message: string, code?: string, status?: unknown, meta: Record<string, unknown> = {}): FailureView | undefined => {
+    const seen = classify(message, code, status)
+    if (seen) return seen
+    if (!HARNESS_TEXT.test(message)) return { kind: 'own', shown: message }
+    if (!droppedWarnings.has(message)) {
+      droppedWarnings.add(message)
+      warn('[chat-routes] harness warning withheld from the person', { failureClass: 'harness_warning', code, error: message, ...meta })
+    }
+    return undefined
+  }
+  /** An event as it may reach the client, or `undefined` for a dropped warning, which leaves nothing to show. */
   const event = (event: JsonRecord): JsonRecord | undefined => {
     const data = asRecord(event.data)
     if (event.type === 'raw') return shownRaw(event, (reason) => view(reason, undefined, undefined, failureIds(data)))
@@ -208,11 +279,13 @@ export function personFacing(options: { log?: Log; failedTurnText: string }) {
     if (!failed && !FAILURE_TYPES.has(String(event.type))) return event
     const reason = failureReason(event)
     if (!reason) return event
-    const shown = view(reason, asString(data?.code), data?.statusCode ?? (failed ? undefined : data?.status), failureIds(data))
-    if (event.type === 'warning' && shown.kind === 'withheld') return undefined
-    return shownFailure(event, shown.shown, reason)
+    const status = data?.statusCode ?? (failed ? undefined : data?.status)
+    const seen = event.type === 'warning'
+      ? warning(reason, asString(data?.code), status, failureIds(data))
+      : view(reason, asString(data?.code), status, failureIds(data))
+    return seen ? shownFailure(event, seen.shown, reason) : undefined
   }
-  return { view, event }
+  return { view, warning, event }
 }
 
 /** Every model in the chain was refused by the product's model policy (`checkModelPolicy`'s refusal words), so a

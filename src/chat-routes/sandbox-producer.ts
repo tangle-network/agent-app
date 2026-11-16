@@ -343,7 +343,8 @@ function shownStream(
 export function createSandboxChatProducer(options: SandboxChatProducerOptions): ChatTurnRouteProducer {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
-  const person = personFacing({ log: options.log, failedTurnText: options.failedTurnText ?? FAILED_TURN_TEXT })
+  const person = personFacing({ log: options.log, failedTurnText: options.failedTurnText ?? FAILED_TURN_TEXT,
+    hasAnswer: () => projectionState.fullText.trim().length > 0 })
 
   // ── model failover ────────────────────────────────────────────────────────
   // ON by default whenever the caller can reopen the stream (`openEvents`) and
@@ -471,9 +472,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'warning') {
           const message = asString(event.data?.message)
           const code = asString(event.data?.code)
-          // A plainly worded failure arrives as its error event next, and `person` logs and drops a withheld one: only a
-          // warning in its own words becomes a notice.
-          const view = message ? person.view(message, code, undefined, failureIds(event.data)) : undefined
+          // A plainly worded failure arrives as its error event next, and `person` logs and drops one carrying harness
+          // text: only a warning in its own words becomes a notice.
+          const view = message ? person.warning(message, code, event.data?.statusCode, failureIds(event.data)) : undefined
           if (view?.kind === 'plain') log('[chat-routes] failure warning folded into its error notice', { code, error: message })
           if (view?.kind === 'own') {
             projectionState.warningCount += 1
@@ -562,7 +563,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
       // Logged once: a withheld or settlement reason by `person`, with its failure note; any other by this line.
-      const view = person.view(diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status,
+      const statusCode = asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status
+      const view = person.view(diagnostic.reason, diagnostic.code, statusCode,
         { ...failureIds(asRecord(streamErr)?.diagnostics), failureNote: diagnostic.failureNote })
       if (view.kind !== 'withheld' && !diagnostic.code.startsWith('settlement_')) log('[chat-routes] sandbox stream failed', {
         failureNote: diagnostic.failureNote,
@@ -580,8 +582,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       }
       projectionState.interactionOutcome = 'expired'
       yield* emitTerminalizedTools()
+      // The status goes with the reason, so the event reads on the wire as the text above reads.
       yield toProducerWireEvent({ type: 'error', data: { message: diagnostic.reason, code: diagnostic.code,
-        details: { failureNote: diagnostic.failureNote } } })
+        ...(statusCode !== undefined ? { statusCode } : {}), details: { failureNote: diagnostic.failureNote } } })
     } finally {
       reasoningClock.settle()
     }

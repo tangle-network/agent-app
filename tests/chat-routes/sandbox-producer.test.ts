@@ -788,14 +788,17 @@ describe('createSandboxChatProducer', () => {
     expect(persisted.some((p) => 'url' in p)).toBe(false)
   })
 
-  it('notices and forwards a warning in its own words, and drops a withheld harness warning', async () => {
-    const harnessWarning = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
+  it('notices and forwards a warning in its own words, and drops one that carries harness text', async () => {
+    const harnessWarning = { type: 'warning', data: { code: 'OPENCODE_ERROR',
+      message: "opencode execution failed: Model tried to call unavailable tool 'save_fact'. Available tools: bash, edit." } }
+    const fileDenied = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
     const refusal = { type: 'warning', data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance for this request.' } }
-    const producer = createSandboxChatProducer({ events: feed([harnessWarning, refusal]), log: () => {} })
-    const notice = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: 'PAYMENT_REQUIRED: The account has no balance for this request.' }
+    const producer = createSandboxChatProducer({ events: feed([harnessWarning, fileDenied, refusal]), log: () => {} })
+    const denied = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: 'FILE_DENIED: Outside workspace' }
+    const refused = { type: 'notice', id: 'warning-2', noticeKind: 'warning', text: 'PAYMENT_REQUIRED: The account has no balance for this request.' }
 
-    expect(onWire(await drain(producer.stream))).toEqual([notice, refusal])
-    expect(producer.assistantParts?.()).toEqual([notice])
+    expect(onWire(await drain(producer.stream))).toEqual([denied, fileDenied, refused, refusal])
+    expect(producer.assistantParts?.()).toEqual([denied, refused])
   })
 
   it('keeps visible output before a raw error, appends the plain sentence, and forwards the error without its reason', async () => {

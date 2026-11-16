@@ -35,7 +35,7 @@ const LIST_FRAGMENTS = ['Available tools', 'list_facts_list_facts', 'lookup_look
 /** What a box harness reports when it stops a turn after the model repeats a refused tool call. */
 const HARNESS_FAILURE = 'opencode execution failed: opencode sent the same save_fact call 3 times and every one was rejected. '
   + `The turn stopped before it ran the model again: Model tried to call unavailable tool 'save_fact'. ${TOOL_LIST} (killed by SIGTERM)`
-const RAW_FRAGMENTS = ['execution failed', 'save_fact', 'SIGTERM', ...LIST_FRAGMENTS]
+const RAW_FRAGMENTS = ['execution failed', 'save_fact', 'SIGTERM', '/v1/', ...LIST_FRAGMENTS]
 const REFUSED_CALL = `Model tried to call unavailable tool 'save_fact'. ${TOOL_LIST}`
 /** The harness's repair tool standing in for a call to a tool the model does not have. */
 const REPAIR_PART = { type: 'tool', id: 'call-1', tool: 'invalid', state: { status: 'completed',
@@ -136,19 +136,49 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason(result)
   })
 
-  it('drops a withheld harness warning from the wire and the stored row, while the terminal error reads the plain sentence', async () => {
-    const result = await turn([{ type: 'warning', data: { code: 'OPENCODE_ERROR', message: HARNESS_FAILURE } }, terminalError])
+  it('drops a harness warning from the wire and the stored row, logged as a harness warning, while the terminal error reads the plain sentence', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const result = await turn([{ type: 'warning', data: { code: 'OPENCODE_ERROR', message: HARNESS_FAILURE } }, terminalError],
+        { serverLog: 'default' })
 
-    expect(result.streamed.filter((event) => event.type === 'warning' || event.type === 'notice')).toEqual([])
-    expect(JSON.stringify(result.row?.parts)).not.toContain('OPENCODE_ERROR')
-    expect(result.error?.message).toBe(PLAIN)
-    expect(result.text).toBe(PLAIN)
-    expect(result.row?.content).toBe(PLAIN)
-    expectNoRawReason(result)
+      expect(result.streamed.filter((event) => event.type === 'warning' || event.type === 'notice')).toEqual([])
+      expect(JSON.stringify(result.row?.parts)).not.toContain('OPENCODE_ERROR')
+      expect(result.error?.message).toBe(PLAIN)
+      expect(result.text).toBe(PLAIN)
+      expect(result.row?.content).toBe(PLAIN)
+      expectNoRawReason(result)
+      // The dropped warning is a harness warning in the log, never a turn failure.
+      expect(warn).toHaveBeenCalledWith('[chat-routes] harness warning withheld from the person',
+        expect.objectContaining({ failureClass: 'harness_warning', code: 'OPENCODE_ERROR' }))
+      expect(warn.mock.calls.filter(([, meta]) => (meta as { code?: string } | undefined)?.code === 'OPENCODE_ERROR'
+        && (meta as { failureClass?: string }).failureClass === 'runtime_failure')).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it.each([
+    ['empty_visible_output_retry', 'The model returned no visible text; retrying once.'],
+    ['OPENCODE_STEP_TRUNCATED', 'A model step was cut off before it finished; its work may be incomplete.'],
+    ['CODEX_UNEXPECTED_APPROVAL', 'The agent asked for an approval it does not need; it was declined.'],
+    ['FILE_DENIED', 'Outside workspace'],
+  ])('keeps a %s warning without harness text as a notice in its own words, and forwards it', async (code, message) => {
+    const answer = 'Here is the answer.'
+    const result = await turn([{ type: 'warning', data: { code, message } }, textPart(answer), { type: 'result', data: { finalText: answer } }])
+
+    expect(result.streamed.find((event) => event.type === 'notice')?.text).toBe(`${code}: ${message}`)
+    expect(result.streamed.find((event) => event.type === 'warning')?.data).toMatchObject({ code, message })
+    expect(JSON.stringify(result.row?.parts)).toContain(`${code}: ${message}`)
+    expect(result.row?.content).toBe(answer)
   })
 
   it.each([
     ['a raw error', { type: 'raw', data: { backend: 'opencode', event: { type: 'error', error: { name: 'UnknownError', data: { message: HARNESS_FAILURE } } } } }],
+    ['a raw turn.failed', { type: 'raw', data: { backend: 'codex', event: { type: 'turn.failed',
+      error: { message: `stream error: POST /v1/responses returned HTTP 500 Internal Server Error. ${TOOL_LIST}` } } } }],
+    ['a raw error item', { type: 'raw', data: { backend: 'codex', event: { type: 'item.completed',
+      item: { id: 'item-1', type: 'error', message: HARNESS_FAILURE } } } }],
     ['a failed status', { type: 'status', data: { status: 'failed', detail: HARNESS_FAILURE } }],
     ['a failed done', { type: 'done', data: { status: 'failed', message: HARNESS_FAILURE } }],
     ['a session.run.failed', { type: 'session.run.failed', data: { message: HARNESS_FAILURE } }],
@@ -223,16 +253,100 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expect(recovered.text).toBe('Here is the answer.')
   })
 
-  it('shows a Router budget refusal as the Router\'s own sentence, without the harness wrapper', async () => {
-    const sentence = "This key's lifetime budget is exhausted. Increase the cap on id.tangle.tools."
+  it('shows a Router budget refusal as the Router\'s own first sentence, without the harness wrapper or what follows', async () => {
+    const sentence = "This key's lifetime budget is exhausted."
     const result = await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED',
-      message: `opencode execution failed: ${sentence} (exit code 1)` } }])
+      message: `opencode execution failed: ${sentence} Increase the cap at https://example.test/keys. (exit code 1)` } }])
 
     expect(result.text).toBe(sentence)
     expect(result.error?.message).toBe(sentence)
     expect(result.row?.content).toBe(sentence)
-    expectNoRawReason(result, ['execution failed', 'exit code'])
+    expectNoRawReason(result, ['execution failed', 'exit code', 'https://'])
   })
+
+  it('reads a thrown 402 on the wire as in the text, in its own words, without a withheld log', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const refused = Object.assign(new Error('POST /v1/chat/completions returned HTTP 402: The provider declined to bill this request.'),
+        { status: 402, code: 'upstream_refused' })
+      const result = await turn([], { severed: refused, serverLog: 'default' })
+
+      expect(result.error?.message).toBe('The provider declined to bill this request.')
+      expect(result.text).toBe(`The sandbox agent returned an error before producing a visible answer.\n\nError: ${result.error?.message}`)
+      expect(result.row?.content).toBe(result.text)
+      expectNoRawReason(result, ['/v1/', 'POST ', 'HTTP 402'])
+      expect(warn.mock.calls.filter(([message]) => message === '[chat-routes] turn failure withheld from the person')).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it.each([
+    { answer: 'Here is the full answer.', shown: 'The answer above is complete.' },
+    { answer: '', shown: PLAIN },
+  ])('reads a settlement failure after "$answer" as "$shown"', async ({ answer, shown }) => {
+    const settlement = { type: 'error', data: { code: 'settlement_over_limit', message: 'Provider settlement exceeded execution limits' } }
+    const result = await turn(answer ? [textPart(answer), settlement] : [settlement])
+
+    expect(result.error).toMatchObject({ code: 'settlement_over_limit', message: shown })
+    expect(result.text).toBe(answer ? `${answer}\n\n---\n${shown}` : shown)
+    expect(result.failed).toBe(true)
+    expectNoRawReason(result, ['exceeded execution limits'])
+  })
+
+  // A model failover trail: an earlier attempt's route, status and model id, then the last attempt's reason.
+  const trail = (last: string) => 'All 2 model(s) failed. model-a: POST /v1/sandboxes/sbx_test/runtime/agents/run/stream '
+    + `returned HTTP 502 Bad Gateway | model-b: ${last}`
+  const TRAIL_FRAGMENTS = ['/v1/', 'POST ', 'model-a', 'model-b', 'model(s) failed', 'HTTP 502', 'Bad Gateway']
+  const TRAIL_REASONS = [
+    { kind: 'withheld', last: `opencode execution failed: the tool loop stopped. ${TOOL_LIST}`, shows: PLAIN },
+    { kind: '402 payment', last: 'The account has no balance or plan for this request.', code: 'PAYMENT_REQUIRED', statusCode: 402,
+      shows: 'The account has no balance or plan for this request.' },
+    { kind: 'funding words', last: 'POST /v1/chat/completions returned HTTP 402: Insufficient credits. Top up at https://example.test/billing.',
+      shows: 'Insufficient credits' },
+    { kind: 'Router budget', last: "This key's monthly budget is exhausted. Increase the cap or wait for the next billing cycle.",
+      shows: "This key's monthly budget is exhausted." },
+    { kind: 'provider reset', last: 'Rate limit exceeded (HTTP 429); the provider asked to wait, reset at 2030-01-02T03:04:05Z',
+      shows: 'The model provider refused the call (Rate limit exceeded); try again after 03:04:05 UTC on 2030-01-02.' },
+    { kind: 'policy denied', last: 'model "model-b" is not admitted by policy: the policy filter rejected it', code: 'model_policy_denied',
+      shows: 'is not admitted by policy' },
+  ]
+  const CARRIERS = ['error event', 'thrown stream', 'warning', 'done failed', 'status failed', 'session.run.failed', 'detached result']
+
+  /** One failure carrying `failure` on `carrier`: what reached the client and what was stored. */
+  async function trailFailure(carrier: string, failure: { message: string; code?: string; statusCode?: number }) {
+    if (carrier === 'detached result') {
+      const store = createMemoryTurnEventStore()
+      const result = await runDetachedTurn({ store, turnId: 'detached-1', scopeId: 'thread-1',
+        events: box([{ type: 'error', data: failure }]), log: () => {} })
+      return { wire: (await store.read('detached-1', 0)).map((row) => row.event).join('\n'), stored: JSON.stringify(result) }
+    }
+    const { message, code, statusCode } = failure
+    const events: Record<string, unknown[]> = {
+      'error event': [{ type: 'error', data: failure }],
+      warning: [{ type: 'warning', data: failure }],
+      'done failed': [{ type: 'done', data: { ...failure, status: 'failed' } }],
+      'status failed': [{ type: 'status', data: { status: 'failed', detail: message, code, statusCode } }],
+      'session.run.failed': [{ type: 'session.run.failed', data: failure }],
+    }
+    const result = await turn(events[carrier] ?? [],
+      carrier === 'thrown stream' ? { severed: Object.assign(new Error(message), { code, status: statusCode }) } : {})
+    return { wire: result.wire, stored: JSON.stringify(result.row ?? null) }
+  }
+
+  it.each(CARRIERS.flatMap((carrier) => TRAIL_REASONS.map((reason) => ({ carrier, ...reason }))))(
+    'reads a model failover trail on the $carrier by its last attempt ($kind): no route, status or model id',
+    async ({ carrier, kind, last, code, statusCode, shows }) => {
+      const { wire, stored } = await trailFailure(carrier, { message: trail(last), ...(code ? { code } : {}), ...(statusCode ? { statusCode } : {}) })
+
+      for (const fragment of TRAIL_FRAGMENTS) {
+        expect(wire).not.toContain(fragment)
+        expect(stored).not.toContain(fragment)
+      }
+      if (kind === 'withheld' && carrier === 'warning') expect(wire).not.toContain('"type":"warning"')
+      else expect(wire).toContain(shows)
+      if (code) expect(wire).toContain(`"code":"${code}"`)
+    })
 
   it.each([
     { kind: 'funding', card: true, shown: 'Insufficient credits. Add funds to continue.',
