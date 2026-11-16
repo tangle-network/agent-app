@@ -101,6 +101,12 @@ export interface RouterTurnFailure {
 export interface RouterTurnOutcome {
   /** Every text segment the model wrote, joined by blank lines. */
   text: string
+  /**
+   * The turn's answer: the text written after the last tool call. Text a round writes before calling a tool
+   * narrates the work ("Let me check your vault"), and is not the answer. When nothing was written after the
+   * last tool call, the answer is `text`, so narration that is the turn's only text is still shown.
+   */
+  answer: string
   /** The model the router reports having served, when it said. */
   servedModel: string | null
   toolCalls: Array<{ callId: string; toolName: string; ok: boolean }>
@@ -431,12 +437,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     ? placeRouterTurn({ ...options.placement, requestedModel: options.model, toolNames: (options.tools ?? []).map(tool => tool.name) })
     : undefined
   if (placement?.chosen === 'sandbox') {
-    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
+    return { text: '', answer: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [], placement,
       failure: { code: 'placement_sandbox', message: placement.reason } }
   }
   const { apiKey } = options
   if (!apiKey) {
-    return { text: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
+    return { text: '', answer: '', servedModel: null, toolCalls: [], usage: { promptTokens: 0, completionTokens: 0, modelCalls: 0 }, toolEvents: [],
       ...(placement ? { placement } : {}),
       failure: { code: 'router_unconfigured', message: 'The model credential is not configured.' } }
   }
@@ -505,6 +511,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     },
   })
   const segments: string[] = []
+  // Indexes of the segments a tool call followed: narration, not the answer.
+  const narrated = new Set<number>()
   const usage: RouterTurnOutcome['usage'] = { promptTokens: 0, completionTokens: 0, modelCalls: 0 }
   // How much reasoning the turn streamed: the number an app logs to measure reasoning coverage.
   const reasoning = { deltas: 0, chars: 0 }
@@ -607,6 +615,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         } else if (event.type === 'tool_call_start') {
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
         } else if (event.type === 'tool_call') {
+          if (segmentOpen) narrated.add(segments.length - 1)
           segmentOpen = false
           const tool = byFunction.get(event.call.toolName)
           // The loop yields this event before extracting its call. Normalize a missing id once,
@@ -649,10 +658,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     return 'completed'
   }
 
-  const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => ({
-    text: joinText([options.continueFrom?.text ?? '', ...segments]),
-    servedModel, toolCalls, usage: { ...usage }, reasoning: { ...reasoning }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}),
-  })
+  const outcome = (failure?: RouterTurnFailure): RouterTurnOutcome => {
+    const text = joinText([options.continueFrom?.text ?? '', ...segments])
+    const answer = joinText(segments.filter((_segment, index) => !narrated.has(index)))
+    return { text, answer: answer || text,
+      servedModel, toolCalls, usage: { ...usage }, reasoning: { ...reasoning }, toolEvents: [...toolEvents], ...(placement ? { placement } : {}), ...(failure ? { failure } : {}) }
+  }
   const repeat = options.repeat !== false
   // The safe repeat walks this chain: the next fallback model, or the same model once.
   const repeats = !repeat ? [] : options.fallbackModels?.length ? [...options.fallbackModels] : [options.model]
