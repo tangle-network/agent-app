@@ -2,6 +2,7 @@
 import { snapshotAgentProfile } from '@tangle-network/agent-interface/profile-snapshot'
 import {
   parseProfileRevisionDiff,
+  PROFILE_PROMPT_HISTORY_MAX,
   ProfileConflictError,
   serializeProfileRevisionDiff,
   type ProfileBinding,
@@ -326,6 +327,30 @@ export function createD1ProfileRevisionStore(db: ProfileD1Database,
     getBinding,
     getSwitchReceipt,
     getTurnPin,
+    async readPromptHistory(workspaceId, profileId, revisionId) {
+      // One round trip that returns flags, not prompts. The recursion carries ids only; prompts are compared once per
+      // row in the final select. The depth bound keeps a corrupt parent cycle finite; a cut history reads as incomplete.
+      const prompt = (alias: string) => `json_extract(${alias}.profile_json, '$.prompt.systemPrompt')`
+      const rows = await db.prepare(`WITH RECURSIVE history(revision_id, parent_id, depth) AS (
+          SELECT revision_id, parent_id, 0 FROM agent_profile_revision
+          WHERE workspace_id = ? AND profile_id = ? AND revision_id = ?
+          UNION ALL
+          SELECT r.revision_id, r.parent_id, h.depth + 1
+          FROM history h JOIN agent_profile_revision r ON r.revision_id = h.parent_id AND r.workspace_id = ? AND r.profile_id = ?
+          WHERE h.depth < ${PROFILE_PROMPT_HISTORY_MAX - 1})
+        SELECT r.revision_id, r.parent_id, r.author_kind, r.author_id,
+          ${prompt('r')} IS (SELECT ${prompt('n')} FROM agent_profile_revision n WHERE n.revision_id = ?) AS same_as_newest,
+          CASE WHEN p.revision_id IS NULL THEN NULL ELSE ${prompt('r')} IS ${prompt('p')} END AS same_as_parent
+        FROM history h JOIN agent_profile_revision r ON r.revision_id = h.revision_id
+        LEFT JOIN agent_profile_revision p ON p.revision_id = h.parent_id AND p.workspace_id = ? AND p.profile_id = ?
+        ORDER BY h.depth LIMIT ${PROFILE_PROMPT_HISTORY_MAX}`)
+        .bind(workspaceId, profileId, revisionId, workspaceId, profileId, revisionId, workspaceId, profileId)
+        .all<Pick<RevisionRow, 'revision_id' | 'parent_id' | 'author_kind' | 'author_id'> &
+          { same_as_newest: number; same_as_parent: number | null }>()
+      return rows.results.map(row => ({ id: row.revision_id, parentId: row.parent_id,
+        author: { kind: row.author_kind, id: row.author_id }, sameAsNewest: row.same_as_newest === 1,
+        sameAsParent: row.same_as_parent === null ? null : row.same_as_parent === 1 }))
+    },
     async listKnowledgeEvents(workspaceId, profileId) {
       const rows = await db.prepare(`SELECT * FROM agent_profile_knowledge_event
         WHERE workspace_id = ? AND profile_id = ? ORDER BY created_at, event_id`)

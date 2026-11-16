@@ -120,6 +120,21 @@ export interface ProfileRevisionStore {
   getTurnPin(key: ProfileBindingKey, messageId: string, inputHash: string): Promise<ProfileTurnPin | null>
   listKnowledgeEvents(workspaceId: string, profileId: string): Promise<ProfileKnowledgeEvent[]>
   appendKnowledgeEvent(event: ProfileKnowledgeEvent): Promise<void>
+  /** A revision and its ancestors, newest first, in one read; it ends early at a missing ancestor.
+   *  Without it, `followProductRelease` reads the history one `getRevision` at a time. */
+  readPromptHistory?(workspaceId: string, profileId: string, revisionId: string): Promise<ProfilePromptHistoryEntry[]>
+}
+
+/** One revision of a profile's history, reduced to what decides whether the newest one's system prompt is product
+ *  text. Prompts are compared where they are stored, so the history carries no prompt text. */
+export interface ProfilePromptHistoryEntry {
+  id: string
+  parentId: string | null
+  author: ProfileRevision['author']
+  /** Its system prompt equals the newest entry's. */
+  sameAsNewest: boolean
+  /** Its system prompt equals its parent's; `null` when it has no parent row. */
+  sameAsParent: boolean | null
 }
 
 export class ProfileConflictError extends Error {
@@ -689,3 +704,4 @@ export function profileTools<TTurn extends ProfileToolTurn>(
 }
 
 export * from './self-management'
+export * from './release'
