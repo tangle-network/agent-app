@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.7
+
+- fix(billing): a transient cleanup retry past the child's expiry still blocks issuance (#1545)
+- fix(turn-stream): reclaim a dead turn's lock by default; a live turn keeps it (#1538)
+
 ## 4.0.6
 
 - fix(billing): the same member's next sign-in keeps the workspace child key (#1540)
