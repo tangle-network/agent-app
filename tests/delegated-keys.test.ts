@@ -189,6 +189,18 @@ describe('createPlatformDelegatedKeyClient.verify, revoke and listChildren', () 
     await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9' })).resolves.toMatchObject({ succeeded: false })
   })
 
+  it('falls through a refused 401 DELETE to revoke-slot, and reads a revoke-slot that revoked nothing as a refusal', async () => {
+    const { client, calls } = platform(
+      () => ({ status: 401, body: { success: false, error: { code: 'UNAUTHORIZED' } } }),
+      () => ({ status: 200, body: { success: true, data: { revoked: 0 } } }),
+    )
+    const slot = { userId: 'usr_payer', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router', sourceKeyId: 'key_source' }
+    await expect(client.revoke({ sourceKey: SOURCE, keyId: 'key_9', slot })).resolves.toEqual({ succeeded: false,
+      error: { status: 409, code: 'delegated_key.slot_not_revoked', message: 'Platform revoked nothing in this slot.' } })
+    expect(calls.map(call => `${call.method} ${new URL(call.url).pathname}`))
+      .toEqual(['DELETE /v1/keys/key_9', 'POST /v1/keys/auto-provisioned/revoke-slot'])
+  })
+
   it('lists live children in one canonical slot', async () => {
     const { client } = platform(() => ({ status: 200, body: { success: true, data: [
       { id: 'key_1', name: 'auto:tax-agent:router:ws-1:op-1', product: 'router' },

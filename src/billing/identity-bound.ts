@@ -398,12 +398,21 @@ function defaultRemoteMissing(error: unknown): boolean {
   return value?.status === 404 || value?.code === 'not_found'
 }
 
+/** `<status> <code>` for a typed refusal Platform decided (a 4xx other than 408 and 429): a retry gets the same answer. */
+function definiteRefusal(error: unknown): string | null {
+  const refusal = (error as { refusal?: { status?: unknown; code?: unknown; platformCode?: unknown } } | null)?.refusal
+  const status = refusal?.status
+  if (typeof status !== 'number' || status < 400 || status > 499 || status === 408 || status === 429) return null
+  return `${status} ${String(refusal?.platformCode ?? refusal?.code ?? 'refused')}`
+}
+
 /**
  * Create a product-neutral manager for child-key issuance and cleanup.
  *
  * The provisioner must already be authenticated for the current source
- * credential. The manager persists only the source id and its non-secret
- * fingerprint, then refuses to reuse a row from another identity.
+ * credential. The manager persists the source id and its non-secret
+ * fingerprint with each row, reuses an active row for the same workspace,
+ * owner, product and Platform user, and cleans each row through its own slot.
  */
 export function createIdentityBoundWorkspaceKeyManager(
   options: DurableWorkspaceKeyManagerOptions,
@@ -521,7 +530,7 @@ export function createIdentityBoundWorkspaceKeyManager(
     if (!sameOwner(row, identity, product)) {
       await options.store.markRevocationPending({
         id: row.id,
-        error: 'active child key identity does not match the authenticated owner and source',
+        error: 'active child key belongs to another workspace owner or Platform user',
         nextAttemptAt: now(),
         incrementAttempts: false,
       })
@@ -630,23 +639,24 @@ function createWorkspaceKeyRecovery(
   }
 
   /**
-   * A refusal to revoke never blocks the scope. Missing is gone. After a definite refusal (a typed 4xx other than 408
-   * and 429) the child's own verdict decides: one that can no longer authenticate or spend is gone; a live one is
-   * retired at its expiry. Null keeps today's retry: a transient failure, or a verdict that could not be read.
+   * A refusal to revoke never blocks the scope. Missing is gone. After a definite refusal the child's own verdict
+   * decides: past its expiry, or unable to authenticate or spend, it is gone; live or refused for now, it is retired
+   * at its expiry. Null keeps today's retry: a transient failure, or a verdict read that failed transiently.
    */
   async function settleFailedRevoke(row: DurableWorkspaceKeyRecord, keyId: string, error: unknown): Promise<'gone' | 'waits' | null> {
     if (isRemoteMissing(error)) return 'gone'
-    const refusal = (error as { refusal?: { status?: unknown; code?: unknown; platformCode?: unknown } } | null)?.refusal
-    const status = refusal?.status
-    if (typeof status !== 'number' || status < 400 || status > 499 || status === 408 || status === 429) return null
+    const refused = definiteRefusal(error)
+    if (!refused) return null
+    if (now().getTime() >= row.expiresAt.getTime()) return 'gone'
     try {
       if (usageFromRemote(row, await recoveryProvisioner.getKey(keyId), now()).exhausted) return 'gone'
     } catch (readError) {
-      return isRemoteMissing(readError) ? 'gone' : null
+      if (isRemoteMissing(readError)) return 'gone'
+      if (!definiteRefusal(readError)) return null
     }
     await options.store.markRevocationPending({
       id: row.id,
-      error: `cleanup refused (${status} ${String(refusal?.platformCode ?? refusal?.code ?? 'refused')}); the child is retired at its expiry`,
+      error: errorMessage(new Error(`cleanup refused (${refused}); the child is retired at its expiry`), 'cleanup refused'),
       nextAttemptAt: row.expiresAt,
       incrementAttempts: true,
     })

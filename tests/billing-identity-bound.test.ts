@@ -11,7 +11,12 @@ import {
   type WorkspaceKeyIdentity,
   type DurableWorkspaceKeyProvisioningRecord,
 } from '../src/billing/index'
-import { createDelegatedKeyProvisioner, createPlatformDelegatedKeyClient, DelegatedKeyRefusalError } from '../src/platform/delegated-keys'
+import {
+  createDelegatedKeyProvisioner,
+  createPlatformDelegatedKeyClient,
+  type DelegatedKeyCode,
+  DelegatedKeyRefusalError,
+} from '../src/platform/delegated-keys'
 
 type RemoteKey = {
   id: string
@@ -20,6 +25,8 @@ type RemoteKey = {
   product: string
   sourceKeyId: string | null
   platformUserId?: string
+  /** Platform refuses the key for now (a funding or eligibility lapse), as verify-by-id reports it. */
+  lapse?: boolean
   budgetUsd: number
   budgetSpent: number
   expiresAt: string
@@ -34,9 +41,8 @@ function missingRemoteKey(): Error & { status: number; code: string } {
   return Object.assign(new Error('missing remote key'), { status: 404, code: 'not_found' })
 }
 
-function platformRefusal(status: number, platformCode: string): DelegatedKeyRefusalError {
-  return new DelegatedKeyRefusalError({ status, code: status === 403 ? 'delegated_key.refused' : 'delegated_key.failed',
-    message: `Platform declined (${platformCode}).`, platformCode })
+function platformRefusal(status: number, code: DelegatedKeyCode, platformCode?: string): DelegatedKeyRefusalError {
+  return new DelegatedKeyRefusalError({ status, code, message: `Platform declined (${platformCode ?? code}).`, ...(platformCode ? { platformCode } : {}) })
 }
 
 function makeHarness() {
@@ -50,6 +56,7 @@ function makeHarness() {
   let currentPlatformUserId = 'platform-1'
   const endedSources = new Set<string>()
   let refuseRevokeSlot = false
+  let verdictReads = 0
   const slotRevocations: Array<{ keyId: string; name: string | null; sourceKeyId: string | null; platformUserId: string }> = []
   let createDelayMs = 0
   let createFailure: Error | null = null
@@ -174,7 +181,8 @@ function makeHarness() {
   // Platform's rules for agent-app's provisioner, bound to the current source: `getKey` is verify-by-id under the
   // service authority (any child; an ended source ends its children); a DELETE with the source reaches only that
   // source's own children (else 403); revoke-slot under the service authority retires only the child's own slot
-  // (Platform user, name, minting source; else 409); listing with the source finds only that source's children.
+  // (another user's is a 409; the same user's slot naming another source revokes nothing, which the client reads as a
+  // 409 refusal); listing with the source finds only that source's children.
   const provisioner: DurableWorkspaceKeyProvisioner = {
     supportsIdempotentCreate: true,
     async createKey(input) {
@@ -208,8 +216,10 @@ function makeHarness() {
       return { id, key, budgetUsd: input.budgetUsd, expiresAt: input.expiresAt }
     },
     async getKey(id) {
+      verdictReads += 1
       const key = remote.get(id)
       if (!key || key.revoked || (key.sourceKeyId !== null && endedSources.has(key.sourceKeyId))) throw missingRemoteKey()
+      if (key.lapse) throw platformRefusal(403, 'delegated_key.refused')
       return { budgetUsd: key.budgetUsd, budgetSpent: key.budgetSpent, expiresAt: key.expiresAt }
     },
     async revokeKey(id, slot) {
@@ -220,10 +230,11 @@ function makeHarness() {
       const key = remote.get(id)
       if (!key || key.revoked) throw missingRemoteKey()
       if (key.sourceKeyId !== currentSourceKeyId) {
-        if (!slot) throw platformRefusal(403, 'FORBIDDEN')
+        if (!slot) throw platformRefusal(403, 'delegated_key.refused', 'FORBIDDEN')
         slotRevocations.push({ keyId: id, ...slot })
-        if (refuseRevokeSlot || slot.platformUserId !== key.platformUserId || slot.name !== key.name
-          || slot.sourceKeyId !== key.sourceKeyId) throw platformRefusal(409, 'SLOT_IDENTITY_MISMATCH')
+        if (refuseRevokeSlot) throw platformRefusal(403, 'delegated_key.refused', 'FORBIDDEN')
+        if (slot.platformUserId !== key.platformUserId) throw platformRefusal(409, 'delegated_key.failed', 'SLOT_OWNER_MISMATCH')
+        if (slot.name !== key.name || slot.sourceKeyId !== key.sourceKeyId) throw platformRefusal(409, 'delegated_key.slot_not_revoked')
       }
       key.revoked = true
     },
@@ -306,6 +317,7 @@ function makeHarness() {
     endSource(value: string) { endedSources.add(value) },
     setRefuseRevokeSlot(value: boolean) { refuseRevokeSlot = value },
     getSlotRevocations() { return slotRevocations },
+    getVerdictReads() { return verdictReads },
     rowFor(keyId: string) { return [...rows.values()].find((row) => row.keyId === keyId) },
     setCreateDelay(value: number) { createDelayMs = value },
     setRenewalDelay(value: number) { renewalDelayMs = value },
@@ -550,13 +562,83 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     const old = h.rowFor(first.usage.keyId)!
     expect(old.status).toBe('revocation_pending')
     expect(old.nextRevocationAt?.getTime()).toBe(old.expiresAt.getTime())
-    expect(old.lastRevocationError).toContain('409 SLOT_IDENTITY_MISMATCH')
+    expect(old.lastRevocationError).toBe('cleanup refused (403 FORBIDDEN); the child is retired at its expiry')
     expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
     expect((await manager.ensureKey(h.identity())).usage.keyId).toBe(other.usage.keyId)
 
+    // At its expiry the child cannot authenticate: it is retired without reading its verdict.
     h.setNow(old.expiresAt.getTime())
+    const reads = h.getVerdictReads()
     expect(await manager.retryPendingRevocations({ workspaceId: 'workspace-1', ownerUserId: 'owner-1' })).toBe(1)
     expect(old.status).toBe('revoked')
+    expect(h.getVerdictReads()).toBe(reads)
+  })
+
+  it.each([
+    [503, 'delegated_key.unavailable'],
+    [429, 'delegated_key.unavailable'],
+    [408, 'delegated_key.failed'],
+  ] as Array<[number, DelegatedKeyCode]>)('keeps retrying and blocks issuance when a cleanup answers a typed %i', async (status, code) => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    const manager = h.manager('router', { provisioner: { ...h.provisioner, async revokeKey() { throw platformRefusal(status, code) } } })
+
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).toBe('revocation_pending')
+    expect(old.nextRevocationAt!.getTime()).toBeLessThan(old.expiresAt.getTime())
+    expect(h.getVerdictReads()).toBe(0)
+  })
+
+  it('keeps retrying and blocks issuance when the verdict after a refused cleanup cannot be read', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    h.setRefuseRevokeSlot(true)
+    const manager = h.manager('router', { provisioner: { ...h.provisioner,
+      async getKey() { throw platformRefusal(503, 'delegated_key.unavailable') } } })
+
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).toBe('revocation_pending')
+    expect(old.nextRevocationAt!.getTime()).toBeLessThan(old.expiresAt.getTime())
+  })
+
+  it('retires a live child at its expiry when revoke-slot revokes nothing, and never marks it revoked', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    // The slot names the current source, not the minting one: Platform revokes nothing.
+    const manager = h.manager('router', { provisioner: { ...h.provisioner,
+      revokeKey: (id, slot) => h.provisioner.revokeKey(id, slot && { ...slot, sourceKeyId: 'source-2' }) } })
+
+    const other = await manager.ensureKey(h.identity())
+    expect(other.usage.keyId).not.toBe(first.usage.keyId)
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).toBe('revocation_pending')
+    expect(old.nextRevocationAt?.getTime()).toBe(old.expiresAt.getTime())
+    expect(old.lastRevocationError).toContain('409 delegated_key.slot_not_revoked')
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
+  })
+
+  it('retires a live child at its expiry when its verdict after a refused cleanup is a lapse', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    h.remote.get(first.usage.keyId)!.lapse = true
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    h.setRefuseRevokeSlot(true)
+
+    const other = await h.manager('router').ensureKey(h.identity())
+    expect(other.usage.keyId).not.toBe(first.usage.keyId)
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.status).toBe('revocation_pending')
+    expect(old.nextRevocationAt?.getTime()).toBe(old.expiresAt.getTime())
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
   })
 
   it('revokes the old child at once, through its own slot, when a different Platform user takes the workspace', async () => {

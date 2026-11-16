@@ -57,6 +57,7 @@ export type DelegatedKeyCode =
   | 'delegated_key.failed'
   | 'delegated_key.response_invalid'
   | 'delegated_key.invalid_request'
+  | 'delegated_key.slot_not_revoked'
 
 export interface DelegatedKeyRefusal {
   status: number
@@ -159,8 +160,9 @@ export interface PlatformDelegatedKeyClient {
   verify(input: { keyId: string; product: string }): Promise<DelegatedKeyOutcome<DelegatedKeyVerdict>>
   /**
    * `DELETE /v1/keys/:id` with the source key; a key already gone counts as revoked. Platform refuses key
-   * mutations from a service-provisioned source (an app's SSO key) with 403; given `slot`, the client then
-   * retires the slot through `revoke-slot` with the service token.
+   * mutations from a service-provisioned source (an app's SSO key) or a sibling source with 403, and a source it no
+   * longer accepts with 401; given `slot`, the client then retires the slot through `revoke-slot` with the service
+   * token. A `revoke-slot` that revokes nothing is a 409 `delegated_key.slot_not_revoked` refusal.
    */
   revoke(input: { sourceKey: string; keyId: string; slot?: DelegatedKeySlotRef }): Promise<DelegatedKeyOutcome<null>>
   /** Children of the source key in one slot, from `GET /v1/keys` with the source key. */
@@ -387,7 +389,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       if (result.status === 404 || (result.status >= 200 && result.status < 300 && result.body?.success === true)) {
         return { succeeded: true, value: null }
       }
-      if (result.status === 403 && slot) {
+      if ((result.status === 403 || result.status === 401) && slot) {
         let { name, product, sourceKeyId } = slot
         if (!name || !product || !sourceKeyId) {
           const row = await call(`/v1/keys/${encodeURIComponent(keyId)}`, { method: 'GET', bearer: sourceKey, service: false })
@@ -409,7 +411,12 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
           },
         })
         if (!retired) return { succeeded: false, error: refusal(503, null) }
-        if (retired.status >= 200 && retired.status < 300 && retired.body?.success === true) return { succeeded: true, value: null }
+        const ok = retired.status >= 200 && retired.status < 300 && retired.body?.success === true
+        // Nothing revoked: the slot named another source, or no live child matched. Never assumed done.
+        if (ok && record(retired.body?.data)?.revoked === 0) {
+          return failure<null>(409, 'delegated_key.slot_not_revoked', 'Platform revoked nothing in this slot.')
+        }
+        if (ok) return { succeeded: true, value: null }
         return { succeeded: false, error: refusal(retired.status, record(retired.body?.error)?.code) }
       }
       return { succeeded: false, error: refusal(result.status, record(result.body?.error)?.code) }
