@@ -46,6 +46,7 @@ import {
 } from './sandbox-producer'
 import type { ChatTurnUsage } from './turn-routes'
 import { measuredUsage, TURN_USAGE_KEYS } from './sandbox-turn-usage'
+import { transformVisibleTextParts } from './visible-text'
 
 /** The normalized structured message body (tool-call / file / plan / interaction
  *  parts) that `/chat-store` persists as the durable assistant row — the same
@@ -338,15 +339,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     if (!draft) return result
     const transform = opts.persist?.transformText
     const content = transform ? await transform(result.text) : result.text
-    const rawParts = transform
-      ? await Promise.all(
-          result.parts.map(async (part) =>
-            String((part as { type?: unknown }).type ?? '') === 'text'
-              ? { ...part, text: await transform(String((part as { text?: unknown }).text ?? '')) }
-              : part,
-          ),
-        )
-      : result.parts
+    const rawParts = transform ? await transformVisibleTextParts(result.parts, transform) : result.parts
     const parts = toChatMessageParts(rawParts)
     if (!content.trim() && parts.length === 0) {
       await draft.discard()
