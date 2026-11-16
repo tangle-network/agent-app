@@ -701,8 +701,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     }
     // The stream adapter puts the service's own text after the status; keep it, short, for the app's error categories.
     const detail = error instanceof Error ? error.message.match(/\(HTTP \d+\): ([\s\S]*)$/)?.[1]?.slice(0, 1000) : undefined
+    // A spent cap (the turn's key or the source it spends through) is the payer's to fix, not an outage.
+    const spent = status === 402 && /budget_(exhausted|exceeded)/i.test(detail ?? '')
     return outcome(typeof status === 'number'
-      ? { code: `model_http_${status}`, status, message: 'The model service did not answer.', ...(detail ? { detail } : {}) }
+      ? { code: `model_http_${status}`, status, ...(detail ? { detail } : {}),
+          message: spent ? 'The paying key has spent its budget. Top it up or raise its cap, then retry.' : 'The model service did not answer.' }
       : { code: 'model_unavailable', message: 'The model service did not answer.' })
   }
   if (placementFailure) return outcome(placementFailure)

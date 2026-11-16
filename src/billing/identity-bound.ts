@@ -46,6 +46,7 @@ export interface DurableWorkspaceKeyRecord {
   idempotencyKey?: string | null
   keyId: string
   keyEncrypted: string
+  /** 0 for a spend-through child: it has no budget of its own and spends its source's cap. */
   budgetUsd: number
   expiresAt: Date
   status: WorkspaceKeyStatus
@@ -60,17 +61,15 @@ export interface DurableWorkspaceKeyProvisioningRecord extends DurableWorkspaceK
   status: 'provisioning'
 }
 
-type DurableWorkspaceKeyCreateResult = Awaited<ReturnType<KeyProvisioner['createKey']>> & {
-  budgetUsd?: number | null
-  budgetRemaining?: number
-  expiresAt?: string | null
-}
+type DurableWorkspaceKeyCreateResult = Awaited<ReturnType<KeyProvisioner['createKey']>> & { budgetUsd?: number | null; expiresAt?: string | null }
 
 /** The exact request identity that must be reused when recovering a create. */
 export interface DurableWorkspaceKeyCreateInput {
   name: string
   product: string
   budgetUsd: number
+  /** Mint a child that spends the source's cap and reserves nothing. A provisioner that ignores it mints `budgetUsd`. */
+  spendThrough?: true
   expiresAt: string
   /** Stable across process restarts for one persisted provisioning row. */
   idempotencyKey: string
@@ -82,11 +81,8 @@ export interface DurableWorkspaceKeyProvisioner {
   supportsIdempotentCreate?: true
   /** Create one child key. Non-idempotent providers recover through stable-name discovery only. */
   createKey(input: DurableWorkspaceKeyCreateInput): Promise<DurableWorkspaceKeyCreateResult>
-  getKey(id: string): Promise<{
-    budgetUsd?: number | null
-    budgetSpent?: number
-    expiresAt?: string | null
-  }>
+  /** `budgetRemaining` is what the key can still spend; for a spend-through child, its source's remainder. */
+  getKey(id: string): Promise<{ budgetUsd?: number | null; budgetSpent?: number; budgetRemaining?: number; expiresAt?: string | null }>
   /**
    * Retire one child. `slot` is the row that minted it: its name, its own source and Platform user, so a child minted
    * under an earlier source is retired through that source's slot. A typed refusal carries `refusal.status`.
@@ -186,8 +182,12 @@ export interface WorkspaceRuntimeKey {
 
 /** Identity-bound durable key manager API. */
 export interface DurableWorkspaceKeyManager {
-  /** Reuse a matching active key or reconcile and mint one under a lease. */
-  ensureKey(identity: WorkspaceKeyIdentity, options?: { budgetUsd?: number }): Promise<WorkspaceRuntimeKey>
+  /**
+   * Reuse a matching active key or reconcile and mint one under a lease. Pass `spendThrough` when Platform reports a
+   * budget on the source: the child then reserves nothing, so live children never hold the source's cap several times
+   * over, and Platform refuses each request once that cap is spent. `budgetUsd` is then the remainder reported at mint.
+   */
+  ensureKey(identity: WorkspaceKeyIdentity, options?: { budgetUsd?: number; spendThrough?: boolean }): Promise<WorkspaceRuntimeKey>
   /** Read usage without returning the child secret. */
   getUsage(identity: WorkspaceKeyIdentity): Promise<WorkspaceKeyUsage | null>
   /**
@@ -382,21 +382,24 @@ function usageFromRemote(
   remote: Awaited<ReturnType<DurableWorkspaceKeyProvisioner['getKey']>>,
   now: Date,
 ): WorkspaceKeyUsage {
-  const budgetUsd = remote.budgetUsd ?? row.budgetUsd
-  const budgetSpent = remote.budgetSpent ?? 0
+  // A spend-through child has no budget to exhaust: a spent source is refused per request, and retiring the child for
+  // it would only mint another child that Platform refuses. Only its expiry retires it.
+  const spendThrough = row.budgetUsd === 0
+  const budgetUsd = spendThrough ? 0 : remote.budgetUsd ?? row.budgetUsd
+  const budgetSpent = spendThrough ? 0 : remote.budgetSpent ?? 0
   if (!Number.isFinite(budgetUsd) || budgetUsd < 0) throw new Error('workspace child key budget is malformed')
   if (!Number.isFinite(budgetSpent) || budgetSpent < 0) throw new Error('workspace child key usage is malformed')
   const expiresAt = remote.expiresAt ?? row.expiresAt.toISOString()
   const expiryMs = Date.parse(expiresAt)
   if (!Number.isFinite(expiryMs)) throw new Error('workspace child key expiry is malformed')
-  const budgetRemaining = Math.max(0, budgetUsd - budgetSpent)
+  const budgetRemaining = Math.max(0, spendThrough ? remote.budgetRemaining ?? 0 : budgetUsd - budgetSpent) || 0
   return {
     keyId: row.keyId,
     budgetUsd,
     budgetSpent,
     budgetRemaining,
     expiresAt,
-    exhausted: budgetRemaining <= 0 || expiryMs <= now.getTime(),
+    exhausted: (!spendThrough && budgetRemaining <= 0) || expiryMs <= now.getTime(),
   }
 }
 
@@ -574,7 +577,7 @@ export function createIdentityBoundWorkspaceKeyManager(
 
   const { mint } = createWorkspaceKeyMinter(options, now, keyLifetimeMs, product, markPending, cleanupProvisioning, revokePending)
 
-  async function ensureKey(identityInput: WorkspaceKeyIdentity, keyOptions?: { budgetUsd?: number }): Promise<WorkspaceRuntimeKey> {
+  async function ensureKey(identityInput: WorkspaceKeyIdentity, keyOptions?: { budgetUsd?: number; spendThrough?: boolean }): Promise<WorkspaceRuntimeKey> {
     const identity = normalizeIdentity(identityInput)
     const budgetUsd = keyOptions?.budgetUsd ?? defaultBudgetUsd
     requirePositive(budgetUsd, 'budgetUsd')
@@ -603,7 +606,7 @@ export function createIdentityBoundWorkspaceKeyManager(
       const finalCleanup = await retryPendingRevocationsUnlocked(identity, identity)
       if (finalCleanup.pending > 0) throw new Error('a previous workspace child-key cleanup is pending; issuance is blocked until it completes')
       await assertNoPendingRevocations(identity)
-      return mint(identity, budgetUsd, (row, remoteId) => {
+      return mint(identity, budgetUsd, keyOptions?.spendThrough === true, (row, remoteId) => {
         mintedRemote = { row, remoteId }
       })
     }, async () => {
@@ -739,6 +742,7 @@ function createWorkspaceKeyRecovery(
         name,
         product: row.product,
         budgetUsd: row.budgetUsd,
+        ...(row.budgetUsd === 0 ? { spendThrough: true as const } : {}),
         expiresAt: row.expiresAt.toISOString(),
         idempotencyKey,
       })
@@ -841,6 +845,7 @@ function createWorkspaceKeyMinter(
   async function mint(
     identity: WorkspaceKeyIdentity,
     budgetUsd: number,
+    spendThrough: boolean,
     onRemoteKey?: (row: DurableWorkspaceKeyProvisioningRecord, remoteId: string) => void,
   ): Promise<WorkspaceRuntimeKey> {
     await assertWorkspaceKeyCryptoUsable(options.crypto)
@@ -864,7 +869,7 @@ function createWorkspaceKeyMinter(
       idempotencyKey,
       keyId: `provisioning:${mintOperationId}:${name}`,
       keyEncrypted: '',
-      budgetUsd,
+      budgetUsd: spendThrough ? 0 : budgetUsd,
       expiresAt,
       status: 'provisioning',
       revocationAttempts: 0,
@@ -877,11 +882,7 @@ function createWorkspaceKeyMinter(
     let created: Awaited<ReturnType<DurableWorkspaceKeyProvisioner['createKey']>>
     try {
       created = await options.provisioner.createKey({
-        name,
-        product,
-        budgetUsd,
-        expiresAt: expiresAt.toISOString(),
-        idempotencyKey,
+        name, product, budgetUsd, ...(spendThrough ? { spendThrough: true as const } : {}), expiresAt: expiresAt.toISOString(), idempotencyKey,
       })
     } catch (error) {
       // Keep cleanup running even when the state write fails. The remote
@@ -945,7 +946,8 @@ function createWorkspaceKeyMinter(
       const remoteExpiresAt = created.expiresAt?.trim()
       const activeExpiresAt = remoteExpiresAt ? new Date(remoteExpiresAt) : expiresAt
       if (!Number.isFinite(activeExpiresAt.getTime())) throw new Error('remote child key expiry is malformed')
-      const activeBudgetUsd = created.budgetUsd ?? budgetUsd
+      // A child minted without a budget spends through its source (0); one with a budget is sized, whatever was asked.
+      const activeBudgetUsd = created.budgetUsd ?? provisioningRow.budgetUsd
       if (!Number.isFinite(activeBudgetUsd) || activeBudgetUsd < 0) throw new Error('remote child key budget is malformed')
       const activated = await markActive(options.store, {
         id: rowId,
@@ -986,9 +988,7 @@ function createWorkspaceKeyMinter(
       throw error
     }
     const usage = usageFromRemote(row, {
-      budgetUsd: created.budgetUsd,
-      budgetSpent: 0,
-      expiresAt: created.expiresAt ?? expiresAt.toISOString(),
+      budgetUsd: created.budgetUsd, budgetSpent: 0, budgetRemaining: budgetUsd, expiresAt: created.expiresAt ?? expiresAt.toISOString(),
     }, now())
     return { key: secret, usage, refreshed: true }
   }
