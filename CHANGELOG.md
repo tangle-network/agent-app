@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.5
+
+- docs: regenerate the codemap and API docs (#1543)
+
 ## 4.0.4
 
 - fix(chat): bound streamed tool previews and retain live disclosure state (#1544)
