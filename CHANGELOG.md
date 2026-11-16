@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.14
+
+- fix(billing): children of a budgeted source spend through its cap (#1554)
+
 ## 4.0.13
 
 - fix(billing): recover a mint that died after the remote create by the name it stored (#1553)
