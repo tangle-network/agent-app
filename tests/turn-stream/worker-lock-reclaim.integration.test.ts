@@ -12,7 +12,7 @@ import { sqliteD1 } from '../launch-invariants/sqlite-d1'
  * turn still renews its row and a parked release all keep their lock. No clock is replaced.
  */
 it('reclaims a dead Worker-run holder by default and keeps box-run, live and parked holders', async () => {
-  const turns = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL))
+  const turns = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL).d1)
   const durable = createMemoryTurnStreamHarness()
   const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
   const lock = createDurableTurnLock<Record<string, never>>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns })
