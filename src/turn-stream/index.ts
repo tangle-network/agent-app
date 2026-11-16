@@ -2,7 +2,7 @@
  * Server-only durable turn storage, workspace signals, and single-flight locks.
  * Products bind TurnStreamDO and share TURN_STREAM_AUTH_SECRET with worker adapters.
  * The worker authorizes workspace viewers before forwarding their WebSocket upgrade.
- * Every DO request independently verifies a short-lived token for its own named channel.
+ * Every DO request independently verifies a short-lived token for its own named channel (a per-turn object: its id).
  *
  * Interactive turn replay belongs to the sandbox session gateway.
  * The optional turn-event backend is independent of lock and signal coordination.

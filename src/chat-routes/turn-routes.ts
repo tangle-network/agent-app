@@ -11,7 +11,9 @@
  *   turn engine              → agent-runtime `/durable` `handleChatTurn` (verbatim)
  *   durability               → `/stream` turn-buffer tap, wired BY DEFAULT
  *                              (tee + drain keeps the turn running after a
- *                              client drop; replay serves the buffered tail)
+ *                              client drop; replay serves the buffered tail);
+ *                              `turnHost` runs it in a Durable Object instead,
+ *                              which outlives the browser's request
  *   persistence              → injected `/chat-store`-shaped store
  *                              (user row on send, assistant row on completion)
  *   interactions answer      → `/interactions` `createInteractionAnswerRoute`
@@ -87,6 +89,7 @@ import { resolveTurnStorage, turnStorageBindings, type ResolvedChatTurnRoutesOpt
 import { createDefaultChatBackend, type ChatTurnDefaultBackend } from './default-backend'
 import { createChatPrewarm } from './route-prewarm'
 import { cancelChatTurn } from './cancellation'
+import { forwardTurnToHost, type TurnHost } from '../turn-stream/adapters'
 
 export * from './turn-route-contracts'
 
@@ -191,6 +194,23 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   const runAdmittedTurn = createAdmittedTurnRunner({
     options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
   })
+  // A hosted turn's object is placed with the turn lock's channel unless the host names a place.
+  const turnHost = input.turnHost && { locationHint: turnStorageBindings(input)?.region, ...input.turnHost }
+
+  /** Run the turn in a new turn-stream object. An object that cannot be reached leaves the turn to this request, as
+   *  without `turnHost`; a throw from the turn's own code in the object stays a throw, as it would be here. */
+  async function hostTurn(host: TurnHost, request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
+    try {
+      const response = await forwardTurnToHost(host, request.clone())
+      void request.body?.cancel().catch(() => {})
+      return response
+    } catch (err) {
+      if ((err as { remote?: unknown } | null)?.remote === true) throw err
+      log('[chat-routes] turn host unavailable; the turn runs in this request', {
+        class: 'turn_host_unavailable', error: err instanceof Error ? err.name : typeof err })
+      return withD1QueryCount(() => turn(request, ctx))
+    }
+  }
 
   async function turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response> {
     // Parsing and authorization finish before any response opens, for both
@@ -401,7 +421,10 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
 
   return {
     prewarm: createChatPrewarm(input, backend?.prewarm),
-    turn: (request, ctx) => withD1QueryCount(() => turn(request, ctx)),
+    // A request with no credential runs here, where `authorize` refuses it, so it never costs an object.
+    turn: (request, ctx) => turnHost && !ctx?.hosted && ctx?.executionLimits === undefined && ctx?.cancelOnDisconnect !== true
+      && (request.headers.has('cookie') || request.headers.has('authorization'))
+      ? hostTurn(turnHost, request, ctx) : withD1QueryCount(() => turn(request, ctx)),
     cancel: request => cancelChatTurn(request, { authorize: options.authorize, cancel: options.cancel, log }),
     replay,
     running,

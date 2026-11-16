@@ -246,6 +246,8 @@ export interface ChatTurnRequestContext {
   cancelOnDisconnect?: boolean
   /** Limits already authenticated by the server adapter. */
   executionLimits?: ChatTurnExecutionLimits
+  /** Set by `TurnStreamDO` on the turn it runs for `turnHost`: the route runs it there, never forwarding it again. */
+  hosted?: boolean
 }
 
 /** A workspace agent a turn is addressed to, resolved by the product from an
@@ -661,6 +663,27 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  the binding-derived workspace lock. `false` explicitly disables it. Native
    *  producers retain it until backend termination is observed. */
   turnLock?: ChatTurnLock<TContext, TResource> | false
+  /** Run each browser turn in a new object of the app's turn-stream binding instead of the browser's request, so the
+   *  turn finishes, persists and releases its lock after the browser leaves; the request only streams the object's
+   *  response. The binding's `TurnStreamDO` subclass passes `turnRoutes`, building these same routes; authorization,
+   *  lock, tap, persistence and Stop run there unchanged, on the forwarded request with its cookies. Omit → every turn
+   *  runs in the request, under its `waitUntil`.
+   *
+   *  These turns still run in the request: one with neither a `Cookie` nor an `Authorization` header (`authorize`
+   *  refuses it there, so it never costs an object), one given `executionLimits` or `cancelOnDisconnect: true`, and one
+   *  whose object cannot be reached, logged once as `turn_host_unavailable`.
+   *
+   *  Deploying it:
+   *  - Compatibility date 2026-10-01 or later, or the flag `durable_object_io_tasks_prevent_eviction`, so the object
+   *    stays alive while the turn's work is pending and no client is connected.
+   *  - The whole turn's CPU time counts against the one forwarded request. Set `limits.cpu_ms` (up to 300000) for
+   *    long turns.
+   *  - A code deploy resets active objects under the `immediate` update strategy. Give the turn-stream class a
+   *    `deferred` code update strategy whose `max_delay` covers your longest turn. Cloudflare lets in-flight requests
+   *    finish without access to the object's own storage, which a hosted turn never uses.
+   *  - The class's `turnRoutes` must pass `ctx` through unchanged: its `hosted` mark stops the object forwarding the
+   *    turn again. */
+  turnHost?: import('../turn-stream/adapters').TurnHost
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.

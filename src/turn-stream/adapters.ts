@@ -1,5 +1,5 @@
 /**
- * Worker adapters for durable turn storage, single-flight locks, and workspace signals.
+ * Worker adapters for durable turn storage, single-flight locks, workspace signals, and turns hosted in an object.
  * Namespace interfaces remain structural so Cloudflare bindings and the memory harness
  * run the same authenticated request path.
  * Products provide workspace authorization and their binding's TURN_STREAM_AUTH_SECRET.
@@ -13,6 +13,7 @@ import {
   TURN_STREAM_TOKEN_HEADER,
   mintTurnStreamToken,
   scopeIndexChannelKey,
+  turnHostChannelKey,
   turnLockChannelKey,
   turnStorageChannelKey,
   workspaceChannelKey,
@@ -650,4 +651,24 @@ export function createTurnStreamUpgradeHandler(
     headers.set(TURN_STREAM_TOKEN_HEADER, await mintTurnStreamToken(key, options.authSecret))
     return stub.fetch(new Request(new Request(forwardUrl, request), { headers }))
   }
+}
+
+// ── turn host forwarder (worker entry) ──────────────────────────────────────
+
+/** The turn-stream binding chat turns run in (`createChatTurnRoutes`' `turnHost`); its `TurnStreamDO` subclass passes
+ *  `turnRoutes`. */
+export interface TurnHost {
+  namespace: TurnStreamNamespaceLike & { newUniqueId(): unknown }
+  auth: TurnStreamAuth
+  /** Placement of each turn's object. Default: the turn lock's region. */
+  locationHint?: TurnStreamLocationHint
+}
+
+/** Send a browser's turn request, unread and with its cookies, to a new object of the host binding, and return that
+ *  object's streamed response. The object's capability names its id, so only this Worker can start a turn there. */
+export async function forwardTurnToHost(host: TurnHost, request: Request): Promise<Response> {
+  const id = host.namespace.newUniqueId()
+  const headers = new Headers(request.headers)
+  headers.set(TURN_STREAM_TOKEN_HEADER, await mintTurnStreamToken(turnHostChannelKey(String(id)), host.auth.secret))
+  return host.namespace.get(id, { locationHint: host.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT }).fetch(new Request(request, { headers }))
 }

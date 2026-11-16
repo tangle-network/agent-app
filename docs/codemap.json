@@ -26319,6 +26319,12 @@
           "doc": "The stored single-flight lock."
         },
         {
+          "name": "forwardTurnToHost",
+          "kind": "function",
+          "signature": "(host: TurnHost, request: Request) => Promise<Response>",
+          "doc": "Send a browser's turn request, unread and with its cookies, to a new object of the host binding, and return that object's streamed response."
+        },
+        {
           "name": "HolderBoxReport",
           "kind": "type",
           "signature": "type HolderBoxReport",
@@ -26491,6 +26497,18 @@
           "kind": "function",
           "signature": "(seq: number) => string",
           "doc": "Zero-padded seq so DO storage `list({ prefix })` returns rows in replay order without a sort."
+        },
+        {
+          "name": "TurnHost",
+          "kind": "interface",
+          "signature": "interface TurnHost",
+          "doc": "The turn-stream binding chat turns run in (`createChatTurnRoutes`' `turnHost`); its `TurnStreamDO` subclass passes `turnRoutes`."
+        },
+        {
+          "name": "turnHostChannelKey",
+          "kind": "function",
+          "signature": "(objectId: string) => string",
+          "doc": "The capability name of a per-turn object, which `newUniqueId` leaves without a channel name."
         },
         {
           "name": "TurnLockAcquireInput",

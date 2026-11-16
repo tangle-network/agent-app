@@ -7,6 +7,7 @@
  * Sockets use hibernation attachments; products may add authenticated endpoints,
  * defer lock release during persistence, and contribute workspace sync events.
  * Product storage keys must avoid TURN_STREAM_STORAGE_KEYS.
+ * With `turnRoutes`, an unnamed per-turn object runs one forwarded chat turn.
  */
 
 import { DurableTurnCancellation, readTurnCancellationIdentity, type TurnCancellationIdentity, type TurnCancellationSocketMeta } from './cancellation-do'
@@ -24,6 +25,7 @@ import {
   interruptedReleaseApplies,
   pruneStaleThreads,
   turnEventStorageKey,
+  turnHostChannelKey,
   turnLockMatchesRelease,
   turnLockStorageKey,
   verifyTurnStreamToken,
@@ -65,6 +67,8 @@ export interface TurnStreamDOState {
    *  Capability tokens are bound to this name, so it must be present for the
    *  DO to serve any request. */
   id?: { name?: string | null }
+  /** Cloudflare's `DurableObjectState.waitUntil`: a hosted turn's drain keeps the object alive through it. */
+  waitUntil?(promise: Promise<unknown>): void
 }
 
 type SocketMeta = TurnCancellationSocketMeta
@@ -124,6 +128,15 @@ export interface TurnStreamDOOptions {
    * no unauthenticated mode.
    */
   authSecret?: string
+  /**
+   * Run chat turns in this namespace. `createChatTurnRoutes`' `turnHost` sends each browser turn, unread, to a new
+   * unnamed object, which runs `turnRoutes(env).turn` under its own `waitUntil`, so the turn finishes, persists and
+   * releases its lock after the browser leaves. Build the same routes the Worker builds; authorization runs here on
+   * the forwarded request. Pass `ctx` to `turn` unchanged: its `hosted` mark stops the routes forwarding the turn
+   * again. Needs compatibility date 2026-10-01 or later, or the flag `durable_object_io_tasks_prevent_eviction`; the
+   * CPU limit and the code update strategy this class needs are in `createChatTurnRoutes`' `turnHost`.
+   */
+  turnRoutes?(env: unknown): { turn(request: Request, ctx: { waitUntil?(promise: Promise<unknown>): void; hosted: true }): Promise<Response> }
 }
 
 /** Durable turn-event storage, workspace signals, and the single-flight turn
@@ -170,7 +183,8 @@ export class TurnStreamDO {
    * secret fails closed with a 500 that names the fix (issue #746).
    */
   private async authorizeRequest(request: Request): Promise<Response | null> {
-    const name = this.state.id?.name
+    // A per-turn object (`newUniqueId`) has no name; with `turnRoutes`, its capability names its id.
+    const name = this.state.id?.name || (this.options.turnRoutes ? turnHostChannelKey(String(this.state.id)) : null)
     if (typeof name !== 'string' || !name) {
       return Response.json(
         { error: 'turn-stream DO has no channel name; bind with idFromName so capability tokens can be bound to it' },
@@ -221,6 +235,13 @@ export class TurnStreamDO {
 
     const unauthorized = await this.authorizeRequest(request)
     if (unauthorized) return unauthorized
+
+    // A per-turn object runs only the browser's turn request it was sent, without its capability, under its own waitUntil.
+    if (this.options.turnRoutes && !this.state.id?.name) {
+      const headers = new Headers(request.headers)
+      headers.delete(TURN_STREAM_TOKEN_HEADER)
+      return this.options.turnRoutes(this.env).turn(new Request(request, { headers }), { waitUntil: this.state.waitUntil?.bind(this.state), hosted: true })
+    }
 
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       return this.handleWebSocketUpgrade(request, url)
