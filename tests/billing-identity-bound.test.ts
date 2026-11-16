@@ -535,6 +535,30 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(old.status).toBe('revoked')
   })
 
+  // Platform holds one key per slot name: a create under a name already held revokes the key holding it. A consumer's
+  // stable `nameForIdentity` must not let the floor rotation's create revoke the key a running turn still holds.
+  it('mints the floor rotation under a distinct slot when nameForIdentity is stable, so the old key stays live', async () => {
+    const h = makeHarness()
+    const provisioner: DurableWorkspaceKeyProvisioner = {
+      ...h.provisioner,
+      async createKey(input) {
+        for (const key of h.remote.values()) {
+          if (!key.revoked && key.name === input.name && key.product === input.product) key.revoked = true
+        }
+        return h.provisioner.createKey(input)
+      },
+    }
+    const manager = h.manager('router', { provisioner, nameForIdentity: (current) => `router:${current.workspaceId}` })
+    const first = await manager.ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - REUSE_FLOOR_MS + 1)
+
+    const next = await manager.ensureKey(h.identity())
+    expect(next.usage.keyId).not.toBe(first.usage.keyId)
+    expect(h.remote.get(first.usage.keyId)?.revoked).toBe(false)
+    expect(h.remote.get(next.usage.keyId)?.name).not.toBe(h.remote.get(first.usage.keyId)?.name)
+    await expect(h.provisioner.getKey(first.usage.keyId)).resolves.toMatchObject({ expiresAt: first.usage.expiresAt })
+  })
+
   it('reuses the active key while its remaining life is at or above the reuse floor', async () => {
     const h = makeHarness()
     const manager = h.manager('router')
