@@ -1,6 +1,7 @@
 import { assistantRowIdForTurn, createAssistantDraftWriter } from '../chat-routes/draft-persistence'
 import { observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource } from '../chat-routes/native-completion'
 import type { ChatTurnMessageStore } from '../chat-routes/turn-route-contracts'
+import type { ValueRedactor } from '../chat-routes/redact-values'
 import { createTurnTrace, type TurnTrace, type TurnTraceSink, type TurnSpan, type TurnTraceSnapshot } from '../turn-trace/index'
 import { createD1TurnEventStore } from '../stream/turn-buffer'
 import { releaseDurableTurnLock, type TurnStreamNamespaceLike, type TurnStreamAuth } from '../turn-stream/adapters'
@@ -96,6 +97,8 @@ export interface NativeCompletionOwnerOptions<TPayload extends NativeCompletionP
   lock: { namespace: TurnStreamNamespaceLike; auth: TurnStreamAuth }
   workflow: { binding: CloudflareWorkflowBindingLike<TPayload>; prefix: string }
   reconcile(payload: TPayload, source: TSource): Promise<boolean>
+  /** The turn's registered secret values (chat-routes `redactValues`), applied to the transcript this owner stores. */
+  redact?(payload: TPayload): ValueRedactor | undefined | Promise<ValueRedactor | undefined>
 }
 
 export function createNativeCompletionOwner<TPayload extends NativeCompletionPayload, TSource extends NativeCompletionSessionSource>(
@@ -107,8 +110,11 @@ export function createNativeCompletionOwner<TPayload extends NativeCompletionPay
       throw new Error('Native completion changed attempts before terminal persistence')
     }
     const messageId = assistantRowIdForTurn(payload.executionId)
+    const redact = await options.redact?.(payload)
+    const row = { content: receipt.text, parts: receipt.parts }
+    const stored = redact ? redact(row) : row
     await createAssistantDraftWriter({ store: options.messages, threadId: payload.threadId,
-      messageId, snapshot: () => null }).finalize({ content: receipt.text, parts: receipt.parts as never,
+      messageId, snapshot: () => null }).finalize({ content: stored.content, parts: stored.parts as never,
       model: receipt.servedModel ?? options.model(payload), ...receipt.usage })
     return messageId
   }
