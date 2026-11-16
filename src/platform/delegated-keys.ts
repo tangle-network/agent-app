@@ -533,7 +533,8 @@ export function createDelegatedKeyProvisioner(input: {
         return {
           ...(v.budgetUsd !== undefined ? { budgetUsd: v.budgetUsd } : {}),
           ...(v.budgetUsd !== undefined && v.budgetRemaining !== undefined ? { budgetSpent: Math.max(0, v.budgetUsd - v.budgetRemaining) } : {}),
-          ...(v.budgetRemaining !== undefined ? { budgetRemaining: v.budgetRemaining } : {}),
+          // No budget of its own: a spend-through child, whose remainder is its source's.
+          ...(v.budgetUsd === undefined && v.budgetRemaining !== undefined ? { budgetRemaining: v.budgetRemaining } : {}),
           ...(v.expiresAt ? { expiresAt: v.expiresAt } : {}),
         }
       }
