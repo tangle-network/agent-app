@@ -136,6 +136,8 @@ export function createNativeCompletionOwner<TPayload extends NativeCompletionPay
       initialize(): void
       source(payload: TPayload): Promise<TSource | null>
       observe?(payload: TPayload): ReturnType<typeof observe>
+      /** A custom observer's exact, side-effect-free receipt read for replay. */
+      readReceipt?(payload: TPayload): Promise<NativeCompletionReceipt | null>
       settle(payload: TPayload, receipt: NativeCompletionReceipt, messageId: string): Promise<void>
       timing(payload: TPayload, checkpoint: NativeCompletionCheckpoint, trace: TurnTraceSnapshot, receipt: NativeCompletionReceipt): Promise<void>
       exportTrace(payload: TPayload, trace: TurnTraceSnapshot): Promise<void>
@@ -153,6 +155,16 @@ export function createNativeCompletionOwner<TPayload extends NativeCompletionPay
         observe: async () => {
           const { payload } = await required()
           return input.observe ? input.observe(payload) : observe(payload, await input.source(payload))
+        },
+        readReceipt: async () => {
+          const row = await required()
+          if (input.readReceipt) return input.readReceipt(row.payload)
+          // A completed observation closed this admission. Never renew or close
+          // it during replay, and never replay an override with product effects.
+          if (input.observe) throw new Error('Custom native completion observation requires its read-only receipt reader')
+          if (row.state !== 'closed') return null
+          const observation = await observe(row.payload, await input.source(row.payload), true)
+          return observation.state === 'running' ? null : observation.receipt
         },
         prepare: async (_initial, receipt) => {
           if ((await required()).vaultReconciledAt) return receipt

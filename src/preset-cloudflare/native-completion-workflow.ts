@@ -4,10 +4,12 @@
  * this helper never nests those callbacks inside `step.do`.
  */
 
-import type {
-  NativeCompletionObservation,
-  NativeCompletionReceipt,
+import {
+  NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
+  type NativeCompletionObservation,
+  type NativeCompletionReceipt,
 } from '../chat-routes/native-completion'
+import { sha256Hex } from '../crypto/digest'
 import {
   runDetachedTurnWorkflowTick,
   type CloudflareWorkflowEventLike,
@@ -21,7 +23,45 @@ export interface NativeCompletionWorkflowPayload extends DetachedTurnWorkflowIde
   registeredAt: number
 }
 
-type NativeCompletionDriveResult = NativeCompletionObservation
+/** A checkpoint addresses the existing native record; it owns no copy of its body. */
+interface NativeCompletionReceiptReference {
+  receiptReference: {
+    sessionId: string
+    turnId: string
+    turnIds: string[]
+    contentSha256: string
+    bytes: number
+  }
+  /** Includes product extensions, such as a native execution proof. */
+  metadata: Omit<NativeCompletionReceipt, 'text' | 'parts'>
+}
+
+type NativeCompletionDriveResult = NativeCompletionObservation | (
+  NativeCompletionReceiptReference & { state: 'completed' | 'failed' }
+)
+
+/** Large final output points at the transcript the product already persisted. */
+export interface NativeCompletionTranscriptReference<TMessageId> extends Omit<NativeCompletionReceipt, 'text' | 'parts'> {
+  text?: never
+  parts?: never
+  transcriptReference: { messageId: TMessageId; omitted: ['text', 'parts'] }
+}
+
+export type NativeCompletionWorkflowResult<TMessageId> = NativeCompletionReceipt | NativeCompletionTranscriptReference<TMessageId>
+
+const encoder = new TextEncoder()
+function serializedBytes(value: unknown): number {
+  return encoder.encode(JSON.stringify(value)).byteLength
+}
+
+/** JSON key order is immaterial; part order and every serialized value are not. */
+function receiptBody(receipt: NativeCompletionReceipt): string {
+  return JSON.stringify({ text: receipt.text, parts: receipt.parts }, (_key, value: unknown) => (
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map(key => [key, (value as Record<string, unknown>)[key]]))
+      : value
+  ))
+}
 
 export interface NativeCompletionWorkflowOptions<
   TPayload extends NativeCompletionWorkflowPayload,
@@ -32,6 +72,16 @@ export interface NativeCompletionWorkflowOptions<
   /** Read-only exact observation. It must never dispatch, drive, or cancel. */
   observe(payload: TPayload): Promise<NativeCompletionObservation>
   /**
+   * Reload this admission's exact retained native receipt, without changing
+   * admission, stream status, transcript or settlement. Required only when an
+   * observation exceeds the checkpoint budget. The adapter verifies the whole
+   * content against the checkpoint before preparation. Original usage, terminal
+   * facts and product proof metadata stay in the checkpoint; a later read cannot
+   * replace them. A missing or changed result is retryable; it never becomes an
+   * empty successful answer. Reuse the product's existing native read adapter.
+   */
+  readReceipt?(payload: TPayload): Promise<NativeCompletionReceipt | null>
+  /**
    * Product-owned idempotent preparation, for example artifact promotion and
    * output classification. It runs outside an enclosing Workflow step so a
    * product may use its own named steps without nesting `step.do`.
@@ -40,8 +90,10 @@ export interface NativeCompletionWorkflowOptions<
   /**
    * Durable transcript write. Without a message id it must upsert the turn's
    * one row: the terminal observation step checkpoints the observed receipt
-   * with it before preparation, and the transcript step writes the prepared
-   * receipt over that checkpoint. A supplied message id updates the existing row.
+   * with it before preparation for an inline receipt. Oversized native bodies
+   * stay in the native result until preparation promotes their artifacts; the
+   * transcript step then writes the prepared view. A supplied message id updates
+   * the existing row. The product owns that view's storage limits.
    */
   persistTranscript(
     payload: TPayload,
@@ -93,6 +145,9 @@ function validObservation(value: NativeCompletionObservation): NativeCompletionD
   if (value.state !== 'running' && !value.receipt) {
     throw new Error('native completion observer returned a terminal state without a receipt')
   }
+  if (value.state !== 'running' && value.receipt.state !== value.state) {
+    throw new Error('native completion observation contradicts its receipt state')
+  }
   return value
 }
 
@@ -104,11 +159,15 @@ function validObservation(value: NativeCompletionObservation): NativeCompletionD
 export async function runNativeCompletionWorkflow<
   TPayload extends NativeCompletionWorkflowPayload,
   TMessageId,
->(options: NativeCompletionWorkflowOptions<TPayload, TMessageId>): Promise<NativeCompletionReceipt> {
+>(options: NativeCompletionWorkflowOptions<TPayload, TMessageId>): Promise<NativeCompletionWorkflowResult<TMessageId>> {
   const name = options.stepName ?? 'native-completion'
-  let receipt = await runDetachedTurnWorkflowTick<
+  // Only the invocation that observed the answer holds this value. A replay
+  // resolves the checkpoint through the native reader, never a mutable chat row
+  // or the product's observation callback (which may update stream status).
+  let observedReceipt: NativeCompletionReceipt | undefined
+  const checkpoint = await runDetachedTurnWorkflowTick<
     TPayload,
-    NativeCompletionReceipt,
+    NativeCompletionReceipt | NativeCompletionReceiptReference,
     NativeCompletionDriveResult
   >({
     event: options.event,
@@ -117,14 +176,56 @@ export async function runNativeCompletionWorkflow<
     stepName: `${name}:observe`,
     drive: async (payload) => {
       const observation = validObservation(await options.observe(payload))
+      if (observation.state === 'running') return { succeeded: true, value: observation }
+      if (!('receipt' in observation)) throw new Error('native completion observer returned a reference instead of a receipt')
+      if (serializedBytes(observation) > NATIVE_COMPLETION_RECEIPT_MAX_BYTES) {
+        if (!options.readReceipt) throw new Error('Oversized native completion requires a read-only exact receipt reader')
+        const { text: _text, parts: _parts, ...metadata } = observation.receipt
+        const serialized = receiptBody(observation.receipt)
+        const reference = {
+          state: observation.state,
+          receiptReference: {
+            sessionId: payload.sessionId,
+            turnId: payload.turnId,
+            turnIds: observation.receipt.completedTurnIds,
+            contentSha256: await sha256Hex(serialized),
+            bytes: encoder.encode(serialized).byteLength,
+          },
+          metadata,
+        }
+        if (serializedBytes(reference) > NATIVE_COMPLETION_RECEIPT_MAX_BYTES) {
+          throw new Error('Native completion reference metadata exceeds the checkpoint byte budget')
+        }
+        observedReceipt = observation.receipt
+        return { succeeded: true, value: reference }
+      }
       // The observed answer is written in the same step that observed it, so
       // a later preparation, settlement or Workflow failure cannot lose it.
-      if (observation.state !== 'running') await options.persistTranscript(payload, observation.receipt)
+      await options.persistTranscript(payload, observation.receipt)
       return { succeeded: true, value: observation }
     },
-    settle: async (_payload, result) => result.receipt,
+    settle: async (_payload, result) => 'receipt' in result ? result.receipt : result,
   })
 
+  let receipt: NativeCompletionReceipt
+  if ('receiptReference' in checkpoint) {
+    const reference = checkpoint.receiptReference
+    if (reference.sessionId !== options.event.payload.sessionId || reference.turnId !== options.event.payload.turnId) {
+      throw new Error('Native completion reference belongs to another admission')
+    }
+    const retained = observedReceipt ?? await options.readReceipt?.(options.event.payload)
+    if (!retained) throw new Error('Native completion referenced receipt is unavailable; retry the exact native read')
+    const serialized = receiptBody(retained)
+    if (retained.state !== checkpoint.metadata.state
+      || JSON.stringify(retained.completedTurnIds) !== JSON.stringify(reference.turnIds)
+      || encoder.encode(serialized).byteLength !== reference.bytes
+      || await sha256Hex(serialized) !== reference.contentSha256) {
+      throw new Error('Native completion referenced receipt changed; reconciliation is required')
+    }
+    receipt = { ...checkpoint.metadata, text: retained.text, parts: retained.parts }
+  } else {
+    receipt = checkpoint
+  }
   if (options.prepare) receipt = await options.prepare(options.event.payload, receipt)
   const messageId = await options.step.do(`${name}:persist-transcript`, () => (
     options.persistTranscript(options.event.payload, receipt)
@@ -135,6 +236,14 @@ export async function runNativeCompletionWorkflow<
     await options.step.do(`${name}:persist-final-transcript`, () => (
       options.persistTranscript(options.event.payload, receipt, messageId)
     ))
+  }
+  let result: NativeCompletionWorkflowResult<TMessageId> = receipt
+  if (serializedBytes(receipt) > NATIVE_COMPLETION_RECEIPT_MAX_BYTES) {
+    const { text: _text, parts: _parts, ...metadata } = receipt
+    result = { ...metadata, transcriptReference: { messageId, omitted: ['text', 'parts'] } }
+    if (serializedBytes(result) > NATIVE_COMPLETION_RECEIPT_MAX_BYTES) {
+      throw new Error('Native completion transcript reference metadata exceeds the output byte budget')
+    }
   }
   if (options.recordTiming) {
     await options.step.do(`${name}:record-timing`, () => (
@@ -148,5 +257,5 @@ export async function runNativeCompletionWorkflow<
   }
   await options.step.do(`${name}:release-lock`, () => options.releaseLock(options.event.payload))
   await options.afterRelease?.(options.event.payload, receipt)
-  return receipt
+  return result
 }
