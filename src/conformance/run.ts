@@ -33,8 +33,9 @@ export interface ConformanceOptions {
   operatorKey?: string
   /** Id or exact name of the workspace the turns run in: the app's canary or smoke workspace, never a customer's. */
   workspace?: string
-  /** `digest` hashes a fresh nonce on the workspace computer; `file` has the computer save a file the app serves back. */
-  computer?: ComputerProof
+  /** `digest` hashes a fresh nonce on the workspace computer; `file` has the computer save a file the app serves back;
+   *  `none` runs the plain turn only, for a check that asks exactly once (a post-serve first ask). */
+  computer?: ComputerProof | 'none'
   /** The computer turn's model. The plain turn keeps the app's own model, so the served model is still checked once. */
   computerModel?: string
   /** Where the `file` proof is saved, relative to the workspace root. */
@@ -132,12 +133,15 @@ export async function checkDeployedApp(options: ConformanceOptions): Promise<Che
   if (access) {
     const open = access
     await check('plain-turn', async () => ({ value: true, detail: await plainTurn(open, turnMs) }))
-    await check('computer-turn', async () => ({
-      value: true, detail: await computerTurn(open, turnMs, options.computer ?? 'digest', options.fileDir ?? 'proof', options.computerModel ?? DEFAULT_COMPUTER_MODEL),
-    }))
+    const proof = options.computer ?? 'digest'
+    if (proof !== 'none') {
+      await check('computer-turn', async () => ({
+        value: true, detail: await computerTurn(open, turnMs, proof, options.fileDir ?? 'proof', options.computerModel ?? DEFAULT_COMPUTER_MODEL),
+      }))
+    }
   } else {
     blocked('plain-turn', 'blocked by operator-access')
-    blocked('computer-turn', 'blocked by operator-access')
+    if (options.computer !== 'none') blocked('computer-turn', 'blocked by operator-access')
   }
 
   // A key this run minted is revoked whether or not the turns ran: it names the member and would outlive the run.
