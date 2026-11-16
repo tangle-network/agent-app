@@ -190,7 +190,9 @@ describe('protected Runtime chat producer', () => {
     const events = await drain(producer)
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 1, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: false } })
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    // The settlement failure after a complete answer is the server's: the answer stands with no failure notice.
+    expect(events.some(event => event.type === 'error' || event.type === 'notice')).toBe(false)
+    expect(producer.finalText()).toBe('Completed work.')
   })
 
   it('sends prior chat rows to the provider as role and content only', async () => {
@@ -291,12 +293,12 @@ describe('protected Runtime chat producer', () => {
     expect(requests.map(url => url.split('/').at(-1))).toEqual(['resolve', 'reserve', 'activate', 'completions', 'settle'])
     expect(audit).toHaveBeenCalledOnce()
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
-    // The person reads the plain sentence; the server log keeps the audit reason under the withheld class.
-    expect(events.find(event => event.type === 'error')).toMatchObject({
-      data: { message: 'That answer stopped before it finished. Please send your question again.' } })
+    // The charged answer stands with no failure for the person to act on; the server log keeps the audit failure.
+    expect(events.some(event => event.type === 'error' || event.type === 'notice')).toBe(false)
+    expect(producer.finalText()).toBe('Charged work completed.')
     expect(JSON.stringify(events)).not.toContain('audit record could not be saved')
-    const withheldLog = warn.mock.calls.find(([message]) => message === '[chat-routes] turn failure withheld from the person')
-    expect(withheldLog?.[1]).toMatchObject({ failureClass: 'runtime_failure', error: expect.stringContaining('audit record could not be saved') })
+    const settlementLog = warn.mock.calls.find(([message]) => message === '[chat-routes] protected turn settlement failed after its answer')
+    expect(settlementLog?.[1]).toMatchObject({ code: 'settlement_audit_failed', message: expect.stringContaining('audit record could not be saved') })
     expect(JSON.stringify(events)).not.toContain('synthetic-parent-key')
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 0, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: true } })
@@ -331,7 +333,9 @@ describe('protected Runtime chat producer', () => {
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 0, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: false } })
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    // The settlement failure after a complete answer is the server's: the answer stands with no failure notice.
+    expect(events.some(event => event.type === 'error' || event.type === 'notice')).toBe(false)
+    expect(producer.finalText()).toBe('Completed work.')
   })
 
   it('does no preparation or inference after cancellation', async () => {

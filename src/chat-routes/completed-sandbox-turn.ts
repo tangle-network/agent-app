@@ -20,6 +20,7 @@ import {
   normalizePersistedPart,
   type JsonRecord,
 } from '../stream/index'
+import { withoutToolList } from './failure-wording'
 import { addStepFinishUsage } from './sandbox-turn-usage'
 import type { DetachedTurnFinal } from './detached-turn'
 import type { ChatTurnModelAttribution, ChatTurnUsage } from './turn-routes'
@@ -163,8 +164,9 @@ function projectMessageParts(parts: JsonRecord[], finalText: string): JsonRecord
   const order: string[] = []
   const map = new Map<string, JsonRecord>()
   for (let index = 0; index < parts.length; index += 1) {
-    const part = parts[index]!
-    const type = String(part.type ?? '')
+    const type = String(parts[index]!.type ?? '')
+    // A recovered tool part reads as a live one: never with the harness's list of every tool.
+    const part = type === 'tool' ? withoutToolList(parts[index]!) : parts[index]!
     // A session's aggregate message contains every step receipt. Preserve each
     // occurrence just as the live producer does; other kinds merge by their
     // canonical identity.

@@ -788,25 +788,18 @@ describe('createSandboxChatProducer', () => {
     expect(persisted.some((p) => 'url' in p)).toBe(false)
   })
 
-  it('persists and emits warning notices while preserving raw warning forwarding', async () => {
-    const rawWarning = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
-    const producer = createSandboxChatProducer({ events: feed([rawWarning]) })
+  it('notices a warning in its own words, withholds a harness warning, and forwards both', async () => {
+    const harnessWarning = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
+    const refusal = { type: 'warning', data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance for this request.' } }
+    const producer = createSandboxChatProducer({ events: feed([harnessWarning, refusal]), log: () => {} })
+    const notice = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: 'PAYMENT_REQUIRED: The account has no balance for this request.' }
 
-    expect(await drain(producer.stream)).toEqual([
-      {
-        type: 'notice',
-        id: 'warning-1',
-        noticeKind: 'warning',
-        text: 'FILE_DENIED: Outside workspace',
-      },
-      rawWarning,
+    expect(onWire(await drain(producer.stream))).toEqual([
+      { type: 'warning', data: { code: 'FILE_DENIED', message: FAILED } },
+      notice,
+      refusal,
     ])
-    expect(producer.assistantParts?.()).toEqual([{
-      type: 'notice',
-      id: 'warning-1',
-      noticeKind: 'warning',
-      text: 'FILE_DENIED: Outside workspace',
-    }])
+    expect(producer.assistantParts?.()).toEqual([notice])
   })
 
   it('keeps visible output before a raw error, appends the plain sentence, and forwards the error without its reason', async () => {
