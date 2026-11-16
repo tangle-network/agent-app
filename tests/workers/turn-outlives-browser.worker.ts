@@ -2,8 +2,9 @@
  * Real workerd fixture for a chat turn that outlives the browser that sent it. The Worker and the app's
  * TurnStreamDO subclass build the same chat routes with `turnHost`; the producer answers over 40 s, longer than a
  * Worker request's `waitUntil` work may run after its client leaves. D1 marks record where the producer ran and whose
- * `waitUntil` held the turn's work. `/probe/wait-until` checks the runtime itself: a Worker request's own `waitUntil`
- * work, marked once a second, after its client disconnects.
+ * `waitUntil` held the turn's work, and the host binding marks each request it sends to a turn's object.
+ * `/probe/wait-until` checks the runtime itself: a Worker request's own `waitUntil` work, marked once a second, after
+ * its client disconnects.
  */
 import type { D1Database } from '@cloudflare/workers-types'
 import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnRequestContext } from '../../src/chat-routes/turn-routes'
@@ -40,6 +41,19 @@ function observed(env: Env, where: Where, waitUntil: ((promise: Promise<unknown>
   return { waitUntil: promise => { waitUntil?.(promise); waitUntil?.(mark(env, `wait-until:${where}`)) } }
 }
 
+/** The binding as the turn host sees it: every request sent to a turn's object is marked first. */
+function markedHost(env: Env): Env['TURN_STREAM_DO'] {
+  const namespace = env.TURN_STREAM_DO
+  return {
+    idFromName: name => namespace.idFromName(name),
+    newUniqueId: () => namespace.newUniqueId(),
+    get: (id, options) => {
+      const stub = namespace.get(id, options)
+      return { fetch: async (input, init) => { await mark(env, 'host:object-request'); return stub.fetch(input, init) } }
+    },
+  }
+}
+
 function routes(env: Env, where: Where) {
   const auth = { secret: env.TURN_STREAM_AUTH_SECRET }
   return createChatTurnRoutes({
@@ -53,7 +67,7 @@ function routes(env: Env, where: Where) {
     },
     store: messages(env.DB),
     turnStore: { db: env.DB, lock: { namespace: env.TURN_STREAM_DO, auth } },
-    turnHost: { namespace: env.TURN_STREAM_DO, auth },
+    turnHost: { namespace: markedHost(env), auth },
     produce: async () => {
       await mark(env, `produce:${where}`)
       let text = ''

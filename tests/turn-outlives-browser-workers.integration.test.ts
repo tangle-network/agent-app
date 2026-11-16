@@ -46,6 +46,10 @@ it('finishes, stores and replays a member’s turn after the browser that sent i
     const state = async (turnId: string) =>
       await (await fetch(new URL(`/state/proof-workspace/${turnId}`, url))).json() as State
 
+    const objectRequests = (marks: string[]) => marks.filter(kind => kind === 'host:object-request').length
+    const anonymous = await send({})
+    assert.equal(anonymous.status, 401, 'A caller with no credential is refused')
+    assert.equal(objectRequests((await state('none')).marks), 0, 'A request with no credential is refused without creating a turn-stream object')
     const refused = await send({ cookie: 'session=stranger' })
     assert.equal(refused.status, 401, 'A caller without the member cookie is refused before any turn starts')
 
@@ -78,30 +82,32 @@ it('finishes, stores and replays a member’s turn after the browser that sent i
       'The turn-stream object’s waitUntil held the turn’s work; the browser request’s held none of it')
     assert.deepEqual(settled.marks.filter(kind => kind.startsWith('produce:')), ['produce:object'],
       'The producer ran once, in the turn-stream object')
+    assert.equal(objectRequests(settled.marks), 2,
+      'Each request with a credential, the refused stranger’s and the member’s, went to its own turn-stream object')
   } finally {
     await worker.close()
   }
 }, 180_000)
 
 // The runtime check behind the proof, run on demand: does local workerd cancel a Worker request's own waitUntil work
-// after its client disconnects, as Cloudflare does? A last mark near 45 s means it does not.
+// after its client disconnects, as Cloudflare does? It reports the last mark and never fails on it: a last mark near
+// 45 s means workerd does not cancel the work, one near 32 s means it does, and 0 means the work never ran.
 it.runIf(process.env.WORKERD_WAIT_UNTIL_PROBE === '1')('measures how long a Worker request’s waitUntil work runs after its client disconnects', async () => {
+  // test-quality:probe-only — a measurement printed for the reader, not an assertion.
   const worker = createTestHarness({ workers: [{ configPath }] })
   try {
     const { url } = await worker.listen()
-    assert.equal((await fetch(new URL('/seed', url), { method: 'POST' })).status, 204)
+    await fetch(new URL('/seed', url), { method: 'POST' })
     const client = new AbortController()
-    const response = await fetch(new URL('/probe/wait-until', url), { signal: client.signal })
-    assert.equal((await response.body!.getReader().read()).done, false)
+    const sent = fetch(new URL('/probe/wait-until', url), { signal: client.signal }).catch(() => null)
     await sleep(2_000)
     client.abort()
+    await sent
     await sleep(50_000)
     const { marks } = await (await fetch(new URL('/state/probe-workspace/none', url))).json() as State
     const lastMarkSecond = Math.max(0, ...marks.filter(kind => kind.startsWith('probe:')).map(kind => Number(kind.slice('probe:'.length))))
-    console.info(JSON.stringify({ probe: 'workerd-wait-until-after-disconnect', disconnectedAfterMs: 2_000, plannedMarks: 45, lastMarkSecond,
-      workerdCancelsWaitUntil: lastMarkSecond < 40 }))
-    assert(lastMarkSecond > 0, 'The probe’s waitUntil work started')
+    console.info(JSON.stringify({ probe: 'workerd-wait-until-after-disconnect', disconnectedAfterMs: 2_000, plannedMarks: 45, lastMarkSecond }))
   } finally {
     await worker.close()
   }
-}, 120_000)
+}, 300_000)

@@ -132,8 +132,9 @@ export interface TurnStreamDOOptions {
    * Run chat turns in this namespace. `createChatTurnRoutes`' `turnHost` sends each browser turn, unread, to a new
    * unnamed object, which runs `turnRoutes(env).turn` under its own `waitUntil`, so the turn finishes, persists and
    * releases its lock after the browser leaves. Build the same routes the Worker builds; authorization runs here on
-   * the forwarded request. Needs compatibility date 2026-10-01 or later, or the flag
-   * `durable_object_io_tasks_prevent_eviction`, so the pending work keeps the object alive with no client.
+   * the forwarded request. Pass `ctx` to `turn` unchanged: its `hosted` mark stops the routes forwarding the turn
+   * again. Needs compatibility date 2026-10-01 or later, or the flag `durable_object_io_tasks_prevent_eviction`; the
+   * CPU limit and the code update strategy this class needs are in `createChatTurnRoutes`' `turnHost`.
    */
   turnRoutes?(env: unknown): { turn(request: Request, ctx: { waitUntil?(promise: Promise<unknown>): void; hosted: true }): Promise<Response> }
 }
