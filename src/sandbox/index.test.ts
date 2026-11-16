@@ -5554,17 +5554,21 @@ describe('warm reuse round trips', () => {
   })
 
   // Production 2026-11-15 (Tax provisioning, 8 reuses of a running box): the bootstrap's box execs took
-  // 2.73-4.43 s of a 3.0-4.7 s finalize on every reuse.
-  it('skips the product bootstrap under the same declared build, and runs it after a release or an egress change', async () => {
-    const saved = new Map<string, SharedReuseState>()
-    const store: ReuseStateStore = {
-      load: async (name) => saved.get(name) ?? null,
-      save: async (name, state) => { saved.set(name, structuredClone(state)) },
-      drop: async (name) => { saved.delete(name) },
-    }
+  // 2.73-4.43 s of a 3.0-4.7 s finalize on every reuse; reading a marker is one exec.
+  it('skips the product bootstrap on a box with a fresh marker for the same declared build, and runs it otherwise', async () => {
+    // The box's home: marker files by name with their write time, read the way `find -mmin -1440` reads them.
+    const home = new Map<string, number>()
+    const exec = vi.fn(async (command: string) => {
+      const key = command.includes('.agent-app/bootstrapped') ? /\b([0-9a-f]{64})\b/.exec(command)?.[1] : undefined
+      if (key && command.includes('find ')) {
+        const written = home.get(key)
+        return { stdout: '', stderr: '', exitCode: written !== undefined && Date.now() - written < 24 * 3_600_000 ? 0 : 1 }
+      }
+      if (key && command.startsWith('mkdir -p')) { home.set(key, Date.now()); return { stdout: '', stderr: '', exitCode: 0 } }
+      return { stdout: 'alive', stderr: '', exitCode: 0 }
+    })
     const strict: EgressPolicy = { mode: 'strict', allowDomains: ['a.example.com'] }
     const egressGet = vi.fn().mockResolvedValue({ policy: strict, source: 'sandbox' })
-    const exec = vi.fn().mockResolvedValue({ stdout: 'alive', stderr: '', exitCode: 0 })
     const running = fakeBox({ status: 'running', exec, egress: { get: egressGet, update: vi.fn() } } as unknown as Partial<SandboxInstance>)
     listMock.mockResolvedValue([running])
     getMock.mockResolvedValue(running)
@@ -5572,12 +5576,12 @@ describe('warm reuse round trips', () => {
     let build = 'release-1'
     let egressPolicy = strict
     const shell = () => shellFor({ apiKey: 'k', baseUrl: 'u' }, {
-      egressPolicy, bootstrap, bootstrapDigest: () => build, livenessProbe: { cacheTtlMs: 0 }, reuseState: store,
+      egressPolicy, bootstrap, bootstrapDigest: () => build, livenessProbe: { cacheTtlMs: 0 },
     })
 
     await ensureWorkspaceSandbox(shell(), scope)
     expect(bootstrap).toHaveBeenCalledOnce()
-    // The next request lands in an isolate that has seen nothing; the shared record says the bootstrap ran.
+    // The next request lands in an isolate that has seen nothing; the box itself says the bootstrap ran.
     resetClientCache()
     await ensureWorkspaceSandbox(shell(), scope)
     expect(bootstrap).toHaveBeenCalledOnce()
@@ -5588,7 +5592,7 @@ describe('warm reuse round trips', () => {
     await ensureWorkspaceSandbox(shell(), scope)
     expect(bootstrap).toHaveBeenCalledTimes(2)
 
-    // A box bootstrapped under another egress policy has its policy read and is bootstrapped again.
+    // Another egress policy is read and asserted, and the bootstrap runs under it.
     egressPolicy = { mode: 'strict', allowDomains: ['a.example.com', 'b.example.com'] }
     egressGet.mockResolvedValue({ policy: egressPolicy, source: 'sandbox' })
     const reads = egressGet.mock.calls.length
@@ -5596,11 +5600,23 @@ describe('warm reuse round trips', () => {
     expect(egressGet.mock.calls.length).toBeGreaterThan(reads)
     expect(bootstrap).toHaveBeenCalledTimes(3)
 
+    // A marker older than a day no longer stands in for the bootstrap.
+    for (const key of home.keys()) home.set(key, Date.now() - 25 * 3_600_000)
+    await ensureWorkspaceSandbox(shell(), scope)
+    expect(bootstrap).toHaveBeenCalledTimes(4)
+
+    // A wiped home has no marker, and a failed bootstrap writes none.
+    home.clear()
+    bootstrap.mockResolvedValueOnce({ succeeded: false, error: new Error('setup failed') })
+    await expect(ensureWorkspaceSandbox(shell(), scope)).rejects.toThrow()
+    await ensureWorkspaceSandbox(shell(), scope)
+    expect(bootstrap).toHaveBeenCalledTimes(6)
+
     // A product that declares no build bootstraps on every reuse.
-    const undeclared = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy, bootstrap, livenessProbe: { cacheTtlMs: 0 }, reuseState: store })
+    const undeclared = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy, bootstrap, livenessProbe: { cacheTtlMs: 0 } })
     await ensureWorkspaceSandbox(undeclared, scope)
     await ensureWorkspaceSandbox(undeclared, scope)
-    expect(bootstrap).toHaveBeenCalledTimes(5)
+    expect(bootstrap).toHaveBeenCalledTimes(8)
   })
 
   it('hands what one isolate learned about a box to the next through the reuse store', async () => {

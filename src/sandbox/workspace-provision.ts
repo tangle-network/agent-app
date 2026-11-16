@@ -22,7 +22,7 @@ import {
   assertProvisionPayloadWithinCap,
 } from './payload-limits'
 import { runningBoxIds, forgetBox, trustedBoxes, rememberRunningBox } from './runtime-cache'
-import { resolveWorkspaceRuntimeEnv, prefetchExistingBoxReads, finalizeExistingBox } from './existing-box'
+import { resolveWorkspaceRuntimeEnv, prefetchExistingBoxReads, finalizeExistingBox, bootstrapBox } from './existing-box'
 import { refreshRuntimeConnection } from './runtime-connection'
 import { isReusableBox, recoverUnresponsiveBox, resumeStoppedBox } from './box-health'
 import { splitDeferredProfileFiles, writeProfileFilesToBox } from './profile-files'
@@ -299,13 +299,7 @@ export async function provisionWorkspaceSandbox(
     }
   }
 
-  if (shell.bootstrap) {
-    const bootstrap = shell.bootstrap.bind(shell)
-    const boot = await measure('bootstrap', () => bootstrap(box, scope))
-    if (!boot.succeeded) {
-      throw new Error(`bootstrap failed on new box ${name}`, { cause: boot.error })
-    }
-  }
+  if (shell.bootstrap) await measure('bootstrap', () => bootstrapBox(shell, box, scope, harness, 'new', name, true))
   return rememberRunningBox(name, box)
 }
 
