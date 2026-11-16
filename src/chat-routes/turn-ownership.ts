@@ -26,14 +26,18 @@ export function createChatTurnOwnership(state: OwnershipState,
   const attempt = async (step: string, run: () => unknown): Promise<void> => {
     try { await run() } catch (err) { log(`[chat-routes] ${step} failed`, { turnId: turnStreamId, error: err instanceof Error ? err.message : String(err) }) }
   }
-  // The running row a lock reclaim reads: written at acquire and renewed on the tap's interval, so a turn still in
-  // `contextGate` or `beforeTurn` holds its lock; it stops when the tap takes the row over, at hand-off, or at release.
+  // The running row a lock reclaim reads, written only for a lock that reads it (`holdForHandoff` marks the default
+  // reclaim): at acquire, then renewed on the tap's interval, so a turn still in `contextGate` or `beforeTurn` holds
+  // its lock. It stops when the tap takes the row over, at hand-off, or at release. Writes are chained: none lands late.
+  const store = options.turnLock?.holdForHandoff ? options.turnStore : undefined
   let runningRow: Promise<void> | undefined
   let renewal: ReturnType<typeof setInterval> | undefined
-  const markRunning = () => {
-    const write = () => (runningRow = options.turnStore?.setStatus(turnStreamId, 'running', scopeId))
+  const markRunning = async (): Promise<void> => {
+    if (!store) return
+    const write = () => (runningRow = (runningRow ?? Promise.resolve()).catch(() => {})
+      .then(() => store.setStatus(turnStreamId, 'running', scopeId)))
     const first = write()
-    renewal = setInterval(() => void write()?.catch(() => {}), DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS)
+    renewal = setInterval(() => void write().catch(() => {}), DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS)
     return first
   }
   const stopRenewal = async (): Promise<void> => {
@@ -51,7 +55,12 @@ export function createChatTurnOwnership(state: OwnershipState,
         // A lock whose reclaim would read the handed-off turn as dead once nothing renews its row holds for the owner,
         // whose release of the exact lock frees it.
         if (state.lockAcquired && options.turnLock?.holdForHandoff) {
-          const held = await Promise.resolve().then(() => options.turnLock!.holdForHandoff!(state.lockHandle)).catch(() => false)
+          // Nothing renews a handed-off turn's row, so an unheld lock could be reclaimed under the native run: retry.
+          let held = false
+          for (let tries = 0; tries < 3 && !held; tries++) {
+            if (tries) await new Promise(resolve => setTimeout(resolve, 250 * tries))
+            held = await Promise.resolve().then(() => options.turnLock!.holdForHandoff!(state.lockHandle)).catch(() => false)
+          }
           if (!held) log('[chat-routes] turn lock hand-off hold failed', { turnId: turnStreamId, class: 'turn_lock_handoff_hold_failed' })
         }
         let registrationFailed = false
@@ -97,7 +106,7 @@ export function createChatTurnOwnership(state: OwnershipState,
     await stopRenewal()
     if (end !== 'handoff' && !state.completionHandoff) {
       if (state.tap) await attempt('turn buffer close', () => state.tap!.done(end))
-      else if (state.lockAcquired) await attempt('running row settle', () => options.turnStore?.setStatus(turnStreamId, end, scopeId))
+      else if (store && runningRow) await attempt('running row settle', () => store.setStatus(turnStreamId, end, scopeId))
     }
     await releaseLock()
   }

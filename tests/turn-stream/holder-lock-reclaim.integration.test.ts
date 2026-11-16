@@ -181,6 +181,19 @@ it('settles the running row on each release before the drain and stops its renew
     await gated.done()
     expect(runningAtGate).toEqual([gatedTurn])
     expect(statusesOn('gatedturn-thread')).toEqual([{ status: 'complete' }])
+    // A gate that hands the turn to the product leaves the row to the product's owner: never settled here.
+    const handed = chatTurn('handedgate', { contextGate: async () => ({ proceed: 'handoff' as const,
+      response: new Response('owned', { status: 202 }) }), produce: () => answer('unused') })
+    expect((await handed.turn).status).toBe(202)
+    await handed.done()
+    expect(statusesOn('handedgate-thread')).toEqual([{ status: 'running' }])
+    // A lock that does not read running rows gets none written before the tap, as before the reclaim existed.
+    const plain = chatTurn('plaingate', { contextGate: async () => ({ proceed: false as const,
+      response: new Response('not ready', { status: 409 }) }), produce: () => answer('unused') },
+    { turnLock: createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace' }) })
+    expect((await plain.turn).status).toBe(409)
+    await plain.done()
+    expect(statusesOn('plaingate-thread')).toEqual([])
     // History changed while the lock was taken, and a throw in beforeTurn: each ends its row as error.
     const changed = chatTurn('changedturn', { produce: () => answer('unused') }, { changeHistory: true })
     expect((await changed.turn).status).toBe(409)
