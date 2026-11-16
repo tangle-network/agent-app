@@ -22,6 +22,10 @@
  * the derived ask (the floor) still exceeds remaining and the platform will
  * refuse it — that case is indistinguishable from exhausted for the caller
  * and surfaces through the same error path with the numbers attached.
+ *
+ * A known remaining means the source has a budget: pass `spendThrough: true`
+ * with the derived ask to the workspace key manager's `ensureKey`, so each
+ * live child spends the source's cap instead of reserving its own share.
  */
 
 /** The platform's minimum child-key budget. Asks below it are refused by the

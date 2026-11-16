@@ -442,10 +442,10 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
 
 /** The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone. */
 export interface DelegatedKeyProvisioner {
-  createKey(input: { name: string; product: string; budgetUsd: number; expiresAt: string; idempotencyKey: string }): Promise<{
+  createKey(input: { name: string; product: string; budgetUsd: number; spendThrough?: true; expiresAt: string; idempotencyKey: string }): Promise<{
     id: string; key: string; budgetUsd?: number | null; expiresAt?: string | null
   }>
-  getKey(id: string): Promise<{ budgetUsd?: number | null; expiresAt?: string | null }>
+  getKey(id: string): Promise<{ budgetUsd?: number | null; budgetRemaining?: number; expiresAt?: string | null }>
   revokeKey(id: string, slot?: { name: string | null; sourceKeyId: string | null; platformUserId: string }): Promise<unknown>
   findCreatedKeys(input: { name: string; product: string; sourceKeyId?: string | null }): Promise<Array<{ id: string }>>
 }
@@ -488,7 +488,8 @@ const SPENT_REASONS = new Set(['budget_exhausted', 'monthly_budget_exhausted'])
  *
  * `getKey` reads Platform's verdict: a key gone for good is reported missing
  * (the manager marks it revoked and mints again); a spent key is reported
- * exhausted (the manager revokes it remotely and mints again); a funding or
+ * exhausted (the manager revokes a sized child and mints again, and keeps a
+ * spend-through child, whose spent source Router refuses per request); a funding or
  * eligibility refusal is a typed error, so a lapse never retires a key that
  * still works.
  */
@@ -515,7 +516,8 @@ export function createDelegatedKeyProvisioner(input: {
         sourceKey: input.sourceKey, name: create.name, product,
         ...(input.resource ? { resource: input.resource } : {}),
         ...(input.allowedModels ? { allowedModels: input.allowedModels } : {}),
-        budget: { usd: create.budgetUsd, ...(input.monthlyBudgetUsd !== undefined ? { monthlyUsd: input.monthlyBudgetUsd } : {}) },
+        budget: { ...(create.spendThrough ? { spendThrough: true as const } : { usd: create.budgetUsd }),
+          ...(input.monthlyBudgetUsd !== undefined ? { monthlyUsd: input.monthlyBudgetUsd } : {}) },
         ...(input.rpmLimit !== undefined ? { rpmLimit: input.rpmLimit } : {}),
         expiresAt: new Date(create.expiresAt),
         ...(input.expect ? { expect: input.expect } : {}),
@@ -531,12 +533,14 @@ export function createDelegatedKeyProvisioner(input: {
         return {
           ...(v.budgetUsd !== undefined ? { budgetUsd: v.budgetUsd } : {}),
           ...(v.budgetUsd !== undefined && v.budgetRemaining !== undefined ? { budgetSpent: Math.max(0, v.budgetUsd - v.budgetRemaining) } : {}),
+          // No budget of its own: a spend-through child, whose remainder is its source's.
+          ...(v.budgetUsd === undefined && v.budgetRemaining !== undefined ? { budgetRemaining: v.budgetRemaining } : {}),
           ...(v.expiresAt ? { expiresAt: v.expiresAt } : {}),
         }
       }
       if (v.invalidReason && GONE_REASONS.has(v.invalidReason)) throw new DelegatedKeyMissingError(id)
       if (v.invalidReason && SPENT_REASONS.has(v.invalidReason)) {
-        // Spent: the manager sees no budget left and revokes the child before minting again.
+        // Spent: the manager revokes a sized child before minting again; a spend-through child's spent source is not its own.
         return { budgetUsd: v.budgetUsd ?? 0, budgetSpent: v.budgetUsd ?? 0, ...(v.expiresAt ? { expiresAt: v.expiresAt } : {}) }
       }
       throw new DelegatedKeyRefusalError({ status: 403, code: 'delegated_key.refused',
