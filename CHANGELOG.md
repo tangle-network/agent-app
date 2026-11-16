@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.9
+
+- fix(chat-routes): a failed sandbox turn shows one plain sentence, never the harness reason (#1547)
+- fix(chat-routes): a turn outlives the browser that started it (#1546)
+
 ## 4.0.8
 
 - test(chat): replace trace coverage floor with span order and nesting (#1548)
