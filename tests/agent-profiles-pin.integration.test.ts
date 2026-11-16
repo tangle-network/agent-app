@@ -233,11 +233,13 @@ describe('profile turn pin', () => {
       release = prompt('Deliver the ask, then offer one next step.')
       expect((await followRelease(edited!)).prompt?.systemPrompt).toBe('Deliver the ask, then offer one next step.')
 
-      // A custom profile starts from the text the builtin runs today, not its stored copy.
+      // A custom profile stores no prompt, so it runs the product's current one at this release and every later one.
       const custom = await createTextProfile({ store, workspaceId, baselineProfileId: 'director', existingProfiles: [{ name: 'Director' }],
         name: 'Brief', instructions: 'One paragraph.', authorId: 'owner', actorRole: 'owner', planDigest: () => PLAN, followRelease })
-      expect(custom.profile.prompt).toEqual({ systemPrompt: 'Deliver the ask, then offer one next step.',
-        instructions: ['Keep answers short.', 'One paragraph.'] })
+      expect(custom.profile.prompt).toEqual({ instructions: ['Keep answers short.', 'One paragraph.'] })
+      expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask, then offer one next step.')
+      release = prompt('Deliver the ask with its sources.')
+      expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask with its sources.')
     } finally { sqlite.close() }
   })
 })

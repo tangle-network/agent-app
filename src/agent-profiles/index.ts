@@ -270,8 +270,9 @@ export interface CreateTextProfileInput {
   actorRole: 'owner' | 'manager' | 'member' | 'viewer'
   /** Product computes ADC's hashWorkspacePlan for the complete authored snapshot. */
   planDigest: (profile: AgentProfile) => string | Promise<string>
-  /** The profile a turn runs for a stored revision (usually {@link followProductRelease}); the new profile starts
-   *  from this text rather than the baseline's stored copy, which may be an earlier release's. */
+  /** The profile a turn runs for a stored revision (usually {@link followProductRelease}). With it, the new profile
+   *  stores no system prompt, so it runs the product's current one at every release, not the baseline's stored copy;
+   *  a read path that shows the prompt must read it through the same function. */
   followRelease?: (revision: ProfileRevision) => Promise<AgentProfile>
   now?: number
 }
@@ -294,10 +295,14 @@ export async function createTextProfile(input: CreateTextProfileInput): Promise<
   const profileId = `custom-${sha256Utf8(`${input.workspaceId}\0${normalizedName}`).slice(7, 39)}`
   const addedInstruction = input.instructions.trim()
   const text = input.followRelease ? await input.followRelease(baseline) : baseline.profile
+  // Following releases, the new profile stores no system prompt: an absent one runs the release's at every turn
+  // (followProductRelease), where a copy of today's would stop following at the next release.
+  const { systemPrompt: _followed, ...withoutPrompt } = text.prompt ?? {}
+  const prompt = input.followRelease ? withoutPrompt : text.prompt
   const profile = bindProfileText(baseline.profile, {
     ...text, name,
     prompt: {
-      ...text.prompt,
+      ...prompt,
       instructions: [...(text.prompt?.instructions ?? []),
         ...(addedInstruction ? [addedInstruction] : [])],
     },
