@@ -6,6 +6,7 @@
  * a live event's structure; a turn's stream takes values only, with the same `[redacted]` marker.
  */
 import { REDACTED } from '../workspace-export/secrets'
+import { WITHHELD_FAILURE } from './turn-event-stream'
 
 /** Values shorter than this are never registered: a short value would redact ordinary text. */
 const MIN_SECRET_LENGTH = 8
@@ -19,10 +20,15 @@ export function valueRedactor(values: readonly string[] | undefined): ValueRedac
     .sort((a, b) => b.length - a.length)
   if (secrets.length === 0) return undefined
   const text = (s: string) => secrets.some((v) => s.includes(v)) ? secrets.reduce((acc, v) => acc.split(v).join(REDACTED), s) : s
-  const walk = (v: unknown): unknown => typeof v === 'string' ? text(v)
-    : Array.isArray(v) ? v.map(walk)
-    : v !== null && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [text(k), walk(x)]))
-    : v
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'string') return text(v)
+    if (Array.isArray(v)) return v.map(walk)
+    if (v === null || typeof v !== 'object') return v
+    const out = Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [text(k), walk(x)]))
+    // A withheld failure's original, for the route's hooks only, is redacted too and kept under its Symbol key.
+    const withheld = (v as { [WITHHELD_FAILURE]?: unknown })[WITHHELD_FAILURE]
+    return withheld === undefined ? out : Object.assign(out, { [WITHHELD_FAILURE]: walk(withheld) })
+  }
   return walk as ValueRedactor
 }
 

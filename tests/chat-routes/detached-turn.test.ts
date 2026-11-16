@@ -278,13 +278,13 @@ describe('runDetachedTurn', () => {
     expect(await store.getStatus('t1')).toBe('error')
   })
 
-  it('extracts session.run.failed via data.reason and words a message-less error plainly', async () => {
+  it('words a session.run.failed reason and a message-less error plainly', async () => {
     const store = createMemoryTurnEventStore()
     async function* runFailed(): AsyncGenerator<unknown> {
       yield { type: 'session.run.failed', data: { reason: 'sandbox oom' } }
     }
-    const a = await runDetachedTurn({ store, turnId: 't-a', scopeId: 'thread-1', events: runFailed() })
-    expect(a).toMatchObject({ state: 'failed', error: 'sandbox oom' })
+    const a = await runDetachedTurn({ store, turnId: 't-a', scopeId: 'thread-1', events: runFailed(), log: () => {} })
+    expect(a).toMatchObject({ state: 'failed', error: PLAIN })
 
     async function* bareError(): AsyncGenerator<unknown> {
       yield { type: 'error', data: {} }

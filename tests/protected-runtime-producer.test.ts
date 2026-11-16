@@ -96,9 +96,9 @@ describe('protected Runtime chat producer', () => {
     const events = await drain(createProtectedRuntimeChatProducer(options))
     expect(fetch).not.toHaveBeenCalled()
     expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
-    // A refusal that would fail the same way again reads as its own words, with its code.
+    // A refusal that would fail the same way again reads its class's sentence, with its code.
     expect(events.find(event => event.type === 'error')).toMatchObject({ data: {
-      code: 'grant_model_unsupported', message: expect.stringContaining('requires an Anthropic or OpenAI model without reasoning') } })
+      code: 'grant_model_unsupported', message: "This assistant's model can't run here. Ask the team to choose a supported model." } })
   })
 
   it('sends one buffered completion per model call with the profile ceilings and reasoning effort', async () => {
@@ -169,10 +169,14 @@ describe('protected Runtime chat producer', () => {
     options.profile.tools = { read: true }
     change(options.profile)
     const reserve = vi.spyOn(options.grant.port, 'reserveGrant')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn())
     const events = await drain(createProtectedRuntimeChatProducer(options))
-    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { code: 'profile_unsupported' } })
-    expect(JSON.stringify(events.find(event => event.type === 'error'))).toContain(named)
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { code: 'profile_unsupported',
+      message: "This assistant's setup can't run here. Ask the team to update it." } })
+    // The person reads the class's sentence; the server log names the refused axis.
+    expect(warn).toHaveBeenCalledWith('[chat-routes] turn failure withheld from the person',
+      expect.objectContaining({ failureClass: 'profile_unsupported', error: expect.stringContaining(named) }))
     expect(reserve).not.toHaveBeenCalled()
     expect(settle).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
@@ -190,7 +194,9 @@ describe('protected Runtime chat producer', () => {
     const events = await drain(producer)
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 1, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: false } })
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    // The turn still fails, and the person reads that the answer stands rather than being asked to send again.
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { message: 'The answer above is complete.' } })
+    expect(producer.finalText()).toBe('Completed work.')
   })
 
   it('sends prior chat rows to the provider as role and content only', async () => {
@@ -291,12 +297,13 @@ describe('protected Runtime chat producer', () => {
     expect(requests.map(url => url.split('/').at(-1))).toEqual(['resolve', 'reserve', 'activate', 'completions', 'settle'])
     expect(audit).toHaveBeenCalledOnce()
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
-    // The person reads the plain sentence; the server log keeps the audit reason under the withheld class.
-    expect(events.find(event => event.type === 'error')).toMatchObject({
-      data: { message: 'That answer stopped before it finished. Please send your question again.' } })
+    // The turn still fails; the person reads that the charged answer stands, and the server log keeps the audit reason.
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { message: 'The answer above is complete.' } })
+    expect(producer.finalText()).toBe('Charged work completed.')
     expect(JSON.stringify(events)).not.toContain('audit record could not be saved')
     const withheldLog = warn.mock.calls.find(([message]) => message === '[chat-routes] turn failure withheld from the person')
-    expect(withheldLog?.[1]).toMatchObject({ failureClass: 'runtime_failure', error: expect.stringContaining('audit record could not be saved') })
+    expect(withheldLog?.[1]).toMatchObject({ failureClass: 'settlement', code: 'settlement_audit_failed',
+      error: expect.stringContaining('audit record could not be saved') })
     expect(JSON.stringify(events)).not.toContain('synthetic-parent-key')
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 0, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: true } })
@@ -331,7 +338,9 @@ describe('protected Runtime chat producer', () => {
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 0, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: false } })
-    expect(events.some(event => event.type === 'error')).toBe(true)
+    // The turn still fails, and the person reads that the answer stands rather than being asked to send again.
+    expect(events.find(event => event.type === 'error')).toMatchObject({ data: { message: 'The answer above is complete.' } })
+    expect(producer.finalText()).toBe('Completed work.')
   })
 
   it('does no preparation or inference after cancellation', async () => {

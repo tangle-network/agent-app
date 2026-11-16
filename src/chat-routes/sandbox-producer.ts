@@ -51,17 +51,14 @@ import { isTerminalPromptEvent } from '../sandbox/prompt-events'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
 import {
   failureIds,
+  failureReason,
+  failureText,
   FAILED_TURN_TEXT,
-  modelKeyRefusedSentence,
   MODEL_KEY_REFUSED_CODE,
-  plainFailureEvent,
-  plainFailureSentence,
+  personFacing,
   providerRetryNotice,
   sandboxStreamErrorCode,
-  sandboxStreamErrorMessage,
   sandboxStreamFailureDiagnostic,
-  withheld,
-  withheldFailureEvent,
   withoutToolList,
 } from './failure-wording'
 import type {
@@ -319,11 +316,34 @@ function toProducerWireEvent(event: JsonRecord): ProducerWireEvent {
   return event as unknown as ProducerWireEvent
 }
 
+/** The producer's stream with every event passed through `shown` just before it leaves, and an event `shown` drops
+ *  skipped; next, return and throw reach the source unchanged, so cancellation and error injection behave as on the
+ *  source itself. */
+function shownStream(
+  source: AsyncGenerator<ProducerWireEvent, void, unknown>,
+  shown: (event: JsonRecord) => JsonRecord | undefined,
+): AsyncGenerator<ProducerWireEvent, void, unknown> {
+  const map = async (step: Promise<IteratorResult<ProducerWireEvent, void>>): Promise<IteratorResult<ProducerWireEvent, void>> => {
+    const result = await step
+    if (result.done) return result
+    const value = shown(result.value as unknown as JsonRecord)
+    return value ? { done: false, value: toProducerWireEvent(value) } : map(source.next())
+  }
+  return {
+    [Symbol.asyncIterator]() { return this },
+    next(...args) { return map(source.next(...args)) },
+    return(value) { return map(source.return(value)) },
+    throw(error) { return map(source.throw(error)) },
+    async [Symbol.asyncDispose]() { await this.return(undefined) },
+  }
+}
+
 /** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
 export function createSandboxChatProducer(options: SandboxChatProducerOptions): ChatTurnRouteProducer {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
-  const failedTurnText = options.failedTurnText ?? FAILED_TURN_TEXT
+  const person = personFacing({ log: options.log, failedTurnText: options.failedTurnText ?? FAILED_TURN_TEXT,
+    hasAnswer: () => projectionState.answered })
 
   // ── model failover ────────────────────────────────────────────────────────
   // ON by default whenever the caller can reopen the stream (`openEvents`) and
@@ -334,6 +354,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
   const projectionState: SandboxProjectionState = {
     fullText: '',
+    answered: false,
     terminalObserved: false,
     stepCounter: 0,
     danglingToolsTerminalized: false,
@@ -449,21 +470,15 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: retry }
         }
         if (event.type === 'warning') {
-          const message = asString(event.data?.message)
-          // A failure the producer words plainly arrives as its error event next; its raw warning is logged, not shown.
-          const plainFailure = message && plainFailureSentence(message)
-          if (plainFailure) log('[chat-routes] failure warning folded into its error notice', { code: asString(event.data?.code), error: message })
-          if (message && !plainFailure) {
+          // Only an allowed warning becomes a notice, in a sentence written for it; `person` logs and drops any other.
+          const text = person.warning(asString(event.data?.code), failureReason(record), failureIds(event.data))
+          if (text) {
             projectionState.warningCount += 1
-            const code = asString(event.data?.code)
-            const text = code ? `${code}: ${message}` : message
             const notice = noticePart('warning', `warning-${projectionState.warningCount}`, text)
             recordPersistedPart(notice, undefined, noticePartKey(notice.id))
             yield { type: 'notice', id: notice.id, noticeKind: 'warning', text }
           }
-          // The flattened notice is additive; existing raw-warning consumers keep
-          // receiving the original event too.
-          yield toProducerWireEvent(plainFailureEvent(record))
+          yield toProducerWireEvent(record)
           continue
         }
 
@@ -477,7 +492,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'result') {
           projectionState.terminalObserved = true
           const finalText = asString(event.data?.finalText)
-          if (finalText) projectionState.fullText = finalText
+          if (finalText) Object.assign(projectionState, { fullText: finalText, answered: true })
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -507,20 +522,18 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
             yield* emitFinalUsage()
           }
           yield* emitTerminalizedTools()
-          yield toProducerWireEvent(plainFailureEvent(record))
+          yield toProducerWireEvent(record)
           continue
         }
 
         if (event.type === 'error') {
-          const message = sandboxStreamErrorMessage(event.data)
-          const keyRefused = modelKeyRefusedSentence(message)
-          if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
-          const hidden = withheld(options.log, message, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
-          const errorContent = hidden ? failedTurnText : plainFailureSentence(message) ?? (projectionState.fullText.trim()
-            ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
-            : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
+          // The same reason the wire's error event carries, so the text and the event read the same sentence.
+          const reason = failureReason(record)
+          const view = person.view(reason, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
+          const errorContent = failureText(view, projectionState.fullText)
           if (options.errorNotice) {
-            yield* emitErrorNotice(errorContent, keyRefused ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data))
+            const code = view.class === 'model_key_refused' ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data)
+            yield* emitErrorNotice(errorContent, code)
           } else if (options.includeErrorText !== false) {
             const errorDelta = projectionState.fullText ? `\n\n---\n${errorContent}` : errorContent
             projectionState.fullText += errorDelta
@@ -528,13 +541,12 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
           projectionState.interactionOutcome = 'expired'
           yield* emitTerminalizedTools()
-          yield toProducerWireEvent(hidden ? withheldFailureEvent(record, failedTurnText) : plainFailureEvent(record))
+          yield toProducerWireEvent(record)
           continue
         }
 
-        // Remaining lifecycle events forward verbatim; the client parser ignores
-        // unknown types.
-        yield toProducerWireEvent(plainFailureEvent(record))
+        // Remaining lifecycle events forward as they came (through `person`); the client parser ignores unknown types.
+        yield toProducerWireEvent(record)
       }
       // A model that fell over and then produced nothing never entered the loop
       // body; the downgrade must still be recorded.
@@ -545,14 +557,11 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       preflightRefused = !observedSourceEvent && openAttempts() === 1
         && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
-      // Logged once: a withheld reason by `withheld`, with its failure note; any other by this line.
-      const hidden = withheld(options.log, diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status,
+      // `person` logs the reason once, with its class and failure note.
+      const statusCode = asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status
+      const view = person.view(diagnostic.reason, diagnostic.code, statusCode,
         { ...failureIds(asRecord(streamErr)?.diagnostics), failureNote: diagnostic.failureNote })
-      if (!hidden) log('[chat-routes] sandbox stream failed', {
-        failureNote: diagnostic.failureNote,
-        error: streamErr instanceof Error ? streamErr.message : String(streamErr),
-      })
-      const userMessage = hidden ? failedTurnText : diagnostic.userMessage
+      const userMessage = failureText(view, projectionState.fullText)
       if (options.errorNotice) {
         yield* emitErrorNotice(userMessage, diagnostic.code)
       } else if (options.includeErrorText !== false) {
@@ -564,16 +573,17 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       }
       projectionState.interactionOutcome = 'expired'
       yield* emitTerminalizedTools()
-      const failure = { type: 'error', data: { message: hidden ? diagnostic.reason : userMessage, code: diagnostic.code,
-        details: { failureNote: diagnostic.failureNote } } }
-      yield toProducerWireEvent(hidden ? withheldFailureEvent(failure, failedTurnText) : failure)
+      // The status goes with the reason, so the event reads on the wire as the text above reads.
+      yield toProducerWireEvent({ type: 'error', data: { message: diagnostic.reason, code: diagnostic.code,
+        ...(statusCode !== undefined ? { statusCode } : {}), details: { failureNote: diagnostic.failureNote } } })
     } finally {
       reasoningClock.settle()
     }
   }
 
   return {
-    stream: stream(),
+    // Every event leaves through `person`: no failure reason or tool list reaches the person's client.
+    stream: shownStream(stream(), person.event),
     finalText: () => projectionState.fullText,
     terminalObserved: () => projectionState.terminalObserved || preflightRefused,
     assistantParts: () => finalizePendingInteractionParts(
@@ -610,6 +620,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
 interface SandboxProjectionState {
   fullText: string
+  /** The model's own answer text has arrived, apart from any failure text appended to `fullText`. */
+  answered: boolean
   terminalObserved: boolean
   stepCounter: number
   danglingToolsTerminalized: boolean
@@ -748,7 +760,7 @@ async function* projectSandboxMessagePart(
       if (delta) {
         if (partType === 'reasoning') reasoningClock.reasoning(key)
         else reasoningClock.settle()
-        if (partType === 'text') projectionState.fullText += delta
+        if (partType === 'text') Object.assign(projectionState, { fullText: projectionState.fullText + delta, answered: true })
         yield { type: partType, text: delta }
       }
       return

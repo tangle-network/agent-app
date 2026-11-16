@@ -2008,7 +2008,7 @@ interface ProtectedRuntimeChatOptions
 
 ### `providerResetSentence`
 
-`function` — A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence.
+`function` — A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence with its time.
 
 ```ts
 (message: string) => string | undefined
@@ -2016,7 +2016,7 @@ interface ProtectedRuntimeChatOptions
 
 ### `providerRetryNotice`
 
-`function` — A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt.
+`function` — A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence with its next attempt's time.
 
 ```ts
 (event: { type: string; data?: unknown; }) => string | undefined

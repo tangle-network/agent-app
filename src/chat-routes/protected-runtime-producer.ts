@@ -117,7 +117,7 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
       // The agent-interface root initializes every schema; only a protected turn needs it, so it loads here.
       const { profileMaterializationAxes } = await import('@tangle-network/agent-interface')
       let settings: ReturnType<typeof protectedTurnSettings>
-      // A profile this lane cannot run is a refusal that fails the same way again: the person reads its words.
+      // A profile this lane cannot run is a refusal that fails the same way again: the person reads its class sentence.
       try {
         settings = protectedTurnSettings(profile, tools, profileMaterializationAxes)
       } catch (error) {
@@ -175,7 +175,7 @@ export function createProtectedRuntimeChatProducer(options: ProtectedRuntimeChat
           if (finalText) await emit({ type: 'message.part.updated', data: { part: { id: 'text_delta', type: 'text' }, delta: finalText } })
           await emit({ type: 'result', data: { finalText } })
         }
-        // The code goes with the message, so a refusal reads as its own words and a runtime failure is withheld.
+        // The code goes with the message, so a refusal reads its class sentence and a runtime failure is withheld.
         if (outcome.failure) throw Object.assign(new Error(outcome.failure.message), { code: outcome.failure.code })
         await channelWriter.close()
       }).catch(error => channelWriter.abort(error))
