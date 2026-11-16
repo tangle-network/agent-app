@@ -2,10 +2,13 @@
 "@tangle-network/agent-app": patch
 ---
 
-A turn lock whose turn died with its invocation (a closed tab, a runtime limit) is reclaimed by default. With the new `turnStore` and `readHolderBox` options and no product `reconcile`, `createDurableTurnLock` uses `reconcileTurnLockFromStoreAndBox`:
-- An unexpired running turn on the holder's thread holds the lock. So does a session with an active execution on the box the turn ran work on, read with `readHolderBoxSessions`.
-- With neither, the lock is released past the 60 s terminal grace.
-- A box that does not answer within 5 s is reported unreachable, so the stale-lock policy's own bound applies, not the TTL. A store that cannot answer, and a parked release, both hold.
-- The 409 diagnostics carry counts and classes only.
+A turn lock whose turn died with its invocation (a closed tab, a runtime limit) is reclaimed by default. Give `createDurableTurnLock` the new `turnStore` option (it must implement `listRunning`) and no product `reconcile`, and a refused acquire runs `reconcileTurnLockFromStoreAndBox`:
+- An unexpired running turn on the holder's thread holds the lock. With the optional `readHolderBox` (`readHolderBoxSessions` from `/sandbox`), so does a session with an active execution on the box the turn ran work on; without it, no box is read.
+- With neither, the lock is released past the 60 s terminal grace, so a turn must write its running row within 60 s of taking the lock.
+- A lock taken with durable Stop (`cancellationOf`) is judged by the owner rule on the same evidence: no running turn and no box work is abandoned and released past the same grace; an unanswered read is unknown and holds.
+- A box that does not answer within 5 s (`box_read_timeout`) or fails its read (`box_unreachable`) sends a native lock to the stale-lock policy's unreachable bound, not the TTL. A store that cannot answer, and a parked release, both hold.
+- The 409 diagnostics carry counts and classes only; failed reads are logged server-side by class.
 
-`readHolderBoxSessions(find)` counts only active executions: the runtime can return a finished session with no status, which the SDK reads as running. Before this, one cancel refused every turn in the lock's scope for the 30 minute TTL (Incident 3, 2026-11-16).
+`readHolderBoxSessions(find)` counts only active executions, by the sidecar's `hasActiveExecution` verdict: the runtime can return a finished session with no status, which the SDK reads as running. A session from an older sidecar without that verdict counts its `activeExecutionId`, and that fallback is logged.
+
+`reconcileStaleTurnLock` now reads its clock once, before any probe, for every branch: the unreachable branch no longer measures the lock's age or fences its release after a slow probe.

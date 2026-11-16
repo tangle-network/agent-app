@@ -297,43 +297,61 @@ export async function reconcileStaleDurableTurnLock(
 /** What the box a held lock's turn ran work on reports: executions still active and sessions seen, or no answer. */
 export type HolderBoxReport = { live: number; sessions: number } | 'unreachable' | 'timeout'
 
+/** Whether a held lock's turn still runs, in the owner rule's terms; diagnostics are counts and classes only. */
+type HolderEvidence = { status: 'live' | 'abandoned' | 'unknown'; diagnostics: Record<string, unknown> }
+
 /**
  * The reclaim for a lock whose turn died with its invocation (a closed tab, a runtime limit), which releases nothing,
- * so without it one cancel refused every turn in the lock's scope for the 30 minute TTL (Incident 3, 2026-11-16).
- * A live turn renews its running row every 30 s, so a holder thread with an unexpired running turn holds. Box work a
- * turn started (a sandbox turn, a detached computer step) outlives the invocation, so with no running row the box
- * answers next: an active execution there holds. Only a holder with neither is released, past the policy's terminal
- * grace. A box that does not answer is unreachable, so the policy's own bound applies, not the TTL; a store that
- * cannot answer and a parked release hold. Diagnostics reach a browser in the 409: counts and classes only.
+ * so without it the lock refuses every turn in its scope until its TTL. A live turn renews its running row every 30 s,
+ * so a holder thread with an unexpired running turn holds. Box work a turn started (a sandbox turn, a detached computer
+ * step) outlives the invocation, so with no running row the box answers next: an active execution there holds. Without
+ * `readHolderBox` no box is read. A holder with neither is released past the policy's terminal grace, so a turn must
+ * write its running row within that grace of taking the lock. A parked release and a store that cannot answer hold. A
+ * box that does not answer sends a lock to the policy's unreachable bound; a durable-Stop lock goes through the owner
+ * rule on the same evidence, where an unanswered read is `unknown` and holds. The 409 carries counts and classes only.
  */
 export async function reconcileTurnLockFromStoreAndBox(input: {
   namespace: TurnStreamNamespaceLike
   auth: TurnStreamAuth
-  turnStore: Pick<TurnEventStore, 'listRunning'>
-  readHolderBox(active: DurableTurnLock): Promise<HolderBoxReport>
+  turnStore: Required<Pick<TurnEventStore, 'listRunning'>>
+  readHolderBox?(active: DurableTurnLock): Promise<HolderBoxReport>
   active: DurableTurnLock
-  graceMs?: number
+  /** The policy's clock. Default `Date.now`. */
+  now?(): number
 }): Promise<{ released: boolean; diagnostics: Record<string, unknown> }> {
-  const { active, turnStore } = input
+  const { active, turnStore, readHolderBox } = input
+  const unknown = (probeError: string): HolderEvidence => ({ status: 'unknown', diagnostics: { probeError } })
+  // A failed read is logged here by class; its message never reaches the 409.
+  const unreadable = (probeError: string, error: unknown) => {
+    console.warn('[turn-lock] held lock evidence unreadable', { class: probeError, error: error instanceof Error ? error.name : typeof error,
+      workspaceId: active.workspaceId, lockId: active.lockId })
+    return unknown(probeError)
+  }
+  const evidence = async (): Promise<HolderEvidence> => {
+    if (active.releasePending) return { status: 'live', diagnostics: { releasePending: true } }
+    let running: string[]
+    try { running = await turnStore.listRunning(active.threadId) }
+    catch (error) { return unreadable('turn_store_unreadable', error) }
+    if (running.length > 0) return { status: 'live', diagnostics: { runningTurns: running.length } }
+    let box: HolderBoxReport
+    try { box = readHolderBox ? await readHolderBox(active) : { live: 0, sessions: 0 } }
+    catch (error) { return unreadable('box_unreachable', error) }
+    if (box === 'unreachable' || box === 'timeout') return unknown(box === 'timeout' ? 'box_read_timeout' : 'box_unreachable')
+    if (box.live > 0) return { status: 'live', diagnostics: { liveBoxSessions: box.live, boxSessions: box.sessions } }
+    return { status: 'abandoned', diagnostics: { runningTurns: 0, liveBoxSessions: 0, boxSessions: box.sessions } }
+  }
   return reconcileStaleDurableTurnLock({
-    namespace: input.namespace, auth: input.auth, workspaceId: active.workspaceId, threadId: active.threadId, active,
-    ...(input.graceMs ? { graceMs: input.graceMs } : {}),
+    namespace: input.namespace, auth: input.auth, workspaceId: active.workspaceId, threadId: active.threadId, active, now: input.now,
     context: { workspaceId: active.workspaceId, threadId: active.threadId, executionId: active.executionId, lockId: active.lockId },
     probeSandbox: async () => ({ status: 'running' }),
+    // A native lock: an unreadable store holds; a box that does not answer goes to the policy's unreachable bound.
     probeSession: async () => {
-      if (active.releasePending) return { reachable: true, terminal: false, diagnostics: { releasePending: true } }
-      let running: string[]
-      try {
-        running = await turnStore.listRunning!(active.threadId)
-      } catch {
-        return { reachable: true, terminal: false, diagnostics: { probeError: 'turn_store_unreadable' } }
-      }
-      if (running.length > 0) return { reachable: true, terminal: false, diagnostics: { runningTurns: running.length } }
-      const box = await input.readHolderBox(active).catch(() => 'unreachable' as const)
-      if (box === 'unreachable' || box === 'timeout') return { reachable: false, reason: box === 'timeout' ? 'box_read_timeout' : 'box_unreachable' }
-      if (box.live > 0) return { reachable: true, terminal: false, diagnostics: { liveBoxSessions: box.live, boxSessions: box.sessions } }
-      return { reachable: true, terminal: true, diagnostics: { runningTurns: 0, liveBoxSessions: 0, boxSessions: box.sessions } }
+      const { status, diagnostics } = await evidence()
+      if (status === 'unknown' && diagnostics.probeError !== 'turn_store_unreadable') return { reachable: false, reason: String(diagnostics.probeError) }
+      return { reachable: true, terminal: status === 'abandoned', diagnostics }
     },
+    // A durable-Stop lock: the owner rule judges the same evidence; unknown holds.
+    probeOwner: async identity => ({ identity, ...await evidence() }),
   })
 }
 
@@ -368,12 +386,14 @@ export interface CreateDurableTurnLockOptions<TContext> {
   scopeOf(args: TurnLockSeamArgs<TContext>): TurnLockScope
   /** Opt the existing lock into durable Stop. Leave native/durable completion lanes on their existing owner. */
   cancellationOf?(args: TurnLockSeamArgs<TContext>): boolean
-  /** The store the routes renew running turns in, and how to read the box the holder's turn ran work on. With both
-   *  and no `reconcile`, a dead holder is reclaimed ({@link reconcileTurnLockFromStoreAndBox}). */
-  turnStore?: Pick<TurnEventStore, 'listRunning'>
+  /** The store the routes renew running turns in. Given it and no `reconcile`, a dead holder is reclaimed
+   *  ({@link reconcileTurnLockFromStoreAndBox}). */
+  turnStore?: Required<Pick<TurnEventStore, 'listRunning'>>
+  /** Read the box the holder's turn ran work on (`readHolderBoxSessions` from `/sandbox`). Omit when turns run no box
+   *  work: the default reclaim then reads the turn store alone. */
   readHolderBox?(active: DurableTurnLock): Promise<HolderBoxReport>
-  /** Override the policy's unreachable bound (5 min) for the default reconcile. */
-  unreachableGraceMs?: number
+  /** The default reclaim's clock (the stale-lock policy's `now`). Default `Date.now`. */
+  now?(): number
   /** Override the execution id the lock records (e.g. a follow-up reclaiming
    *  the execution it already dispatched). Default: the turn's own. */
   lockExecutionIdOf?(args: TurnLockSeamArgs<TContext>): string | undefined
@@ -384,8 +404,8 @@ export interface CreateDurableTurnLockOptions<TContext> {
    * Attempt stale-lock recovery after a refused acquire. Return whether the
    * held lock was released (the adapter then retries the acquire once).
    * Products wire {@link reconcileStaleDurableTurnLock} with their sandbox +
-   * session probes here. Omit → {@link reconcileTurnLockFromStoreAndBox} when `turnStore` and `readHolderBox` are
-   * given, else a refused acquire is final.
+   * session probes here. Omit → {@link reconcileTurnLockFromStoreAndBox} when `turnStore` is given, else a refused
+   * acquire is final.
    */
   reconcile?(
     args: TurnLockSeamArgs<TContext>,
@@ -439,6 +459,11 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
       ...init, locationHint: options.locationHint ?? DEFAULT_TURN_LOCK_LOCATION_HINT,
     }),
   }
+  const { turnStore } = options
+  const reconcile = options.reconcile ?? (turnStore
+    ? (_args: TurnLockSeamArgs<TContext>, active: DurableTurnLock) => reconcileTurnLockFromStoreAndBox({
+      namespace, auth: options.auth, turnStore, readHolderBox: options.readHolderBox, active, now: options.now })
+    : undefined)
   return {
     // Every lock lives on the workspace channel, so this wakes that object
     // (evicted after idle) before the turn's acquire reaches it.
@@ -466,12 +491,6 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
 
       let acquired = await acquireDurableTurnLock(namespace, input, options.auth)
       let diagnostics: Record<string, unknown> | undefined
-      const { turnStore, readHolderBox } = options
-      const reconcile = options.reconcile ?? (turnStore && readHolderBox
-        ? (_args: TurnLockSeamArgs<TContext>, active: DurableTurnLock) =>
-          reconcileTurnLockFromStoreAndBox({ namespace, auth: options.auth, turnStore, readHolderBox, active,
-            ...(options.unreachableGraceMs ? { graceMs: options.unreachableGraceMs } : {}) })
-        : undefined)
       if (!acquired.acquired && reconcile) {
         const reconciled = await reconcile(args, acquired.active)
         diagnostics = reconciled.diagnostics
