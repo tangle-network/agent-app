@@ -189,7 +189,9 @@ export class Journey {
         }, 100)
       }, Date.now())
     }
-    await context.tracing.start({ screenshots: true, snapshots: true, title: `${this.id} ${label}` })
+    // No screencast in the trace: the video holds the pixels. Its frames were all but 1 MB of a 4.28 GB trace
+    // (24,845 JPEGs in one journey); the DOM snapshots, network and actions stay.
+    await context.tracing.start({ screenshots: false, snapshots: true, title: `${this.id} ${label}` })
     const page = await context.newPage()
     this.recorded.push({ label, identity, device, size, context, page, t0: Date.now(), rawDir })
     return page
