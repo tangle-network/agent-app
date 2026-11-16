@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.32
+
+- fix(chat-routes): redact registered values in object keys too (#1532)
+
 ## 3.0.31
 
 - feat(chat-routes): redact registered secret values from a turn's stream, buffer, draft and stored row (#1531)
