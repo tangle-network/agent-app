@@ -1,0 +1,22 @@
+name = "agent-app-turn-outlives-browser-proof"
+main = "./turn-outlives-browser.worker.ts"
+# The flag keeps a Durable Object alive while its waitUntil work and outbound I/O are pending with no client connected,
+# which a per-turn object needs after the browser leaves. Compatibility date 2026-10-01 or later turns it on by default.
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env", "durable_object_io_tasks_prevent_eviction"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "agent-app-turn-outlives-browser-proof"
+database_id = "00000000-0000-0000-0000-000000000047"
+
+[[durable_objects.bindings]]
+name = "TURN_STREAM_DO"
+class_name = "TurnOutlivesBrowserDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TurnOutlivesBrowserDO"]
+
+[vars]
+TURN_STREAM_AUTH_SECRET = "local-only-turn-outlives-browser-integration-secret"
