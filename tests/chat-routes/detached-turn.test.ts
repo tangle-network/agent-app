@@ -4,6 +4,8 @@ import { buildInteractionRequest } from '../test-utils/interaction-request'
 import { runDetachedTurn, type AssistantDraftStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 
+const PLAIN = 'That answer stopped before it finished. Please send your question again.'
+
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
 }
@@ -272,11 +274,11 @@ describe('runDetachedTurn', () => {
 
     const res = await runDetachedTurn({ store, turnId: 't1', scopeId: 'thread-1', events: events() })
 
-    expect(res).toMatchObject({ state: 'failed', error: 'model exploded' })
+    expect(res).toMatchObject({ state: 'failed', error: PLAIN, text: `partial\n\n---\n${PLAIN}` })
     expect(await store.getStatus('t1')).toBe('error')
   })
 
-  it('extracts session.run.failed via data.reason and a message-less error via the default', async () => {
+  it('extracts session.run.failed via data.reason and words a message-less error plainly', async () => {
     const store = createMemoryTurnEventStore()
     async function* runFailed(): AsyncGenerator<unknown> {
       yield { type: 'session.run.failed', data: { reason: 'sandbox oom' } }
@@ -288,7 +290,7 @@ describe('runDetachedTurn', () => {
       yield { type: 'error', data: {} }
     }
     const b = await runDetachedTurn({ store, turnId: 't-b', scopeId: 'thread-1', events: bareError() })
-    expect(b).toMatchObject({ state: 'failed', error: 'run failed' })
+    expect(b).toMatchObject({ state: 'failed', error: PLAIN })
   })
 
   it('falls back to completedResult for usage when the stream carries none', async () => {
@@ -413,13 +415,8 @@ describe('runDetachedTurn', () => {
       log: () => {},
     })
 
-    expect(result).toMatchObject({
-      state: 'failed',
-      text: expect.stringContaining('oops'),
-      error: expect.stringContaining('stream died'),
-      cached: false,
-    })
-    expect(result.text).toContain('The sandbox model stream stopped before a clean completion.')
+    // The partial answer stays; the reason reaches the log, never the row.
+    expect(result).toMatchObject({ state: 'failed', text: `oops\n\n---\n${PLAIN}`, error: PLAIN, cached: false })
     expect(await store.getStatus('t1')).toBe('error')
   })
 })

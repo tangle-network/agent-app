@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSandboxChatProducer } from '../../src/chat-routes/index'
 import { buildInteractionRequest } from '../test-utils/interaction-request'
 
+const FAILED = 'That answer stopped before it finished. Please send your question again.'
+
 function partUpdated(part: Record<string, unknown>, delta?: string): Record<string, unknown> {
   return { type: 'message.part.updated', data: { part, ...(delta !== undefined ? { delta } : {}) } }
 }
@@ -805,45 +807,35 @@ describe('createSandboxChatProducer', () => {
     }])
   })
 
-  it('composes raw errors after visible output and forwards the original error last', async () => {
+  it('keeps visible output before a raw error, appends the plain sentence, and forwards the error without its reason', async () => {
     const rawError = { type: 'error', data: { message: 'upstream reset', retryable: false } }
     const producer = createSandboxChatProducer({
       events: feed([
         partUpdated({ type: 'text', id: 't1', text: 'Partial answer' }, 'Partial answer'),
         rawError,
       ]),
+      log: () => {},
     })
 
     const events = await drain(producer.stream)
     expect(events).toEqual([
       { type: 'text', text: 'Partial answer' },
-      {
-        type: 'text',
-        text: '\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
-      },
-      rawError,
+      { type: 'text', text: `\n\n---\n${FAILED}` },
+      { type: 'error', data: { message: FAILED, retryable: false } },
     ])
-    expect(producer.finalText()).toBe(
-      'Partial answer\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
-    )
-    expect(producer.assistantParts?.()).toEqual([{
-      type: 'text',
-      text: 'Partial answer\n\n---\nThe sandbox model stream stopped before a clean completion.\n\nError: upstream reset',
-    }])
+    expect(producer.finalText()).toBe(`Partial answer\n\n---\n${FAILED}`)
+    expect(producer.assistantParts?.()).toEqual([{ type: 'text', text: `Partial answer\n\n---\n${FAILED}` }])
   })
 
-  it('composes a no-visible-answer error without a separator', async () => {
+  it('shows a no-visible-answer error as the plain sentence without a separator', async () => {
     const rawError = { type: 'error', data: { error: 'model rejected' } }
-    const producer = createSandboxChatProducer({ events: feed([rawError]) })
+    const producer = createSandboxChatProducer({ events: feed([rawError]), log: () => {} })
 
     expect(await drain(producer.stream)).toEqual([
-      {
-        type: 'text',
-        text: 'The sandbox agent returned an error before producing a visible answer.\n\nError: model rejected',
-      },
-      rawError,
+      { type: 'text', text: FAILED },
+      { type: 'error', data: { error: FAILED, message: FAILED } },
     ])
-    expect(producer.finalText()).not.toContain('---')
+    expect(producer.finalText()).toBe(FAILED)
   })
 
   it.each(['raw', 'throw'] as const)('errorNotice persists a %s terminal error as an error notice part, never as answer text', async (source) => {
@@ -865,7 +857,7 @@ describe('createSandboxChatProducer', () => {
       expect.objectContaining({ type: 'notice', id: 'error-1', noticeKind: 'error' }),
     ])
     const noticeText = (notices[0] as { text: string }).text
-    expect(noticeText).toMatch(source === 'raw' ? /model rejected/ : /.+/)
+    expect(noticeText).toBe(FAILED)
     expect(events.at(-1)).toMatchObject({ type: 'error' })
     expect(producer.finalText()).toBe(answer)
     // The persisted notice carries a typed reason the operator reports.
@@ -885,7 +877,7 @@ describe('createSandboxChatProducer', () => {
     await drain(producer.stream)
     expect(producer.assistantParts?.()).toEqual([
       expect.objectContaining({ type: 'notice', noticeKind: 'error', code: 'SECRET_PROFILE_PREPARATION_FAILED',
-        text: expect.stringContaining('Secret profile preparation failed') }),
+        text: FAILED }),
     ])
   })
 
@@ -958,7 +950,7 @@ describe('createSandboxChatProducer', () => {
           message: 'Tool did not report a terminal result before the assistant turn completed.',
         },
       },
-      { type: 'error', data: { message: 'stream failed' } },
+      { type: 'error', data: { message: FAILED } },
     ])
     expect(producer.assistantParts?.()).toEqual([
       expect.objectContaining({
@@ -993,6 +985,7 @@ describe('createSandboxChatProducer', () => {
   })
 
   it('catches a severed stream, persists partial content, and emits a structured failure normally', async () => {
+    const logged: Array<{ message: string; meta?: Record<string, unknown> }> = []
     const streamError = Object.assign(new Error('socket severed'), {
       streamMessage: 'sandbox stream disconnected',
       diagnostics: { sessionId: 's-1', lastEventId: 'evt-9' },
@@ -1002,14 +995,11 @@ describe('createSandboxChatProducer', () => {
         partUpdated({ type: 'text', id: 't1', text: 'Partial' }, 'Partial'),
         partUpdated({ type: 'tool', id: 'call-4', tool: 'fetch', state: { status: 'running', input: {} } }),
       ], streamError),
-      log: () => {},
+      log: (message, meta) => { logged.push({ message, meta }) },
     })
 
     const events = await drain(producer.stream)
-    const structuredError = events.at(-1) as {
-      type: string
-      data: { message: string; code: string; details: { failureNote: string } }
-    }
+    const structuredError = events.at(-1) as { type: string; data: Record<string, unknown> }
     expect(events.filter((event) => event.type === 'tool_result')).toEqual([
       expect.objectContaining({
         toolCallId: 'call-4',
@@ -1017,16 +1007,14 @@ describe('createSandboxChatProducer', () => {
       }),
     ])
     expect(structuredError.type).toBe('error')
-    expect(structuredError.data.code).toBe('sandbox.stream_failed')
-    expect(structuredError.data.message).toContain('Please retry')
-    expect(structuredError.data.details.failureNote).toContain('sandbox stream disconnected')
-    expect(structuredError.data.details.failureNote).toContain('"lastEventId":"evt-9"')
-    expect(producer.finalText()).toContain('Partial\n\n---\nThe sandbox model stream stopped')
+    // The person reads the plain sentence; the support details stay in the server log.
+    expect(structuredError.data).toEqual({ message: FAILED, code: 'sandbox.stream_failed' })
+    const failureNote = String(logged.find((entry) => entry.message === '[chat-routes] sandbox stream failed')?.meta?.failureNote)
+    expect(failureNote).toContain('sandbox stream disconnected')
+    expect(failureNote).toContain('"lastEventId":"evt-9"')
+    expect(producer.finalText()).toBe(`Partial\n\n---\n${FAILED}`)
     expect(producer.assistantParts?.()).toEqual([
-      expect.objectContaining({
-        type: 'text',
-        text: expect.stringContaining('Partial\n\n---\nThe sandbox model stream stopped'),
-      }),
+      expect.objectContaining({ type: 'text', text: `Partial\n\n---\n${FAILED}` }),
       expect.objectContaining({
         type: 'tool',
         id: 'call-4',

@@ -278,10 +278,11 @@ it.each([
     await Promise.all(pending)
     expect(events.find(event => event.type === 'session.run.failed')?.data.code).toBe(code)
     expect(events.some(event => event.type === 'session.run.completed')).toBe(false)
+    // The failure's code is recorded; its raw reason is withheld from the stream the route reads, so the log keeps it.
     expect(sqlite.prepare('SELECT failed, failure_code FROM rollout_turn_timing').get()).toEqual({
       failed: 1,
       failure_code: failureCode === 'product.refused' ? failureCode
-        : `${code}: ${message}`,
+        : `${code}: That answer stopped before it finished. Please send your question again.`,
     })
   } finally { sqlite.close() }
 })
@@ -324,7 +325,8 @@ it('shared timing lifecycle records real route outcomes and current revision, ex
     const rows = sqlite.prepare('SELECT lane, failed, model, revision, arm, failure_code FROM rollout_turn_timing ORDER BY failed').all()
     expect(rows).toEqual([
       { lane: 'router', failed: 0, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: null },
-      { lane: 'sandbox', failed: 1, model: 'served-model', revision: 'settled-revision', arm: 'control', failure_code: 'MODEL_REFUSED: Outside the allowed models.' },
+      { lane: 'sandbox', failed: 1, model: 'served-model', revision: 'settled-revision', arm: 'control',
+        failure_code: 'MODEL_REFUSED: That answer stopped before it finished. Please send your question again.' },
     ])
   } finally {
     if (before === undefined) delete process.env.DEPLOY_SHA

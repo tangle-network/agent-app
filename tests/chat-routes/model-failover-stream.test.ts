@@ -829,6 +829,7 @@ describe('createSandboxChatProducer — failover wiring', () => {
       const closed: string[] = []
       const started = new Set<string>()
       const signals = new Map<string, AbortSignal>()
+      const logged: Array<{ message: string; meta?: Record<string, unknown> }> = []
       const producer = createSandboxChatProducer({
         model: 'silent-a',
         fallbackModels: ['silent-b'],
@@ -854,7 +855,7 @@ describe('createSandboxChatProducer — failover wiring', () => {
             }),
           }
         },
-        log: () => {},
+        log: (message, meta) => { logged.push({ message, meta }) },
       })
 
       let events: Array<Record<string, unknown>> | undefined
@@ -863,10 +864,12 @@ describe('createSandboxChatProducer — failover wiring', () => {
       await Promise.resolve()
 
       const terminal = events?.find((event) => event.type === 'error') as
-        | { data?: { code?: string; details?: { failureNote?: string } } }
+        | { data?: { code?: string; details?: unknown } }
         | undefined
       expect(terminal?.data?.code).toBe('provider_first_response_timeout')
-      expect(terminal?.data?.details?.failureNote).toContain('silent-b')
+      // The failure note names the silent models for the operator, in the server log and not on the wire.
+      expect(terminal?.data?.details).toBeUndefined()
+      expect(String(logged.find((entry) => entry.message === '[chat-routes] sandbox stream failed')?.meta?.failureNote)).toContain('silent-b')
       expect(closed).toEqual(['silent-a', 'silent-b'])
       expect([...signals.values()].every((signal) => signal.aborted)).toBe(true)
       expect(producer.modelFailover?.().attempts.map((attempt) => attempt.model)).toEqual([

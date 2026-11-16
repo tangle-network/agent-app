@@ -348,6 +348,7 @@ export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
   'The sandbox model stream stopped before a clean completion.',
   'The sandbox agent returned an error before producing a visible answer.',
   "The assistant's model refused its access key, so this message was not answered.",
+  'That answer stopped before it finished. Please send your question again.',
 ]
 
 /**

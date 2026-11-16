@@ -52,6 +52,7 @@ import {
 import type { ModelPolicy } from '../policy-filters/index'
 import { isTerminalPromptEvent } from '../sandbox/prompt-events'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
+import { getChatFundingRecovery } from '../web/turn-funding-recovery'
 import {
   ModelFailoverTimeoutError,
   type EmptyTurnRetryInfo,
@@ -215,6 +216,10 @@ export interface SandboxChatProducerOptions {
    * from the answer. Default false (today's text behavior). When true, the
    * error is never appended to the text, whatever `includeErrorText` says. */
   errorNotice?: boolean
+  /** What the person reads (text, error notice, error event) for a failure whose reason the producer withholds. Default
+   * "That answer stopped before it finished. Please send your question again."; a product that changes it adds its
+   * words to turn-health's `errorReplyPrefixes`. */
+  failedTurnText?: string
   log?: (message: string, meta?: Record<string, unknown>) => void
 }
 
@@ -362,10 +367,30 @@ function plainFailureEvent(event: JsonRecord): JsonRecord {
   return { ...event, data: { ...data, ...Object.fromEntries(reasons.map((key) => [key, plain])), details: { ...asRecord(data.details), raw } } }
 }
 
+const FAILED_TURN_TEXT = 'That answer stopped before it finished. Please send your question again.'
+
+/** True when a terminal failure's reason (a harness error, a tool list, a call loop, a stack) is withheld: the person
+ *  reads the failed-turn text and the server log (`log`, else `console.warn`) keeps the reason under one class. Passing
+ *  through as before: a provider reset or refused model key, worded plainly; HTTP 402; and what the client's recovery
+ *  UI reads (`getChatFundingRecovery`: `insufficient_credits`, `paid_access_required`, `funding_required`, or its words). */
+function withheld(log: SandboxChatProducerOptions['log'], reason: string, code: string | undefined, status: unknown): boolean {
+  const passes = toFiniteNumber(status) === 402 || providerResetSentence(reason) || modelKeyRefusedSentence(reason)
+    || getChatFundingRecovery({ code, message: reason })
+  if (!passes) (log ?? console.warn)('[chat-routes] turn failure withheld from the person', { failureClass: 'runtime_failure', code, error: reason })
+  return !passes
+}
+
+/** A failure event whose reason is withheld: `message`, and `error` when present, read `text`, never the raw reason. */
+function withheldFailureEvent(event: JsonRecord, text: string): JsonRecord {
+  const data = asRecord(event.data)
+  return { ...event, data: { ...data, ...(typeof data?.error === 'string' ? { error: text } : {}), message: text } }
+}
+
 function sandboxStreamFailureDiagnostic(error: unknown): {
   userMessage: string
   failureNote: string
   code: string
+  reason: string
 } {
   const streamMessage = (error as { streamMessage?: unknown })?.streamMessage
   const message = typeof streamMessage === 'string'
@@ -398,13 +423,14 @@ function sandboxStreamFailureDiagnostic(error: unknown): {
     code = error.upstreamCode ?? code
   }
   if (keyRefused) code = MODEL_KEY_REFUSED_CODE
-  return { userMessage, failureNote, code }
+  return { userMessage, failureNote, code, reason: message }
 }
 
 /** Create a sandbox chat producer that manages chat turn routing with logging and interaction rendering options */
 export function createSandboxChatProducer(options: SandboxChatProducerOptions): ChatTurnRouteProducer {
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
+  const failedTurnText = options.failedTurnText ?? FAILED_TURN_TEXT
 
   // ── model failover ────────────────────────────────────────────────────────
   // ON by default whenever the caller can reopen the stream (`openEvents`) and
@@ -596,7 +622,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           const message = sandboxStreamErrorMessage(event.data)
           const keyRefused = modelKeyRefusedSentence(message)
           if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
-          const errorContent = providerResetSentence(message) ?? keyRefused ?? (projectionState.fullText.trim()
+          const hidden = withheld(options.log, message, asString(event.data?.code), event.data?.statusCode ?? event.data?.status)
+          const errorContent = hidden ? failedTurnText : providerResetSentence(message) ?? keyRefused ?? (projectionState.fullText.trim()
             ? `The sandbox model stream stopped before a clean completion.\n\nError: ${message}`
             : `The sandbox agent returned an error before producing a visible answer.\n\nError: ${message}`)
           if (options.errorNotice) {
@@ -608,7 +635,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           }
           projectionState.interactionOutcome = 'expired'
           yield* emitTerminalizedTools()
-          yield toProducerWireEvent(plainFailureEvent(record))
+          yield toProducerWireEvent(hidden ? withheldFailureEvent(record, failedTurnText) : plainFailureEvent(record))
           continue
         }
 
@@ -629,12 +656,14 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         failureNote: diagnostic.failureNote,
         error: streamErr instanceof Error ? streamErr.message : String(streamErr),
       })
+      const hidden = withheld(options.log, diagnostic.reason, diagnostic.code, asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status)
+      const userMessage = hidden ? failedTurnText : diagnostic.userMessage
       if (options.errorNotice) {
-        yield* emitErrorNotice(diagnostic.userMessage, diagnostic.code)
+        yield* emitErrorNotice(userMessage, diagnostic.code)
       } else if (options.includeErrorText !== false) {
         const errorDelta = projectionState.fullText
-          ? `\n\n---\n${diagnostic.userMessage}`
-          : diagnostic.userMessage
+          ? `\n\n---\n${userMessage}`
+          : userMessage
         projectionState.fullText += errorDelta
         yield { type: 'text', text: errorDelta }
       }
@@ -643,9 +672,9 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       yield {
         type: 'error',
         data: {
-          message: diagnostic.userMessage,
+          message: userMessage,
           code: diagnostic.code,
-          details: { failureNote: diagnostic.failureNote },
+          ...(hidden ? {} : { details: { failureNote: diagnostic.failureNote } }),
         },
       }
     } finally {

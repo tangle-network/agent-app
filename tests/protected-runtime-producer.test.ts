@@ -93,11 +93,13 @@ describe('protected Runtime chat producer', () => {
   it('refuses a provider whose protected Chat Completions semantics are unverified', async () => {
     const { options, settle } = fixture('google')
     vi.stubGlobal('fetch', vi.fn())
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const events = await drain(createProtectedRuntimeChatProducer(options))
     expect(fetch).not.toHaveBeenCalled()
     expect(settle).toHaveBeenCalledWith(expect.objectContaining({ reason: 'failed' }))
-    expect(JSON.stringify(events.find(event => event.type === 'error')))
-      .toContain('requires an Anthropic or OpenAI model without reasoning')
+    // The refusal reaches the server log; the person reads the plain sentence.
+    expect(events.some(event => event.type === 'error')).toBe(true)
+    expect(JSON.stringify(warn.mock.calls)).toContain('requires an Anthropic or OpenAI model without reasoning')
   })
 
   it('sends one buffered completion per model call with the profile ceilings and reasoning effort', async () => {
@@ -169,8 +171,11 @@ describe('protected Runtime chat producer', () => {
     change(options.profile)
     const reserve = vi.spyOn(options.grant.port, 'reserveGrant')
     vi.stubGlobal('fetch', vi.fn())
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const events = await drain(createProtectedRuntimeChatProducer(options))
-    expect(JSON.stringify(events.find(event => event.type === 'error'))).toContain(named)
+    // The refusal names the axis in the server log; the person reads the plain sentence.
+    expect(events.some(event => event.type === 'error')).toBe(true)
+    expect(JSON.stringify(warn.mock.calls)).toContain(named)
     expect(reserve).not.toHaveBeenCalled()
     expect(settle).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
