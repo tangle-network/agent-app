@@ -99,6 +99,9 @@ async function runTurn(access: OperatorAccess, title: string, content: string, t
   if (turn.state === 'failed') throw new Failure(`the turn failed${turn.failure?.code ? ` (${turn.failure.code})` : ''}: ${(turn.failure?.message ?? 'no message').slice(0, 300)} (${where})`)
   if (turn.state === 'input-required' || turn.approvals.length > 0) throw new Failure(`the turn is waiting on a decision, which no one can answer in a conformance run (${where})`)
   if (turn.state !== 'succeeded') throw new Failure(`the turn had not settled after ${Math.round(turnMs / 1000)} s (state ${turn.state}; ${where})`)
+  // A refused tool call is red even when the turn recovered and answered.
+  const refused = turn.refusedToolCalls?.[0]
+  if (refused) throw new Failure(`a tool call was refused (${refused.tool}): ${refused.error.slice(0, 200)} (${where})`)
   return { turn, where }
 }
 
