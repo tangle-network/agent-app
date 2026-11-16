@@ -592,6 +592,26 @@ describe('createIdentityBoundWorkspaceKeyManager', () => {
     expect(h.getVerdictReads()).toBe(0)
   })
 
+  it('blocks issuance on a transient cleanup failure even when its retry lands past the child expiry', async () => {
+    const h = makeHarness()
+    const first = await h.manager('router').ensureKey(h.identity())
+    h.setNow(Date.parse(first.usage.expiresAt) - 1_000)
+    h.setCurrentSourceKeyId('source-2')
+    h.setCurrentPlatformUserId('platform-2')
+    const manager = h.manager('router', { provisioner: { ...h.provisioner,
+      async revokeKey() { throw platformRefusal(503, 'delegated_key.unavailable') } } })
+
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    const old = h.rowFor(first.usage.keyId)!
+    expect(old.nextRevocationAt!.getTime()).toBeGreaterThan(old.expiresAt.getTime())
+    // The retry lands past the expiry, yet a second request still refuses to mint beside the live child.
+    await expect(manager.ensureKey(h.identity())).rejects.toThrow('cleanup is pending')
+    // Once the child has expired it can no longer authenticate: the next request retires it and issues.
+    h.setNow(old.nextRevocationAt!.getTime())
+    expect((await manager.ensureKey(h.identity())).usage.keyId).not.toBe(first.usage.keyId)
+    expect(old.status).toBe('revoked')
+  })
+
   it('keeps retrying and blocks issuance when the verdict after a refused cleanup cannot be read', async () => {
     const h = makeHarness()
     const first = await h.manager('router').ensureKey(h.identity())

@@ -330,9 +330,13 @@ function slotOf(row: DurableWorkspaceKeyRecord): Pick<DurableWorkspaceKeyRecord,
   return { name: row.name, sourceKeyId: row.sourceKeyId, platformUserId: row.platformUserId }
 }
 
-/** A refused cleanup of a live child waits for the child's own expiry and blocks no issuance meanwhile. */
+/**
+ * A refused cleanup of a live child waits for the child's own expiry and blocks no issuance meanwhile. Only that
+ * deferral schedules the row AT the expiry (`settleFailedRevoke`); a transient retry that lands at or past it still
+ * blocks, so a second child never mints while the first is live.
+ */
 function waitsForExpiry(row: DurableWorkspaceKeyRecord): boolean {
-  return row.nextRevocationAt !== null && row.nextRevocationAt.getTime() >= row.expiresAt.getTime()
+  return row.nextRevocationAt !== null && row.nextRevocationAt.getTime() === row.expiresAt.getTime()
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -644,10 +648,10 @@ function createWorkspaceKeyRecovery(
    * at its expiry. Null keeps today's retry: a transient failure, or a verdict read that failed transiently.
    */
   async function settleFailedRevoke(row: DurableWorkspaceKeyRecord, keyId: string, error: unknown): Promise<'gone' | 'waits' | null> {
-    if (isRemoteMissing(error)) return 'gone'
+    // An expired child can neither authenticate nor spend, whatever answered: it never holds the scope.
+    if (isRemoteMissing(error) || now().getTime() >= row.expiresAt.getTime()) return 'gone'
     const refused = definiteRefusal(error)
     if (!refused) return null
-    if (now().getTime() >= row.expiresAt.getTime()) return 'gone'
     try {
       if (usageFromRemote(row, await recoveryProvisioner.getKey(keyId), now()).exhausted) return 'gone'
     } catch (readError) {
