@@ -720,6 +720,10 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
   /** Pre-persist transform of the final text (e.g. `/redact`'s `redactPII`).
    *  Live stream is never altered. */
   transformFinalText?(text: string): string | Promise<string>
+  /** Secret values this turn could expose (a credential the product placed in its box's environment). Every
+   *  occurrence becomes `[redacted]` in the live stream, the turn buffer, the draft and the stored row, matched by value,
+   *  never by pattern; values under 8 characters are ignored. The product redacts its own history reads the same way. */
+  redactValues?(turn: { tenantId: string; userId: string; threadId: string }): readonly string[] | Promise<readonly string[]>
   /** Post-processing after a turn settles (billing, titles, audit). Fires with
    *  `failed:true` + `failureReason` when the turn carried a terminal error
    *  event (model 402 / rate-limit / server error) instead of a clean

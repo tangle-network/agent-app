@@ -1,6 +1,7 @@
 /** Admission-to-settlement execution for one authenticated chat turn. */
 import { deriveExecutionId, handleChatTurn, type ChatTurnIdentity } from '@tangle-network/agent-runtime/durable'
 import { toChatMessageParts } from '../chat-store/parts'
+import { redactEvents, valueRedactor, type ValueRedactor } from './redact-values'
 import {
   coalesceDeltas,
   createBufferedTurnTap,
@@ -112,6 +113,8 @@ async function runAdmittedTurn<TContext, TResource>({
   const preparedBatch = await prepareAdmittedTurn(options, trace, log, tenantId, userId, payload, context, request, progress, content, turnId, draftTuning, ctx?.waitUntil)
   if (preparedBatch instanceof Response) return preparedBatch
   const { turnStreamId, identity, executionId, chatTurn, readHistory, historyBeforeLock } = preparedBatch
+  // Registered secret values never reach the stream, the buffer, the draft or the stored row (redact-values.ts).
+  const redact = options.redactValues ? valueRedactor(await options.redactValues({ tenantId, userId, threadId: payload.threadId })) : undefined
 
   const prompt: string | ChatTurnPartInput[] =
     fileParts.length === 0
@@ -324,12 +327,13 @@ async function runAdmittedTurn<TContext, TResource>({
         messageId: assistantRowIdForTurn(executionId),
         snapshot: () => {
           if (!state.producer || state.cancellationAbort?.signal.aborted) return null
-          return {
+          const snapshot = {
             content: state.producer.finalText(),
             ...(state.producer.draftParts ? { parts: state.producer.draftParts() } : {}),
             ...(state.producer.usage ? { usage: state.producer.usage() } : {}),
             ...(state.producer.model ? { model: state.producer.model } : {}),
           }
+          return redact ? redact(snapshot) : snapshot
         },
         ...(options.transformFinalText ? { transformText: options.transformFinalText } : {}),
         log,
@@ -357,7 +361,7 @@ async function runAdmittedTurn<TContext, TResource>({
     }
     streamSetup.end()
 
-    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId)
+    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId, redact)
 
     // The engine has the turn, and its first pull runs `produce`, which owns whatever `afterAuthorize` started.
     const { clientBody } = startTurnDrain(result, log, turnStreamId, state, endTrace, exportTrace, trace, ctx, request, fireTerminalLifecycle, releaseLock, runAfterSettle, early.settle)
@@ -710,6 +714,7 @@ function createTurnEngine<TContext, TResource>(
   context: TContext,
   payload: AdmittedTurn<TContext>['parsed']['payload'],
   assistantRowId: () => string | null,
+  redact: ValueRedactor | undefined,
 ) {
   const result = handleChatTurn({
     identity,
@@ -735,7 +740,7 @@ function createTurnEngine<TContext, TResource>(
             state.producer = await started
             yield* state.producer.stream
           }
-          let source: AsyncIterable<ChatRouteEvent> = producerStream()
+          let source: AsyncIterable<ChatRouteEvent> = redact ? redactEvents(producerStream(), redact) : producerStream()
           // A durable owner connection already carries exact authenticated Stop.
           // Keep metadata observation only for existing non-adopting targets.
           if (options.cancel && state.cancellationAbort && !state.closeCancellation) {
@@ -823,13 +828,14 @@ function createTurnEngine<TContext, TResource>(
         }
         const usage = state.producer?.usage?.() ?? {}
         const attribution = state.producer?.modelAttribution?.()
-        const values = {
+        const unredacted = {
           content: finalText,
           ...(parts && parts.length > 0 ? { parts } : {}),
           ...(state.producer?.model ? { model: state.producer.model } : {}),
           ...modelAttributionFields(attribution),
           ...measuredUsage(usage),
         }
+        const values = redact ? redact(unredacted) : unredacted
         // ONE row per turn either way. With drafting, `finalize` settles
         // any in-flight draft and then insert-or-patches the same
         // deterministic id — so the row this turn ends with is identical to
