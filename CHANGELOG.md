@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.6
+
+- fix(billing): the same member's next sign-in keeps the workspace child key (#1540)
+
 ## 4.0.5
 
 - docs: regenerate the codemap and API docs (#1543)
