@@ -102,7 +102,7 @@ export async function verifyTurnStreamToken(
 
 // ── channel keys ────────────────────────────────────────────────────────────
 //
-// One DO instance per channel key. Four families:
+// One DO instance per channel key. Five families:
 //   thread     `${workspaceId}:${threadId}` — thread viewer signals.
 //   workspace  `${workspaceId}`             — sidebar activity + thread.created
 //              + every turn lock: the workspace-scope lock and each
@@ -111,6 +111,8 @@ export async function verifyTurnStreamToken(
 //              (the TurnEventStore contract; replay survives DO eviction).
 //   scope      `scope:${scopeId}`           — running-turn index for a thread,
 //              backing `TurnEventStore.listRunning`.
+//   turn host  `turn-host:${objectId}`      — the capability of an unnamed
+//              per-turn object that runs one chat turn (`forwardTurnToHost`).
 
 /** Define the scope level for acquiring a turn lock within thread or workspace contexts */
 export type TurnLockScope = 'thread' | 'workspace'
@@ -151,6 +153,11 @@ export function turnStorageChannelKey(turnId: string): string {
 /** Running-turn index for the optional Durable Object turn-event backend. */
 export function scopeIndexChannelKey(scopeId: string): string {
   return `scope:${scopeId}`
+}
+
+/** The capability name of a per-turn object, which `newUniqueId` leaves without a channel name. */
+export function turnHostChannelKey(objectId: string): string {
+  return `turn-host:${objectId}`
 }
 
 /** Recent thread-created markers kept for late-connecting sidebars. */
