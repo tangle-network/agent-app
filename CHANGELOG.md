@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.35
+
+- fix(sandbox): a reused box skips the product bootstrap it already ran under the same build (#1535)
+
 ## 3.0.34
 
 - fix(agent-profiles): a stored profile runs the product's current prompt where its own is product text (#1530)
