@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useEffect, useState } from 'react'
+import { Button } from '@tangle-network/ui/primitives'
 import { ChatMessages } from '../../web-react'
 import type { ChatMessagesProps, ChatToolCallInfo } from '../../web-react'
 import {
@@ -165,6 +166,55 @@ export const StreamingInProgress: Story = {
     ],
     loading: true,
   },
+}
+
+/** Synthetic stream transitions keep the reader's disclosure choice visible
+ *  while progress arrives. The Storybook decorator supplies the theme. */
+function StreamingToolRunDemo(args: ChatMessagesProps) {
+  const [calls, setCalls] = useState<ChatToolCallInfo[]>([
+    { id: 'read-1', name: 'read_record', status: 'done', args: { path: 'notes.md' }, result: 'The first record is available.' },
+    { id: 'command-2', name: 'sandbox_run_command', status: 'done', args: { command: 'cat /workspace/reports/latest/status.json' }, result: { ok: true, result: { stdout: 'Report checks passed.', exitCode: 0 } } },
+    { id: 'inspect-3', name: 'inspect_report', status: 'running', args: { path: 'report.md' } },
+  ])
+  const [loading, setLoading] = useState(true)
+  const [answer, setAnswer] = useState('')
+  const changeLast = (change: Partial<ChatToolCallInfo>) => setCalls(current => current.map((call, index) =>
+    index === current.length - 1 ? { ...call, ...change } : call))
+  return (
+    <>
+      <div className="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-6 py-3" aria-label="Synthetic stream controls">
+        <Button size="sm" variant="outline" disabled={!loading} onClick={() => setCalls(current => [
+          ...current.map(call => ({ ...call, status: 'done' as const })),
+          { id: `inspect-${current.length + 1}`, name: 'inspect_report', status: 'running', args: { path: 'appendix.md' } },
+        ])}>Add step</Button>
+        <Button size="sm" variant="outline" disabled={!loading} onClick={() => {
+          setCalls(current => current.map(call => ({ ...call, status: 'done' })))
+          setAnswer('The report is ready.')
+          setLoading(false)
+        }}>Finish</Button>
+        <Button size="sm" variant="outline" disabled={!loading} onClick={() => changeLast({
+          status: 'error', result: { ok: false, message: 'The report could not be read.' },
+        })}>Fail step</Button>
+        <Button size="sm" variant="outline" disabled={!loading} onClick={() => changeLast({
+          name: 'submit_proposal', status: 'done', args: { title: 'Share the report' },
+          result: { ok: true, result: { status: 'queued_for_approval', proposalId: 'report-proposal' } },
+        })}>Request approval</Button>
+        <Button size="sm" variant="outline" disabled={!loading} onClick={() => setLoading(false)}>End while active</Button>
+      </div>
+      <ChatMessages {...args} loading={loading} approval={approval} messages={[
+        { id: 'tool-run-user', role: 'user', content: 'Is the report ready?' },
+        { id: 'tool-run-assistant', role: 'assistant', content: answer, segments: [
+          ...calls.map(call => ({ kind: 'tool' as const, call })),
+          ...(answer ? [{ kind: 'text' as const, content: answer }] : []),
+        ] },
+      ]} />
+    </>
+  )
+}
+
+export const StreamingToolRun: Story = {
+  name: 'Live Tool Run — Disclosure and Exceptions',
+  render: args => <StreamingToolRunDemo {...args} />,
 }
 
 /** The pending-decision surface: Approve is filled/primary, Reject is quiet. */

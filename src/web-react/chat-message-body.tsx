@@ -56,20 +56,19 @@ function SegmentText({
   )
 }
 
-/** A settled run of at least this many consecutive tool calls collapses into a
- *  single "Worked through N steps" disclosure so a long multi-step turn does not
- *  flood the transcript. Below it, tool rows render inline as before. */
+/** A run of at least this many consecutive tool calls shares one disclosure,
+ *  while its live summary keeps progress visible. Short runs remain inline. */
 const COLLAPSE_TOOL_RUN_AT = 3
 
-/** A tool call the user must not miss even in a settled run — a failure (by
+/** A tool call the user must not miss — a failure (by
  *  status OR by an `ok:false` outcome, the shared `toolCallFailed` predicate),
  *  a card awaiting their approval, or a tool still `running` after the turn has
- *  settled (i.e. stuck / timed out). A run containing one is NEVER collapsed, so
+ *  settled (i.e. stuck / timed out). A run containing one is never collapsed, so
  *  a failed, blocked, or stuck turn can't hide behind a "Worked through N steps"
  *  summary and read as successful. */
-function isImportantTool(call: ChatToolCallInfo): boolean {
+function isImportantTool(call: ChatToolCallInfo, streaming: boolean): boolean {
   return (
-    call.status === 'running' ||
+    (!streaming && call.status === 'running') ||
     toolCallFailed(call) ||
     pendingApprovalOf(call) !== null
   )
@@ -79,8 +78,8 @@ function isImportantTool(call: ChatToolCallInfo): boolean {
  *  run carries the streaming caret; if the last segment is instead a tool, a
  *  trailing caret keeps the gap before the next run from looking frozen. Any
  *  `toolCalls` not represented in `segments` (a partially-migrated producer that
- *  set both) still render, so a tool row is never silently dropped. A settled
- *  run of many tool calls collapses into one disclosure — see below. */
+ *  set both) still render, so a tool row is never silently dropped. Long tool
+ *  runs share a disclosure during streaming and after settlement. */
 export function SegmentedBody({
   segments,
   msg,
@@ -124,12 +123,11 @@ export function SegmentedBody({
       staggerIndex={index}
     />
   )
-  // Group consecutive tool segments so a SETTLED run of many tool calls (a
+  // Group consecutive tool segments so a run of many tool calls (a
   // multi-step turn, e.g. workflow authoring) collapses into one disclosure
-  // instead of flooding the transcript with a card per step. While the turn is
-  // streaming nothing is grouped — live tool activity is exactly what the user
-  // wants to watch; the run collapses once the turn settles. Text runs (the
-  // actual answer) always render in full.
+  // instead of flooding the transcript with a card per step. Live progress
+  // stays on its summary; the reader can expand the same rows at any time.
+  // Text runs (the actual answer) always render in full.
   const groups: Array<
     | { kind: 'text'; index: number; content: string }
     | { kind: 'tools'; index: number; calls: ChatToolCallInfo[] }
@@ -183,10 +181,15 @@ export function SegmentedBody({
       continue
     }
     if (
-      !streaming &&
       g.calls.length >= COLLAPSE_TOOL_RUN_AT &&
-      !g.calls.some(isImportantTool)
+      !g.calls.some((call) => isImportantTool(call, streaming))
     ) {
+      const running = g.calls.filter((call) => call.status === 'running')
+      const summary = running.length > 1
+        ? `Working · ${running.length} active steps`
+        : running.length === 1
+          ? `Working · step ${g.calls.indexOf(running[0]!) + 1}`
+          : `Worked through ${g.calls.length} steps`
       // The fold is a quiet disclosure line, not a filled box — the canonical
       // rows inside it carry the row chrome.
       //
@@ -199,16 +202,14 @@ export function SegmentedBody({
       // case — it is open while the model thinks, so what has to animate there
       // is the HEIGHT.
       //
-      // The key names the FOLD, not the group: folded and unfolded are two
-      // different elements for one group, and one key over two element types is
-      // how React is told to tear a subtree down and rebuild it — replaying the
-      // entrance of every row in it.
+      // Keep the disclosure identity as calls append or settle. Its native
+      // open state belongs to the reader, not to each streaming update.
       children.push(
         <details key={`tools-fold-${g.index}`}>
           {/* No horizontal padding: the fold line hangs on the same left edge
               as the rows it reveals, so opening it does not shift the column. */}
           <summary className="cursor-pointer select-none rounded-md py-0.5 text-xs font-medium text-muted-foreground [transition:color_var(--motion-control)] hover:text-foreground">
-            Worked through {g.calls.length} steps
+            <span aria-live="polite">{summary}</span>
           </summary>
           <div className="mt-1.5 flex flex-col gap-1.5">
             {g.calls.map(renderToolCard)}

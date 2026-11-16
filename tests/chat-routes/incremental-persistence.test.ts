@@ -223,6 +223,109 @@ describe('incremental assistant persistence — mid-run durability', () => {
 
 // ── 2. coalescing ───────────────────────────────────────────────────────────
 
+describe('incremental assistant persistence — draft byte bounds', () => {
+  async function captureToolDraft(output: unknown, maxDraftToolOutputBytes = 32768) {
+    const { store, threadId } = await freshStore()
+    let draft: Row | undefined
+    async function* events(): AsyncGenerator<unknown> {
+      yield partUpdated({ type: 'tool', id: 'output', tool: 'read_record', state: {
+        status: 'completed', input: { path: 'result.json' }, output, metadata: { source: 'native' },
+      } })
+      draft = await waitUntil(() => assistantRow(store, threadId), row => Boolean(row?.parts?.length), 'tool draft')
+      yield { type: 'result', data: { finalText: 'Complete.' } }
+    }
+    const result = await runDetachedTurn({
+      store: createMemoryTurnEventStore(), turnId: 'draft-output', scopeId: threadId, events: events(),
+      persist: { store, threadId, maxDraftToolOutputBytes },
+    })
+    expect(result.state).toBe('completed')
+    const final = await assistantRow(store, threadId)
+    const draftTool = draft?.parts?.find(part => part.type === 'tool')
+    const finalTool = final?.parts?.find(part => part.type === 'tool')
+    if (!draftTool || !finalTool) throw new Error('expected persisted draft and final tool parts')
+    expect(finalTool.state.output).toEqual(output)
+    expect(finalTool.state.metadata?.draftTruncated).toBeUndefined()
+    expect(final?.id).toBe(draft?.id)
+    expect(final?.content).toBe('Complete.')
+    expect(draftTool.state.metadata?.source).toBe('native')
+    return draftTool.state
+  }
+
+  it.each([
+    ['ASCII below the bound', 'a'.repeat(4096), false],
+    ['ASCII exactly at the serialized bound', 'a'.repeat(32766), false],
+    ['ASCII above the bound', 'a'.repeat(32769), true],
+    ['multibyte BMP text', '界'.repeat(12000), true],
+    ['astral text', '😀'.repeat(12000), true],
+    ['JSON-escaped string', '\n"\\\u0000'.repeat(4000), true],
+    ['structured escaped output', { rows: [{ text: '😀\n"'.repeat(5000) }] }, true],
+  ])('bounds %s in SQLite drafts and retains the complete final value', async (_label, output, clipped) => {
+    const state = await captureToolDraft(output)
+    expect(Buffer.byteLength(JSON.stringify(state.output), 'utf8')).toBeLessThanOrEqual(32768)
+    if (clipped) {
+      expect(state.metadata?.draftTruncated).toBe(true)
+      expect(typeof state.output).toBe('string')
+      expect(state.output).toContain('…[draft-truncated]')
+      // Encoding and decoding the preview cannot replace a split surrogate.
+      expect(Buffer.from(state.output as string, 'utf8').toString('utf8')).toBe(state.output)
+    } else {
+      expect(state.output).toEqual(output)
+      expect(state.metadata?.draftTruncated).toBeUndefined()
+    }
+  })
+
+  it.each([1, 2, 6, 23, 24, 31])('honors a %i-byte draft cap even when its marker does not fit', async maxBytes => {
+    const state = await captureToolDraft('😀"\n'.repeat(20), maxBytes)
+    expect(Buffer.byteLength(JSON.stringify(state.output) ?? '', 'utf8')).toBeLessThanOrEqual(maxBytes)
+    expect(state.metadata?.draftTruncated).toBe(true)
+    if (typeof state.output === 'string') {
+      expect(Buffer.from(state.output, 'utf8').toString('utf8')).toBe(state.output)
+    } else {
+      expect(state.output).toBeUndefined()
+    }
+  })
+
+  it('keeps the existing zero-cap opt-out for drafts as well as final output', async () => {
+    const output = { text: '😀\n"'.repeat(5000) }
+    const state = await captureToolDraft(output, 0)
+    expect(state.output).toEqual(output)
+    expect(state.metadata?.draftTruncated).toBeUndefined()
+  })
+
+  it('backs off on persisted UTF-8 parts bytes while retaining the next draft and full final answer', async () => {
+    const { store, threadId } = await freshStore()
+    const text = '界'.repeat(300)
+    let first: Row | undefined
+    let duringBackoff: Row | undefined
+    let afterBackoff: Row | undefined
+    async function* events(): AsyncGenerator<unknown> {
+      yield partUpdated({ type: 'text', id: 'answer', text }, text)
+      first = await waitUntil(() => assistantRow(store, threadId), row => row?.content === text, 'first multibyte draft')
+      expect(JSON.stringify(first!.parts).length).toBeLessThan(800)
+      expect(Buffer.byteLength(JSON.stringify(first!.parts), 'utf8')).toBeGreaterThan(800)
+      await new Promise(resolve => setTimeout(resolve, 700))
+      yield partUpdated({ type: 'text', id: 'answer', text: text + ' second' }, ' second')
+      // The ordinary 500 ms interval has elapsed, but the byte-based 1250 ms
+      // backoff has not. A character-count implementation writes this draft.
+      await new Promise(resolve => setTimeout(resolve, 50))
+      duringBackoff = await assistantRow(store, threadId)
+      await new Promise(resolve => setTimeout(resolve, 650))
+      yield partUpdated({ type: 'text', id: 'answer', text: text + ' second third' }, ' third')
+      afterBackoff = await waitUntil(() => assistantRow(store, threadId), row => row?.content.endsWith(' third') === true, 'draft after backoff')
+      yield { type: 'result', data: { finalText: text + ' second third final' } }
+    }
+    await runDetachedTurn({
+      store: createMemoryTurnEventStore(), turnId: 'draft-backoff', scopeId: threadId, events: events(),
+      persist: { store, threadId, intervalMs: 500, backoffBytes: 800 },
+    })
+    expect(duringBackoff?.content).toBe(first?.content)
+    expect(afterBackoff?.content).toBe(text + ' second third')
+    const final = await assistantRow(store, threadId)
+    expect(final?.content).toBe(text + ' second third final')
+    expect(final?.id).toBe(first?.id)
+  })
+})
+
 describe('incremental assistant persistence — write cadence', () => {
   it('coalesces: 200 token events produce a handful of writes, not 200', async () => {
     const { store, threadId } = await freshStore()
