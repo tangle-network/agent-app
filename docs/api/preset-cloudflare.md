@@ -4,7 +4,7 @@
 
 Source: `src/preset-cloudflare/index.ts`
 
-47 exports.
+49 exports.
 
 ### `CloudflareHeadersRule`
 
@@ -278,6 +278,14 @@ interface NativeCompletionPayload
 interface NativeCompletionTimingSource
 ```
 
+### `NativeCompletionTranscriptReference`
+
+`interface` — Large final output points at the transcript the product already persisted.
+
+```ts
+interface NativeCompletionTranscriptReference
+```
+
 ### `nativeCompletionWorkflowId`
 
 `function`
@@ -300,6 +308,14 @@ interface NativeCompletionWorkflowOptions
 
 ```ts
 interface NativeCompletionWorkflowPayload
+```
+
+### `NativeCompletionWorkflowResult`
+
+`type`
+
+```ts
+type NativeCompletionWorkflowResult
 ```
 
 ### `PRESET_MIGRATION_SQL`
