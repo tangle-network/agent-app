@@ -320,8 +320,8 @@ export function createChatOperatorAdapter<Identity>(options: ChatOperatorAdapter
         }
         const completedAt = iso(assistant.createdAt)
         if (completedAt && (state === 'succeeded' || state === 'failed')) turn.completedAt = completedAt
-        // A recovered turn still carries a refused tool call in its parts; say so.
-        const refused = classifyTurnOutcome({ finalText: assistant.content, parts: assistant.parts as readonly unknown[] | null })
+        // A refused tool call stays in the parts of a settled turn, including one that recovered and answered.
+        const refused = classifyTurnOutcome({ finalText: assistant.content, parts: assistant.parts })
           .reasons.flatMap(reason => reason.kind === 'tool_call_rejected' ? [{ tool: reason.tool, error: reason.error }] : [])
         if (refused.length > 0) turn.refusedToolCalls = refused
       }
