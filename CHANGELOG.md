@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.31
+
+- feat(chat-routes): redact registered secret values from a turn's stream, buffer, draft and stored row (#1531)
+
 ## 3.0.30
 
 - refactor(assistant): use shared Core SSE reader (#1529)
