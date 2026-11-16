@@ -4,7 +4,7 @@
 
 Source: `src/agent-profiles/index.ts`
 
-47 exports.
+54 exports.
 
 ### `admitProfileTurn`
 
@@ -62,6 +62,14 @@ Source: `src/agent-profiles/index.ts`
 interface CreateTextProfileInput
 ```
 
+### `followProductRelease`
+
+`function` — The profile a turn runs for `revision`: the stored profile with the release's system prompt where the stored prompt is one the product shipped into its history (`promptShippedByProduct`, revisions wh…
+
+```ts
+(store: ProfileRevisionStore, revision: ProfileRevision, release: AgentProfile, productAuthorIds: readonly string[]) =>…
+```
+
 ### `handleProfileSwitchText`
 
 `function` — Call before dispatching a chat message; a recognized command is never sent to the model.
@@ -92,6 +100,14 @@ interface MountProfileChangeResult
 
 ```ts
 (name: string) => string
+```
+
+### `overlayOnRelease`
+
+`function` — Resolve a stored profile over the release.
+
+```ts
+(stored: AgentProfile, shipped: readonly AgentProfile[], release: AgentProfile) => { profile: AgentProfile; updates: Pr…
 ```
 
 ### `parseProfileRevisionDiff`
@@ -132,6 +148,14 @@ interface ProductSelfMountConfig
 
 ```ts
 "/memories/workspace/"
+```
+
+### `PROFILE_PROMPT_HISTORY_MAX`
+
+`const` — The longest history read; a longer one reads as incomplete, so its prompt is kept.
+
+```ts
+1000
 ```
 
 ### `ProfileAccessError`
@@ -230,6 +254,22 @@ interface ProfileKnowledgeEvent
 interface ProfileMemoryStore
 ```
 
+### `ProfilePromptHistoryEntry`
+
+`interface` — One revision of a profile's history, reduced to what decides whether the newest one's system prompt is product text.
+
+```ts
+interface ProfilePromptHistoryEntry
+```
+
+### `ProfileReleaseUpdates`
+
+`interface` — How a stored profile's text compares with the current release; `customized` text is the workspace's own and stays.
+
+```ts
+interface ProfileReleaseUpdates
+```
+
 ### `ProfileRevision`
 
 `interface`
@@ -310,6 +350,14 @@ interface ProfileTurnPin
 (input: { store: ProfileRevisionStore; workspaceId: string; profileId: string; revisionId: string; actorRole: "member"…
 ```
 
+### `promptShippedByProduct`
+
+`function` — Whether a revision's system prompt is one the product shipped into its history: some revision by a product author has that prompt and differs from its parent's (an import, or a release refresh).
+
+```ts
+(store: ProfileRevisionStore, revision: ProfileRevision, productAuthorIds: readonly string[]) => Promise<boolean>
+```
+
 ### `proposeRevision`
 
 `function` — All authors use one immutable write path.
@@ -332,6 +380,14 @@ interface ProposeRevisionInput
 
 ```ts
 (store: ProfileRevisionStore, key: ProfileBindingKey, messageId: string, content: string) => Promise<ProfileAdmissionRe…
+```
+
+### `refreshBuiltinSkills`
+
+`function` — The active profile's skills with built-ins brought to the release.
+
+```ts
+(active: AgentProfile, shipped: readonly AgentProfileResourceRef[], release: AgentProfile) => { skills: AgentProfileRes…
 ```
 
 ### `SelfMountSkillEntry`

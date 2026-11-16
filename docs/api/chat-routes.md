@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-324 exports.
+331 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -1494,6 +1494,14 @@ number
 (path: string) => ChatMentionKind
 ```
 
+### `MODEL_KEY_REFUSED_CODE`
+
+`const` — The typed code for a harness whose model refused its key, so a product can tell it from other stream failures.
+
+```ts
+"model.key_refused"
+```
+
 ### `ModelAttemptTimeoutCode`
 
 `type` — Structured timeout codes surfaced by the producer on final exhaustion.
@@ -1532,6 +1540,14 @@ class ModelFailoverTimeoutError
 
 ```ts
 interface ModelFallbackInfo
+```
+
+### `modelKeyRefusedSentence`
+
+`function` — A harness whose model provider refused its key ("Invalid API key", OpenCode's `OPENCODE_ERROR`) as plain words, true both for a newly started box whose harness called the model before its minted key…
+
+```ts
+(message: string) => string | undefined
 ```
 
 ### `NATIVE_COMPLETION_RECEIPT_MAX_BYTES`
@@ -1990,6 +2006,22 @@ type PromptInputPart
 interface ProtectedRuntimeChatOptions
 ```
 
+### `providerResetSentence`
+
+`function` — A terminal provider wait (`…, reset at <ISO>`, agent-container provider-retry-wait.ts) as one sentence.
+
+```ts
+(message: string) => string | undefined
+```
+
+### `providerRetryNotice`
+
+`function` — A harness's provider retry wait (OpenCode's raw `retry` status) as one sentence: the provider's words and the next attempt.
+
+```ts
+(event: { type: string; data?: unknown; }) => string | undefined
+```
+
 ### `RawAgentFilePart`
 
 `interface` — Define the structure for a raw file part with optional metadata and media type information
@@ -2060,6 +2092,14 @@ interface ReconcileStaleTurnLockResult
 
 ```ts
 (message: SessionMessage) => DetachedTurnFinal
+```
+
+### `redactEvents`
+
+`function` — Every event of a stream, redacted.
+
+```ts
+<T>(source: AsyncIterable<T>, redact: ValueRedactor) => AsyncGenerator<T, any, any>
 ```
 
 ### `resolveChatAttachments`
@@ -2572,6 +2612,22 @@ interface UploadedChatFile
 
 ```ts
 (path: unknown) => SandboxMentionPathCheck
+```
+
+### `valueRedactor`
+
+`function` — A redactor for these values, or undefined when none qualifies: object keys and string values alike.
+
+```ts
+(values: readonly string[] | undefined) => ValueRedactor | undefined
+```
+
+### `ValueRedactor`
+
+`type`
+
+```ts
+type ValueRedactor
 ```
 
 ### `withDurableChatProjection`

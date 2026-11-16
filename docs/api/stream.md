@@ -4,7 +4,7 @@
 
 Source: `src/stream/index.ts`
 
-67 exports.
+68 exports.
 
 ### `asRecord`
 
@@ -115,7 +115,7 @@ interface ConsumeTurnStreamOptions
 `function`
 
 ```ts
-(db: D1LikeForTurns, options?: TurnEventStoreOptions) => TurnEventStore
+(db: D1LikeForTurns, options?: TurnEventStoreOptions) => ListingTurnEventStore
 ```
 
 ### `createMemoryTurnEventStore`
@@ -123,7 +123,7 @@ interface ConsumeTurnStreamOptions
 `function` — In-memory store for tests and keyless local dev.
 
 ```ts
-(options?: TurnEventStoreOptions) => TurnEventStore
+(options?: TurnEventStoreOptions) => ListingTurnEventStore
 ```
 
 ### `D1BoundForTurns`
@@ -220,6 +220,14 @@ number
 
 ```ts
 type JsonRecord
+```
+
+### `ListingTurnEventStore`
+
+`type` — A store that lists running turns by scope, as the turn lock's default reclaim needs.
+
+```ts
+type ListingTurnEventStore
 ```
 
 ### `mergePersistedPart`
