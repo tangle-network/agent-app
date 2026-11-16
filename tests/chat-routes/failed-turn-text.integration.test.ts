@@ -288,7 +288,9 @@ describe('a failed turn never shows the person the raw failure reason', () => {
       expect(result.text).toBe(led(FUNDING))
       expect(result.row?.content).toBe(led(FUNDING))
       expectNoRawReason(result, ['/v1/', 'POST ', 'HTTP 402', 'declined to bill'])
-      expect(warn.mock.calls.map(([, meta]) => (meta as { failureClass?: string }).failureClass)).toEqual(['funding'])
+      // Only the failure lines carry a class; other warnings (a trace export with no key) carry no meta.
+      expect(warn.mock.calls.flatMap(([, meta]) => (meta as { failureClass?: string } | undefined)?.failureClass ?? []))
+        .toEqual(['funding'])
     } finally {
       warn.mockRestore()
     }
