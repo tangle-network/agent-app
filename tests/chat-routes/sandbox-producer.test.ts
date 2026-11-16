@@ -788,17 +788,17 @@ describe('createSandboxChatProducer', () => {
     expect(persisted.some((p) => 'url' in p)).toBe(false)
   })
 
-  it('notices and forwards a warning in its own words, and drops one that carries harness text', async () => {
+  it('notices and forwards an allowed warning as the sentence written for its code, and drops any other', async () => {
     const harnessWarning = { type: 'warning', data: { code: 'OPENCODE_ERROR',
       message: "opencode execution failed: Model tried to call unavailable tool 'save_fact'. Available tools: bash, edit." } }
-    const fileDenied = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace' } }
+    const fileDenied = { type: 'warning', data: { code: 'FILE_DENIED', message: 'Outside workspace /srv/secrets' } }
     const refusal = { type: 'warning', data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance for this request.' } }
     const producer = createSandboxChatProducer({ events: feed([harnessWarning, fileDenied, refusal]), log: () => {} })
-    const denied = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: 'FILE_DENIED: Outside workspace' }
-    const refused = { type: 'notice', id: 'warning-2', noticeKind: 'warning', text: 'PAYMENT_REQUIRED: The account has no balance for this request.' }
+    const sentence = 'The agent was refused access to a file.'
+    const denied = { type: 'notice', id: 'warning-1', noticeKind: 'warning', text: sentence }
 
-    expect(onWire(await drain(producer.stream))).toEqual([denied, fileDenied, refused, refusal])
-    expect(producer.assistantParts?.()).toEqual([denied, refused])
+    expect(onWire(await drain(producer.stream))).toEqual([denied, { type: 'warning', data: { code: 'FILE_DENIED', message: sentence } }])
+    expect(producer.assistantParts?.()).toEqual([denied])
   })
 
   it('keeps visible output before a raw error, appends the plain sentence, and forwards the error without its reason', async () => {

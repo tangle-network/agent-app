@@ -51,14 +51,13 @@ import { isTerminalPromptEvent } from '../sandbox/prompt-events'
 import { SandboxRunError } from '../sandbox/sandbox-run-error'
 import {
   failureIds,
+  failureReason,
   failureText,
   FAILED_TURN_TEXT,
-  modelKeyRefusedSentence,
   MODEL_KEY_REFUSED_CODE,
   personFacing,
   providerRetryNotice,
   sandboxStreamErrorCode,
-  sandboxStreamErrorMessage,
   sandboxStreamFailureDiagnostic,
   withoutToolList,
 } from './failure-wording'
@@ -344,7 +343,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
   const log = options.log ?? ((message, meta) => console.error(message, meta ?? ''))
   const renderable = options.isRenderableInteraction ?? isRenderableInteractionKind
   const person = personFacing({ log: options.log, failedTurnText: options.failedTurnText ?? FAILED_TURN_TEXT,
-    hasAnswer: () => projectionState.fullText.trim().length > 0 })
+    hasAnswer: () => projectionState.answered })
 
   // ── model failover ────────────────────────────────────────────────────────
   // ON by default whenever the caller can reopen the stream (`openEvents`) and
@@ -355,6 +354,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
   const projectionState: SandboxProjectionState = {
     fullText: '',
+    answered: false,
     terminalObserved: false,
     stepCounter: 0,
     danglingToolsTerminalized: false,
@@ -470,15 +470,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
           yield { type: 'notice', id: notice.id, noticeKind: 'warning', text: retry }
         }
         if (event.type === 'warning') {
-          const message = asString(event.data?.message)
-          const code = asString(event.data?.code)
-          // A plainly worded failure arrives as its error event next, and `person` logs and drops one carrying harness
-          // text: only a warning in its own words becomes a notice.
-          const view = message ? person.warning(message, code, event.data?.statusCode, failureIds(event.data)) : undefined
-          if (view?.kind === 'plain') log('[chat-routes] failure warning folded into its error notice', { code, error: message })
-          if (view?.kind === 'own') {
+          // Only an allowed warning becomes a notice, in a sentence written for it; `person` logs and drops any other.
+          const text = person.warning(asString(event.data?.code), failureReason(record), failureIds(event.data))
+          if (text) {
             projectionState.warningCount += 1
-            const text = code ? `${code}: ${view.shown}` : view.shown
             const notice = noticePart('warning', `warning-${projectionState.warningCount}`, text)
             recordPersistedPart(notice, undefined, noticePartKey(notice.id))
             yield { type: 'notice', id: notice.id, noticeKind: 'warning', text }
@@ -497,7 +492,7 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         if (event.type === 'result') {
           projectionState.terminalObserved = true
           const finalText = asString(event.data?.finalText)
-          if (finalText) projectionState.fullText = finalText
+          if (finalText) Object.assign(projectionState, { fullText: finalText, answered: true })
           const reported = extractReportedTurnUsage(asRecord(event.data))
           if (reported) {
             applyTerminalUsage(reported, usage)
@@ -532,13 +527,13 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
         }
 
         if (event.type === 'error') {
-          const message = sandboxStreamErrorMessage(event.data)
-          const keyRefused = modelKeyRefusedSentence(message)
-          if (keyRefused) log('[chat-routes] model key refused', { code: MODEL_KEY_REFUSED_CODE, error: message })
-          const view = person.view(message, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
+          // The same reason the wire's error event carries, so the text and the event read the same sentence.
+          const reason = failureReason(record)
+          const view = person.view(reason, asString(event.data?.code), event.data?.statusCode ?? event.data?.status, failureIds(event.data))
           const errorContent = failureText(view, projectionState.fullText)
           if (options.errorNotice) {
-            yield* emitErrorNotice(errorContent, keyRefused ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data))
+            const code = view.class === 'model_key_refused' ? MODEL_KEY_REFUSED_CODE : sandboxStreamErrorCode(event.data)
+            yield* emitErrorNotice(errorContent, code)
           } else if (options.includeErrorText !== false) {
             const errorDelta = projectionState.fullText ? `\n\n---\n${errorContent}` : errorContent
             projectionState.fullText += errorDelta
@@ -562,14 +557,10 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
       preflightRefused = !observedSourceEvent && openAttempts() === 1
         && streamErr instanceof SandboxRunError && streamErr.code === 'sandbox_unavailable'
       const diagnostic = sandboxStreamFailureDiagnostic(streamErr)
-      // Logged once: a withheld or settlement reason by `person`, with its failure note; any other by this line.
+      // `person` logs the reason once, with its class and failure note.
       const statusCode = asRecord(streamErr)?.statusCode ?? asRecord(streamErr)?.status
       const view = person.view(diagnostic.reason, diagnostic.code, statusCode,
         { ...failureIds(asRecord(streamErr)?.diagnostics), failureNote: diagnostic.failureNote })
-      if (view.kind !== 'withheld' && !diagnostic.code.startsWith('settlement_')) log('[chat-routes] sandbox stream failed', {
-        failureNote: diagnostic.failureNote,
-        error: streamErr instanceof Error ? streamErr.message : String(streamErr),
-      })
       const userMessage = failureText(view, projectionState.fullText)
       if (options.errorNotice) {
         yield* emitErrorNotice(userMessage, diagnostic.code)
@@ -629,6 +620,8 @@ export function createSandboxChatProducer(options: SandboxChatProducerOptions): 
 
 interface SandboxProjectionState {
   fullText: string
+  /** The model's own answer text has arrived, apart from any failure text appended to `fullText`. */
+  answered: boolean
   terminalObserved: boolean
   stepCounter: number
   danglingToolsTerminalized: boolean
@@ -767,7 +760,7 @@ async function* projectSandboxMessagePart(
       if (delta) {
         if (partType === 'reasoning') reasoningClock.reasoning(key)
         else reasoningClock.settle()
-        if (partType === 'text') projectionState.fullText += delta
+        if (partType === 'text') Object.assign(projectionState, { fullText: projectionState.fullText + delta, answered: true })
         yield { type: partType, text: delta }
       }
       return

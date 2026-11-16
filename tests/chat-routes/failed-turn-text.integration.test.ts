@@ -21,6 +21,7 @@ import {
   type ChatTurnRouteProducer,
 } from '../../src/chat-routes/index'
 import { recoverSandboxAssistantMessage } from '../../src/chat-routes/completed-sandbox-turn'
+import { personFacing } from '../../src/chat-routes/failure-wording'
 import { createProtectedRuntimeChatProducer } from '../../src/chat-routes/protected-runtime-producer'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
 import { createChatTables } from '../../src/chat-store/schema'
@@ -28,7 +29,15 @@ import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { getChatFundingRecovery } from '../../src/web/turn-funding-recovery'
 import { openDatabase, workspacesTable } from '../teams/db-helper'
 
+// The sentences a person reads, one per class: written by agent-app, never taken from the failure.
 const PLAIN = 'That answer stopped before it finished. Please send your question again.'
+const FUNDING = 'Insufficient credits. Open billing to add funds before trying again.'
+const PAID = 'Paid access required. Inference requires verified paid access. Open billing to check your funded balance or paid seat before trying again.'
+const BUDGET = "This assistant's spending budget is used up. Raise its cap or wait for it to reset, then send again."
+const BALANCE = 'Insufficient credits to cover this request. Add funds, then send again.'
+const POLICY = "That model isn't available here. Choose another model and send again."
+/** A refusal's sentence after the lead line a client recognizes a stored failure by. */
+const led = (sentence: string) => `The sandbox agent returned an error before producing a visible answer.\n\nError: ${sentence}`
 
 const TOOL_LIST = 'Available tools: lookup_lookup, bash, edit, ledger_ledger, list_facts_list_facts.'
 const LIST_FRAGMENTS = ['Available tools', 'list_facts_list_facts', 'lookup_lookup']
@@ -159,18 +168,20 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   it.each([
-    ['empty_visible_output_retry', 'The model returned no visible text; retrying once.'],
-    ['OPENCODE_STEP_TRUNCATED', 'A model step was cut off before it finished; its work may be incomplete.'],
-    ['CODEX_UNEXPECTED_APPROVAL', 'The agent asked for an approval it does not need; it was declined.'],
-    ['FILE_DENIED', 'Outside workspace'],
-  ])('keeps a %s warning without harness text as a notice in its own words, and forwards it', async (code, message) => {
+    ['empty_visible_output_retry', 'The model returned no visible answer, so it is trying once more.'],
+    ['OPENCODE_STEP_TRUNCATED', 'A step of this answer was cut short, so the answer may be incomplete.'],
+    ['CODEX_UNEXPECTED_APPROVAL', 'The agent asked for an approval it does not need here, and it was declined.'],
+    ['FILE_DENIED', 'The agent was refused access to a file.'],
+  ])('shows an allowed %s warning as the sentence written for it, never its own text', async (code, sentence) => {
     const answer = 'Here is the answer.'
-    const result = await turn([{ type: 'warning', data: { code, message } }, textPart(answer), { type: 'result', data: { finalText: answer } }])
+    const result = await turn([{ type: 'warning', data: { code, message: `${code}: POST /v1/files failed at /srv/app.js:1:1` } },
+      textPart(answer), { type: 'result', data: { finalText: answer } }])
 
-    expect(result.streamed.find((event) => event.type === 'notice')?.text).toBe(`${code}: ${message}`)
-    expect(result.streamed.find((event) => event.type === 'warning')?.data).toMatchObject({ code, message })
-    expect(JSON.stringify(result.row?.parts)).toContain(`${code}: ${message}`)
+    expect(result.streamed.filter((event) => event.type === 'notice').map((event) => event.text)).toEqual([sentence])
+    expect(result.streamed.find((event) => event.type === 'warning')?.data).toEqual({ code, message: sentence })
+    expect(JSON.stringify(result.row?.parts)).toContain(sentence)
     expect(result.row?.content).toBe(answer)
+    expectNoRawReason(result, ['/v1/', '/srv/'])
   })
 
   it.each([
@@ -253,29 +264,31 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expect(recovered.text).toBe('Here is the answer.')
   })
 
-  it('shows a Router budget refusal as the Router\'s own first sentence, without the harness wrapper or what follows', async () => {
-    const sentence = "This key's lifetime budget is exhausted."
-    const result = await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED',
-      message: `opencode execution failed: ${sentence} Increase the cap at https://example.test/keys. (exit code 1)` } }])
+  it.each([
+    { kind: 'budget', message: "This key's lifetime budget is exhausted. Increase the cap at https://example.test/keys.", shown: BUDGET, text: BUDGET },
+    { kind: 'balance', message: "Available credits cannot cover this request's maximum cost and other in-flight requests. Top up at example.test.",
+      shown: BALANCE, text: led(BALANCE) },
+  ])('shows a Router $kind refusal as the sentence written for it', async ({ message, shown, text }) => {
+    const result = await turn([{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: `opencode execution failed: ${message} (exit code 1)` } }])
 
-    expect(result.text).toBe(sentence)
-    expect(result.error?.message).toBe(sentence)
-    expect(result.row?.content).toBe(sentence)
-    expectNoRawReason(result, ['execution failed', 'exit code', 'https://'])
+    expect(result.text).toBe(text)
+    expect(result.error?.message).toBe(shown)
+    expect(result.row?.content).toBe(text)
+    expectNoRawReason(result, ['execution failed', 'exit code', 'example.test', 'Increase the cap', 'Top up'])
   })
 
-  it('reads a thrown 402 on the wire as in the text, in its own words, without a withheld log', async () => {
+  it('reads a thrown 402 on the wire as in the text, as the funding sentence, logged under the funding class', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     try {
       const refused = Object.assign(new Error('POST /v1/chat/completions returned HTTP 402: The provider declined to bill this request.'),
         { status: 402, code: 'upstream_refused' })
       const result = await turn([], { severed: refused, serverLog: 'default' })
 
-      expect(result.error?.message).toBe('The provider declined to bill this request.')
-      expect(result.text).toBe(`The sandbox agent returned an error before producing a visible answer.\n\nError: ${result.error?.message}`)
-      expect(result.row?.content).toBe(result.text)
-      expectNoRawReason(result, ['/v1/', 'POST ', 'HTTP 402'])
-      expect(warn.mock.calls.filter(([message]) => message === '[chat-routes] turn failure withheld from the person')).toEqual([])
+      expect(result.error?.message).toBe(FUNDING)
+      expect(result.text).toBe(led(FUNDING))
+      expect(result.row?.content).toBe(led(FUNDING))
+      expectNoRawReason(result, ['/v1/', 'POST ', 'HTTP 402', 'declined to bill'])
+      expect(warn.mock.calls.map(([, meta]) => (meta as { failureClass?: string }).failureClass)).toEqual(['funding'])
     } finally {
       warn.mockRestore()
     }
@@ -295,31 +308,33 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   // A model failover trail: an earlier attempt's route, status and model id, then the last attempt's reason.
-  const trail = (last: string) => 'All 2 model(s) failed. model-a: POST /v1/sandboxes/sbx_test/runtime/agents/run/stream '
-    + `returned HTTP 502 Bad Gateway | model-b: ${last}`
-  const TRAIL_FRAGMENTS = ['/v1/', 'POST ', 'model-a', 'model-b', 'model(s) failed', 'HTTP 502', 'Bad Gateway']
+  const trail = (last: string, first = 'POST /v1/sandboxes/sbx_test/runtime/agents/run/stream returned HTTP 502 Bad Gateway') =>
+    `All 2 model(s) failed. model-a: ${first} | model-b: ${last}`
+  const TRAIL_FRAGMENTS = ['/v1/', 'POST ', 'model-a', 'model-b', 'model(s) failed', 'HTTP 502', 'Bad Gateway', 'example.test']
   const TRAIL_REASONS = [
     { kind: 'withheld', last: `opencode execution failed: the tool loop stopped. ${TOOL_LIST}`, shows: PLAIN },
-    { kind: '402 payment', last: 'The account has no balance or plan for this request.', code: 'PAYMENT_REQUIRED', statusCode: 402,
-      shows: 'The account has no balance or plan for this request.' },
+    { kind: 'earlier attempt ignored', first: 'Insufficient credits for this request', last: 'upstream connection reset', shows: PLAIN },
+    { kind: '402 payment', last: 'The account has no balance or plan for this request.', code: 'PAYMENT_REQUIRED', statusCode: 402, shows: FUNDING },
     { kind: 'funding words', last: 'POST /v1/chat/completions returned HTTP 402: Insufficient credits. Top up at https://example.test/billing.',
-      shows: 'Insufficient credits' },
-    { kind: 'Router budget', last: "This key's monthly budget is exhausted. Increase the cap or wait for the next billing cycle.",
-      shows: "This key's monthly budget is exhausted." },
+      shows: FUNDING },
+    { kind: 'Router budget', last: "This key's monthly budget is exhausted. Increase the cap or wait for the next billing cycle.", shows: BUDGET },
     { kind: 'provider reset', last: 'Rate limit exceeded (HTTP 429); the provider asked to wait, reset at 2030-01-02T03:04:05Z',
-      shows: 'The model provider refused the call (Rate limit exceeded); try again after 03:04:05 UTC on 2030-01-02.' },
+      shows: 'The model provider asked us to wait. Try again after 03:04:05 UTC on 2030-01-02.' },
     { kind: 'policy denied', last: 'model "model-b" is not admitted by policy: the policy filter rejected it', code: 'model_policy_denied',
-      shows: 'is not admitted by policy' },
+      shows: POLICY },
   ]
   const CARRIERS = ['error event', 'thrown stream', 'warning', 'done failed', 'status failed', 'session.run.failed', 'detached result']
+  /** The wire event that carries each failure's sentence; an error event otherwise (the route turns a producer's
+   *  session.run.failed into one). */
+  const CARRIED_TYPE: Record<string, string> = { 'done failed': 'done', 'status failed': 'status' }
 
-  /** One failure carrying `failure` on `carrier`: what reached the client and what was stored. */
+  /** One failure carrying `failure` on `carrier`: what reached the client, what was stored, and the sentence it shows. */
   async function trailFailure(carrier: string, failure: { message: string; code?: string; statusCode?: number }) {
     if (carrier === 'detached result') {
       const store = createMemoryTurnEventStore()
       const result = await runDetachedTurn({ store, turnId: 'detached-1', scopeId: 'thread-1',
         events: box([{ type: 'error', data: failure }]), log: () => {} })
-      return { wire: (await store.read('detached-1', 0)).map((row) => row.event).join('\n'), stored: JSON.stringify(result) }
+      return { wire: (await store.read('detached-1', 0)).map((row) => row.event).join('\n'), stored: JSON.stringify(result), shown: result.error }
     }
     const { message, code, statusCode } = failure
     const events: Record<string, unknown[]> = {
@@ -331,42 +346,44 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     }
     const result = await turn(events[carrier] ?? [],
       carrier === 'thrown stream' ? { severed: Object.assign(new Error(message), { code, status: statusCode }) } : {})
-    return { wire: result.wire, stored: JSON.stringify(result.row ?? null) }
+    const carried = result.streamed.filter((event) => event.type === (CARRIED_TYPE[carrier] ?? 'error'))
+      .map((event) => event.data as { message?: string; detail?: string } | undefined)
+      .find((data) => data?.message !== undefined || data?.detail !== undefined)
+    return { wire: result.wire, stored: JSON.stringify(result.row ?? null), shown: carried?.message ?? carried?.detail }
   }
 
   it.each(CARRIERS.flatMap((carrier) => TRAIL_REASONS.map((reason) => ({ carrier, ...reason }))))(
-    'reads a model failover trail on the $carrier by its last attempt ($kind): no route, status or model id',
-    async ({ carrier, kind, last, code, statusCode, shows }) => {
-      const { wire, stored } = await trailFailure(carrier, { message: trail(last), ...(code ? { code } : {}), ...(statusCode ? { statusCode } : {}) })
+    'reads a model failover trail on the $carrier by its last attempt ($kind) as the sentence for its class',
+    async ({ carrier, first, last, code, statusCode, shows }) => {
+      const failure = { message: trail(last, first), ...(code ? { code } : {}), ...(statusCode ? { statusCode } : {}) }
+      const { wire, stored, shown } = await trailFailure(carrier, failure)
 
       for (const fragment of TRAIL_FRAGMENTS) {
         expect(wire).not.toContain(fragment)
         expect(stored).not.toContain(fragment)
       }
-      if (kind === 'withheld' && carrier === 'warning') expect(wire).not.toContain('"type":"warning"')
-      else expect(wire).toContain(shows)
-      if (code) expect(wire).toContain(`"code":"${code}"`)
+      // No warning code here is allowed, so a warning carrier leaves nothing on the wire.
+      if (carrier === 'warning') expect(wire).not.toMatch(/"type":"(?:warning|notice)"/)
+      else expect(shown).toBe(shows)
+      if (code && carrier !== 'warning') expect(wire).toContain(`"code":"${code}"`)
     })
 
   it.each([
-    { kind: 'funding', card: true, shown: 'Insufficient credits. Add funds to continue.',
-      data: { code: 'insufficient_credits', message: 'Insufficient credits. Add funds to continue.' } },
-    { kind: 'admission', card: true, shown: 'Inference requires verified paid access. Add funds or activate a paid seat.',
+    { kind: 'funding', card: true, shown: FUNDING, data: { code: 'insufficient_credits', message: 'Insufficient credits. Add funds to continue.' } },
+    { kind: 'admission', card: true, shown: PAID,
       data: { message: `opencode execution failed: Inference requires verified paid access. Add funds or activate a paid seat. ${TOOL_LIST} (exit code 1)` } },
-    { kind: 'billing', card: false, shown: 'The provider refused payment for this call.',
+    { kind: 'billing', card: true, shown: FUNDING,
       data: { code: 'AGENT_EXECUTION_FAILED', statusCode: 402, message: 'opencode execution failed: The provider refused payment for this call.' } },
-    { kind: 'payment', card: false, shown: 'The account has no balance or plan for this request.',
-      data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance or plan for this request.' } },
-    { kind: 'model policy', card: false, shown: 'The selected model is outside the allowed models.',
-      data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the allowed models.' } },
-  ])('the $kind refusal keeps its own words, without the harness wrapper, where the person and the recovery UI read them', async ({ data, card, shown }) => {
+    { kind: 'payment', card: true, shown: FUNDING, data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance or plan for this request.' } },
+    { kind: 'model policy', card: false, shown: POLICY, data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the allowed models.' } },
+  ])('the $kind refusal reads the sentence written for its class, where the person and the recovery UI read it', async ({ data, card, shown }) => {
     const refused = await turn([{ type: 'error', data }])
 
-    const stored = `The sandbox agent returned an error before producing a visible answer.\n\nError: ${shown}`
-    expect(refused.text).toBe(stored)
-    expect(refused.row?.content).toBe(stored)
+    expect(refused.text).toBe(led(shown))
+    expect(refused.row?.content).toBe(led(shown))
     expect(refused.error?.message).toBe(shown)
-    expectNoRawReason(refused, ['execution failed', 'exit code', ...LIST_FRAGMENTS])
+    expectNoRawReason(refused, ['execution failed', 'exit code', 'Add funds or activate', 'refused payment', 'no balance or plan',
+      'outside the allowed', ...LIST_FRAGMENTS])
     // The recovery UI reads the live error event and the stored reason alike.
     expect(getChatFundingRecovery({ code: refused.error?.code, message: refused.error?.message }) !== null).toBe(card)
     expect(getChatFundingRecovery(refused.row!.content.split('\n\nError: ')[1]) !== null).toBe(card)
@@ -374,6 +391,58 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     // The same route withholds a runtime failure, so the pass-through is a decision, not the absence of one.
     const failed = await turn([{ type: 'error', data: { message: HARNESS_FAILURE } }])
     expect(failed.row?.content).toBe(PLAIN)
+  })
+
+  const ANSWER = 'Here is the answer.'
+  const ANSWERED = [textPart(ANSWER), { type: 'result', data: { finalText: ANSWER } }]
+  // Harness text no cleaning rule anticipated: each reads only its class's sentence, live and stored.
+  it.each([
+    { kind: 'a stack after "Insufficient credits"', error: FUNDING, text: led(FUNDING), leaks: ['/srv/', 'at charge'],
+      events: [{ type: 'error', data: { message: 'Insufficient credits\n    at charge (/srv/billing.js:10:5)\n    at run (/srv/app.js:20:1)' } }] },
+    { kind: 'a host and /v1 route without a scheme', error: PLAIN, text: PLAIN, leaks: ['example.test', '/v1/', 'socket hang up'],
+      events: [{ type: 'error', data: { message: 'request to router.example.test/v1/chat/completions failed: socket hang up' } }] },
+    { kind: 'a JSON 402 body', error: FUNDING, text: led(FUNDING), leaks: ['Payment required for', 'model-a', 'payment_required'],
+      events: [{ type: 'error', data: { statusCode: 402,
+        message: '{"error":{"code":402,"message":"Payment required for model-a","type":"payment_required"}}' } }] },
+    { kind: 'a data.error object with harness support details', error: PLAIN, text: PLAIN, leaks: RAW_FRAGMENTS,
+      events: [{ type: 'error', data: { error: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE },
+        details: { supportDetails: HARNESS_FAILURE } } }] },
+    { kind: 'a raw Codex error message', error: PLAIN, text: PLAIN, leaks: ['example.test', '/v1/', 'stream disconnected'],
+      events: [{ type: 'raw', data: { backend: 'codex', event: { type: 'error',
+        message: 'stream disconnected before completion: error sending request for url (https://api.example.test/v1/responses)' } } },
+      terminalError] },
+    { kind: 'a raw OpenCode retry message', notices: ['The model provider is busy; retrying at 03:04:05 UTC.'], text: ANSWER,
+      leaks: ['example.test', 'Provider returned'],
+      events: [{ type: 'raw', data: { backend: 'opencode', event: { type: 'retry', attempt: 1, next: Date.UTC(2030, 0, 2, 3, 4, 5),
+        message: 'Provider returned 503 from https://api.example.test/v1/chat' } } }, ...ANSWERED] },
+    { kind: 'a session.error data message', error: PLAIN, text: PLAIN, leaks: ['example.test', '/v1/', 'APIError'],
+      events: [{ type: 'session.error', data: { properties: { sessionID: 'session-1',
+        error: { name: 'APIError', data: { message: 'POST https://api.example.test/v1/chat returned 500' } } } } }, terminalError] },
+    { kind: 'details.stderr', error: PLAIN, text: PLAIN, details: { code: 'E1', retryable: false }, leaks: ['Traceback', '/srv/'],
+      events: [{ type: 'error', data: { code: 'AGENT_EXECUTION_FAILED', message: 'agent exited with code 1',
+        details: { stderr: 'Traceback (most recent call last):\n  File "/srv/agent.py", line 3', code: 'E1', retryable: false } } }] },
+    { kind: 'an unknown warning with a provider 503', text: ANSWER, leaks: ['example.test', '503 Service', 'PROVIDER_UNAVAILABLE'],
+      events: [{ type: 'warning', data: { code: 'PROVIDER_UNAVAILABLE',
+        message: 'Provider returned 503 Service Unavailable from https://api.example.test/v1' } }, ...ANSWERED] },
+  ])('$kind reads only the sentence for its class', async ({ events, error, text, notices, details, leaks }) => {
+    const result = await turn(events)
+
+    expect(result.error?.message).toBe(error)
+    expect(result.error?.details).toEqual(details)
+    expect(result.text).toBe(text)
+    expect(result.row?.content).toBe(text)
+    expect(result.streamed.filter((event) => event.type === 'notice').map((event) => event.text)).toEqual(notices ?? [])
+    expectNoRawReason(result, leaks)
+  })
+
+  it('classifies a 32 KB whitespace run in linear time', () => {
+    const person = personFacing({ log: () => {}, failedTurnText: PLAIN })
+    const reason = `All 2 model(s) failed. model-a: ${' '.repeat(16_384)} | model-b: Insufficient credits${' \t'.repeat(8_192)}x`
+    const started = performance.now()
+    const seen = person.view(reason)
+
+    expect(performance.now() - started).toBeLessThan(50)
+    expect(seen).toEqual({ class: 'funding', shown: FUNDING })
   })
 
   it('keeps the real reason for the server: its warn log and the route failure hooks, never the wire', async () => {
