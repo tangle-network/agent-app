@@ -331,7 +331,7 @@ const HOUR_MS = 3_600_000
  * Assistant-row openers agent-app writes ITSELF when a sandbox turn fails.
  *
  * Kept byte-identical to the strings `createSandboxChatProducer` composes
- * (`src/chat-routes/sandbox-producer.ts`). They are shell vocabulary, not
+ * (`src/chat-routes/sandbox-producer.ts`, `failure-wording.ts`). They are shell vocabulary, not
  * product domain, so recognising them is this package's job — a product on
  * the shared producer gets a correct sweep with no configuration.
  *
@@ -348,6 +348,7 @@ export const SHELL_ERROR_REPLY_PREFIXES: readonly string[] = [
   'The sandbox model stream stopped before a clean completion.',
   'The sandbox agent returned an error before producing a visible answer.',
   "The assistant's model refused its access key, so this message was not answered.",
+  'That answer stopped before it finished. Please send your question again.',
 ]
 
 /**

@@ -350,11 +350,9 @@ describe('createD1TurnHealthSource — an error row is not an answer', () => {
     // These are agent-app's OWN words, not product domain — the sandbox
     // producer composes them. If someone rewords the producer without
     // updating the list, dead threads start looking answered, so this fails
-    // CI instead.
-    const producer = await readFile(
-      new URL('../../src/chat-routes/sandbox-producer.ts', import.meta.url),
-      'utf8',
-    )
+    // CI instead. The producer and its failure wording module compose them.
+    const producer = (await Promise.all(['sandbox-producer.ts', 'failure-wording.ts'].map((file) =>
+      readFile(new URL(`../../src/chat-routes/${file}`, import.meta.url), 'utf8')))).join('\n')
     for (const prefix of SHELL_ERROR_REPLY_PREFIXES) {
       expect(producer).toContain(prefix)
     }

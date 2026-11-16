@@ -2,7 +2,7 @@ import type { SandboxChatProducerOptions } from './sandbox-producer'
 import type { ChatTurnModelAttribution } from './turn-routes'
 import { asRecord, asString, type JsonRecord } from '../stream/index'
 import { buildModelChain } from '../model-resolution/failover'
-import { streamWithModelFailover, resolveEmptyTurnRetries, summarizeFailoverReason, type ModelFailoverStreamHandle } from './model-failover-stream'
+import { streamWithModelFailover, resolveEmptyTurnRetries, type ModelFailoverStreamHandle } from './model-failover-stream'
 
 function parseEffectiveBackend(data: JsonRecord): Omit<
   ChatTurnModelAttribution,
@@ -77,11 +77,10 @@ export function createSandboxModelSource(options: SandboxChatProducerOptions, lo
           id: `model-fallback-${modelNoticeCount}`,
           // Named models on both sides: a quality regression after a downgrade
           // must be attributable to the model that actually answered. The
-          // REASON is condensed — a real edge 5xx arrives as Cloudflare's HTML
-          // error page, and the raw text put `<!DOCTYPE html><!--[if lt IE 7]>…`
-          // into the customer's transcript. The verbatim text is still on
-          // `modelFailover.attempts[].reason` for the operator.
-          text: `${info.from} was unavailable (${summarizeFailoverReason(info.reason)}) — answered with ${info.to} instead.`,
+          // reason stays off the transcript (an upstream's own text can be an
+          // HTML error page or a harness report); the failover stream logs it,
+          // and `modelFailover.attempts[].reason` keeps it for the operator.
+          text: `The model ${info.from} stopped; trying ${info.to}.`,
         })
         options.onModelFallback?.(info)
       },

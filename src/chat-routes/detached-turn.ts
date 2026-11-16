@@ -120,6 +120,8 @@ export interface DetachedTurnOptions {
   /** Opt-in eager promotion of harness-emitted `file` parts. Forwarded to the
    *  producer (see its docs). */
   promoteFilePart?: SandboxChatProducerOptions['promoteFilePart']
+  /** What the person reads for a failure whose reason is withheld. Forwarded to the producer. */
+  failedTurnText?: SandboxChatProducerOptions['failedTurnText']
   /** Authoritative final receipt, consulted whenever a re-invoke finds a prior
    *  buffer: (a) an already-`complete` turn returns it as the cached result,
    *  (b) a `running` turn (crash mid-run) uses it to detect a run that finished
@@ -417,6 +419,7 @@ export async function runDetachedTurn(opts: DetachedTurnOptions): Promise<Detach
     isRenderableInteraction: opts.isRenderableInteraction,
     declineInteraction: opts.declineInteraction,
     promoteFilePart: opts.promoteFilePart,
+    failedTurnText: opts.failedTurnText,
     log: opts.log,
   })
 

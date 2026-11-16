@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getChatFundingRecovery } from '../../src/web-react/turn-funding-recovery'
+import { getChatFundingRecovery } from '../../src/web/turn-funding-recovery'
 
 describe('chat funding recovery', () => {
   it.each([

@@ -52,7 +52,7 @@ export interface FailurePatterns {
 export const DEFAULT_FAILURE_TEXT: readonly RegExp[] = [
   /\b[a-z]+(?:_[a-z]+)*\.[a-z]+(?:_[a-z]+)*_(?:failed|unavailable|timeout)\b/,
   /\bAPIError \d{3}\b/,
-  /stopped before a clean completion/i,
+  /stopped before a clean completion|answer stopped before it finished/i,
   /Failed to connect to Sandbox API/i,
   /\bbilling\.balance_required\b|Add balance or upgrade your plan/i,
   /Internal Server Error/,
