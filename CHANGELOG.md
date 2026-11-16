@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.10
+
+- fix(chat-routes): one person-facing filter for every sandbox producer event (#1549)
+
 ## 4.0.9
 
 - fix(chat-routes): a failed sandbox turn shows one plain sentence, never the harness reason (#1547)
