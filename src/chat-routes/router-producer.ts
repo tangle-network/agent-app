@@ -113,7 +113,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
           // The model stopped reasoning when it called the tool.
           reasoningClock.settle(event.startedAt)
           if (event.status === 'running') {
-            if (textPart) narration.add(textPart)
+            // Text before an action tool (save, send) is the answer it acts on, not narration.
+            if (textPart && options.tools?.find(tool => tool.name === event.toolName)?.effect !== 'action') narration.add(textPart)
             textPart = null
             const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
               state: { status: 'running', input: event.input, time: { start: event.startedAt } } }

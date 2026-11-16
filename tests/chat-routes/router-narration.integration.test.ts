@@ -8,18 +8,26 @@ import type { RouterTurnOptions } from '../../src/runtime/router-turn'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { sqliteD1 } from '../launch-invariants/sqlite-d1'
 
-type Case = 'answered' | 'tool-failed'
+type Case = 'answered' | 'tool-failed' | 'saved'
 
 /**
  * Real HTTP model and tool peers, the chat routes' Router producer and SQLite persistence; no model spend.
  * A round's text before its tool call narrates the work ("Let me look at the brief."): it is stored as a
  * reasoning part and left out of the answer when the model answers after the tool, and kept as the answer
- * when nothing follows the tool (here the tool fails and the model writes nothing more).
+ * when nothing follows the tool (here the tool fails and the model writes nothing more). Text before an
+ * action tool (`effect: 'action'`, here a save) is the answer the action acts on, so it stays the answer.
  */
-it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call out of the answer: %s', async mode => {
+const MEMO = 'Memo for case ACME-1234: ship Friday, the launch copy stays warm and plain-spoken.'
+
+it.each<Case>(['answered', 'tool-failed', 'saved'])('keeps narration before a tool call out of the answer: %s', async mode => {
   const { sqlite } = sqliteD1('CREATE TABLE messages(id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, parts TEXT);')
   let calls = 0
   const peer = createServer((request, response) => {
+    if (request.url === '/save') {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({ saved: true }))
+      return
+    }
     if (request.url === '/brief') {
       response.writeHead(mode === 'answered' ? 200 : 503, { 'content-type': 'application/json' })
       response.end(JSON.stringify(mode === 'answered' ? { brief: 'Warm, plain-spoken, no puns.' } : { error: 'unavailable' }))
@@ -30,10 +38,13 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
       const bytes = Buffer.concat(chunks)
       const body = JSON.parse((request.headers['content-encoding'] === 'gzip' ? gunzipSync(bytes) : bytes).toString())
       calls++
-      const delta = calls === 1
-        ? { content: 'Let me look at the brief for case ACME-1234.', tool_calls: [{ index: 0, id: 'brief-1', type: 'function',
-          function: { name: 'read_brief', arguments: '{}' } }] }
-        : { content: mode === 'answered' ? 'Here are three taglines that fit the brief.' : '' }
+      const delta = calls === 1 && mode === 'saved'
+        ? { content: MEMO, tool_calls: [{ index: 0, id: 'save-1', type: 'function',
+          function: { name: 'save_document', arguments: '{}' } }] }
+        : calls === 1
+          ? { content: 'Let me look at the brief for case ACME-1234.', tool_calls: [{ index: 0, id: 'brief-1', type: 'function',
+            function: { name: 'read_brief', arguments: '{}' } }] }
+          : { content: { answered: 'Here are three taglines that fit the brief.', 'tool-failed': '', saved: 'Saved.' }[mode] }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       response.end(`data: ${JSON.stringify({ model: body.model, choices: [{ index: 0, delta,
         finish_reason: calls === 1 ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`)
@@ -49,7 +60,9 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
         const reply = await fetch(`${baseUrl}/brief`, { signal: context.signal })
         if (!reply.ok) throw Object.assign(new Error('Brief unavailable'), { code: 'brief_unavailable' })
         return reply.json()
-      } }],
+      } },
+    { name: 'save_document', description: 'Save the memo.', inputSchema: { type: 'object' }, effect: 'action',
+      async run(_args, context) { return (await fetch(`${baseUrl}/save`, { method: 'POST', signal: context.signal })).json() } }],
   }
   const store: ChatTurnMessageStore = {
     async listMessages(threadId) {
@@ -83,7 +96,15 @@ it.each<Case>(['answered', 'tool-failed'])('keeps narration before a tool call o
     const [assistant] = sqlite.prepare("SELECT content, parts FROM messages WHERE role = 'assistant'").all() as Array<{ content: string; parts: string }>
     const parts = (JSON.parse(assistant!.parts) as Array<Record<string, unknown>>)
       .map(part => part.type === 'tool' ? { type: 'tool', status: (part.state as { status: string }).status } : { type: part.type, text: part.text })
-    if (mode === 'answered') {
+    if (mode === 'saved') {
+      // The memo is the answer the save acts on; the confirmation after the save follows it.
+      expect(assistant!.content).toBe('Memo for case [REDACTED]: ship Friday, the launch copy stays warm and plain-spoken.\n\nSaved.')
+      expect(parts).toEqual([
+        { type: 'text', text: 'Memo for case [REDACTED]: ship Friday, the launch copy stays warm and plain-spoken.' },
+        { type: 'tool', status: 'completed' },
+        { type: 'text', text: 'Saved.' },
+      ])
+    } else if (mode === 'answered') {
       expect(assistant!.content).toBe('Here are three taglines that fit the brief.')
       expect(parts).toEqual([
         { type: 'reasoning', text: 'Let me look at the brief for case [REDACTED].' },

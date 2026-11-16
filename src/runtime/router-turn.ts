@@ -37,6 +37,12 @@ export interface RouterTurnTool {
   description: string
   /** JSON Schema for the arguments object. */
   inputSchema: Record<string, unknown>
+  /**
+   * What calling this tool does. `'lookup'` (the default) fetches what the answer needs, so text a round
+   * writes before calling it narrates the work. `'action'` acts on the answer (save, send, create), so
+   * text written before it is the answer itself and stays the answer.
+   */
+  effect?: 'lookup' | 'action'
   run(args: Record<string, unknown>, context: RouterTurnToolContext): Promise<unknown>
 }
 
@@ -102,9 +108,10 @@ export interface RouterTurnOutcome {
   /** Every text segment the model wrote, joined by blank lines. */
   text: string
   /**
-   * The turn's answer: the text written after the last tool call. Text a round writes before calling a tool
-   * narrates the work ("Let me check your vault"), and is not the answer. When nothing was written after the
-   * last tool call, the answer is `text`, so narration that is the turn's only text is still shown.
+   * The turn's answer: `text` without its narration. Text a round writes before calling a lookup tool
+   * narrates the work ("Let me check your vault"), and is not the answer; text before an action tool
+   * (`effect: 'action'`) is the answer it acts on, and stays. When everything written was narration, the
+   * answer is `text`, so narration that is the turn's only text is still shown.
    */
   answer: string
   /** The model the router reports having served, when it said. */
@@ -615,9 +622,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         } else if (event.type === 'tool_call_start') {
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
         } else if (event.type === 'tool_call') {
-          if (segmentOpen) narrated.add(segments.length - 1)
-          segmentOpen = false
           const tool = byFunction.get(event.call.toolName)
+          // Text before a lookup narrates the work; text before an action (save, send) is the answer it acts on.
+          if (segmentOpen && tool?.effect !== 'action') narrated.add(segments.length - 1)
+          segmentOpen = false
           // The loop yields this event before extracting its call. Normalize a missing id once,
           // so execution, progress, result and replay history reuse the displayed identity.
           event.call.toolCallId ||= callIdOf(undefined, event.call.toolName)
