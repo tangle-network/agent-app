@@ -12,7 +12,8 @@ const MIN_SECRET_LENGTH = 8
 
 export type ValueRedactor = <T>(value: T) => T
 
-/** A redactor for these values, or undefined when none qualifies. Longest first, so a value that contains another wins. */
+/** A redactor for these values, or undefined when none qualifies: object keys and string values alike. Longest first, so
+ *  a value that contains another wins. */
 export function valueRedactor(values: readonly string[] | undefined): ValueRedactor | undefined {
   const secrets = [...new Set((values ?? []).filter((v) => typeof v === 'string' && v.length >= MIN_SECRET_LENGTH))]
     .sort((a, b) => b.length - a.length)
@@ -20,7 +21,7 @@ export function valueRedactor(values: readonly string[] | undefined): ValueRedac
   const text = (s: string) => secrets.some((v) => s.includes(v)) ? secrets.reduce((acc, v) => acc.split(v).join(REDACTED), s) : s
   const walk = (v: unknown): unknown => typeof v === 'string' ? text(v)
     : Array.isArray(v) ? v.map(walk)
-    : v !== null && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, walk(x)]))
+    : v !== null && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [text(k), walk(x)]))
     : v
   return walk as ValueRedactor
 }
