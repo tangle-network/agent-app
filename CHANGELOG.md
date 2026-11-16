@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.8
+
+- test(chat): replace trace coverage floor with span order and nesting (#1548)
+
 ## 4.0.7
 
 - fix(billing): a transient cleanup retry past the child's expiry still blocks issuance (#1545)
