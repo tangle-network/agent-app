@@ -244,6 +244,19 @@ async function hasBootstrapMarker(box: SandboxInstance, key: string): Promise<bo
   }
 }
 
+/**
+ * Remove this box's bootstrap markers, so its next start runs the bootstrap again. Call it when a turn fails on
+ * something the bootstrap provides (a runtime it installs, a folder it creates): without it, the box would stay
+ * broken until the next release or for up to a day. Best effort; returns whether the box confirmed the removal.
+ */
+export async function forgetBootstrap(box: SandboxInstance): Promise<boolean> {
+  try {
+    return (await box.exec(`rm -rf ${BOOTSTRAP_MARKERS}`)).exitCode === 0
+  } catch {
+    return false
+  }
+}
+
 async function writeBootstrapMarker(box: SandboxInstance, key: string): Promise<void> {
   try {
     await box.exec(`mkdir -p ${BOOTSTRAP_MARKERS} && : > ${BOOTSTRAP_MARKERS}/${key}`)

@@ -48,6 +48,7 @@ import {
   ensureWorkspaceSandbox,
   reuseWorkspaceSandbox,
   dropTrustedBox,
+  forgetBootstrap,
   createCacheReuseStore,
   type ReuseStateStore,
   type SharedReuseState,
@@ -5567,6 +5568,7 @@ describe('warm reuse round trips', () => {
         return { stdout: '', stderr: '', exitCode: fresh ? 0 : 1 }
       }
       if (key && command.startsWith('mkdir -p')) { home.set(key, Date.now()); return { stdout: '', stderr: '', exitCode: 0 } }
+      if (command.startsWith('rm -rf') && command.includes('.agent-app/bootstrapped')) { home.clear(); return { stdout: '', stderr: '', exitCode: 0 } }
       return { stdout: 'alive', stderr: '', exitCode: 0 }
     })
     const strict: EgressPolicy = { mode: 'strict', allowDomains: ['a.example.com'] }
@@ -5614,11 +5616,18 @@ describe('warm reuse round trips', () => {
     await ensureWorkspaceSandbox(shell(), scope)
     expect(bootstrap).toHaveBeenCalledTimes(6)
 
+    // A turn that failed on something the bootstrap provides forgets it, so the next start repairs the box.
+    await ensureWorkspaceSandbox(shell(), scope)
+    expect(bootstrap).toHaveBeenCalledTimes(6)
+    expect(await forgetBootstrap(running)).toBe(true)
+    await ensureWorkspaceSandbox(shell(), scope)
+    expect(bootstrap).toHaveBeenCalledTimes(7)
+
     // A product that declares no build bootstraps on every reuse.
     const undeclared = shellFor({ apiKey: 'k', baseUrl: 'u' }, { egressPolicy, bootstrap, livenessProbe: { cacheTtlMs: 0 } })
     await ensureWorkspaceSandbox(undeclared, scope)
     await ensureWorkspaceSandbox(undeclared, scope)
-    expect(bootstrap).toHaveBeenCalledTimes(8)
+    expect(bootstrap).toHaveBeenCalledTimes(9)
   })
 
   it('hands what one isolate learned about a box to the next through the reuse store', async () => {

@@ -8,8 +8,8 @@ import { DatabaseSync } from 'node:sqlite'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import { AGENT_PROFILE_D1_SCHEMA_SQL, createD1ProfileRevisionStore, type ProfileD1Database, type ProfileD1Statement } from '../src/agent-profiles/d1'
-import { admitProfileTurn, followProductRelease, PROFILE_PROMPT_HISTORY_MAX, proposeRevision, readProfileAdmission,
-  switchProfile, ProfileConflictError, type ProfileRevision } from '../src/agent-profiles/index'
+import { admitProfileTurn, createTextProfile, followProductRelease, PROFILE_PROMPT_HISTORY_MAX, profileTools, proposeRevision,
+  readProfileAdmission, switchProfile, ProfileConflictError, type ProfileRevision } from '../src/agent-profiles/index'
 
 const PLAN = `sha256:${'a'.repeat(64)}`
 
@@ -201,6 +201,58 @@ describe('profile turn pin', () => {
       expect(trips.count - before).toBe(1)
       // One more revision cuts the read before the import, so nothing shows the prompt is the product's.
       expect((await followProductRelease(store, longer!, release, ['app-release'])).prompt?.systemPrompt).toBe(shipped)
+    } finally { sqlite.close() }
+  })
+
+  // Before this, profile.read showed the stored import-day prompt while the turn ran the release's, so an agent's
+  // self-edit stored the old product text as its own and the profile stopped following releases.
+  it('reads, edits and copies the text a turn runs, and an edit that keeps the shown prompt keeps following', async () => {
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const store = createD1ProfileRevisionStore(d1(sqlite).database)
+    const workspaceId = `tools-${crypto.randomUUID()}`
+    const prompt = (systemPrompt: string): AgentProfile => ({ name: 'Director', prompt: { systemPrompt } })
+    let release = prompt('Deliver the ask first.')
+    const followRelease = (revision: ProfileRevision) => followProductRelease(store, revision, release, ['app-release'])
+    try {
+      const imported = await proposeRevision({ store, workspaceId, profileId: 'director', expectedRevisionId: null,
+        profile: prompt('Ask one question, then halt and wait.'), knowledgeText: '', planDigest: PLAN,
+        author: { kind: 'person', id: 'app-release' }, actorRole: 'owner', reason: 'Import' })
+      const tools = profileTools({ store, followRelease, planDigest: async () => PLAN,
+        activeTurn: async () => ({ workspaceId, profileId: 'director', revisionId: imported.id, memberId: 'owner', role: 'owner' as const }) })
+      const run = (name: string, args: object) =>
+        tools.find(tool => tool.name === name)!.run(args as never, {} as never) as Promise<Record<string, unknown>>
+
+      const read = await run('profile.read', {})
+      expect(read.systemPrompt).toBe('Deliver the ask first.')
+      // The agent hands back the prompt it read with a new instruction: the stored prompt stays the import's.
+      const updated = await run('profile.update', { expectedRevisionId: read.revisionId,
+        changes: { systemPrompt: read.systemPrompt, instructions: ['Keep answers short.'] } })
+      const edited = await store.getRevision(workspaceId, 'director', updated.revisionId as string)
+      expect(edited?.profile.prompt).toEqual({ systemPrompt: 'Ask one question, then halt and wait.', instructions: ['Keep answers short.'] })
+      // So the next release still reaches it.
+      release = prompt('Deliver the ask, then offer one next step.')
+      expect((await followRelease(edited!)).prompt?.systemPrompt).toBe('Deliver the ask, then offer one next step.')
+
+      // A custom profile stores no prompt, so it runs the product's current one at this release and every later one.
+      const custom = await createTextProfile({ store, workspaceId, baselineProfileId: 'director', existingProfiles: [{ name: 'Director' }],
+        name: 'Brief', instructions: 'One paragraph.', authorId: 'owner', actorRole: 'owner', planDigest: () => PLAN, followRelease })
+      expect(custom.profile.prompt).toEqual({ instructions: ['Keep answers short.', 'One paragraph.'] })
+      expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask, then offer one next step.')
+      release = prompt('Deliver the ask with its sources.')
+      expect((await followRelease(custom)).prompt?.systemPrompt).toBe('Deliver the ask with its sources.')
+
+      // A prompt that differs from the shown one is the person's: stored, and kept at later releases and in a copy.
+      const shown = await run('profile.read', {})
+      const french = await run('profile.update', { expectedRevisionId: shown.revisionId, changes: { systemPrompt: 'Answer in French.' } })
+      const own = await store.getRevision(workspaceId, 'director', french.revisionId as string)
+      expect(own?.profile.prompt?.systemPrompt).toBe('Answer in French.')
+      release = prompt('Deliver the ask, then stop.')
+      expect((await followRelease(own!)).prompt?.systemPrompt).toBe('Answer in French.')
+      const copy = await createTextProfile({ store, workspaceId, baselineProfileId: 'director',
+        existingProfiles: [{ name: 'Director' }, { name: 'Brief' }], name: 'Brief FR', instructions: '', authorId: 'owner',
+        actorRole: 'owner', planDigest: () => PLAN, followRelease })
+      expect(copy.profile.prompt?.systemPrompt).toBe('Answer in French.')
     } finally { sqlite.close() }
   })
 })

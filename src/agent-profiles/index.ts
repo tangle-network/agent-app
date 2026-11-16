@@ -270,6 +270,11 @@ export interface CreateTextProfileInput {
   actorRole: 'owner' | 'manager' | 'member' | 'viewer'
   /** Product computes ADC's hashWorkspacePlan for the complete authored snapshot. */
   planDigest: (profile: AgentProfile) => string | Promise<string>
+  /** The profile a turn runs for a stored revision (usually {@link followProductRelease}). With it, a new profile
+   *  whose baseline runs the release's system prompt stores none, so it runs the product's current one at every
+   *  release, not a stored copy; a system prompt a person wrote on the baseline is copied. A read path that shows the
+   *  prompt must read it through the same function. */
+  followRelease?: (revision: ProfileRevision) => Promise<AgentProfile>
   now?: number
 }
 
@@ -290,11 +295,19 @@ export async function createTextProfile(input: CreateTextProfileInput): Promise<
   // ambiguous text command even when both read the catalog before either writes.
   const profileId = `custom-${sha256Utf8(`${input.workspaceId}\0${normalizedName}`).slice(7, 39)}`
   const addedInstruction = input.instructions.trim()
+  const text = input.followRelease ? await input.followRelease(baseline) : baseline.profile
+  // Where the baseline runs the release's system prompt, the new profile stores none: an absent one runs the
+  // release's at every turn (followProductRelease), where a copy of today's would stop following at the next release.
+  // A prompt a person wrote on the baseline is copied. The release's is what the baseline runs with no prompt of its own.
+  const { systemPrompt: followed, ...withoutPrompt } = text.prompt ?? {}
+  const release = input.followRelease
+    && (await input.followRelease({ ...baseline, profile: { ...baseline.profile, prompt: withoutPrompt } })).prompt?.systemPrompt
+  const prompt = input.followRelease && followed === release ? withoutPrompt : text.prompt
   const profile = bindProfileText(baseline.profile, {
-    ...baseline.profile, name,
+    ...text, name,
     prompt: {
-      ...baseline.profile.prompt,
-      instructions: [...(baseline.profile.prompt?.instructions ?? []),
+      ...prompt,
+      instructions: [...(text.prompt?.instructions ?? []),
         ...(addedInstruction ? [addedInstruction] : [])],
     },
   })
@@ -602,6 +615,12 @@ export interface ProfileToolContext<TTurn extends ProfileToolTurn = ProfileToolT
    * Structurally matches agent-runtime's `WorkspaceStore`.
    */
   memory?: ProfileMemoryStore
+  /**
+   * The profile a turn runs for a stored revision (usually {@link followProductRelease}). `profile.read` shows this
+   * text, and a `profile.update` that hands back its system prompt unchanged keeps the stored one, so an agent's
+   * edit never stores a release's prompt as its own and the profile keeps following releases.
+   */
+  followRelease?: (revision: ProfileRevision) => Promise<AgentProfile>
 }
 
 /** The subset of agent-runtime's `WorkspaceStore` that `profile.remember` uses. */
@@ -627,10 +646,11 @@ export function profileTools<TTurn extends ProfileToolTurn>(
       if (turn.role !== 'owner' && turn.role !== 'manager') throw new ProfileAccessError('Profile management is required')
       const revision = await context.store.getActiveRevision(turn.workspaceId, turn.profileId)
       if (!revision) throw new ProfileConflictError('Profile revision is unavailable')
+      const shown = context.followRelease ? await context.followRelease(revision) : revision.profile
       return { profileId: turn.profileId, revisionId: revision.id, currentTurnRevisionId: turn.revisionId,
-        name: revision.profile.name, description: revision.profile.description ?? null,
-        systemPrompt: revision.profile.prompt?.systemPrompt ?? null,
-        instructions: revision.profile.prompt?.instructions ?? [], knowledgeText: revision.knowledgeText }
+        name: shown.name, description: shown.description ?? null,
+        systemPrompt: shown.prompt?.systemPrompt ?? null,
+        instructions: shown.prompt?.instructions ?? [], knowledgeText: revision.knowledgeText }
     },
   }, {
     name: 'profile.update',
@@ -642,7 +662,11 @@ export function profileTools<TTurn extends ProfileToolTurn>(
       if (turn.role !== 'owner' && turn.role !== 'manager') throw new ProfileAccessError('Profile management is required')
       const current = await context.store.getActiveRevision(turn.workspaceId, turn.profileId)
       if (!current || current.id !== expectedRevisionId) throw new ProfileConflictError('The profile changed; read it again')
-      const next = profileTextChange(current, changes)
+      // The prompt profile.read showed, handed back unchanged, is not the agent's text: the stored one stays.
+      const shownPrompt = context.followRelease ? (await context.followRelease(current)).prompt?.systemPrompt : undefined
+      const { systemPrompt: _shown, ...withoutPrompt } = changes
+      const unchangedPrompt = shownPrompt !== undefined && changes.systemPrompt === shownPrompt
+      const next = profileTextChange(current, unchangedPrompt ? withoutPrompt : changes)
       const revision = await proposeRevision({ store: context.storeForTurn?.(turn) ?? context.store,
         workspaceId: turn.workspaceId,
         profileId: turn.profileId, expectedRevisionId, ...next,
