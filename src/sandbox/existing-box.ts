@@ -189,13 +189,67 @@ export async function finalizeExistingBox(
     const renewed = await pushRuntimeEnv(finalBox, runtimeEnv, undefined, deadline)
     if (!renewed.succeeded) throw renewed.error
   }
-  if (shell.bootstrap) {
-    const boot = await shell.bootstrap(finalBox, scope)
-    if (!boot.succeeded) {
-      throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
-    }
-  }
+  await bootstrapBox(shell, finalBox, scope, harness, stage, name, false)
   return finalBox
+}
+
+/** Where a box records the bootstrap keys it ran: one empty file per key in the agent's home, so a record lasts as
+ *  long as the box's filesystem and is gone when the home is wiped or the box is replaced. */
+const BOOTSTRAP_MARKERS = '"$HOME/.agent-app/bootstrapped"'
+/** A marker older than this no longer stands in for the bootstrap, which bounds how long files the bootstrap wrote and
+ *  something later deleted can go unrepaired: a day, or the next release, whichever comes first. */
+const BOOTSTRAP_MARKER_MAX_AGE_MINUTES = 24 * 60
+
+/**
+ * Run the product bootstrap unless this box ran it under the same key within a day: the build the product declares
+ * ({@link SandboxRuntimeConfig.bootstrapDigest}), the harness, the egress policy and the scope. Reading the marker is
+ * one exec; the bootstrap it stands for is several. A fresh box has none to read. The marker is written only after the
+ * bootstrap succeeds, and a failed write costs the next reuse a bootstrap. With no declared build, every call runs it.
+ */
+export async function bootstrapBox(
+  shell: SandboxRuntimeConfig,
+  box: SandboxInstance,
+  scope: SandboxScope,
+  harness: Harness,
+  stage: string,
+  name: string,
+  fresh: boolean,
+): Promise<void> {
+  const bootstrap = shell.bootstrap
+  if (!bootstrap) return
+  const key = await bootstrapKey(shell, scope, harness)
+  if (key !== undefined && !fresh && await hasBootstrapMarker(box, key)) return
+  const boot = await bootstrap.call(shell, box, scope)
+  if (!boot.succeeded) {
+    throw new Error(`bootstrap failed on ${stage} box ${name}`, { cause: boot.error })
+  }
+  if (key !== undefined) await writeBootstrapMarker(box, key)
+}
+
+async function bootstrapKey(shell: SandboxRuntimeConfig, scope: SandboxScope, harness: Harness): Promise<string | undefined> {
+  if (!shell.bootstrapDigest) return undefined
+  const build = await shell.bootstrapDigest(scope)
+  if (!build) return undefined
+  const egress = shell.egressPolicy ? normalizedEgressPolicy(shell.egressPolicy) : null
+  return createHash('sha256')
+    .update(JSON.stringify([build, harness, egress, scope.workspaceId, scope.userId ?? null]), 'utf8').digest('hex')
+}
+
+async function hasBootstrapMarker(box: SandboxInstance, key: string): Promise<boolean> {
+  try {
+    const fresh = `find ${BOOTSTRAP_MARKERS} -maxdepth 1 -name ${key} -mmin -${BOOTSTRAP_MARKER_MAX_AGE_MINUTES} 2>/dev/null`
+    return (await box.exec(`test -n "$(${fresh})"`)).exitCode === 0
+  } catch {
+    return false
+  }
+}
+
+async function writeBootstrapMarker(box: SandboxInstance, key: string): Promise<void> {
+  try {
+    await box.exec(`mkdir -p ${BOOTSTRAP_MARKERS} && : > ${BOOTSTRAP_MARKERS}/${key}`)
+  } catch {
+    // The next reuse finds no marker and bootstraps again.
+  }
 }
 
 function canonicalizeJson(value: unknown): unknown {

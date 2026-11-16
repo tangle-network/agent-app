@@ -80,7 +80,8 @@ export interface LivenessProbeConfig {
    * every reuse.
    *
    * Only the exec probe is cached. Runtime readiness, deferred-file
-   * materialization, and bootstrap still run on every reuse, and the egress
+   * materialization, and bootstrap (unless {@link SandboxRuntimeConfig.bootstrapDigest}
+   * names a build this box already ran it under) still run on every reuse, and the egress
    * policy and runtime environment are checked as {@link SandboxRuntimeConfig.egressPolicy}
    * and {@link SandboxRuntimeConfig.runtimeEnv} describe. A box that dies during
    * this window is surfaced by the first call on it: a caller whose first call
@@ -196,6 +197,18 @@ export interface SandboxRuntimeConfig {
   // One-shot post-running bootstrap, on BOTH create and reuse paths (idempotency
   // is the closure's job — it owns the marker check).
   bootstrap?: (box: SandboxInstance, scope: SandboxScope) => Promise<Outcome<void>>
+  /**
+   * The served build this bootstrap belongs to, such as the deploy sha. A box
+   * that ran {@link bootstrap} under the same build, harness, egress policy and
+   * scope keeps a marker file for it, and a reuse that finds a marker younger
+   * than 24 hours skips the bootstrap; a new release runs it once more on every
+   * box. If something deletes what the bootstrap wrote, the box is repaired at
+   * the next release or within a day, not on the next start, so a bootstrap that
+   * must repair on every start declares no build, and neither does a per-turn
+   * lifecycle. Declare the build id, never a hash of the bootstrap's own files.
+   * Without it, the bootstrap runs on every reuse.
+   */
+  bootstrapDigest?: (scope: SandboxScope) => string | Promise<string>
   // Reuse health gate + sidecar liveness probe.
   livenessProbe?: LivenessProbeConfig
   // Enable browser terminal endpoints on newly-created sandboxes.
