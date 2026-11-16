@@ -2307,7 +2307,7 @@ Source: `src/billing/index.ts`
 
 ### `DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS`
 
-`const` — Default reuse floor: a 15 min turn plus a 5 min margin; this package sets no turn limit, so longer turns pass their own.
+`const` — Default child-key reuse floor; set minRemainingLifetimeMs to cover the caller's execution policy and safety margin.
 
 ```ts
 number
