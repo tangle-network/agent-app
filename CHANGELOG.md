@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.11
+
+- fix(billing): reuse a child key only while it outlives one turn (#1550)
+
 ## 4.0.10
 
 - fix(chat-routes): one person-facing filter for every sandbox producer event (#1549)
