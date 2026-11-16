@@ -107,101 +107,33 @@ function replayableExecution(run: Pick<SessionExecutionInfo, 'eventCount'>): boo
 }
 
 /**
- * Serialized UTF-8 budget for one terminal receipt. A Cloudflare Workflow
- * refuses a step result over 1 MiB and D1 refuses a row over 2 MB, and a
- * receipt approaches both as tool payloads accumulate over a long turn.
+ * Serialized UTF-8 budget for inline native completion checkpoints and final
+ * Workflow output. Product transcript storage retains its own separate limit.
  */
 export const NATIVE_COMPLETION_RECEIPT_MAX_BYTES = 900 * 1024
 
-/** Per-string caps tried in order until a receipt fits its budget. */
-// Status, ids and paths stay well under the smallest cap.
-const RECEIPT_STRING_CAPS = [16_384, 4_096, 1_024, 256] as const
-
 const encoder = new TextEncoder()
 
-function serializedBytes(value: unknown): number {
-  return encoder.encode(JSON.stringify(value)).length
-}
-
-function capString(value: string, cap: number): string {
-  if (value.length <= cap) return value
-  return `${value.slice(0, cap)}…[truncated ${value.length - cap} characters; the Sandbox session keeps the full value]`
-}
-
-function capStrings(value: unknown, cap: number): unknown {
-  if (typeof value === 'string') return capString(value, cap)
-  if (Array.isArray(value)) return value.map((item) => capStrings(item, cap))
-  const object = record(value)
-  if (!object) return value
-  return Object.fromEntries(Object.entries(object).map(([key, item]) => [key, capStrings(item, cap)]))
-}
-
-/** Tool payloads and reasoning shrink; the answer text, files and interactions do not. */
-function capReceiptPart(part: Record<string, unknown>, cap: number): Record<string, unknown> {
-  const type = String(part.type ?? '')
-  if (type === 'tool') {
-    const state = record(part.state)
-    if (!state) return part
-    const capped = capStrings(state, cap) as Record<string, unknown>
-    if (serializedBytes(capped) === serializedBytes(state)) return part
-    return { ...part, state: { ...capped, metadata: { ...record(capped.metadata), receiptTruncated: true } } }
-  }
-  if (type === 'reasoning' && typeof part.text === 'string' && part.text.length > cap) {
-    return { ...part, text: capString(part.text, cap), receiptTruncated: true }
-  }
-  return part
-}
-
-/** Last resort for a receipt whose part count alone exceeds the budget. */
-function skeletonPart(part: Record<string, unknown>): Record<string, unknown> | null {
-  const type = String(part.type ?? '')
-  if (type === 'reasoning') return null
-  if (type !== 'tool') return part
-  const state = record(part.state)
-  return {
-    type: 'tool',
-    ...(part.id !== undefined ? { id: part.id } : {}),
-    ...(part.tool !== undefined ? { tool: part.tool } : {}),
-    state: { status: state?.status ?? 'completed', metadata: { receiptTruncated: true } },
-  }
-}
-
 /**
- * Fit a terminal receipt inside {@link NATIVE_COMPLETION_RECEIPT_MAX_BYTES}.
- * A receipt under the budget is returned unchanged. Over it, the longest
- * strings in tool payloads and reasoning are clipped with a marker, at
- * successively smaller caps, so a long turn's answer is always persistable.
+ * Assert the aggregate serialized UTF-8 bound without changing native facts.
+ * Large receipts must travel by reference; clipping text, file data or tool
+ * output here would also change what product preparation and settlement see.
+ * The native Workflow adapter uses its exact-result reader for that case.
  */
 export function boundNativeCompletionReceipt(
   receipt: NativeCompletionReceipt,
   maxBytes: number = NATIVE_COMPLETION_RECEIPT_MAX_BYTES,
 ): NativeCompletionReceipt {
-  if (serializedBytes(receipt) <= maxBytes) return receipt
-  for (const cap of RECEIPT_STRING_CAPS) {
-    const bounded = { ...receipt, parts: receipt.parts.map((part) => capReceiptPart(part, cap)) }
-    if (serializedBytes(bounded) <= maxBytes) return bounded
-  }
-  const skeleton = {
-    ...receipt,
-    parts: receipt.parts.map(skeletonPart).filter((part): part is Record<string, unknown> => part !== null),
-  }
-  if (serializedBytes(skeleton) <= maxBytes) return skeleton
-  // Only the answer text is left to shrink.
-  const textBudget = Math.max(0, Math.floor(maxBytes / 4))
-  return {
-    ...skeleton,
-    text: capString(skeleton.text, textBudget),
-    parts: skeleton.parts.map((part) => (part.type === 'text' && typeof part.text === 'string'
-      ? { ...part, text: capString(part.text, textBudget) }
-      : part)),
-  }
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new RangeError('Native completion byte budget must be a positive safe integer')
+  const bytes = encoder.encode(JSON.stringify(receipt)).byteLength
+  if (bytes > maxBytes) throw new Error(`Native completion receipt is ${bytes} bytes; use an exact native result reference above ${maxBytes} bytes`)
+  return receipt
 }
 
 function terminal(receipt: NativeCompletionReceipt): NativeCompletionObservation {
-  const bounded = boundNativeCompletionReceipt(receipt)
-  return bounded.state === 'completed'
-    ? { state: 'completed', receipt: bounded }
-    : { state: 'failed', receipt: bounded }
+  return receipt.state === 'completed'
+    ? { state: 'completed', receipt }
+    : { state: 'failed', receipt }
 }
 
 function timestamp(value: Date | number | null | undefined): number | undefined {
