@@ -145,6 +145,7 @@ async function runAdmittedTurn<TContext, TResource>({
   const { handoffCompletion, releaseLock } = createChatTurnOwnership(state, log, turnStreamId, options)
 
   let produceArgs: ChatTurnProduceArgs<TContext, TResource> = {
+    lock: () => state.lockHandle,
     request,
     waitUntil: ctx?.waitUntil,
     earlyResource: early.resource,

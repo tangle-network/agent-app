@@ -49,6 +49,11 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
     | ((args: ChatTurnProduceArgs<TContext, TResource>) => ProviderResolutionConfig | Promise<ProviderResolutionConfig>)>>
   /** Explicitly keep every turn on the sandbox lane. */
   router?: false
+  /** A durable owner for a sandbox turn, so its answer outlives the request (a closed tab, a lost connection): called
+   *  after the box is resolved and the turn lock is held, before the prompt is dispatched, with the session and execution the dispatch uses.
+   *  It registers the owner (preset-cloudflare `createNativeCompletionOwner`, as creative-agent does) and then calls
+   *  `args.handoffCompletion()`. A throw fails the turn before any native work starts. */
+  completionOwner?(input: { args: ChatTurnProduceArgs<TContext, TResource>; box: SandboxInstance; sessionId: string; executionId: string }): Promise<void>
   /** Who pays for the Router model call: the turn's key, or a per-turn lease (`createDelegatedTurnKeys`) the
    *  producer revokes when the turn settles. Default `TANGLE_API_KEY`. Started before the turn lock, like the call. */
   funding?(args: ChatTurnProduceArgs<TContext, TResource>): RouterTurnKey | Promise<RouterTurnKey>
@@ -145,9 +150,17 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
       const own = config.providers?.[model]
       const provider = typeof own === 'function' ? await own(args) : own
       const box = await acquire(args)
+      const completionOwner = config.completionOwner
+      const dispatch = (signal: AbortSignal) => streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
+        normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal })
       return { model, modelPolicy, modelFailover: false as const, errorNotice: true,
-        openEvents: ({ signal }: { model: string; signal: AbortSignal }) => streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
-          normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal }),
+        // The route pulls openEvents only after the turn lock, so the durable owner registers holding it.
+        openEvents: ({ signal }: { model: string; signal: AbortSignal }) => completionOwner
+          ? (async function* () {
+            await completionOwner({ args, box, sessionId: args.identity.sessionId, executionId: args.executionId })
+            yield* dispatch(signal)
+          })()
+          : dispatch(signal),
       }
     },
   }

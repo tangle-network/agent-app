@@ -344,6 +344,10 @@ export interface ChatTurnProduceArgs<TContext, TResource = unknown> {
    * `createChatTurnRoutes` invocation supplies it before `produce` runs.
    */
   handoffCompletion?: (options?: NativeCompletionHandoffOptions) => Promise<void>
+  /** The route's turn-lock handle, read when needed: undefined before the lock is acquired and without a `turnLock`.
+   *  A durable completion owner releases it when it settles the turn after `handoffCompletion`
+   *  (preset-cloudflare `NativeCompletionPayload.lock`). */
+  lock?: () => unknown
   /** Serializable observations only; snapshots never predict events after handoff. */
   timingFacts?: () => NativeTurnTimingFacts
   /** What the route's `prefetch` read for this turn's admitted identity; set only when `prefetch` is configured. */
