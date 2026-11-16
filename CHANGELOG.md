@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.30
+
+- refactor(assistant): use shared Core SSE reader (#1529)
+
 ## 3.0.29
 
 - fix(sandbox-producer): a plainly worded failure's raw warning is fold… (#1527)
