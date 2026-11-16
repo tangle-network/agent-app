@@ -5562,7 +5562,9 @@ describe('warm reuse round trips', () => {
       const key = command.includes('.agent-app/bootstrapped') ? /\b([0-9a-f]{64})\b/.exec(command)?.[1] : undefined
       if (key && command.includes('find ')) {
         const written = home.get(key)
-        return { stdout: '', stderr: '', exitCode: written !== undefined && Date.now() - written < 24 * 3_600_000 ? 0 : 1 }
+        const maxMinutes = /-mmin -(\d+)/.exec(command)?.[1]
+        const fresh = written !== undefined && (maxMinutes === undefined || Date.now() - written < Number(maxMinutes) * 60_000)
+        return { stdout: '', stderr: '', exitCode: fresh ? 0 : 1 }
       }
       if (key && command.startsWith('mkdir -p')) { home.set(key, Date.now()); return { stdout: '', stderr: '', exitCode: 0 } }
       return { stdout: 'alive', stderr: '', exitCode: 0 }
