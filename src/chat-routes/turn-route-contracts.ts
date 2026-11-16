@@ -425,6 +425,9 @@ export interface ChatTurnLock<TContext, TResource = unknown> {
   release(handle: unknown): void | Promise<void>
   /** Record a release for the durable owner to complete without freeing the lock; absent or false, the lock stays held. */
   park?(handle: unknown): Promise<boolean>
+  /** Keep the lock held for the durable owner a turn hands off to (`handoffCompletion`), for a lock whose stale-lock
+   *  reclaim would read the turn as dead once the route stops renewing it. The owner's release still frees it. */
+  holdForHandoff?(handle: unknown): Promise<boolean>
   /** Bring up whatever `acquire` will talk to, as soon as the turn is admitted
    *  and while `prepareTurn` and the history read run. Never awaited; a failure
    *  is logged and the turn goes on to `acquire` as usual. */

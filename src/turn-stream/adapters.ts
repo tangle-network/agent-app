@@ -452,6 +452,8 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
   acquire(args: TurnLockSeamArgs<TContext>): Promise<TurnLockSeamResult>
   release(handle: unknown): Promise<void>
   park(handle: unknown): Promise<boolean>
+  /** Present only with the default reclaim: a handed-off turn's lock is parked so the reclaim reads it as held. */
+  holdForHandoff?(handle: unknown): Promise<boolean>
   warm(target: { tenantId: string; threadId?: string }): Promise<void>
 } {
   const namespace: TurnStreamNamespaceLike = {
@@ -530,6 +532,10 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
     async park(handle) {
       return Boolean(handle) && parkDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth)
     },
+    // A product reconciler or a lock without the default reads `releasePending` its own way; leave it untouched.
+    ...(turnStore && !options.reconcile
+      ? { holdForHandoff: async (handle: unknown) => Boolean(handle) && parkDurableTurnLock(namespace, handle as TurnLockReleaseInput, options.auth) }
+      : {}),
   }
 }
 

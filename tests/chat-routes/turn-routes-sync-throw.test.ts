@@ -36,11 +36,12 @@ describe('createChatTurnRoutes — synchronous engine throw', () => {
   it('settles the lifecycle (onTurnError) and releases the lock even when the engine throws after onTurnStart', async () => {
     const events: string[] = []
     const lockOrder: string[] = []
+    const turnStore = createMemoryTurnEventStore()
     const routes = createChatTurnRoutes({
       projectId: 'sync-throw',
       authorize: async () => ({ ok: true, tenantId: 'ws', userId: 'u', context: undefined }),
       store: memoryStore(),
-      turnStore: createMemoryTurnEventStore(),
+      turnStore,
       produce: () => ({
         stream: (async function* () {})(),
         finalText: () => '',
@@ -69,5 +70,7 @@ describe('createChatTurnRoutes — synchronous engine throw', () => {
     expect(events).toEqual(['start', 'error'])
     // The lock acquired before the turn is released on the throw.
     expect(lockOrder).toEqual(['acquire', 'release:h'])
+    // The stream tap existed but no drain took it: its own close settles the row, so nothing renews it after release.
+    expect(await turnStore.listRunning('t-1')).toEqual([])
   })
 })

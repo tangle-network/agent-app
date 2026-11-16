@@ -2,10 +2,10 @@ import { createServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { Sandbox } from '@tangle-network/sandbox'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { createChatTurnRoutes, type ChatTurnProduceArgs, type CreateChatTurnRoutesOptions } from '../../src/chat-routes/index'
+import { createChatTurnRoutes, type ChatTurnLock, type ChatTurnProduceArgs, type CreateChatTurnRoutesOptions } from '../../src/chat-routes/index'
 import { DEFAULT_STALE_TURN_LOCK_GRACE_MS as BOUND, DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS as GRACE } from '../../src/chat-routes/stale-turn-lock'
 import { readHolderBoxSessions } from '../../src/sandbox/holder-box'
-import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
+import { createD1TurnEventStore, DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/index'
 import { acquireDurableTurnLock, createDurableTurnLock, parkDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock,
   type DurableTurnLock, type TurnLockReleaseInput } from '../../src/turn-stream/index'
 import { createMemoryTurnStreamHarness, MEMORY_TURN_STREAM_AUTH_SECRET } from '../../src/turn-stream/memory'
@@ -61,7 +61,10 @@ let skew = 0
 const clock = () => Date.now() + skew
 /** Move the injected clock so the `held` lock is `ageMs` old. */
 const age = (held: DurableTurnLock, ageMs: number) => { skew = held.startedAt + ageMs - Date.now() }
-const turns = createD1TurnEventStore(sqliteD1(TURN_EVENTS_MIGRATION_SQL).d1, { now: clock })
+const turnsDb = sqliteD1(TURN_EVENTS_MIGRATION_SQL)
+const turns = createD1TurnEventStore(turnsDb.d1, { now: clock })
+/** Every status row a thread's turns left. */
+const statusesOn = (threadId: string) => turnsDb.sqlite.prepare('SELECT status FROM turn_status WHERE scopeId = ?').all(threadId)
 const durable = createMemoryTurnStreamHarness()
 const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
 // The box each workspace's holder ran work on; a workspace without one ran none.
@@ -88,14 +91,20 @@ const ask = async (workspaceId: string, via = lock) => {
 }
 const lockOf = async (workspaceId: string) => (await peekDurableTurnLock(durable.namespace, { workspaceId, scope: 'workspace' }, auth))!
 
-/** One turn through the shipped chat route on the default lock and the turn store above. `done` reads it to the end. */
-function chatTurn(workspaceId: string, hooks: Pick<CreateChatTurnRoutesOptions<undefined>, 'beforeTurn' | 'contextGate' | 'produce'>) {
+/** One turn through the shipped chat route on a lock (the default reclaim's unless given) and the turn store above.
+ *  `changeHistory` adds another member's message between the route's history read and its recheck after the lock. */
+function chatTurn(workspaceId: string, hooks: Pick<CreateChatTurnRoutesOptions<undefined>, 'beforeTurn' | 'contextGate' | 'produce'>,
+  { turnLock = lock, changeHistory = false }: { turnLock?: ChatTurnLock<undefined>; changeHistory?: boolean } = {}) {
   const rows: Array<{ id: string; threadId: string; role: 'user' | 'assistant'; content: string }> = []
+  let reads = 0
   const routes = createChatTurnRoutes({
-    projectId: 'reclaim', turnStore: turns, turnLock: lock,
+    projectId: 'reclaim', turnStore: turns, turnLock,
     authorize: async () => ({ ok: true as const, tenantId: workspaceId, userId: 'member', context: undefined }),
     store: {
-      listMessages: async threadId => rows.filter(row => row.threadId === threadId),
+      listMessages: async threadId => {
+        if (changeHistory && ++reads === 2) rows.push({ id: 'concurrent', threadId, role: 'user', content: 'another member' })
+        return rows.filter(row => row.threadId === threadId)
+      },
       appendMessage: async ({ threadId, role, content }) => {
         const row = { id: `m${rows.length + 1}`, threadId, role, content }
         rows.push(row)
@@ -126,26 +135,63 @@ it('releases a holder with no running turn and no box work only past the 60 s gr
   expect(seen.starting).toMatchObject({ runningTurns: 1 })
 })
 
-it('holds a route turn still in beforeTurn past the grace: its running row is written at acquire and settled on release', async () => {
+it('holds a route turn in a long beforeTurn: its running row is written at acquire and renewed until the tap takes over', async () => {
   skew = 0
-  let entered!: () => void
-  let proceed!: () => void
-  const inBeforeTurn = new Promise<void>(resolve => { entered = resolve })
-  const gate = new Promise<void>(resolve => { proceed = resolve })
-  const slow = chatTurn('slowturn', { beforeTurn: async () => { entered(); await gate }, produce: () => answer('done') })
-  await inBeforeTurn
-  age(await lockOf('slowturn'), GRACE + 1_000)
-  expect(await ask('slowturn')).toBe('409 workspace_turn_in_flight')
-  expect(seen.slowturn).toMatchObject({ runningTurns: 1 })
-  proceed()
-  await slow.done()
-  expect(await turns.listRunning('slowturn-thread')).toEqual([])
-  // A turn its gate refuses releases before any tap, and leaves no running row behind.
-  const gated = chatTurn('gatedturn', { contextGate: () => ({ proceed: false, response: new Response('not ready', { status: 409 }) }),
-    produce: () => answer('unused') })
-  expect((await gated.turn).status).toBe(409)
-  await gated.done()
-  expect(await turns.listRunning('gatedturn-thread')).toEqual([])
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }) // the row's renewal interval; every other timer is real
+  try {
+    let entered!: () => void
+    let proceed!: () => void
+    const inBeforeTurn = new Promise<void>(resolve => { entered = resolve })
+    const gate = new Promise<void>(resolve => { proceed = resolve })
+    const slow = chatTurn('slowturn', { beforeTurn: async () => { entered(); await gate }, produce: () => answer('done') })
+    await inBeforeTurn
+    const held = await lockOf('slowturn')
+    age(held, GRACE + 1_000)
+    expect(await ask('slowturn')).toBe('409 workspace_turn_in_flight')
+    expect(seen.slowturn).toMatchObject({ runningTurns: 1 })
+    // Past the row's 5 min lease only a renewal keeps it running: one renewal interval at 6 min, then ask again.
+    age(held, 6 * 60_000)
+    await vi.advanceTimersByTimeAsync(DEFAULT_RUNNING_TURN_RENEW_INTERVAL_MS)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(await ask('slowturn')).toBe('409 workspace_turn_in_flight')
+    expect(seen.slowturn).toMatchObject({ runningTurns: 1 })
+    expect(vi.getTimerCount()).toBe(1)
+    proceed()
+    await slow.done()
+    expect(vi.getTimerCount()).toBe(0)
+    expect(await turns.listRunning('slowturn-thread')).toEqual([])
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('settles the running row on each release before the drain and stops its renewal: complete for a gate, else error', async () => {
+  skew = 0
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  try {
+    // A gate that answers: the row is running while the gate runs and ends complete.
+    let gatedTurn = ''
+    let runningAtGate: string[] = []
+    const gated = chatTurn('gatedturn', { contextGate: async args => {
+      gatedTurn = args.turnStreamId
+      runningAtGate = await turns.listRunning('gatedturn-thread')
+      return { proceed: false, response: new Response('not ready', { status: 409 }) }
+    }, produce: () => answer('unused') })
+    expect((await gated.turn).status).toBe(409)
+    await gated.done()
+    expect(runningAtGate).toEqual([gatedTurn])
+    expect(statusesOn('gatedturn-thread')).toEqual([{ status: 'complete' }])
+    // History changed while the lock was taken, and a throw in beforeTurn: each ends its row as error.
+    const changed = chatTurn('changedturn', { produce: () => answer('unused') }, { changeHistory: true })
+    expect((await changed.turn).status).toBe(409)
+    expect(statusesOn('changedturn-thread')).toEqual([{ status: 'error' }])
+    const thrown = chatTurn('throwturn', { beforeTurn: () => { throw new Error('before turn failed') }, produce: () => answer('unused') })
+    await expect(thrown.turn).rejects.toThrow('before turn failed')
+    expect(statusesOn('throwturn-thread')).toEqual([{ status: 'error' }])
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('keeps a handed-off turn locked while its native run goes on, until the native owner releases it', async () => {
@@ -170,6 +216,13 @@ it('keeps a handed-off turn locked while its native run goes on, until the nativ
   expect(await ask('handoff', storeOnly)).toBe('acquired')
   finishNative()
   await finished
+  // A lock with its own reconcile reads `releasePending` its own way: the hand-off leaves it unparked.
+  const ownLock = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns,
+    reconcile: async () => ({ released: false }) })
+  await chatTurn('ownreconcile', { produce: (args: ChatTurnProduceArgs<undefined>) => ({ stream: (async function* () {
+    await args.handoffCompletion!()
+  })(), finalText: () => '' }) }, { turnLock: ownLock }).done()
+  expect((await lockOf('ownreconcile')).releasePending).toBeUndefined()
 })
 
 it('holds while box work runs, by the sidecar verdict or an older sidecar active id, and while a release is parked', async () => {
