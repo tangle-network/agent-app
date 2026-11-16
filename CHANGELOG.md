@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.2
+
+- fix(chat): keep a Router turn's pre-tool narration out of its answer (#1536)
+
 ## 4.0.1
 
 - feat(conformance): --computer none asks once (plain turn only) (#1541)
