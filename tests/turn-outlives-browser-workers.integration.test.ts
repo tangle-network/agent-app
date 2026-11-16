@@ -8,14 +8,15 @@ import { createTestHarness } from 'wrangler'
  * (`workers/turn-outlives-browser.worker.ts`). A member's turn answers over 40 s; the browser that sent it disconnects
  * at 2 s. The answer must still be stored, the lock released and the turn replayed in full, and the turn's work must
  * have run under a turn-stream object's `waitUntil`, never the browser request's: Cloudflare cancels a Worker request's
- * `waitUntil` work soon after its client leaves, which local workerd may not do (the probe below measures it).
+ * `waitUntil` work soon after its client leaves, which local workerd may not do (the probe below measures it). A second
+ * turn's host then loses its object after the turn started there: the request's own run is refused by the turn lock.
  */
 const configPath = fileURLToPath(new URL('./workers/turn-outlives-browser.wrangler.toml', import.meta.url))
 const ANSWER = [...Array.from({ length: 9 }, (_, index) => `Part ${index + 1}. `), 'Final answer.'].join('')
 const MEMBER = { cookie: 'session=member' }
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-interface State { answer: string | null; status: string | null; lock: unknown; marks: string[] }
+interface State { answers: string[]; status: string | null; lock: unknown; marks: string[] }
 
 async function until<T>(read: () => Promise<T | null>, label: string, ms: number): Promise<T> {
   const deadline = Date.now() + ms
@@ -39,12 +40,12 @@ it('finishes, stores and replays a member’s turn after the browser that sent i
   try {
     const { url } = await worker.listen()
     assert.equal((await fetch(new URL('/seed', url), { method: 'POST' })).status, 204)
-    const send = (headers: Record<string, string>, signal?: AbortSignal) => fetch(new URL('/chat/proof-workspace', url), {
-      method: 'POST', signal, headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify({ threadId: 'slow-thread', turnId: 'slow-turn', content: 'Answer slowly.' }),
+    const send = (headers: Record<string, string>, signal?: AbortSignal,
+      body = { threadId: 'slow-thread', turnId: 'slow-turn', content: 'Answer slowly.' }) => fetch(new URL('/chat/proof-workspace', url), {
+      method: 'POST', signal, headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
     })
-    const state = async (turnId: string) =>
-      await (await fetch(new URL(`/state/proof-workspace/${turnId}`, url))).json() as State
+    const state = async (turnId: string, thread = 'slow-thread') =>
+      await (await fetch(new URL(`/state/proof-workspace/${turnId}?thread=${thread}`, url))).json() as State
 
     const objectRequests = (marks: string[]) => marks.filter(kind => kind === 'host:object-request').length
     const anonymous = await send({})
@@ -66,11 +67,11 @@ it('finishes, stores and replays a member’s turn after the browser that sent i
 
     const settled = await until(async () => {
       const current = await state(turnId)
-      return current.answer !== null && current.lock === null ? current : null
+      return current.answers.length > 0 && current.lock === null ? current : null
     }, 'the answer row is stored and the lock released after the browser disconnected', 100_000)
     const settledAfterMs = Date.now() - disconnectedAt
     console.info(JSON.stringify({ proof: 'turn-outlives-browser', disconnectedAfterMs: disconnectedAt - sentAt, settledAfterMs, marks: [...new Set(settled.marks)] }))
-    assert.equal(settled.answer, ANSWER)
+    assert.deepEqual(settled.answers, [ANSWER])
     assert.equal(settled.status, 'complete')
     assert(settledAfterMs > 30_000, `The turn kept answering for more than 30 s after the browser left: ${settledAfterMs} ms`)
 
@@ -84,10 +85,26 @@ it('finishes, stores and replays a member’s turn after the browser that sent i
       'The producer ran once, in the turn-stream object')
     assert.equal(objectRequests(settled.marks), 2,
       'Each request with a credential, the refused stranger’s and the member’s, went to its own turn-stream object')
+
+    // The host loses its object after the turn started there, with a plain error, so the request runs the turn itself.
+    // The turn lock the object holds refuses that second run: the turn runs once.
+    const producedBefore = settled.marks.filter(kind => kind.startsWith('produce:')).length
+    const broken = await send({ ...MEMBER, 'x-proof-host-breaks': '1' }, undefined,
+      { threadId: 'break-thread', turnId: 'break-turn', content: 'Answer soon.' })
+    const refusal = await broken.text()
+    assert.equal(broken.status, 409, `The lock refuses the request's second run instead of streaming it: ${refusal}`)
+    assert.equal((JSON.parse(refusal) as { error?: { code?: string } }).error?.code, 'workspace_turn_in_flight')
+    const afterBreak = await until(async () => {
+      const current = await state('none', 'break-thread')
+      return current.answers.length > 0 && current.lock === null ? current : null
+    }, 'the object’s turn stores its answer after its host lost it', 60_000)
+    assert.deepEqual(afterBreak.answers, [ANSWER], 'The object’s turn completed and stored exactly one answer row')
+    assert.deepEqual(afterBreak.marks.filter(kind => kind.startsWith('produce:')).slice(producedBefore), ['produce:object'],
+      'Only the object produced the turn; the request never ran a producer')
   } finally {
     await worker.close()
   }
-}, 180_000)
+}, 240_000)
 
 // The runtime check behind the proof, run on demand: does local workerd cancel a Worker request's own waitUntil work
 // after its client disconnects, as Cloudflare does? It reports the last mark and never fails on it: a last mark near
