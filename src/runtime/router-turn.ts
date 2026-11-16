@@ -111,7 +111,8 @@ export interface RouterTurnOutcome {
    * The turn's answer: `text` without its narration. Text a round writes before calling a lookup tool
    * narrates the work ("Let me check your vault"), and is not the answer; text before an action tool
    * (`effect: 'action'`) is the answer it acts on, and stays. When everything written was narration, the
-   * answer is `text`, so narration that is the turn's only text is still shown.
+   * answer is `text`, so narration that is the turn's only text is still shown. It covers this hop only:
+   * `continueFrom.text` from earlier hops is in `text`, never in `answer`.
    */
   answer: string
   /** The model the router reports having served, when it said. */
