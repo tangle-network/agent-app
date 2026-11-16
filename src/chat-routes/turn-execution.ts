@@ -1,7 +1,7 @@
 /** Admission-to-settlement execution for one authenticated chat turn. */
 import { deriveExecutionId, handleChatTurn, type ChatTurnIdentity } from '@tangle-network/agent-runtime/durable'
 import { toChatMessageParts } from '../chat-store/parts'
-import { redactEvents, valueRedactor } from './redact-values'
+import { redactEvents, valueRedactor, type ValueRedactor } from './redact-values'
 import {
   coalesceDeltas,
   createBufferedTurnTap,
@@ -361,7 +361,7 @@ async function runAdmittedTurn<TContext, TResource>({
     }
     streamSetup.end()
 
-    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId)
+    const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId, redact)
 
     // The engine has the turn, and its first pull runs `produce`, which owns whatever `afterAuthorize` started.
     const { clientBody } = startTurnDrain(result, log, turnStreamId, state, endTrace, exportTrace, trace, ctx, request, fireTerminalLifecycle, releaseLock, runAfterSettle, early.settle)
@@ -714,6 +714,7 @@ function createTurnEngine<TContext, TResource>(
   context: TContext,
   payload: AdmittedTurn<TContext>['parsed']['payload'],
   assistantRowId: () => string | null,
+  redact: ValueRedactor | undefined,
 ) {
   const result = handleChatTurn({
     identity,
