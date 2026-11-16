@@ -16,7 +16,8 @@
  *   --app <label>             names the app in each line (default: the origin's first host label)
  *   --auth password|sso       how the member signs in (default password); sso goes through Tangle Platform
  *   --workspace <id|name>     the canary or smoke workspace the turns run in (default: the key's only workspace)
- *   --computer digest|file    digest: hash a fresh nonce on the computer; file: the computer saves a file the app serves back
+ *   --computer digest|file|none  digest: hash a fresh nonce on the computer; file: the computer saves a file the app
+ *                             serves back; none: the plain turn only (one ask, for a post-serve first-ask check)
  *   --computer-model <id>     the computer turn's model (default glm-5.3, flat-rate); the plain turn keeps the app's model
  *   --file-dir <dir>          where the file proof is saved (default proof)
  *   --turn-ms <ms>            the budget of each turn, a cold box included (default 300000)
@@ -48,7 +49,7 @@ function parseConformanceArgs(argv: readonly string[], env: NodeJS.ProcessEnv = 
   const mode = flags.get('--auth') ?? 'password'
   if (mode !== 'password' && mode !== 'sso') throw new Error('--auth is password or sso')
   const computer = flags.get('--computer') ?? 'digest'
-  if (computer !== 'digest' && computer !== 'file') throw new Error('--computer is digest or file')
+  if (computer !== 'digest' && computer !== 'file' && computer !== 'none') throw new Error('--computer is digest, file or none')
   const turnMs = Number(flags.get('--turn-ms') ?? 300_000)
   if (!Number.isFinite(turnMs) || turnMs < 1_000) throw new Error('--turn-ms is a number of milliseconds, at least 1000')
   const email = flags.get('--email') ?? env.CONFORMANCE_EMAIL?.trim()
@@ -60,7 +61,7 @@ function parseConformanceArgs(argv: readonly string[], env: NodeJS.ProcessEnv = 
     ...(email && password ? { member: { mode: mode as SignInMode, email, password } } : {}),
     ...(operatorKey ? { operatorKey } : {}),
     ...(flags.has('--workspace') ? { workspace: flags.get('--workspace')! } : {}),
-    computer: computer as ComputerProof,
+    computer: computer as ComputerProof | 'none',
     ...(flags.has('--computer-model') ? { computerModel: flags.get('--computer-model')! } : {}),
     ...(flags.has('--file-dir') ? { fileDir: flags.get('--file-dir')! } : {}),
     turnMs,
