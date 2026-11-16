@@ -288,13 +288,18 @@ describe('protected Runtime chat producer', () => {
       throw new Error(`Unexpected fixture URL ${url}`)
     }))
     options.grant = { ...options.grant, port: createRouterProtectedModelPort({ apiKey: 'synthetic-parent-key', maxCostUsd: 1, onSettlement: audit }) }
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const producer = createProtectedRuntimeChatProducer(options)
     const events = await drain(producer)
     expect(requests.map(url => url.split('/').at(-1))).toEqual(['resolve', 'reserve', 'activate', 'completions', 'settle'])
     expect(audit).toHaveBeenCalledOnce()
     expect(producer.usage?.()).toEqual({ inputTokens: 3, outputTokens: 2, reasoningTokens: 0, costUsd: 0.0001 })
-    expect(events.some(event => event.type === 'error')).toBe(true)
-    expect(JSON.stringify(events)).toContain('audit record could not be saved')
+    // The person reads the plain sentence; the server log keeps the audit reason under the withheld class.
+    expect(events.find(event => event.type === 'error')).toMatchObject({
+      data: { message: 'That answer stopped before it finished. Please send your question again.' } })
+    expect(JSON.stringify(events)).not.toContain('audit record could not be saved')
+    const withheldLog = warn.mock.calls.find(([message]) => message === '[chat-routes] turn failure withheld from the person')
+    expect(withheldLog?.[1]).toMatchObject({ failureClass: 'runtime_failure', error: expect.stringContaining('audit record could not be saved') })
     expect(JSON.stringify(events)).not.toContain('synthetic-parent-key')
     expect(events).toContainEqual({ type: 'usage', usage: { promptTokens: 3, completionTokens: 2,
       reasoningTokens: 0, toolTokens: 0, providerCostUsd: 0.0001, toolCallCount: 0, budgetEnforced: true } })

@@ -371,10 +371,12 @@ const FAILED_TURN_TEXT = 'That answer stopped before it finished. Please send yo
 
 /** True when a terminal failure's reason (a harness error, a tool list, a call loop, a stack) is withheld: the person
  *  reads the failed-turn text and the server log (`log`, else `console.warn`) keeps the reason under one class. Passing
- *  through as before: a provider reset or refused model key, worded plainly; HTTP 402; and what the client's recovery
- *  UI reads (`getChatFundingRecovery`: `insufficient_credits`, `paid_access_required`, `funding_required`, or its words). */
+ *  through as before: a provider reset or refused model key, worded plainly; HTTP 402 or `PAYMENT_REQUIRED`; a
+ *  `MODEL_REFUSED` policy refusal, whose words let the person pick another model; and what the client's recovery UI
+ *  reads (`getChatFundingRecovery`: `insufficient_credits`, `paid_access_required`, `funding_required`, or its words). */
 function withheld(log: SandboxChatProducerOptions['log'], reason: string, code: string | undefined, status: unknown): boolean {
-  const passes = toFiniteNumber(status) === 402 || providerResetSentence(reason) || modelKeyRefusedSentence(reason)
+  const passes = toFiniteNumber(status) === 402 || code === 'PAYMENT_REQUIRED' || code === 'MODEL_REFUSED'
+    || providerResetSentence(reason) || modelKeyRefusedSentence(reason)
     || getChatFundingRecovery({ code, message: reason })
   if (!passes) (log ?? console.warn)('[chat-routes] turn failure withheld from the person', { failureClass: 'runtime_failure', code, error: reason })
   return !passes

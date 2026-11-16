@@ -1,7 +1,8 @@
 /**
  * A failed turn shows the person one plain sentence, live and after a reload, and never the harness's own failure
- * text: its loop report, the refused tool and the list of every tool it has. Funding and admission refusals keep their
- * words, because the client's recovery UI reads them, and the server log keeps the real reason.
+ * text: its loop report, the refused tool and the list of every tool it has. Funding, billing, admission and
+ * model-policy refusals keep their words, because the person or the client's recovery UI acts on them, and the server
+ * log keeps the real reason.
  *
  * Driven through the real `createChatTurnRoutes` assembly, the real `createSandboxChatProducer` and the real chat store
  * over SQLite. Only the box is stood in for, at its event boundary: the events its sidecar sends, or a severed stream.
@@ -109,6 +110,8 @@ describe('a failed turn never shows the person the raw failure reason', () => {
       data: { message: 'opencode execution failed: Inference requires verified paid access. Add funds or activate a paid seat.' } },
     { kind: 'billing', card: false,
       data: { code: 'AGENT_EXECUTION_FAILED', statusCode: 402, message: "opencode execution failed: This key's budget is exhausted. Raise its cap." } },
+    { kind: 'payment', card: false, data: { code: 'PAYMENT_REQUIRED', message: 'The account has no balance or plan for this request.' } },
+    { kind: 'model policy', card: false, data: { code: 'MODEL_REFUSED', message: 'The selected model is outside the allowed models.' } },
   ])('the $kind refusal keeps its words, live and stored, where the person and the recovery UI read them', async ({ data, card }) => {
     const refused = await turn([{ type: 'error', data }])
 
