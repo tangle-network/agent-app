@@ -38,12 +38,17 @@ export interface RouterTurnTool {
   /** JSON Schema for the arguments object. */
   inputSchema: Record<string, unknown>
   /**
-   * What calling this tool does. `'lookup'` (the default) fetches what the answer needs, so text a round
-   * writes before calling it narrates the work. `'action'` acts on the answer (save, send, create), so
-   * text written before it is the answer itself and stays the answer.
+   * `'lookup'`: the tool fetches what the answer needs, so text a round writes before calling it narrates
+   * the work ("Let me check your vault") and is not the answer. A tool that declares nothing (a save, a send,
+   * a bridged tool) keeps the text before it as the answer.
    */
-  effect?: 'lookup' | 'action'
+  effect?: 'lookup'
   run(args: Record<string, unknown>, context: RouterTurnToolContext): Promise<unknown>
+}
+
+/** Whether text a round writes before calling `tool` narrates the work instead of answering. */
+export function narratesBefore(tool: Pick<RouterTurnTool, 'effect'> | undefined): boolean {
+  return tool?.effect === 'lookup'
 }
 
 /** What a running tool gets besides its arguments. */
@@ -108,10 +113,9 @@ export interface RouterTurnOutcome {
   /** Every text segment the model wrote, joined by blank lines. */
   text: string
   /**
-   * The turn's answer: `text` without its narration. Text a round writes before calling a lookup tool
-   * narrates the work ("Let me check your vault"), and is not the answer; text before an action tool
-   * (`effect: 'action'`) is the answer it acts on, and stays. When everything written was narration, the
-   * answer is `text`, so narration that is the turn's only text is still shown. It covers this hop only:
+   * The turn's answer: `text` without its narration, the text a round wrote before calling a tool marked
+   * `effect: 'lookup'`. Text before any other tool stays. When everything written was narration, the answer
+   * is `text`, so narration that is the turn's only text is still shown. It covers this hop only:
    * `continueFrom.text` from earlier hops is in `text`, never in `answer`.
    */
   answer: string
@@ -624,8 +628,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
         } else if (event.type === 'tool_call') {
           const tool = byFunction.get(event.call.toolName)
-          // Text before a lookup narrates the work; text before an action (save, send) is the answer it acts on.
-          if (segmentOpen && tool?.effect !== 'action') narrated.add(segments.length - 1)
+          if (segmentOpen && narratesBefore(tool)) narrated.add(segments.length - 1)
           segmentOpen = false
           // The loop yields this event before extracting its call. Normalize a missing id once,
           // so execution, progress, result and replay history reuse the displayed identity.

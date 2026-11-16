@@ -8,7 +8,7 @@
  * `stream` generator drains in order, so a slow consumer never drops a frame
  * and the engine never waits on the consumer.
  */
-import { composeRouterTurnPromptSections, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
+import { composeRouterTurnPromptSections, narratesBefore, runRouterTurn, type RouterTurnEvent, type RouterTurnFailure, type RouterTurnOptions, type RouterTurnOutcome, type RouterTurnPromptOptions, type RouterTurnTool } from '../runtime/router-turn'
 import { createReasoningClock } from './reasoning-clock'
 import { redactErrorMessage } from '../redact/index'
 import { noticePart } from '../interactions/contract'
@@ -64,7 +64,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
   const parts: Array<Record<string, unknown>> = []
   const toolParts = new Map<string, Record<string, unknown>>()
   let textPart: { type: 'text'; text: string } | null = null
-  // Text parts a tool call followed: the round's narration of its work, not the answer.
+  // Text parts a lookup tool call followed: the round's narration of its work, not the answer.
   const narration = new Set<Record<string, unknown>>()
   let textSegment = 0
   let reasoningPart: { type: 'reasoning'; text: string } | null = null
@@ -113,8 +113,7 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
           // The model stopped reasoning when it called the tool.
           reasoningClock.settle(event.startedAt)
           if (event.status === 'running') {
-            // Text before an action tool (save, send) is the answer it acts on, not narration.
-            if (textPart && options.tools?.find(tool => tool.name === event.toolName)?.effect !== 'action') narration.add(textPart)
+            if (textPart && narratesBefore(options.tools?.find(tool => tool.name === event.toolName))) narration.add(textPart)
             textPart = null
             const part = { type: 'tool', id: event.callId, callID: event.callId, tool: event.toolName,
               state: { status: 'running', input: event.input, time: { start: event.startedAt } } }
