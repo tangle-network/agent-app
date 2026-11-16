@@ -8,8 +8,8 @@ import { DatabaseSync } from 'node:sqlite'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import { AGENT_PROFILE_D1_SCHEMA_SQL, createD1ProfileRevisionStore, type ProfileD1Database, type ProfileD1Statement } from '../src/agent-profiles/d1'
-import { admitProfileTurn, followProductRelease, proposeRevision, readProfileAdmission, switchProfile, ProfileConflictError,
-  type ProfileRevision } from '../src/agent-profiles/index'
+import { admitProfileTurn, followProductRelease, PROFILE_PROMPT_HISTORY_MAX, proposeRevision, readProfileAdmission,
+  switchProfile, ProfileConflictError, type ProfileRevision } from '../src/agent-profiles/index'
 
 const PLAN = `sha256:${'a'.repeat(64)}`
 
@@ -172,6 +172,32 @@ describe('profile turn pin', () => {
       await run(carried)
       await run(remembered)
       expect(trips.count).toBe(before)
+    } finally { sqlite.close() }
+  })
+
+  it(`reads a ${PROFILE_PROMPT_HISTORY_MAX}-revision history of 20 KB prompts in one round trip and keeps the prompt of a longer one`, async () => {
+    const sqlite = new DatabaseSync(':memory:')
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const { database, trips } = d1(sqlite)
+    const store = createD1ProfileRevisionStore(database)
+    const shipped = `Ask one question, then halt and wait. ${'x'.repeat(20_000)}`
+    const release: AgentProfile = { name: 'Director', prompt: { systemPrompt: 'Deliver the ask first.' } }
+    const insert = sqlite.prepare(`INSERT INTO agent_profile_revision (revision_id, workspace_id, profile_id, parent_id,
+      profile_json, knowledge_text, author_kind, author_id, reason, diff_json, authority_digest, plan_digest, state, created_at)
+      VALUES (?, 'long', 'director', ?, ?, '', 'person', ?, 'Step', '[]', ?, ?, 'active', ?)`)
+    try {
+      // An import, then a remembered fact per revision; revision n has n + 1 revisions of history.
+      for (let n = 0; n <= PROFILE_PROMPT_HISTORY_MAX; n++) {
+        insert.run(`rev-${n}`, n ? `rev-${n - 1}` : null, JSON.stringify({ name: 'Director', description: `Fact ${n}`,
+          prompt: { systemPrompt: shipped } }), n ? 'member' : 'app-release', PLAN, PLAN, n)
+      }
+      const bounded = await store.getRevision('long', 'director', `rev-${PROFILE_PROMPT_HISTORY_MAX - 1}`)
+      const longer = await store.getRevision('long', 'director', `rev-${PROFILE_PROMPT_HISTORY_MAX}`)
+      const before = trips.count
+      expect((await followProductRelease(store, bounded!, release, ['app-release'])).prompt?.systemPrompt).toBe('Deliver the ask first.')
+      expect(trips.count - before).toBe(1)
+      // One more revision cuts the read before the import, so nothing shows the prompt is the product's.
+      expect((await followProductRelease(store, longer!, release, ['app-release'])).prompt?.systemPrompt).toBe(shipped)
     } finally { sqlite.close() }
   })
 })

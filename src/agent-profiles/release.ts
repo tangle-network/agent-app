@@ -29,8 +29,9 @@ export interface ProfileReleaseUpdates {
   }
 }
 
-/** The longest history read; a longer one reads as incomplete, so its prompt is kept. */
-export const PROFILE_PROMPT_HISTORY_MAX = 10_000
+/** The longest history read; a longer one reads as incomplete, so its prompt is kept. The D1 case in
+ *  tests/agent-profiles-pin.integration.test.ts reads a history this long with 20 KB prompts. */
+export const PROFILE_PROMPT_HISTORY_MAX = 1_000
 
 const skillName = (skill: SkillRef) => skill.name ?? (skill.kind === 'github' ? skill.path : '')
 const digest = (value: unknown) => canonicalCandidateDigest(value ?? null)
@@ -117,13 +118,13 @@ async function promptHistory(store: ProfileRevisionStore, revision: ProfileRevis
   if (store.readPromptHistory) return store.readPromptHistory(revision.workspaceId, revision.profileId, revision.id)
   const newest = revision.profile.prompt?.systemPrompt
   const history: ProfilePromptHistoryEntry[] = []
-  let child: string | undefined
   for (let current: ProfileRevision | null = revision; current && history.length < PROFILE_PROMPT_HISTORY_MAX;) {
     const prompt = current.profile.prompt?.systemPrompt
-    history.push({ id: current.id, parentId: current.parentId, author: current.author,
-      sameAsNewest: prompt === newest, sameAsChild: history.length ? prompt === child : null })
-    child = prompt
-    current = current.parentId ? await store.getRevision(revision.workspaceId, revision.profileId, current.parentId) : null
+    const parent: ProfileRevision | null = current.parentId
+      ? await store.getRevision(revision.workspaceId, revision.profileId, current.parentId) : null
+    history.push({ id: current.id, parentId: current.parentId, author: current.author, sameAsNewest: prompt === newest,
+      sameAsParent: parent ? parent.profile.prompt?.systemPrompt === prompt : null })
+    current = parent
   }
   return history
 }
@@ -142,7 +143,7 @@ export async function promptShippedByProduct(store: ProfileRevisionStore, revisi
     const parent = history[index + 1]
     if (entry.parentId !== null && parent?.id !== entry.parentId) return false
     if (entry.sameAsNewest && productAuthorIds.includes(entry.author.id) &&
-        (entry.parentId === null || parent?.sameAsChild === false)) shipped = true
+        (entry.parentId === null || entry.sameAsParent === false)) shipped = true
   }
   return shipped
 }

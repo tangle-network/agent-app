@@ -133,8 +133,8 @@ export interface ProfilePromptHistoryEntry {
   author: ProfileRevision['author']
   /** Its system prompt equals the newest entry's. */
   sameAsNewest: boolean
-  /** Its system prompt equals the entry before it, its child's; `null` on the newest entry. */
-  sameAsChild: boolean | null
+  /** Its system prompt equals its parent's; `null` when it has no parent row. */
+  sameAsParent: boolean | null
 }
 
 export class ProfileConflictError extends Error {
