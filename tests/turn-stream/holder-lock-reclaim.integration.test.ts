@@ -28,9 +28,13 @@ it('reclaims a dead holder by default and holds while its box or turn still runs
     if (!sessions) return json(200, { id: `${name}-box`, status: 'running', filesystemIncarnationId: `${name}-incarnation`,
       filesystemIncarnationProvenance: 'fresh', filesystemIncarnationReadiness: 'ready',
       connection: { runtimeUrl: `${origin}/v1/sandboxes/${name}-box/runtime` } })
+    // The sidecar's own verdict (hasActiveExecution) decides; a finished session can keep a stale activeExecutionId,
+    // and one with no status is read as running by the SDK. Neither is live work.
     return json(200, name === 'busy'
-      ? [{ id: 'detached-run', status: 'running', activeExecutionId: 'detached-execution' }]
-      : [{ id: 'detached-run', status: 'completed', latestExecutionId: 'detached-execution' }, { id: 'earlier-run', latestExecutionId: 'earlier' }])
+      ? [{ id: 'detached-run', status: 'running', activeExecutionId: 'detached-execution', hasActiveExecution: true }]
+      : [{ id: 'detached-run', status: 'completed', latestExecutionId: 'detached-execution', hasActiveExecution: false },
+        { id: 'stale-run', status: 'completed', activeExecutionId: 'stale-execution', hasActiveExecution: false },
+        { id: 'earlier-run', latestExecutionId: 'earlier' }])
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
@@ -41,7 +45,7 @@ it('reclaims a dead holder by default and holds while its box or turn still runs
     const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
     const boxOf: Record<string, string> = { busy: 'busy-box', finished: 'finished-box', down: 'down-box' }
     const lock = createDurableTurnLock<Record<string, never>>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace',
-      turnStore: turns, unreachableGraceMs: 60_000,
+      turnStore: turns, unreachableGraceMs: 90_000,
       readHolderBox: active => readHolderBoxSessions(async () => boxOf[active.workspaceId] ? client.get(boxOf[active.workspaceId]!) : null) })
     const hold = async (workspaceId: string) => {
       const held = await acquireDurableTurnLock(durable.namespace, { workspaceId, threadId: `${workspaceId}-earlier`, scope: 'workspace',
@@ -71,12 +75,17 @@ it('reclaims a dead holder by default and holds while its box or turn still runs
     expect(await ask('busy')).toBe('409 workspace_turn_in_flight')
     expect(seen.busy).toMatchObject({ liveBoxSessions: 1, boxSessions: 1 })
     expect(await ask('finished')).toBe('acquired')
-    expect(await ask('down')).toBe('acquired')
+    // A box that does not answer is unreachable: held inside its own (distinct) bound, released after it.
+    expect(await ask('down')).toBe('409 workspace_turn_in_flight')
+    expect(String(seen.down?.sessionProbeError)).toMatch(/^box_(unreachable|read_timeout)$/)
+    expect(JSON.stringify(seen.down)).not.toMatch(/503|unavailable/)
     expect(await ask('live')).toBe('409 workspace_turn_in_flight')
     expect(seen.live).toMatchObject({ runningTurns: 1 })
     expect(await ask('parked')).toBe('409 workspace_turn_in_flight')
     expect(seen.parked).toMatchObject({ releasePending: true })
+    await new Promise(resolve => setTimeout(resolve, 30_000))
+    expect(await ask('down')).toBe('acquired')
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()))
   }
-}, 120_000)
+}, 150_000)
