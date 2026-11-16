@@ -443,7 +443,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
 /** The `DurableWorkspaceKeyProvisioner` shape (`./billing`), kept structural so this module stays standalone. */
 export interface DelegatedKeyProvisioner {
   createKey(input: { name: string; product: string; budgetUsd: number; spendThrough?: true; expiresAt: string; idempotencyKey: string }): Promise<{
-    id: string; key: string; budgetUsd?: number | null; expiresAt?: string | null
+    id: string; key: string; budgetUsd?: number | null; spendThrough?: true; expiresAt?: string | null
   }>
   getKey(id: string): Promise<{ budgetUsd?: number | null; budgetRemaining?: number; expiresAt?: string | null }>
   revokeKey(id: string, slot?: { name: string | null; sourceKeyId: string | null; platformUserId: string }): Promise<unknown>
@@ -523,7 +523,9 @@ export function createDelegatedKeyProvisioner(input: {
         ...(input.expect ? { expect: input.expect } : {}),
       })
       if (!minted.succeeded) throw new DelegatedKeyRefusalError(minted.error)
-      return { id: minted.value.id, key: minted.value.key, budgetUsd: minted.value.budgetUsd, expiresAt: minted.value.expiresAt.toISOString() }
+      // Platform granted no budget of its own to a spend-through request: confirm it, so the manager never rotates it on spend.
+      const spendThrough = create.spendThrough && minted.value.budgetUsd === null ? { spendThrough: true as const } : {}
+      return { id: minted.value.id, key: minted.value.key, budgetUsd: minted.value.budgetUsd, ...spendThrough, expiresAt: minted.value.expiresAt.toISOString() }
     },
     async getKey(id) {
       const verdict = await input.client.verify({ keyId: id, product })
