@@ -40,7 +40,7 @@ export interface DurableWorkspaceKeyRecord {
   platformUserId: string
   sourceKeyId: string | null
   sourceKeyFingerprint: string
-  /** The persisted name used to recover a remote create after a crash. Null only for pre-name rows. */
+  /** The remote name, used to recover a create after a crash. A store may return null: the placeholder id carries it. */
   name: string | null
   /** The persisted retry identity for the remote create. Absent on legacy rows without a persisted create identity. */
   idempotencyKey?: string | null
@@ -236,7 +236,7 @@ export interface DurableWorkspaceKeyManagerOptions {
   revocationRetryMaxMs?: number
   /** Remote name; the mint's operation id is appended when absent, as a create under a held name revokes its key. */
   nameForIdentity?: (identity: WorkspaceKeyIdentity, operationId: string) => string
-  /** Resolve names for rows written before `name` became durable. Null blocks issuance safely. */
+  /** Resolve names for rows written before a mint stored its name. Null blocks issuance safely. */
   legacyNameForRecord?: (record: DurableWorkspaceKeyRecord) => string | null | undefined
   /** Recognize a missing remote key without depending on a provider SDK. */
   isRemoteMissing?: (error: unknown) => boolean
@@ -357,25 +357,21 @@ function isProvisioningId(value: string): boolean {
   return value.startsWith('provisioning:')
 }
 
-async function markProvisioningRemote(
-  store: DurableWorkspaceKeyStore,
-  input: { id: string; keyId: string },
-): Promise<boolean> {
+/**
+ * The name a mint writes into its placeholder id (`provisioning:<operation>:<name>`) before the remote create, so
+ * recovery finds a half-created child by that name even in a store with no name column. Older placeholders carry none.
+ */
+function placeholderName(keyId: string): string | undefined {
+  return isProvisioningId(keyId) ? keyId.split(':').slice(2).join(':').trim() || undefined : undefined
+}
+
+async function markProvisioningRemote(store: DurableWorkspaceKeyStore, input: { id: string; keyId: string }): Promise<boolean> {
   if (store.conditionalWrites) return store.conditionalWrites.markProvisioningRemote(input)
   await store.markProvisioningRemote(input)
   return true
 }
 
-async function markActive(
-  store: DurableWorkspaceKeyStore,
-  input: {
-    id: string
-    keyId: string
-    keyEncrypted: string
-    expiresAt: Date
-    budgetUsd: number
-  },
-): Promise<boolean> {
+async function markActive(store: DurableWorkspaceKeyStore, input: Parameters<DurableWorkspaceKeyStore['markActive']>[0]): Promise<boolean> {
   if (store.conditionalWrites) return store.conditionalWrites.markActive(input)
   await store.markActive(input)
   return true
@@ -718,7 +714,7 @@ function createWorkspaceKeyRecovery(
     if (row.keyId && !isProvisioningId(row.keyId)) {
       return { name: row.name?.trim() ?? '', candidates: [{ id: row.keyId }] }
     }
-    const name = row.name?.trim() || options.legacyNameForRecord?.(row)?.trim()
+    const name = row.name?.trim() || placeholderName(row.keyId) || options.legacyNameForRecord?.(row)?.trim()
     if (!name) return null
     return {
       name,
@@ -788,7 +784,7 @@ function createWorkspaceKeyRecovery(
 
     for (const keyId of toRevoke) {
       try {
-        await recoveryProvisioner.revokeKey(keyId, slotOf(row))
+        await recoveryProvisioner.revokeKey(keyId, slotOf({ ...row, name: name || row.name }))
       } catch (error) {
         const settled = await settleFailedRevoke(row, keyId, error)
         if (settled === 'gone') continue
@@ -866,7 +862,7 @@ function createWorkspaceKeyMinter(
       sourceKeyFingerprint: identity.sourceKeyFingerprint,
       name,
       idempotencyKey,
-      keyId: `provisioning:${mintOperationId}`,
+      keyId: `provisioning:${mintOperationId}:${name}`,
       keyEncrypted: '',
       budgetUsd,
       expiresAt,
