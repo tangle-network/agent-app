@@ -197,12 +197,16 @@ interface IntelligenceSpanRow {
   endUnixNano: string
   attributes?: Record<string, unknown> | null
   statusCode?: string | null
-  statusMessage?: string | null
 }
 
-/** Attributes the ingest merged in from the export's resource and scope; the export carries them once, outside the spans. */
-const MERGED_ATTRS: ReadonlySet<string> = new Set([
+/**
+ * Attributes the reader leaves out: the ones the ingest merged in from the export's resource and scope (the export
+ * carries them once, outside the spans), and a failed span's error text, which quotes whatever the thrown error held
+ * (an ORM error's parameters, a provider's 400 quoting the prompt). A failed span keeps its error status.
+ */
+const OMITTED_ATTRS: ReadonlySet<string> = new Set([
   'service.name', 'tangle.project', 'otel.scope.name', 'otel.scope.version', 'otel.original_attributes', 'otel.attribute_collisions',
+  'error.message',
 ])
 
 /**
@@ -224,7 +228,7 @@ function turnTraceExport(rows: IntelligenceSpanRow[], executionId: string, proje
   const traceId = otlpTraceId(turnTraceId(executionId))
   const spans = ours.filter((row) => kept.has(spanId(row))).map((row): OtlpSpan => {
     const attrs = Object.fromEntries(Object.entries(row.attributes ?? {})
-      .filter(([key, value]) => !MERGED_ATTRS.has(key) && ['string', 'number', 'boolean'].includes(typeof value))) as Record<string, string | number | boolean>
+      .filter(([key, value]) => !OMITTED_ATTRS.has(key) && ['string', 'number', 'boolean'].includes(typeof value))) as Record<string, string | number | boolean>
     return {
       traceId,
       spanId: spanId(row),
@@ -234,9 +238,7 @@ function turnTraceExport(rows: IntelligenceSpanRow[], executionId: string, proje
       startTimeUnixNano: row.startUnixNano,
       endTimeUnixNano: row.endUnixNano,
       attributes: toOtlpAttributes(attrs, row.name === 'agent_app.turn' ? { doubles: ROOT_MEASUREMENTS } : {}),
-      status: row.statusCode === 'ERROR'
-        ? { code: 2, ...(row.statusMessage ? { message: row.statusMessage } : {}) }
-        : { code: row.statusCode === 'OK' ? 1 : 0 },
+      status: { code: row.statusCode === 'ERROR' ? 2 : row.statusCode === 'OK' ? 1 : 0 },
     }
   })
   return otlpTraceExport(toOtlpAttributes({ 'service.name': project, 'tangle.project': project }), SCOPE, spans)

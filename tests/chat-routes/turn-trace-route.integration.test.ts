@@ -67,7 +67,10 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
   const routes = createChatTurnRoutes({
     projectId: project, store: store as unknown as ChatTurnMessageStore, turnStore: createMemoryTurnEventStore(),
     // The product's own check: the caller's workspace owns the thread row. A refusal here is the product's 403.
-    authorize: async ({ request, threadId, body }) => {
+    authorize: async ({ request, threadId, body, trace, span }) => {
+      // A product step that fails quoting what the member typed: its error text never reaches the trace route.
+      const typed = String((body as Record<string, unknown> | undefined)?.content)
+      await trace?.measure('admission.auth.lookup', 'admission', () => { throw new Error(`no record for ${typed}`) }, undefined, span).catch(() => {})
       const userId = request.headers.get('x-user') ?? ''
       const row = await store.getThread(String(threadId ?? body?.threadId ?? ''))
       if (!workspaceOf[userId] || row?.workspaceId !== workspaceOf[userId]) return { ok: false, response: Response.json({ error: 'Forbidden' }, { status: 403 }) }
@@ -96,10 +99,16 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     const rootRow = intelligence.rows.find((row) => row.name === 'agent_app.turn')!
     intelligence.rows.push({ ...rootRow, id: `${receipt.traceId}:00000000000000aa`, parentSpanId: rootRow.id.split(':')[1], name: 'agent.box.llm',
       attributes: { 'otel.scope.name': 'box-agent', 'input.value': 'When is my estimated payment due?', 'http.request.header.authorization': leak } })
+    // Another turn's spans under the same trace id (an id collision, or a tenant two apps share): never this turn's.
+    intelligence.rows.push(
+      { ...rootRow, id: `${receipt.traceId}:00000000000000bb`,
+        attributes: { ...rootRow.attributes as object, 'tangle.execution_id': `${project}:other-thread:0` } },
+      { ...rootRow, id: `${receipt.traceId}:00000000000000cc`, parentSpanId: '00000000000000bb', name: 'admission.other' })
 
-    // The router hands the path segment over as it arrived: still URL-encoded.
-    const read = (user: string) => routes.trace(new Request(`https://app.test${receipt.traceUrl}`, { headers: { 'x-user': user } }),
-      { turnId: receipt.traceUrl.match(/\/turns\/([^/]+)\/trace$/)![1]! })
+    // The template's router hands the path segment over still URL-encoded; React Router decodes it.
+    const segment = receipt.traceUrl.match(/\/turns\/([^/]+)\/trace$/)![1]!
+    const read = (user: string, turnId = segment) =>
+      routes.trace(new Request(`https://app.test${receipt.traceUrl}`, { headers: { 'x-user': user } }), { turnId })
     expect(receipt.traceUrl).toMatch(/^\/api\/chat\/turns\/[^/]+\/trace$/)
 
     const owner = await read('ada')
@@ -112,6 +121,9 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(spans.every((span) => span.trace_id === receipt.traceId)).toBe(true)
     expect(spans.some((span) => span.name.startsWith('admission.') && span.parent_span_id === root.span_id)).toBe(true)
     expect(spans.map((span) => span.name)).not.toContain('agent.box.llm')
+    expect(spans.map((span) => span.span_id)).not.toContain('00000000000000bb')
+    expect(spans.map((span) => span.name)).not.toContain('admission.other')
+    expect(spans.find((span) => span.name === 'admission.auth.lookup')?.status_code).toBe(2)
     for (const span of spans) {
       for (const value of Object.values(span.attributes)) {
         expect(detectCredential(String(value)), String(value)).toBeUndefined()
@@ -121,9 +133,10 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(text).not.toContain('estimated payment')
     expect(text).not.toContain('tenant-app')
 
+    expect((await read('ada', decodeURIComponent(segment))).status).toBe(200)
     expect((await read('bo')).status).toBe(404)
-    // Only that trace was read, and only with the app's key.
-    expect(intelligence.reads).toEqual([{ path: `/v1/traces/${receipt.traceId}/spans`, authorization: `Bearer ${appKey}` }])
+    // Only that trace was read, only with the app's key, and never for the member who was refused.
+    expect(intelligence.reads).toEqual(Array(2).fill({ path: `/v1/traces/${receipt.traceId}/spans`, authorization: `Bearer ${appKey}` }))
   } finally {
     database.$client.close()
     await intelligence.close()
