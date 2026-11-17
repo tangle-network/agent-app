@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { isDeepStrictEqual } from 'node:util'
 import { expect, it } from 'vitest'
 import { createOpenAICompatStreamTurn, createOpenAIResponsesTurn } from '../src/runtime/openai-stream'
 
@@ -62,12 +61,12 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
   }
 })
 
-it('gives every parallel Responses function call its final arguments, however the stream carries them', async () => {
-  // A Router capture of three parallel function calls, with neutral ids and queries.
+it('gives every Responses function call its final arguments and every reply its final text, however the stream carries them', async () => {
+  // A recorded stream of three parallel function calls, with neutral ids and queries.
   const capture = readFileSync(new URL('./fixtures/responses-parallel-function-calls.sse', import.meta.url), 'utf8')
   type Frame = Record<string, any>
   const events: Frame[] = capture.split('\n').filter(line => line.startsWith('data: ')).map(line => JSON.parse(line.slice(6)))
-  const [created, inProgress] = events
+  const [created, inProgress] = [events[0]!, events[1]!]
   const completed = events.at(-1)!
   const final: Array<{ call_id: string; name: string; arguments: string }> = completed.response.output
   const of = (type: string) => events.filter(event => event.type === type)
@@ -76,19 +75,36 @@ it('gives every parallel Responses function call its final arguments, however th
     ({ ...event, delta: half ? event.delta.slice(event.delta.length >> 1) : event.delta.slice(0, event.delta.length >> 1) })))
   const reasoning = { id: 'rs_fixture1', type: 'reasoning', summary: [] }
   const shift = (event: Frame) => event.output_index === undefined ? event : { ...event, output_index: event.output_index + 1 }
+  const answer = ['Here is', ' the answer:', ' forty-two']
+  const message = { id: 'msg_fixture1', type: 'message', role: 'assistant', content: [{ type: 'output_text', text: answer.join('') }] }
   const replays: Record<string, string | Frame[]> = {
     a_capture: capture,
     b_done_events_only: events.filter(event => !isDelta(event)),
     c_deltas_without_output_index: events.map(({ output_index, ...event }) => isDelta(event) ? event : { ...event, output_index }),
-    d_interleaved: [created, inProgress, ...of('response.output_item.added'), ...[0, 2, 4, 1, 3, 5].map(i => halves[i]),
+    d_interleaved: [created, inProgress, ...of('response.output_item.added'), ...[0, 2, 4, 1, 3, 5].map(i => halves[i]!),
       ...events.filter(event => event.type === 'response.function_call_arguments.done' || event.type === 'response.output_item.done'), completed],
     e_reasoning_item_first: [created, inProgress, { type: 'response.output_item.added', output_index: 0, item: reasoning },
       { type: 'response.output_item.done', output_index: 0, item: reasoning }, ...events.slice(2, -1).map(shift),
       { ...completed, response: { ...completed.response, output: [reasoning, ...final] } }],
-    // The shape a Router sends when it replays a finished response: whole items, no argument events, `response.done`.
+    // A proxy replaying a finished response: whole items, no argument events, `response.done`.
     f_replayed_final_response: [created, ...final.flatMap((item, output_index) => [
       { type: 'response.output_item.added', output_index, item: { ...item, status: 'in_progress' } },
       { type: 'response.output_item.done', output_index, item }]), { type: 'response.done', response: completed.response }],
+    // The reply's last token arrives only in the done events, never in a delta.
+    g_last_text_only_in_done: [created, inProgress, { type: 'response.output_item.added', output_index: 0, item: { ...message, content: [] } },
+      ...answer.slice(0, -1).map(delta => ({ type: 'response.output_text.delta', item_id: message.id, output_index: 0, content_index: 0, delta })),
+      { type: 'response.output_text.done', item_id: message.id, output_index: 0, content_index: 0, text: answer.join('') },
+      { type: 'response.output_item.done', output_index: 0, item: message },
+      { ...completed, response: { ...completed.response, output: [message] } }],
+  }
+  // What each replay should assemble: its final output's text and function calls.
+  const expected = (frames: Frame[]) => {
+    const output: Frame[] = frames.at(-1)!.response.output
+    return {
+      text: output.filter(item => item.type === 'message').map(item => item.content[0].text).join(''),
+      calls: output.filter(item => item.type === 'function_call')
+        .map(item => ({ toolCallId: item.call_id, toolName: item.name, args: JSON.parse(item.arguments) })),
+    }
   }
   const server = createServer((request, response) => {
     request.resume().on('end', () => {
@@ -100,17 +116,20 @@ it('gives every parallel Responses function call its final arguments, however th
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    const table: Record<string, { calls: number; wrong: number; args: unknown[] }> = {}
+    const table: Record<string, { text: string; calls: unknown[] }> = {}
     for (const name of Object.keys(replays)) {
       const turn = createOpenAIResponsesTurn({ baseUrl: `${origin}/${name}/v1`, apiKey: 'local-integration-only', model: 'fixture-model' })
-      const calls = []
-      for await (const event of turn([{ role: 'user', content: 'Search three things at once' }])) if (event.type === 'tool_call') calls.push(event.call)
-      const wrong = final.filter(want => !calls.some(call => call.toolCallId === want.call_id && call.toolName === want.name &&
-        isDeepStrictEqual(call.args, JSON.parse(want.arguments)))).length
-      table[name] = { calls: calls.length, wrong, args: calls.map(call => call.args) }
+      const row: { text: string; calls: unknown[] } = { text: '', calls: [] }
+      for await (const event of turn([{ role: 'user', content: 'Search three things at once' }])) {
+        if (event.type === 'text') row.text += event.text
+        if (event.type === 'tool_call') row.calls.push({ toolCallId: event.call.toolCallId, toolName: event.call.toolName, args: event.call.args })
+      }
+      table[name] = row
     }
-    const exact = { calls: 3, wrong: 0, args: final.map(call => JSON.parse(call.arguments)) }
-    expect(table).toEqual(Object.fromEntries(Object.keys(replays).map(name => [name, exact])))
+    expect(table).toEqual(Object.fromEntries(Object.entries(replays).map(([name, replay]) =>
+      [name, expected(typeof replay === 'string' ? events : replay)])))
+    // The recorded stream's three calls are the expectation for every function-call replay.
+    expect(expected(events).calls).toHaveLength(3)
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
