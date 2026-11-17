@@ -66,7 +66,7 @@ export function turnTraceFlow(exported: unknown): TurnTraceFlow | null {
       ...(!isRoot && span.parent_span_id ? { parentId: span.parent_span_id } : {}),
       kind: flowKind(span.name, a['tangle.turn.span_kind'], isRoot),
       name: isRoot ? 'Turn' : span.name,
-      startMs: nanosToMs(span.start_time_unix_nano) - origin,
+      startMs: nanosToMs(span.start_time_unix_nano), // MUTATION: no origin
       endMs: nanosToMs(span.end_time_unix_nano) - origin,
       status: span.status_code === 2 ? 'failed' : 'done',
       ...(typeof detail === 'string' && !isRoot ? { detail } : {}),
