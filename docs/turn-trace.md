@@ -92,7 +92,7 @@ The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence store
 
 | Where | How to read it |
 |---|---|
-| The turn's owner | the turn receipt (the stream's first line) names `traceId` (the OTLP id) and `traceUrl`; `routes.trace` serves it, below |
+| The turn's owner | the turn receipt (the stream's `turn` event, after any progress events) names `traceId` (the OTLP id) and `traceUrl`; `routes.trace` serves it, below |
 | The turn response | `Server-Timing` on a turn sent without the progress-first header: `admission` (request to stream) and each `admission.*` span in start order, so `curl -sD - -o /dev/null` names where admission went; a progress-first stream reads the same spans from the sink |
 | Inside the turn | `args.trace.spans()` returns the spans recorded so far, so a product's own log line can carry the route's admission steps |
 | Tangle Intelligence (spans) | `GET /v1/traces/<otlpTraceId>/spans`; the root span `agent_app.turn` carries `tangle.trace_id`, `tangle.turn.coverage_pct`, `tangle.turn.wall_ms` and `tangle.turn.<kind>_ms` |
@@ -105,11 +105,13 @@ The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence store
 
 A member hill-climbs their own product from their own turns, so the route serves each turn's trace to whoever may read its thread.
 The turn receipt `{ type: 'turn', turnId, traceId, traceUrl }` names it; `traceId` appears whenever the turn exports, `traceUrl` when the route can read the trace back.
-`traceUrl` is the turn's path plus `/turns/<execution id>/trace` (`/api/chat` gives `/api/chat/turns/tax-agent%3A<thread>%3A3/trace`); mount `routes.trace(request, { turnId })` there, and the execution id names the turn in history as well as live.
+`traceUrl` is the turn's path plus `/turns/<execution id>/trace` (`/api/chat` gives `/api/chat/turns/tax-agent%3A<thread>%3A3/trace`); mount `routes.trace(request, { turnId })` there, since a receipt names the URL whether or not the product serves it, and the execution id names the turn in history as well as live.
 The route takes the thread from the execution id (`deriveExecutionId` must reproduce it), runs the product's `authorize` as `running` on that thread, and answers OTLP JSON with `Cache-Control: private, no-store`.
-A refusal other than 401, an id of another project and a trace not exported yet all answer 404, so a non-owner learns nothing about whether the turn exists; Intelligence not answering is 502.
+A refusal other than 401 or 5xx, an id of another project and a trace not exported yet all answer 404, so a non-owner learns nothing about whether the turn exists; Intelligence not answering is 502.
 The default reader, `createIntelligenceTurnTraceReader({ project })`, reads `GET /v1/traces/<otlpTraceId>/spans` with the key the default sink sends; a product with its own sink passes `turnTrace: { sink, read }` built from the same options.
 It returns only spans under this package's `turn-trace` scope beneath a root whose `tangle.execution_id` is this turn: another exporter's spans in the same trace and tenant (a box agent, the Router) can hold prompt or answer text, and the turn exporter writes metadata only.
+It also leaves out each failed span's error text (`error.message` and the status message): a thrown error can quote a prompt, an answer or a query's parameters, so a failed span keeps only its error status, and the root keeps `tangle.turn.failure_code`.
+The scope is read from the stored attributes, so an exporter holding the app's ingest key could claim it; today only the app's own sink holds that key.
 
 ## Limits
 
