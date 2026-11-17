@@ -83,8 +83,8 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     },
     // A model call recorded the way the Router engine records one: the drawer draws it as the model's and totals its tokens.
     produce: ({ trace }) => ({ stream: (async function* () {
-      const at = Date.now()
-      trace?.record('model.call', 'model', at, at + 4, { 'gen_ai.request.model': 'test-model', 'gen_ai.usage.input_tokens': 120, 'gen_ai.usage.output_tokens': 8 })
+      await trace?.measure('model.call', 'model', () => new Promise((resolve) => setTimeout(resolve, 2)),
+        { 'gen_ai.request.model': 'test-model', 'gen_ai.usage.input_tokens': 120, 'gen_ai.usage.output_tokens': 8 })
       yield { type: 'text' as const, text: 'Pay by the 15th.' }
     })(), finalText: () => 'Pay by the 15th.' }),
   })
