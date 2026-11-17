@@ -382,6 +382,21 @@ describe('a failed turn never shows the person the raw failure reason', () => {
     expectNoRawReason(result, ['Payment required', ...RAW_FRAGMENTS])
   })
 
+  it.each([
+    { kind: 'a typed funding failure', error: { code: 'insufficient_credits', message: 'Payment required' }, shown: FUNDING, text: led(FUNDING) },
+    { kind: 'a withheld failure', error: { code: 'AGENT_EXECUTION_FAILED', message: HARNESS_FAILURE }, shown: PLAIN, text: PLAIN },
+  ])("ends $kind with a failed done that reads the error event's sentence", async ({ error, shown, text }) => {
+    // The sandbox client closes a stream that has no terminal event with a failed done that names no reason.
+    const result = await turn([{ type: 'error', data: error },
+      { type: 'done', data: { status: 'failed', sessionId: 'session-1', executionId: 'execution-1' } }])
+
+    expect(result.error?.message).toBe(shown)
+    expect(result.streamed.filter((event) => event.type === 'done').map((event) => event.data?.message)).toEqual([shown])
+    expect(result.text).toBe(text)
+    expect(result.row?.content).toBe(text)
+    expectNoRawReason(result, ['Payment required', ...RAW_FRAGMENTS])
+  })
+
   it.each(['insufficient_credits', 'paid_access_required', 'funding_required'])('keeps a thrown own funding code %s', async (code) => {
     const result = await turn([], { severed: Object.assign(new Error('Payment required'), { code }) })
     const shown = code === 'insufficient_credits' ? FUNDING : PAID
