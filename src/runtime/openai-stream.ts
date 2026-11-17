@@ -502,14 +502,18 @@ export function createOpenAIResponsesTurn(
   }
 }
 
-interface ResponsesItem { id?: string; type?: string; call_id?: string; name?: string; arguments?: string }
+interface ResponsesItem {
+  id?: string; type?: string; call_id?: string; name?: string; arguments?: string; content?: Array<{ type?: string; text?: string }>
+}
 
 interface ResponsesEvent {
   type?: string
   delta?: string
+  text?: string
   arguments?: string
   item_id?: string
   output_index?: number
+  content_index?: number
   summary_index?: number
   item?: ResponsesItem
   response?: { model?: string; output?: ResponsesItem[]; error?: { code?: string; message?: string }
@@ -540,25 +544,37 @@ async function* streamResponses(
     if (served) report(served)
   }
   let lastSummary: string | null = null
-  // Function calls by item id, else output index. A call starts as soon as its name arrives; its arguments go out once,
-  // when the response ends, as the final ones: `function_call_arguments.done`, else `output_item.done`, else the
-  // response's output, else what `output_item.added` carried, else the deltas.
-  const calls: Array<{ id?: string; at?: number; named?: boolean; args: string; final: Array<string | undefined> }> = []
-  const callFor = (id?: string, at?: number) => {
-    let call = calls.find(c => id !== undefined && c.id === id) ?? calls.find(c => at !== undefined && c.at === at)
-    if (!call) calls.push(call = { id, at, args: '', final: [] })
-    return call
+  // Output items by id, else output index; an event naming neither belongs to the latest item. Text streams as its deltas
+  // arrive, and each done event's final text sends whatever the deltas missed. A function call starts as soon as its name
+  // arrives; its arguments go out once, when the response ends, as the final ones: `function_call_arguments.done`, else
+  // `output_item.done`, else the response's output, else what `output_item.added` carried, else the deltas.
+  const items: Array<{ id?: string; at?: number; named?: boolean; args: string; final: Array<string | undefined>; sent: string[] }> = []
+  const itemFor = (id?: string, at?: number) => {
+    let item = id === undefined && at === undefined ? items.at(-1)
+      : items.find(i => id !== undefined && i.id === id) ?? items.find(i => at !== undefined && i.at === at)
+    if (!item) items.push(item = { id, at, args: '', final: [], sent: [] })
+    return item
+  }
+  const text = (id: string | undefined, at: number | undefined, part = 0, delta = '', final?: string): OpenAIStreamChunk[] => {
+    const item = itemFor(id, at)
+    const sent = item.sent[part] ?? ''
+    const next = final === undefined ? sent + delta : final.startsWith(sent) ? final : sent
+    item.sent[part] = next
+    return next.length > sent.length ? [{ choices: [{ delta: { content: next.slice(sent.length) } }] }] : []
   }
   const sighted = (item: ResponsesItem | undefined, at: number | undefined, rank: number): OpenAIStreamChunk[] => {
+    if (item?.type === 'message') {
+      return (item.content ?? []).flatMap((part, i) => part.type === 'output_text' ? text(item.id, at, i, '', part.text) : [])
+    }
     if (item?.type !== 'function_call') return []
-    const call = callFor(item.id, at)
+    const call = itemFor(item.id, at)
     call.final[rank] ??= item.arguments
     if (call.named || !item.name) return []
     call.named = true
-    return [{ choices: [{ delta: { tool_calls: [{ index: calls.indexOf(call), ...(item.call_id ? { id: item.call_id } : {}),
+    return [{ choices: [{ delta: { tool_calls: [{ index: items.indexOf(call), ...(item.call_id ? { id: item.call_id } : {}),
       function: { name: item.name } }] } }] }]
   }
-  const settled = (): OpenAIStreamChunk => ({ choices: [{ delta: { tool_calls: calls.map((call, index) =>
+  const settled = (): OpenAIStreamChunk => ({ choices: [{ delta: { tool_calls: items.map((call, index) =>
     ({ index, function: { arguments: call.final.find(args => args) ?? call.args } })) } }] })
   for await (const data of readOpenAISseFrames(res.body)) {
       let event: ResponsesEvent
@@ -569,7 +585,10 @@ async function* streamResponses(
       }
       switch (event.type) {
         case 'response.output_text.delta':
-          if (event.delta) yield { choices: [{ delta: { content: event.delta } }] }
+          yield* text(event.item_id, event.output_index, event.content_index, event.delta)
+          break
+        case 'response.output_text.done':
+          yield* text(event.item_id, event.output_index, event.content_index, '', event.text)
           break
         case 'response.reasoning_summary_text.delta': {
           if (!event.delta) break
@@ -587,10 +606,10 @@ async function* streamResponses(
           yield* sighted(event.item, event.output_index, 1)
           break
         case 'response.function_call_arguments.delta':
-          if (event.delta) callFor(event.item_id, event.output_index).args += event.delta
+          if (event.delta) itemFor(event.item_id, event.output_index).args += event.delta
           break
         case 'response.function_call_arguments.done':
-          callFor(event.item_id, event.output_index).final[0] ??= event.arguments
+          itemFor(event.item_id, event.output_index).final[0] ??= event.arguments
           break
         case 'response.completed':
         case 'response.incomplete':
