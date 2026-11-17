@@ -31444,7 +31444,7 @@
         {
           "name": "TurnTraceDrawer",
           "kind": "function",
-          "signature": "({ traceUrl, open, onOpenChange, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element",
+          "signature": "({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element",
           "doc": "The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download."
         },
         {

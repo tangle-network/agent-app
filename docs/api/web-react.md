@@ -3899,7 +3899,7 @@ interface TurnTraceButtonProps
 `function` — The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download.
 
 ```ts
-({ traceUrl, open, onOpenChange, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
+({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
 ```
 
 ### `TurnTraceDrawerProps`
