@@ -211,8 +211,7 @@ const MERGED_ATTRS: ReadonlySet<string> = new Set([
  * the same trace (a box agent, the Router) can carry prompt or answer text, and this sink's spans carry metadata only.
  */
 function turnTraceExport(rows: IntelligenceSpanRow[], executionId: string, project: string): OtlpTraceExport | null {
-  const ours = rows.filter((row) =>
-    row.attributes?.['otel.scope.name'] === SCOPE.name && row.attributes?.['otel.scope.version'] === SCOPE.version)
+  const ours = rows // MUTATION: keep every exporter's spans
   const spanId = (row: IntelligenceSpanRow) => row.id.slice(row.id.lastIndexOf(':') + 1)
   const kept = new Set(ours.filter((row) => row.name === 'agent_app.turn' && row.attributes?.['tangle.execution_id'] === executionId).map(spanId))
   if (kept.size === 0) return null
