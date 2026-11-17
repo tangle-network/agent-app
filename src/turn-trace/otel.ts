@@ -13,10 +13,12 @@
  * and its exporter keeps a timer a Worker refuses at module scope. One OTLP
  * POST per finished turn needs neither.
  */
-import { msToUnixNano, type OtlpSpan, otlpTraceExport, readOtlpPartialSuccess, toOtlpAttributes, toW3CTraceId } from '@tangle-network/agent-trace-contract/otlp'
-import { TURN_SPAN_KINDS, type TurnSpanAttrs, type TurnSpanKind, type TurnTraceSink, type TurnTraceSnapshot } from './recorder'
+import {
+  msToUnixNano, type OtlpSpan, type OtlpTraceExport, otlpTraceExport, readOtlpPartialSuccess, toOtlpAttributes, toW3CTraceId,
+} from '@tangle-network/agent-trace-contract/otlp'
+import { TURN_SPAN_KINDS, turnTraceId, type TurnSpanAttrs, type TurnSpanKind, type TurnTraceSink, type TurnTraceSnapshot } from './recorder'
 
-export type { OtlpSpan } from '@tangle-network/agent-trace-contract/otlp'
+export type { OtlpSpan, OtlpTraceExport } from '@tangle-network/agent-trace-contract/otlp'
 
 /** The root span's measured numbers: one decimal, so each is always a `doubleValue`. */
 const ROOT_MEASUREMENTS: ReadonlySet<string> = new Set([
@@ -177,5 +179,94 @@ export function createIntelligenceTurnTraceSink(options: IntelligenceTurnTraceSi
     } catch (error) {
       fail(error instanceof Error ? error.message : 'turn trace export failed')
     }
+  }
+}
+
+/**
+ * One finished turn's spans as an OTLP JSON export, read back from where its sink sent them; null when the store holds
+ * no trace for that execution (not exported yet, past retention, or written by another app).
+ */
+export type TurnTraceReader = (executionId: string, options?: { signal?: AbortSignal }) => Promise<OtlpTraceExport | null>
+
+/** A span as Intelligence's `GET /v1/traces/:traceId/spans` serializes it: resource, scope and span attributes merged. */
+interface IntelligenceSpanRow {
+  id: string
+  parentSpanId?: string | null
+  name: string
+  startUnixNano: string
+  endUnixNano: string
+  attributes?: Record<string, unknown> | null
+  statusCode?: string | null
+  statusMessage?: string | null
+}
+
+/** Attributes the ingest merged in from the export's resource and scope; the export carries them once, outside the spans. */
+const MERGED_ATTRS: ReadonlySet<string> = new Set([
+  'service.name', 'tangle.project', 'otel.scope.name', 'otel.scope.version', 'otel.original_attributes', 'otel.attribute_collisions',
+])
+
+/**
+ * The turn spans `createIntelligenceTurnTraceSink` exported for `executionId`, rebuilt as the OTLP export it posted.
+ * Only spans under this package's scope whose root names this execution are kept: a span another exporter wrote into
+ * the same trace (a box agent, the Router) can carry prompt or answer text, and this sink's spans carry metadata only.
+ */
+function turnTraceExport(rows: IntelligenceSpanRow[], executionId: string, project: string): OtlpTraceExport | null {
+  const ours = rows.filter((row) =>
+    row.attributes?.['otel.scope.name'] === SCOPE.name && row.attributes?.['otel.scope.version'] === SCOPE.version)
+  const spanId = (row: IntelligenceSpanRow) => row.id.slice(row.id.lastIndexOf(':') + 1)
+  const kept = new Set(ours.filter((row) => row.name === 'agent_app.turn' && row.attributes?.['tangle.execution_id'] === executionId).map(spanId))
+  if (kept.size === 0) return null
+  // The roots' descendants, whatever order the rows come in.
+  for (let size = -1; size !== kept.size;) {
+    size = kept.size
+    for (const row of ours) if (row.parentSpanId && kept.has(row.parentSpanId)) kept.add(spanId(row))
+  }
+  const traceId = otlpTraceId(turnTraceId(executionId))
+  const spans = ours.filter((row) => kept.has(spanId(row))).map((row): OtlpSpan => {
+    const attrs = Object.fromEntries(Object.entries(row.attributes ?? {})
+      .filter(([key, value]) => !MERGED_ATTRS.has(key) && ['string', 'number', 'boolean'].includes(typeof value))) as Record<string, string | number | boolean>
+    return {
+      traceId,
+      spanId: spanId(row),
+      ...(row.parentSpanId ? { parentSpanId: row.parentSpanId } : {}),
+      name: row.name,
+      kind: 1,
+      startTimeUnixNano: row.startUnixNano,
+      endTimeUnixNano: row.endUnixNano,
+      attributes: toOtlpAttributes(attrs, row.name === 'agent_app.turn' ? { doubles: ROOT_MEASUREMENTS } : {}),
+      status: row.statusCode === 'ERROR'
+        ? { code: 2, ...(row.statusMessage ? { message: row.statusMessage } : {}) }
+        : { code: row.statusCode === 'OK' ? 1 : 0 },
+    }
+  })
+  return otlpTraceExport(toOtlpAttributes({ 'service.name': project, 'tangle.project': project }), SCOPE, spans)
+}
+
+/**
+ * Read a turn's trace back from Tangle Intelligence with the key its sink sends under (the same options), so a chat
+ * route can show a turn's owner its own waterfall. Intelligence scopes the read to the key's tenant and redacts at
+ * ingest; this keeps only the turn exporter's own spans. Throws when Intelligence refuses or cannot be reached.
+ */
+export function createIntelligenceTurnTraceReader(options: Omit<IntelligenceTurnTraceSinkOptions, 'onError'>): TurnTraceReader {
+  const base = (options.baseUrl ?? DEFAULT_INTELLIGENCE_BASE_URL).replace(/\/+$/, '')
+  return async (executionId, { signal } = {}) => {
+    const apiKey = options.apiKey?.trim() || resolveIngestKey()
+    if (!apiKey) throw new Error(`no Intelligence key: set ${INGEST_KEY_ENV.join(', ')} or pass apiKey`)
+    const rows: IntelligenceSpanRow[] = []
+    let cursor: string | null = null
+    // The recorder keeps at most 1000 spans a turn and Intelligence pages 5000 by default, so one page is the norm.
+    for (let page = 0; page < 10; page++) {
+      const query: string = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+      const response = await fetch(`${base}/v1/traces/${otlpTraceId(turnTraceId(executionId))}/spans${query}`, {
+        headers: { authorization: `Bearer ${apiKey}` },
+        signal: AbortSignal.any([AbortSignal.timeout(options.timeoutMs ?? 5_000), ...(signal ? [signal] : [])]),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status} from Intelligence`)
+      const body = await response.json() as { items?: IntelligenceSpanRow[]; nextCursor?: string | null }
+      rows.push(...(body.items ?? []))
+      cursor = body.nextCursor ?? null
+      if (!cursor) break
+    }
+    return turnTraceExport(rows, executionId, options.project)
   }
 }
