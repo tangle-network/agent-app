@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.21
+
+- fix(create-agent-app): scaffold agent-interface 5.10.27 (#1563)
+
 ## 4.0.20
 
 - fix(chat): end a typed failure's turn with its own sentence (#1562)
