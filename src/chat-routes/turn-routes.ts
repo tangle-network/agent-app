@@ -57,8 +57,8 @@ import { withD1QueryCount, currentD1QueryCounter } from '../launch-invariants/d1
 import { createInteractionAnswerRoute } from '../interactions/route'
 import { replayTurnEvents, stampReplaySeq } from '../stream/index'
 import { parseJsonObjectBody } from '../web/index'
-import { createTurnTrace, type TurnTrace, type TurnTraceSink } from '../turn-trace/recorder'
-import { createIntelligenceTurnTraceSink } from '../turn-trace/otel'
+import { createTurnTrace, type TurnTrace } from '../turn-trace/recorder'
+import { createTurnTraceRoute, turnTraceWiring } from './turn-trace-route'
 import { storeSupportsDraftPersistence, type AssistantDraftStore, type DraftPersistenceTuning } from './draft-persistence'
 import { startTurnPrefetch } from './turn-prefetch'
 import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, type ParsedTurnBody, type TurnProgressCallback } from './turn-admission'
@@ -149,10 +149,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   const progressMessages: Record<TurnRoutePhase, string> = { ...TURN_ROUTE_PHASE_MESSAGES, ...options.progressMessages }
 
   // Every turn's trace goes to Intelligence unless the product turns it off (`turnTrace: false`).
-  const traceOptions = options.turnTrace === false ? undefined : options.turnTrace
-  const traceSink: TurnTraceSink | undefined = options.turnTrace === false
-    ? undefined
-    : (traceOptions?.sink ?? createIntelligenceTurnTraceSink({ project: options.projectId }))
+  const { traceOptions, traceSink, traceReader, traceReceipt } = turnTraceWiring(options.projectId, options.turnTrace)
 
   /** Start the admitted turn's intent line; resolves to the line, or null. Never rejects. */
   function startIntentLine(admitted: AdmittedTurn<TContext>): Promise<string | null> | undefined {
@@ -192,7 +189,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     return Promise.race([generated, deadline]).finally(() => clearTimeout(timer))
   }
   const runAdmittedTurn = createAdmittedTurnRunner({
-    options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
+    options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, traceReceipt, startIntentLine, log,
   })
   // A hosted turn's object is placed with the turn lock's channel unless the host names a place.
   const turnHost = input.turnHost && { locationHint: turnStorageBindings(input)?.region, ...input.turnHost }
@@ -427,6 +424,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
       ? hostTurn(turnHost, request, ctx) : withD1QueryCount(() => turn(request, ctx)),
     cancel: request => cancelChatTurn(request, { authorize: options.authorize, cancel: options.cancel, log }),
     replay,
+    trace: createTurnTraceRoute({ projectId: options.projectId, authorize: options.authorize, reader: traceReader, log }),
     running,
     interactions: options.interactions ? createInteractionAnswerRoute(options.interactions) : null,
   }

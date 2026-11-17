@@ -61,6 +61,7 @@ interface TurnExecutionOptions<TContext, TResource> {
   progressMessages: Record<TurnRoutePhase, string>
   traceOptions: ChatTurnTraceOptions<TContext> | undefined
   traceSink: TurnTraceSink | undefined
+  traceReceipt(request: Request, executionId: string): Record<string, string>
   startIntentLine(admitted: AdmittedTurn<TContext>): Promise<string | null> | undefined
   log(message: string, meta?: Record<string, unknown>): void
 }
@@ -99,7 +100,7 @@ export function createAdmittedTurnRunner<TContext, TResource>(dependencies: Turn
 }
 
 async function runAdmittedTurn<TContext, TResource>({
-  options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
+  options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, traceReceipt, startIntentLine, log,
 }: TurnExecutionOptions<TContext, TResource>,
   request: Request,
   ctx: ChatTurnRequestContext | undefined,
@@ -318,7 +319,7 @@ async function runAdmittedTurn<TContext, TResource>({
       scopeId: payload.threadId,
       coalesce: coalesceDeltas,
     })
-    const turnMarker = { type: 'turn', turnId: turnStreamId }
+    const turnMarker = { type: 'turn', turnId: turnStreamId, ...traceReceipt(request, executionId) }
     await state.tap.onEvent(turnMarker)
     await stopRenewal() // the tap renews the running row from here
     if (state.completionHandoff) await state.tap!.detach()
