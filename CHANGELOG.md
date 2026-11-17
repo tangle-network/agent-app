@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.24
+
+- fix(runtime): send the answer call that replaces a cancelled lower-effort call with tool_choice none (#1567)
+
 ## 4.0.23
 
 - feat(runtime): lower reasoning effort on Router turn rounds that only choose tools (#1566)
