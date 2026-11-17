@@ -37,11 +37,10 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
   let events = 0
   const tools = new Map<string, TurnSpan>()
 
+  const toolAttrs = (id: string, name: string): TurnSpanAttrs =>
+    ({ 'gen_ai.tool.name': name, 'tool.call_id': id, 'call.index': nextCallIndex(trace, 'tool.call'), where: 'sandbox' })
   const startTool = (id: string, name: string) => {
-    if (tools.has(id)) return
-    tools.set(id, trace.start('tool.call', 'tool', {
-      'gen_ai.tool.name': name, 'tool.call_id': id, 'call.index': nextCallIndex(trace, 'tool.call'), where: 'sandbox', approx: true,
-    }, generation ?? prompt))
+    if (!tools.has(id)) tools.set(id, trace.start('tool.call', 'tool', { ...toolAttrs(id, name), approx: true }, generation ?? prompt))
   }
 
   const observe = (raw: unknown) => {
@@ -87,17 +86,12 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
         if (!id) return
         const state = asRec(part?.state)
         const status = String(state?.status ?? part?.status ?? '')
-        const time = asRec(state?.time)
-        const [toolStart, toolEnd] = [asNum(time?.start), asNum(time?.end)]
-        const ranMs = toolStart !== undefined && toolEnd !== undefined ? toolEnd - toolStart : undefined
+        const ranMs = (asNum(asRec(state?.time)?.end) ?? NaN) - (asNum(asRec(state?.time)?.start) ?? NaN)
         // OpenCode reports a tool part only once it finished, with the box's own start and end: the duration is the box's,
         // the end is when this side heard of it (the two clocks differ, so only the difference is used).
-        if (!tools.has(id) && (status === 'completed' || status === 'error') && ranMs !== undefined && ranMs >= 0) {
-          tools.set(id, trace.record('tool.call', 'tool', Math.max(startedAt, now - ranMs), now, {
-            'gen_ai.tool.name': String(part?.tool ?? 'tool'), 'tool.call_id': id, 'call.index': nextCallIndex(trace, 'tool.call'),
-            where: 'sandbox', ...(status === 'error' ? { 'tool.status': 'error' } : {}),
-          }, generation ?? prompt))
-          return
+        if (!tools.has(id) && (status === 'completed' || status === 'error') && ranMs >= 0) {
+          const attrs = { ...toolAttrs(id, String(part?.tool ?? 'tool')), ...(status === 'error' ? { 'tool.status': 'error' } : {}) }
+          return void tools.set(id, trace.record('tool.call', 'tool', Math.max(startedAt, now - ranMs), now, attrs, generation ?? prompt))
         }
         startTool(id, String(part?.tool ?? 'tool'))
         if (status === 'completed' || status === 'error') tools.get(id)?.end(undefined, status === 'error' ? 'tool_error' : undefined)
