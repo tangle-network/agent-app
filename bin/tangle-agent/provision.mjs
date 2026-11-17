@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { Sandbox } from '@tangle-network/sandbox/core'
 import { HubClient } from '@tangle-network/hub-sdk'
 import { agentProfileSchema, defineAgentProfilePublicConfig as publicValue,
-  defineAgentProfileSecretRef as secretRef, mergeAgentProfiles } from '@tangle-network/agent-interface'
+  mergeAgentProfiles } from '@tangle-network/agent-interface'
 import { GENERAL_AGENT_MODEL, GENERAL_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_HOME,
   withDefaultAgentHome, agentHomeWorkflows } from '../../dist/hosted-agent/index.js'
 
@@ -80,8 +80,10 @@ export function buildGeneralAgent(configInput) {
     mcp: { tangle_agent: { transport: 'stdio', command: 'node',
       args: [publicValue(config.runtimeModule), publicValue('serve')],
       env: {
-        TANGLE_AGENT_ROUTER_KEY: secretRef(config.routerKeyEnv),
-        TANGLE_AGENT_BROWSER_PROXY: secretRef(config.proxyEnv),
+        // Variable names, not values: OpenCode starts this server with its own env, so the
+        // server reads the box's model key and proxy by name and the profile names no secret.
+        TANGLE_AGENT_ROUTER_KEY_ENV: publicValue(config.routerKeyEnv),
+        TANGLE_AGENT_PROXY_ENV: publicValue(config.proxyEnv),
         TANGLE_AGENT_HOME: publicValue(config.home), TANGLE_AGENT_CHROMIUM: publicValue(config.chromium),
         TANGLE_AGENT_MODEL: publicValue(config.model), TANGLE_AGENT_IMAGE_MODEL: publicValue(config.imageModel),
         TANGLE_AGENT_VIDEO_MODEL: publicValue(config.videoModel),
