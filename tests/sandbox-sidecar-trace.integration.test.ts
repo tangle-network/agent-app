@@ -56,3 +56,33 @@ it('projects sidecar startup spans from the HTTP event stream into the exported 
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
 })
+
+it('gives a box tool call the duration the box reported, though OpenCode sends the part only once it finished', async () => {
+  // The box's clock, not this process's: only the difference may be used.
+  const finished = { type: 'tool', id: 'part-1', callID: 'call-1', tool: 'bash', state: { status: 'completed', time: { start: 1_700_000_000_000, end: 1_700_000_000_250 } } }
+  const server = createServer(async (_request, response) => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    response.writeHead(200, { 'content-type': 'application/x-ndjson' })
+    response.end([
+      { type: 'message.part.updated', data: { part: { type: 'text', text: 'Running it.' } } },
+      { type: 'message.part.updated', data: { part: finished } },
+      { type: 'message.part.updated', data: { part: { ...finished, id: 'part-2', callID: 'call-2', state: { status: 'error', time: { start: 5, end: 45 } } } } },
+    ].map(event => JSON.stringify(event)).join('\n'))
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const trace = createTurnTrace({ executionId: 'sidecar-tool-duration' })
+    async function* source() {
+      const response = await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}`)
+      for (const line of (await response.text()).split('\n')) yield JSON.parse(line)
+    }
+    for await (const _event of traceSandboxPromptEvents(source(), { trace })) { /* pass through */ }
+    const tools = trace.finish().spans.filter(span => span.name === 'tool.call')
+    expect(tools.map(span => Math.round(span.endMs - span.startMs))).toEqual([250, 40])
+    expect(tools.every(span => span.attrs.approx === undefined && span.attrs['gen_ai.tool.name'] === 'bash')).toBe(true)
+    expect(tools[1]!.attrs['tool.status']).toBe('error')
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+})
