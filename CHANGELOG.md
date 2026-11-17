@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.19
+
+- fix(tangle-agent): read the router key and browser proxy from the box env by name (#1559)
+
 ## 4.0.18
 
 - fix(runtime): give Responses replies their final text (#1560)
