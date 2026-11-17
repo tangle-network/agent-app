@@ -4,6 +4,8 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { expect, it } from 'vitest'
 import { createOpenAICompatStreamTurn, createOpenAIResponsesTurn } from '../src/runtime/openai-stream'
+import { runRouterTurn } from '../src/runtime/router-turn'
+import { createTurnTrace } from '../src/turn-trace/index'
 
 it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning summaries over HTTP', async () => {
   const requests: Array<{ path: string; body: Record<string, unknown>; authorization?: string }> = []
@@ -130,6 +132,48 @@ it('gives every Responses function call its final arguments and every reply its 
       [name, expected(typeof replay === 'string' ? events : replay)])))
     // The recorded stream's three calls are the expectation for every function-call replay.
     expect(expected(events).calls).toHaveLength(3)
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+})
+
+it('records on each model call span why it ended, its answer characters, its function calls and its reasoning tokens', async () => {
+  const answer = 'Here is the answer: forty-two'
+  const sse = (events: object[]) => events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')
+  const reasoning = { id: 'rs_fixture1', type: 'reasoning', summary: [] }
+  // A reasoning-only call (blank, so the turn repeats it once), the recorded round of three function calls, then the answer.
+  const replies = [
+    sse([{ type: 'response.output_item.added', output_index: 0, item: reasoning },
+      { type: 'response.incomplete', response: { status: 'incomplete', incomplete_details: { reason: 'max_output_tokens' },
+        output: [reasoning], usage: { input_tokens: 90, output_tokens: 4000, output_tokens_details: { reasoning_tokens: 4000 } } } }]),
+    readFileSync(new URL('./fixtures/responses-parallel-function-calls.sse', import.meta.url), 'utf8'),
+    sse([{ type: 'response.output_text.delta', item_id: 'msg_fixture1', output_index: 0, content_index: 0, delta: answer },
+      { type: 'response.completed', response: { status: 'completed',
+        output: [{ id: 'msg_fixture1', type: 'message', content: [{ type: 'output_text', text: answer }] }],
+        usage: { input_tokens: 200, output_tokens: 12, output_tokens_details: { reasoning_tokens: 0 } } } }]),
+  ]
+  let served = 0
+  const server = createServer((request, response) => {
+    request.resume().on('end', () => {
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      response.end(replies[served++] ?? '')
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const trace = createTurnTrace({ executionId: 'model-call-outcome-fixture' })
+    const outcome = await runRouterTurn({ apiKey: 'local-integration-only', model: 'gpt-6-luna', trace,
+      baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, systemPrompt: 's', userMessage: 'Search three things at once',
+      tools: [{ name: 'web_search', description: 'Search the web', run: async () => 'found',
+        inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] })
+    expect(outcome.text).toBe(answer)
+    expect(trace.finish().spans.filter(span => span.name === 'model.call').map(({ attrs }) => ({
+      finish: attrs['gen_ai.response.finish_reasons'], textChars: attrs['tangle.model.text_chars'],
+      toolCalls: attrs['tangle.model.tool_calls'], reasoningTokens: attrs['gen_ai.usage.reasoning_tokens'] }))).toEqual([
+      { finish: 'max_output_tokens', textChars: 0, toolCalls: 0, reasoningTokens: 4000 },
+      { finish: 'completed', textChars: 0, toolCalls: 3, reasoningTokens: 0 },
+      { finish: 'completed', textChars: answer.length, toolCalls: 0, reasoningTokens: 0 },
+    ])
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
