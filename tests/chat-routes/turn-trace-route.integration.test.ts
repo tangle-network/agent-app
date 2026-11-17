@@ -81,7 +81,12 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
       sink: createIntelligenceTurnTraceSink({ project, apiKey: appKey, baseUrl: intelligence.baseUrl, onError: (reason) => { exportErrors.push(reason) } }),
       read: createIntelligenceTurnTraceReader({ project, apiKey: appKey, baseUrl: intelligence.baseUrl }),
     },
-    produce: () => ({ stream: (async function* () { yield { type: 'text' as const, text: 'Pay by the 15th.' } })(), finalText: () => 'Pay by the 15th.' }),
+    // A model call recorded the way the Router engine records one: the drawer draws it as the model's and totals its tokens.
+    produce: ({ trace }) => ({ stream: (async function* () {
+      const at = Date.now()
+      trace?.record('model.call', 'model', at, at + 4, { 'gen_ai.request.model': 'test-model', 'gen_ai.usage.input_tokens': 120, 'gen_ai.usage.output_tokens': 8 })
+      yield { type: 'text' as const, text: 'Pay by the 15th.' }
+    })(), finalText: () => 'Pay by the 15th.' }),
   })
   try {
     const response = await routes.turn(new Request('https://app.test/api/chat', {
@@ -130,7 +135,14 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(drawn.traceId).toBe(receipt.traceId)
     expect(drawn.flow.spans).toHaveLength(spans.length)
     expect(drawn.flow.spans.filter((span) => span.kind === 'pipeline').map((span) => span.id)).toEqual([root.span_id])
-    expect(drawn.flow.spans.filter((span) => span.name.startsWith('admission.')).every((span) => span.kind === 'waiting' && span.parentId)).toBe(true)
+    const parentOf = new Map(spans.map((span) => [span.span_id, span.parent_span_id]))
+    expect(drawn.flow.spans.filter((span) => span.kind !== 'pipeline').every((span) => span.parentId === parentOf.get(span.id!))).toBe(true)
+    expect(drawn.flow.spans.filter((span) => span.name.startsWith('admission.')).every((span) => span.kind === 'waiting')).toBe(true)
+    expect(drawn.flow.spans.find((span) => span.name === 'model.call')).toMatchObject({ kind: 'model', detail: 'test-model', promptTokens: 120 })
+    expect(drawn.flow).toMatchObject({ promptTokens: 120, completionTokens: 8 })
+    // On the turn's own clock: the root starts at 0 and every span sits inside it.
+    expect(drawn.flow.spans.find((span) => span.kind === 'pipeline')).toMatchObject({ startMs: 0, endMs: drawn.flow.totalMs })
+    expect(drawn.flow.spans.every((span) => span.startMs >= 0 && span.endMs >= span.startMs && span.endMs <= drawn.flow.totalMs)).toBe(true)
     // A turn in history: its assistant row's id names the same URL the receipt did.
     const [answer] = (await store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
     expect(turnTraceUrlForMessage('/api/chat', answer!.id)).toBe(receipt.traceUrl)

@@ -38,12 +38,20 @@ export interface TurnTraceFlow {
   firstTextMs?: number
 }
 
-/** The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock. Null when it holds
- *  no turn root. */
+/** The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock. A re-entered
+ *  execution holds one root per attempt; this draws the latest attempt. Null when it holds no turn root. */
 export function turnTraceFlow(exported: unknown): TurnTraceFlow | null {
-  const spans = decodeOtlpTraceExport(exported)
-  const root = spans.find((span) => span.name === 'agent_app.turn' && !span.parent_span_id)
+  const all = decodeOtlpTraceExport(exported)
+  const root = all.filter((span) => span.name === 'agent_app.turn' && !span.parent_span_id)
+    .sort((a, b) => nanosToMs(b.start_time_unix_nano) - nanosToMs(a.start_time_unix_nano))[0]
   if (!root) return null
+  // The chosen attempt's tree only, whatever order the spans come in.
+  const kept = new Set([root.span_id])
+  for (let size = 0; size !== kept.size;) {
+    size = kept.size
+    for (const span of all) if (span.parent_span_id && kept.has(span.parent_span_id)) kept.add(span.span_id)
+  }
+  const spans = all.filter((span) => kept.has(span.span_id))
   const origin = nanosToMs(root.start_time_unix_nano)
   const attr = root.span_attributes
   const flow: FlowSpan[] = spans.map((span) => {
@@ -90,7 +98,8 @@ export function turnTraceFlow(exported: unknown): TurnTraceFlow | null {
       ...(completionTokens !== undefined ? { completionTokens } : {}),
       ...(modelCalls !== undefined ? { modelCalls } : {}),
       ...(toolCalls !== undefined ? { toolCalls } : {}),
-      errors: flow.filter((span) => span.status === 'failed').length,
+      // The turn's own failure is its status, not one more failed step.
+      errors: flow.filter((span) => span.status === 'failed' && span.kind !== 'pipeline').length,
     },
     ...(wallMs !== undefined ? { wallMs } : {}),
     ...(coveragePct !== undefined ? { coveragePct } : {}),
