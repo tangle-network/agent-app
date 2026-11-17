@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.27
+
+- feat(web-react): a Trace drawer that shows a member their own turn's waterfall and its OTLP (#1571)
+
 ## 4.0.26
 
 - fix(turn-trace): keep error text out of the owner's trace; make the route test prove its filters (#1570)
