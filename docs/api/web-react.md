@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-543 exports.
+550 exports.
 
 ### `acceptRejectionReason`
 
@@ -3876,6 +3876,62 @@ type TurnResponseData
 
 ```ts
 type TurnRoutePhase
+```
+
+### `TurnTraceButton`
+
+`function` — A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row.
+
+```ts
+({ label, ...drawer }: TurnTraceButtonProps) => Element
+```
+
+### `TurnTraceButtonProps`
+
+`interface`
+
+```ts
+interface TurnTraceButtonProps
+```
+
+### `TurnTraceDrawer`
+
+`function` — The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download.
+
+```ts
+({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
+```
+
+### `TurnTraceDrawerProps`
+
+`interface`
+
+```ts
+interface TurnTraceDrawerProps
+```
+
+### `turnTraceFlow`
+
+`function` — The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock.
+
+```ts
+(exported: unknown) => TurnTraceFlow | null
+```
+
+### `TurnTraceFlow`
+
+`interface`
+
+```ts
+interface TurnTraceFlow
+```
+
+### `turnTraceUrlForMessage`
+
+`function` — The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id.
+
+```ts
+(turnPath: string, messageId: string) => string | null
 ```
 
 ### `upsertChatInteraction`

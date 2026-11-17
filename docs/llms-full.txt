@@ -3377,7 +3377,7 @@ interface AssistantDraftWriterOptions
 
 ### `assistantRowIdForTurn`
 
-`function` — The default deterministic assistant-row id for a turn.
+`function` — The deterministic assistant-row id for a turn: readable on purpose (an operator grepping a transcript row id finds the run), and stable across re-entries because every input already is.
 
 ```ts
 (turnKey: string) => string
@@ -34449,6 +34449,14 @@ Source: `src/turn-trace/index.ts` · depends on `redact`
 interface CreateTurnTraceOptions
 ```
 
+### `executionIdOfAssistantRow`
+
+`function` — The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key.
+
+```ts
+(messageId: string) => string | null
+```
+
 ### `formatServerTiming`
 
 `function` — Format metrics as a `Server-Timing` header value, the inverse of {@link parseServerTiming}.
@@ -34655,6 +34663,14 @@ interface TurnTraceSnapshot
 
 ```ts
 interface TurnTraceSummary
+```
+
+### `turnTraceUrl`
+
+`function` — `routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`.
+
+```ts
+(turnPath: string, executionId: string) => string
 ```
 
 
@@ -36746,7 +36762,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -40620,6 +40636,62 @@ type TurnResponseData
 type TurnRoutePhase
 ```
 
+### `TurnTraceButton`
+
+`function` — A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row.
+
+```ts
+({ label, ...drawer }: TurnTraceButtonProps) => Element
+```
+
+### `TurnTraceButtonProps`
+
+`interface`
+
+```ts
+interface TurnTraceButtonProps
+```
+
+### `TurnTraceDrawer`
+
+`function` — The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download.
+
+```ts
+({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
+```
+
+### `TurnTraceDrawerProps`
+
+`interface`
+
+```ts
+interface TurnTraceDrawerProps
+```
+
+### `turnTraceFlow`
+
+`function` — The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock.
+
+```ts
+(exported: unknown) => TurnTraceFlow | null
+```
+
+### `TurnTraceFlow`
+
+`interface`
+
+```ts
+interface TurnTraceFlow
+```
+
+### `turnTraceUrlForMessage`
+
+`function` — The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id.
+
+```ts
+(turnPath: string, messageId: string) => string | null
+```
+
 ### `upsertChatInteraction`
 
 `function` — Insert or update one interaction.
@@ -41095,7 +41167,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -41449,7 +41521,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/document`
 
-Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `AppDocument`
 
@@ -41510,7 +41582,7 @@ interface AppDocumentProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `SandboxTerminalConnection`
 

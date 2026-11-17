@@ -13,6 +13,7 @@ import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-
 import { createChatTables, createChatStore, type ChatDatabase } from '../../src/chat-store/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { createIntelligenceTurnTraceReader, createIntelligenceTurnTraceSink } from '../../src/turn-trace/index'
+import { turnTraceFlow, turnTraceUrlForMessage } from '../../src/web-react/turn-trace-flow'
 import { openDatabase } from '../teams/db-helper'
 
 type Row = Record<string, unknown> & { id: string; tenantId: string; traceId: string }
@@ -80,7 +81,12 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
       sink: createIntelligenceTurnTraceSink({ project, apiKey: appKey, baseUrl: intelligence.baseUrl, onError: (reason) => { exportErrors.push(reason) } }),
       read: createIntelligenceTurnTraceReader({ project, apiKey: appKey, baseUrl: intelligence.baseUrl }),
     },
-    produce: () => ({ stream: (async function* () { yield { type: 'text' as const, text: 'Pay by the 15th.' } })(), finalText: () => 'Pay by the 15th.' }),
+    // A model call recorded the way the Router engine records one: the drawer draws it as the model's and totals its tokens.
+    produce: ({ trace }) => ({ stream: (async function* () {
+      await trace?.measure('model.call', 'model', () => new Promise((resolve) => setTimeout(resolve, 2)),
+        { 'gen_ai.request.model': 'test-model', 'gen_ai.usage.input_tokens': 120, 'gen_ai.usage.output_tokens': 8 })
+      yield { type: 'text' as const, text: 'Pay by the 15th.' }
+    })(), finalText: () => 'Pay by the 15th.' }),
   })
   try {
     const response = await routes.turn(new Request('https://app.test/api/chat', {
@@ -124,6 +130,22 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(spans.map((span) => span.span_id)).not.toContain('00000000000000bb')
     expect(spans.map((span) => span.name)).not.toContain('admission.other')
     expect(spans.find((span) => span.name === 'admission.auth.lookup')?.status_code).toBe(2)
+    // What the member's drawer draws from that answer: the turn is the agent row, its admission steps are its waits.
+    const drawn = turnTraceFlow(JSON.parse(text))!
+    expect(drawn.traceId).toBe(receipt.traceId)
+    expect(drawn.flow.spans).toHaveLength(spans.length)
+    expect(drawn.flow.spans.filter((span) => span.kind === 'pipeline').map((span) => span.id)).toEqual([root.span_id])
+    const parentOf = new Map(spans.map((span) => [span.span_id, span.parent_span_id]))
+    expect(drawn.flow.spans.filter((span) => span.kind !== 'pipeline').every((span) => span.parentId === parentOf.get(span.id!))).toBe(true)
+    expect(drawn.flow.spans.filter((span) => span.name.startsWith('admission.')).every((span) => span.kind === 'waiting')).toBe(true)
+    expect(drawn.flow.spans.find((span) => span.name === 'model.call')).toMatchObject({ kind: 'model', detail: 'test-model', promptTokens: 120 })
+    expect(drawn.flow).toMatchObject({ promptTokens: 120, completionTokens: 8 })
+    // On the turn's own clock: the root starts at 0 and every span sits inside it.
+    expect(drawn.flow.spans.find((span) => span.kind === 'pipeline')).toMatchObject({ startMs: 0, endMs: drawn.flow.totalMs })
+    expect(drawn.flow.spans.every((span) => span.startMs >= 0 && span.endMs >= span.startMs && span.endMs <= drawn.flow.totalMs)).toBe(true)
+    // A turn in history: its assistant row's id names the same URL the receipt did.
+    const [answer] = (await store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
+    expect(turnTraceUrlForMessage('/api/chat', answer!.id)).toBe(receipt.traceUrl)
     for (const span of spans) {
       for (const value of Object.values(span.attributes)) {
         expect(detectCredential(String(value)), String(value)).toBeUndefined()

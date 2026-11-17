@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-31 exports.
+33 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -44,6 +44,14 @@ Source: `src/turn-trace/index.ts`
 
 ```ts
 interface CreateTurnTraceOptions
+```
+
+### `executionIdOfAssistantRow`
+
+`function` — The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key.
+
+```ts
+(messageId: string) => string | null
 ```
 
 ### `formatServerTiming`
@@ -252,4 +260,12 @@ interface TurnTraceSnapshot
 
 ```ts
 interface TurnTraceSummary
+```
+
+### `turnTraceUrl`
+
+`function` — `routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`.
+
+```ts
+(turnPath: string, executionId: string) => string
 ```

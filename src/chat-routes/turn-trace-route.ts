@@ -5,6 +5,7 @@
 import { deriveExecutionId } from '@tangle-network/agent-runtime/durable'
 import { createIntelligenceTurnTraceReader, createIntelligenceTurnTraceSink, otlpTraceId, type TurnTraceReader } from '../turn-trace/otel'
 import { turnTraceId, type TurnTraceSink } from '../turn-trace/recorder'
+import { turnTraceUrl } from '../turn-trace/url'
 import type { ChatTurnAuthorization, ChatTurnAuthorizeArgs, ChatTurnTraceOptions } from './turn-route-contracts'
 
 /** The route's trace store: every turn goes to Intelligence unless the product turns it off (`turnTrace: false`). */
@@ -20,9 +21,7 @@ export function turnTraceWiring<TContext>(projectId: string, turnTrace: ChatTurn
   /** The turn receipt's trace fields: the OTLP trace the turn's spans export under, and where its owner reads them. */
   const traceReceipt = (request: Request, executionId: string): Record<string, string> => ({
     ...(traceSink ? { traceId: otlpTraceId(turnTraceId(executionId)) } : {}),
-    ...(traceReader
-      ? { traceUrl: `${new URL(request.url).pathname.replace(/\/+$/, '')}/turns/${encodeURIComponent(executionId)}/trace` }
-      : {}),
+    ...(traceReader ? { traceUrl: turnTraceUrl(new URL(request.url).pathname, executionId) } : {}),
   })
   return { traceOptions, traceSink, traceReader, traceReceipt }
 }

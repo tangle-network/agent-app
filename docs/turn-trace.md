@@ -112,6 +112,8 @@ The default reader, `createIntelligenceTurnTraceReader({ project })`, reads `GET
 It returns only spans under this package's `turn-trace` scope beneath a root whose `tangle.execution_id` is this turn: another exporter's spans in the same trace and tenant (a box agent, the Router) can hold prompt or answer text, and the turn exporter writes metadata only.
 It also leaves out each failed span's error text (`error.message` and the status message): a thrown error can quote a prompt, an answer or a query's parameters, so a failed span keeps only its error status, and the root keeps `tangle.turn.failure_code`.
 The scope is read from the stored attributes, so an exporter holding the app's ingest key could claim it; today only the app's own sink holds that key.
+In the browser, `TurnTraceButton` (put it in `ChatMessages`' `renderExtras` or a product's message row) opens `TurnTraceDrawer` from `/web-react`: the turn's summary, its span waterfall (charts `FlowWaterfall`; pass sandbox-ui's `traceSpanMark` as `renderIcon` for brand marks) and Download OTLP.
+For a turn in history, `turnTraceUrlForMessage(turnPath, message.id)` gives the same URL from the assistant row's id; `turnTraceFlow` is the projection the drawer draws.
 
 ## Limits
 
