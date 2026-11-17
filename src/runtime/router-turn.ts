@@ -237,6 +237,13 @@ export interface RouterTurnOptions {
   /** Sent as `reasoning_effort`. */
   reasoningEffort?: string
   /**
+   * Sent as `reasoning_effort` instead of `reasoningEffort` on a model call that follows a tool round, so a round
+   * that only chooses tools reasons less. Such a call that writes a word is cancelled at that word, before it reaches
+   * the turn, and sent again at `reasoningEffort`, as is one that ends without a tool call, so the one call that
+   * writes the answer runs at full effort. The call that opens the turn runs at `reasoningEffort`. Streamed turns only.
+   */
+  toolRoundEffort?: string
+  /**
    * The caller shows the model's reasoning as it streams (`onEvent` `reasoning` events). With `onEvent`, a
    * streamed chat call and the safe repeat on, the Router then releases the stream at the first reasoning frame
    * instead of holding it for the first word, and returns Gemini's thought summaries (gateway
@@ -521,7 +528,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     options.stream !== false && !useResponses(model)
     ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
     : extraBody
-  const streamTurnFor = (model: string) => (options.stream === false ? createOpenAICompatCompletionTurn
+  const streamTurnFor = (model: string, effort?: string, sent?: (response: Response) => void) => (options.stream === false ? createOpenAICompatCompletionTurn
     : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
@@ -530,9 +537,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
-    ...(Object.keys(bodyFor(model)).length ? { extraBody: bodyFor(model) } : {}),
+    extraBody: effort ? { ...bodyFor(model), reasoning_effort: effort } : bodyFor(model),
     ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
-    ...(fetchImpl ? { fetchImpl } : {}),
+    ...(sent ? { fetchImpl: async (input, init) => { const response = await (fetchImpl ?? fetch)(input, init); sent(response); return response } }
+      : fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => {
       servedModel = served.servedModel
       if (served.servedModel) transportState.lastModelSpan?.set({ 'gen_ai.response.model': served.servedModel })
@@ -575,7 +583,10 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       }
     }
     transportState.currentModel = model
-    const streamTurn = streamTurnFor(model)
+    const { toolRoundEffort } = options
+    const streamTurn = toolRoundEffort && options.stream !== false
+      ? toolRoundsAt(streamTurnFor(model), sent => streamTurnFor(model, toolRoundEffort, sent))
+      : streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
       ...(options.continueFrom
@@ -750,6 +761,30 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     }
   }
   return outcome()
+}
+
+type StreamTurn = (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
+
+/**
+ * `answer` for the call that opens the turn; after a tool round, `toolRound`, kept only when it calls a tool. A call
+ * that writes a word is cancelled there, its connection closed so the model writes no more, and `answer` is sent in
+ * its place, so a lower-effort call never writes the answer and the answer is written once.
+ */
+function toolRoundsAt(answer: StreamTurn, toolRound: (sent: (response: Response) => void) => StreamTurn): StreamTurn {
+  return async function* (messages) {
+    if (messages.at(-1)?.role !== 'tool') { yield* answer(messages); return }
+    let response: Response | undefined
+    let wrote = false
+    let calledTool = false
+    for await (const event of toolRound(sent => { response = sent })(messages)) {
+      if (event.type === 'text' && event.text) { wrote = true; break }
+      calledTool ||= event.type === 'tool_call'
+      yield event
+    }
+    if (calledTool) return
+    if (wrote) await response?.body?.cancel().catch(() => {})
+    yield* answer(messages)
+  }
 }
 
 function createRouterTurnTransport(
