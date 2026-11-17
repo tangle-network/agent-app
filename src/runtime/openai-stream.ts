@@ -502,13 +502,18 @@ export function createOpenAIResponsesTurn(
   }
 }
 
+interface ResponsesItem { id?: string; type?: string; call_id?: string; name?: string; arguments?: string }
+
 interface ResponsesEvent {
   type?: string
   delta?: string
+  arguments?: string
+  item_id?: string
   output_index?: number
   summary_index?: number
-  item?: { type?: string; call_id?: string; name?: string; arguments?: string }
-  response?: { model?: string; usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number | null } | null }; error?: { code?: string; message?: string } }
+  item?: ResponsesItem
+  response?: { model?: string; output?: ResponsesItem[]; error?: { code?: string; message?: string }
+    usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number | null } | null } }
   error?: { code?: string; message?: string }
   message?: string
 }
@@ -535,6 +540,26 @@ async function* streamResponses(
     if (served) report(served)
   }
   let lastSummary: string | null = null
+  // Function calls by item id, else output index. A call starts as soon as its name arrives; its arguments go out once,
+  // when the response ends, as the final ones: `function_call_arguments.done`, else `output_item.done`, else the
+  // response's output, else what `output_item.added` carried, else the deltas.
+  const calls: Array<{ id?: string; at?: number; named?: boolean; args: string; final: Array<string | undefined> }> = []
+  const callFor = (id?: string, at?: number) => {
+    let call = calls.find(c => id !== undefined && c.id === id) ?? calls.find(c => at !== undefined && c.at === at)
+    if (!call) calls.push(call = { id, at, args: '', final: [] })
+    return call
+  }
+  const sighted = (item: ResponsesItem | undefined, at: number | undefined, rank: number): OpenAIStreamChunk[] => {
+    if (item?.type !== 'function_call') return []
+    const call = callFor(item.id, at)
+    call.final[rank] ??= item.arguments
+    if (call.named || !item.name) return []
+    call.named = true
+    return [{ choices: [{ delta: { tool_calls: [{ index: calls.indexOf(call), ...(item.call_id ? { id: item.call_id } : {}),
+      function: { name: item.name } }] } }] }]
+  }
+  const settled = (): OpenAIStreamChunk => ({ choices: [{ delta: { tool_calls: calls.map((call, index) =>
+    ({ index, function: { arguments: call.final.find(args => args) ?? call.args } })) } }] })
   for await (const data of readOpenAISseFrames(res.body)) {
       let event: ResponsesEvent
       try {
@@ -556,17 +581,22 @@ async function* streamResponses(
           break
         }
         case 'response.output_item.added':
-          if (event.item?.type === 'function_call' && event.item.name) {
-            yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0,
-              ...(event.item.call_id ? { id: event.item.call_id } : {}),
-              function: { name: event.item.name, arguments: event.item.arguments ?? '' } }] } }] }
-          }
+          yield* sighted(event.item, event.output_index, 3)
+          break
+        case 'response.output_item.done':
+          yield* sighted(event.item, event.output_index, 1)
           break
         case 'response.function_call_arguments.delta':
-          if (event.delta) yield { choices: [{ delta: { tool_calls: [{ index: event.output_index ?? 0, function: { arguments: event.delta } }] } }] }
+          if (event.delta) callFor(event.item_id, event.output_index).args += event.delta
+          break
+        case 'response.function_call_arguments.done':
+          callFor(event.item_id, event.output_index).final[0] ??= event.arguments
           break
         case 'response.completed':
-        case 'response.incomplete': {
+        case 'response.incomplete':
+        case 'response.done': {
+          for (const [at, item] of (event.response?.output ?? []).entries()) yield* sighted(item, at, 2)
+          yield settled()
           const model = event.response?.model
           if (attribution && !reported && model) report(servedFromBody(model, attribution.requestedModel))
           const usage = event.response?.usage
@@ -585,6 +615,7 @@ async function* streamResponses(
       }
 
   }
+  yield settled()
 }
 
 
