@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.17
+
+- fix(runtime): give Responses function calls their final arguments (#1558)
+
 ## 4.0.16
 
 - test: align failure coverage and generated references (#1556)
