@@ -13,6 +13,7 @@ import { createChatTurnRoutes, type ChatTurnMessageStore } from '../../src/chat-
 import { createChatTables, createChatStore, type ChatDatabase } from '../../src/chat-store/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
 import { createIntelligenceTurnTraceReader, createIntelligenceTurnTraceSink } from '../../src/turn-trace/index'
+import { turnTraceFlow, turnTraceUrlForMessage } from '../../src/web-react/turn-trace-flow'
 import { openDatabase } from '../teams/db-helper'
 
 type Row = Record<string, unknown> & { id: string; tenantId: string; traceId: string }
@@ -124,6 +125,15 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(spans.map((span) => span.span_id)).not.toContain('00000000000000bb')
     expect(spans.map((span) => span.name)).not.toContain('admission.other')
     expect(spans.find((span) => span.name === 'admission.auth.lookup')?.status_code).toBe(2)
+    // What the member's drawer draws from that answer: the turn is the agent row, its admission steps are its waits.
+    const drawn = turnTraceFlow(JSON.parse(text))!
+    expect(drawn.traceId).toBe(receipt.traceId)
+    expect(drawn.flow.spans).toHaveLength(spans.length)
+    expect(drawn.flow.spans.filter((span) => span.kind === 'pipeline').map((span) => span.id)).toEqual([root.span_id])
+    expect(drawn.flow.spans.filter((span) => span.name.startsWith('admission.')).every((span) => span.kind === 'waiting' && span.parentId)).toBe(true)
+    // A turn in history: its assistant row's id names the same URL the receipt did.
+    const [answer] = (await store.listMessages(thread.id)).filter((row) => row.role === 'assistant')
+    expect(turnTraceUrlForMessage('/api/chat', answer!.id)).toBe(receipt.traceUrl)
     for (const span of spans) {
       for (const value of Object.values(span.attributes)) {
         expect(detectCredential(String(value)), String(value)).toBeUndefined()
