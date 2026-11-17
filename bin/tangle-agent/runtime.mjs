@@ -15,6 +15,8 @@ function required(name) {
   if (!value) throw new Error(`Missing ${name}; provision the published general-agent image before serving the line`)
   return value
 }
+// Profiles name the variable to read; the direct value is for lines provisioned before that.
+const named = (nameEnv, legacy) => required(process.env[nameEnv]?.trim() || legacy)
 function https(value) {
   const url = new URL(value)
   if (url.protocol !== 'https:' || url.username || url.password) throw new Error('A credential-free HTTPS URL is required')
@@ -29,14 +31,14 @@ export async function serve() {
   for (const name of ['TangleSearchClient', 'TangleReadClient']) {
     if (typeof router[name] !== 'function') throw new Error(`The installed published agent-integrations lacks ${name}; release #326 and rebuild the image`)
   }
-  const options = { apiKey: required('TANGLE_AGENT_ROUTER_KEY'), baseUrl: 'https://router.tangle.tools' }
+  const options = { apiKey: named('TANGLE_AGENT_ROUTER_KEY_ENV', 'TANGLE_AGENT_ROUTER_KEY'), baseUrl: 'https://router.tangle.tools' }
   const search = new router.TangleSearchClient(options)
   const read = new router.TangleReadClient(options)
   const media = new TCloud({ apiKey: options.apiKey, baseURL: 'https://router.tangle.tools/v1', retry: false, timeout: 120_000 })
   const model = required('TANGLE_AGENT_MODEL')
   const imageModel = required('TANGLE_AGENT_IMAGE_MODEL')
   const videoModel = required('TANGLE_AGENT_VIDEO_MODEL')
-  const proxy = new URL(required('TANGLE_AGENT_BROWSER_PROXY'))
+  const proxy = new URL(named('TANGLE_AGENT_PROXY_ENV', 'TANGLE_AGENT_BROWSER_PROXY'))
   if (!['http:', 'https:', 'socks5:'].includes(proxy.protocol) || proxy.username || proxy.password) {
     throw new Error('Use the sandbox allowlist proxy without credentials in its URL')
   }
