@@ -2,6 +2,28 @@
 import type { ChatRouteEvent } from './turn-route-contracts'
 import { TurnCancellationRequestedError, TurnControlUnavailableError } from '../turn-stream/cancellation'
 
+/** A view queues bytes without making execution wait for a connected reader. */
+export function createTurnView() {
+  let disconnected = false
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const readable = new ReadableStream<Uint8Array>({
+    start(value) { controller = value },
+    cancel() { disconnected = true },
+  })
+  return {
+    readable,
+    get disconnected() { return disconnected },
+    write(chunk: Uint8Array): void {
+      if (disconnected) return
+      try { controller.enqueue(chunk) } catch { disconnected = true }
+    },
+    close(): void {
+      if (disconnected) return
+      try { controller.close() } catch { /* A closed view has no more delivery work. */ }
+    },
+  }
+}
+
 /** One safe pre-execution response for the server-owned host control signal. */
 export function turnControlResponse(signal: AbortSignal): Response {
   const requested = signal.reason instanceof TurnCancellationRequestedError

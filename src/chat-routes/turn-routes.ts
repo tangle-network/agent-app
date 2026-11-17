@@ -92,7 +92,7 @@ import { createChatPrewarm } from './route-prewarm'
 import { cancelChatTurn } from './cancellation'
 import { forwardTurnToHost, type TurnHost } from '../turn-stream/adapters'
 import type { TurnHostControlNamespace } from '../turn-stream/cancellation'
-import { turnControlResponse } from './turn-event-stream'
+import { createTurnView, turnControlResponse } from './turn-event-stream'
 import { startTurnIntentLine } from './turn-intent'
 
 export * from './turn-route-contracts'
@@ -241,22 +241,12 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
   ): Response {
     const receivedAt = Date.now()
     const encoder = new TextEncoder()
-    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
-    const writer = writable.getWriter()
-    let clientGone = false
-    const write = async (chunk: Uint8Array): Promise<void> => {
-      if (clientGone) return
-      try {
-        await writer.write(chunk)
-      } catch {
-        clientGone = true
-      }
-    }
-    const writeEvent = (event: ChatRouteEvent): Promise<void> => write(encoder.encode(`${JSON.stringify(event)}\n`))
+    const view = createTurnView()
+    const writeEvent = (event: ChatRouteEvent): void => view.write(encoder.encode(`${JSON.stringify(event)}\n`))
     const progress: TurnProgressCallback = (phase, message) => {
-      void writeEvent(buildTurnPhaseEvent(phase, message, { sinceRequestMs: Date.now() - receivedAt }))
+      writeEvent(buildTurnPhaseEvent(phase, message, { sinceRequestMs: Date.now() - receivedAt }))
     }
-    if (control) void writeEvent({ type: TURN_HOST_CONTROL_EVENT, data: { ...control } })
+    if (control) writeEvent({ type: TURN_HOST_CONTROL_EVENT, data: { ...control } })
     let piping = false
     let atLineStart = true
     let pendingIntent: TurnIntentEvent | null = null
@@ -273,9 +263,9 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
           // Intent is execution work: never start it before full admission/Stop gate.
           const intent = startIntentLine(admitted, ctx?.hostControl?.signal)
           if (intent) void intent.then(text => {
-            if (!text || clientGone) return
+            if (!text || view.disconnected) return
             const event: TurnIntentEvent = { type: TURN_INTENT_EVENT, data: { text, sinceRequestMs: Date.now() - receivedAt } }
-            if (!piping || atLineStart) void writeEvent(event)
+            if (!piping || atLineStart) writeEvent(event)
             else pendingIntent = event
           })
           inner = await runTurn(request, ctx, admitted, progress, intent)
@@ -287,7 +277,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
           : Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
       }
       if (!inner.body || !inner.headers.get('x-turn-id')) {
-        await writeEvent(await turnResponseEventFor(inner))
+        writeEvent(await turnResponseEventFor(inner))
       } else {
         const reader = inner.body.getReader()
         piping = true
@@ -296,13 +286,13 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
             const { done, value } = await reader.read()
             if (done) break
             atLineStart = value.length > 0 && value[value.length - 1] === 0x0a
-            await write(value)
+            view.write(value)
             if (atLineStart && pendingIntent) {
               const event = pendingIntent
               pendingIntent = null
-              await writeEvent(event)
+              writeEvent(event)
             }
-            if (clientGone) {
+            if (view.disconnected) {
               // The turn keeps running under its own drain; only this view stops.
               await reader.cancel().catch(() => {})
               break
@@ -312,12 +302,12 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
           log('[chat-routes] progress-first pipe failed', { error: err instanceof Error ? err.message : String(err) })
         }
       }
-      if (!clientGone) await writer.close().catch(() => {})
+      view.close()
     })()
     if (ctx?.waitUntil) ctx.waitUntil(pump)
     else void pump.catch(() => {})
 
-    return new Response(readable, {
+    return new Response(view.readable, {
       headers: {
         'Content-Type': 'application/x-ndjson',
         'Cache-Control': 'no-cache',

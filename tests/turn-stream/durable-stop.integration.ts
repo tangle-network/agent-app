@@ -725,6 +725,101 @@ try {
     assert.equal((await request('/host-repeat', normalTarget)).status, 409)
     checks.push('host: ordinary disconnect saves/replays once; old H/attempt/stream are fenced; control survives resource disposal')
 
+    // Pause an attached view after the shared parser receives H, not after an assumed first chunk.
+    const slowViewThread = 'host-slow-view'
+    await database.prepare('INSERT INTO threads VALUES (?, ?)').bind(slowViewThread, 'workspace').all()
+    const slowViewModelsBefore = modelRequests
+    const slowViewModel = modelCase()
+    slowViewModel.complete = true
+    active = slowViewModel
+    const slowViewAdmission = admission('slow-view-client')
+    const slowViewDisposal = { entered: deferred<void>(), release: deferred<void>() }
+    hostDisposals.set(slowViewThread, slowViewDisposal)
+    const slowViewReceipt = deferred<TurnHostControlTarget>()
+    const slowViewPauseEntered = deferred<void>()
+    const slowViewResume = deferred<void>()
+    let slowViewPaused = false
+    try {
+      const slowViewResponse = await request('/host-turn', { threadId: slowViewThread, turnId: 'slow-view-client', content: 'Finish while this view waits.' })
+      const slowViewSource = slowViewResponse.body!.getReader()
+      const slowViewBytes = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          if (slowViewPaused) {
+            slowViewPauseEntered.resolve()
+            await slowViewResume.promise
+          }
+          const next = await slowViewSource.read()
+          if (next.done) controller.close()
+          else controller.enqueue(next.value)
+        },
+        cancel(reason) { slowViewResume.resolve(); return slowViewSource.cancel(reason) },
+      }, { highWaterMark: 0 })
+      const slowViewSettled = settleTurnResponse(new Response(slowViewBytes, {
+        status: slowViewResponse.status, headers: slowViewResponse.headers,
+      }), () => {}, undefined, target => {
+        slowViewPaused = true
+        slowViewReceipt.resolve(target)
+      })
+      void slowViewSettled.catch(() => {})
+      const slowViewTarget = await bounded(slowViewReceipt.promise, 'slow attached view receives actual shared control receipt')
+      await bounded(slowViewPauseEntered.promise, 'slow attached view is paused before its next underlying read')
+      await bounded(slowViewAdmission.entered.promise, 'slow-view paid admission remains held')
+      slowViewAdmission.release.resolve(200)
+      await bounded(slowViewModel.entered.promise, 'slow-view real model HTTP')
+      await bounded(slowViewModel.admitted.promise, 'slow-view exact workspace owner')
+      const slowViewOwner = (await hostPeek(slowViewThread))!
+      assert(slowViewOwner?.cancellation)
+      const slowViewSettlement = await bounded(slowViewModel.settling.promise, 'slow-view terminal lifecycle')
+      slowViewSettlement.end('settled')
+      await bounded(slowViewModel.released.promise, 'slow-view exact lock release')
+      await bounded(slowViewDisposal.entered.promise, 'slow-view resource disposal entered')
+      slowViewDisposal.release.resolve()
+      await bounded((async () => {
+        for (;;) {
+          const disposedRows = await database.prepare('SELECT kind FROM host_steps WHERE thread_id = ? AND kind = ?')
+            .bind(slowViewThread, 'disposed').all()
+          if (disposedRows.results.length) {
+            assert.equal(disposedRows.results.length, 1)
+            return
+          }
+          await delay(10)
+        }
+      })(), 'slow-view resource disposal completed')
+      await staleHost(slowViewTarget)
+      assert.equal(slowViewPaused, true, 'H retires while the attached view is still paused')
+      assert.equal(await hostPeek(slowViewThread), null)
+      assert.equal(slowViewModel.releases, 1)
+      assert.equal(modelRequests, slowViewModelsBefore + 1, 'A paused view starts exactly one producer')
+      const slowViewEffects = await database.prepare('SELECT code FROM effects WHERE turn_id = ?')
+        .bind(slowViewOwner.cancellation.turnStreamId).all<{ code: string }>()
+      assert.deepEqual(slowViewEffects.results.map(row => row.code), ['complete'])
+      const slowViewSaved = await database.prepare('SELECT role, content FROM messages WHERE thread_id = ? ORDER BY rowid')
+        .bind(slowViewThread).all<{ role: string; content: string }>()
+      assert.deepEqual(slowViewSaved.results.map(row => row.role), ['user', 'assistant'])
+      assert.equal(slowViewSaved.results[1]!.content, 'The request is complete.')
+      slowViewPaused = false
+      slowViewResume.resolve()
+      const slowViewResult = await bounded(slowViewSettled, 'resume the same shared response parser')
+      const slowViewBody = await bounded(slowViewResult.text(), 'read the complete queued slow-view body')
+      assert.equal(slowViewResult.status, 200)
+      assert.equal(slowViewBody.split('The request is complete.').length - 1, 1, 'Queued answer is neither lost nor duplicated')
+      assert.equal(slowViewBody.split('"type":"session.run.completed"').length - 1, 1)
+      assert(!slowViewBody.includes('"type":"session.run.failed"'))
+      assert(slowViewBody.endsWith('\n'), 'The real queued body reaches its complete final frame')
+      const slowViewReplay = await hostRead(`/host-replay?turnId=${slowViewOwner.cancellation.turnStreamId}`)
+      assert.equal(slowViewReplay.status, 200)
+      const slowViewReplayBody = await bounded(slowViewReplay.text(), 'slow-view saved replay')
+      assert.equal(slowViewReplayBody.split('The request is complete.').length - 1, 1)
+      assert.equal(modelRequests, slowViewModelsBefore + 1, 'Resuming the same view cannot start another producer')
+      assert.equal(slowViewModel.releases, 1)
+      checks.push('host: a paused attached shared-parser view retains every answer byte after model, lock, resource and H settle once')
+    } finally {
+      slowViewAdmission.release.resolve(200)
+      slowViewDisposal.release.resolve()
+      slowViewPaused = false
+      slowViewResume.resolve()
+    }
+
     const modelsBeforeLoss = modelRequests
     const intentsBeforeLoss = hostIntents
     const lossAdmission = admission('loss-client')
