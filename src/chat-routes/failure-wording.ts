@@ -204,6 +204,8 @@ function shownFailure(event: JsonRecord, shown: string, reason: string): JsonRec
  *  `hasAnswer` says whether the turn already shows answer text. */
 export function personFacing(options: { log?: Log; failedTurnText: string; hasAnswer?: () => boolean }) {
   const views = new Map<string, FailureView>()
+  // The turn's first failure that reads in its own words; a withheld failed `done` or `status` reads it too.
+  let named: FailureView | undefined
   const droppedWarnings = new Set<string>()
   const warn = (message: string, meta: Record<string, unknown>) => (options.log ?? console.warn)(message, meta)
   const view = (reason: string, code?: string, status?: unknown, meta: Record<string, unknown> = {}): FailureView => {
@@ -218,6 +220,7 @@ export function personFacing(options: { log?: Log; failedTurnText: string; hasAn
       ?? { class: settled ? 'settlement' : 'runtime_failure', shown: options.failedTurnText }
     warn('[chat-routes] turn failure withheld from the person', { failureClass: seen.class, code, error: reason, ...meta })
     views.set(key, seen)
+    if (seen.shown !== options.failedTurnText) named ??= seen
     return seen
   }
   /** An allowed warning's sentence, or `undefined` for any other warning, which is dropped and logged once. */
@@ -252,7 +255,9 @@ export function personFacing(options: { log?: Log; failedTurnText: string; hasAn
       return shown ? shownFailure(event, shown, reason) : undefined
     }
     const status = data?.statusCode ?? (failed ? undefined : data?.status)
-    return shownFailure(event, view(reason, failureCode(event), status, failureIds(data)).shown, reason)
+    const own = view(reason, failureCode(event), status, failureIds(data))
+    // A turn's end reads the sentence its error, answer text and saved message carry, not the generic one.
+    return shownFailure(event, (failed && own.shown === options.failedTurnText && named ? named : own).shown, reason)
   }
   return { view, warning, event }
 }
