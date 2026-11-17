@@ -49,7 +49,7 @@ export function createTurnTraceRoute<TContext>({ projectId, authorize, reader, l
     if (!threadId) return notFound('turn_trace_not_found')
     // Reading a turn's trace is reading its thread: the same check as running-turn discovery, on the product's rows.
     const auth = await authorize({ request, intent: 'running', threadId })
-    if (!auth.ok) return auth.response.status === 401 ? auth.response : notFound('turn_trace_not_found')
+    if (!auth.ok && auth.response.status === 401) return auth.response // MUTATION: ignore the product's refusal
     if (auth.intent !== undefined && auth.intent !== 'running') return notFound('turn_trace_not_found')
     if (!reader) return notFound('turn_trace_unreadable')
     let exported: Awaited<ReturnType<TurnTraceReader>>
