@@ -104,7 +104,7 @@ interface AssistantDraftWriterOptions
 
 ### `assistantRowIdForTurn`
 
-`function` — The default deterministic assistant-row id for a turn.
+`function` — The deterministic assistant-row id for a turn: readable on purpose (an operator grepping a transcript row id finds the run), and stable across re-entries because every input already is.
 
 ```ts
 (turnKey: string) => string

@@ -2680,7 +2680,7 @@
           "name": "assistantRowIdForTurn",
           "kind": "function",
           "signature": "(turnKey: string) => string",
-          "doc": "The default deterministic assistant-row id for a turn."
+          "doc": "The deterministic assistant-row id for a turn: readable on purpose (an operator grepping a transcript row id finds the run), and stable across re-entries because every input already is."
         },
         {
           "name": "AssistantRowValues",
@@ -26707,6 +26707,12 @@
           "doc": null
         },
         {
+          "name": "executionIdOfAssistantRow",
+          "kind": "function",
+          "signature": "(messageId: string) => string | null",
+          "doc": "The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key."
+        },
+        {
           "name": "formatServerTiming",
           "kind": "function",
           "signature": "(entries: readonly ServerTimingEntry[]) => string",
@@ -26861,6 +26867,12 @@
           "kind": "interface",
           "signature": "interface TurnTraceSummary",
           "doc": "How much of the turn's wall time is inside named spans, and what the time was spent on."
+        },
+        {
+          "name": "turnTraceUrl",
+          "kind": "function",
+          "signature": "(turnPath: string, executionId: string) => string",
+          "doc": "`routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`."
         }
       ]
     },
@@ -28507,6 +28519,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -31417,6 +31430,48 @@
           "doc": "Stages the shared route emits before the producer runs."
         },
         {
+          "name": "TurnTraceButton",
+          "kind": "function",
+          "signature": "({ label, ...drawer }: TurnTraceButtonProps) => Element",
+          "doc": "A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row."
+        },
+        {
+          "name": "TurnTraceButtonProps",
+          "kind": "interface",
+          "signature": "interface TurnTraceButtonProps",
+          "doc": null
+        },
+        {
+          "name": "TurnTraceDrawer",
+          "kind": "function",
+          "signature": "({ traceUrl, open, onOpenChange, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element",
+          "doc": "The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download."
+        },
+        {
+          "name": "TurnTraceDrawerProps",
+          "kind": "interface",
+          "signature": "interface TurnTraceDrawerProps",
+          "doc": null
+        },
+        {
+          "name": "turnTraceFlow",
+          "kind": "function",
+          "signature": "(exported: unknown) => TurnTraceFlow | null",
+          "doc": "The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock."
+        },
+        {
+          "name": "TurnTraceFlow",
+          "kind": "interface",
+          "signature": "interface TurnTraceFlow",
+          "doc": null
+        },
+        {
+          "name": "turnTraceUrlForMessage",
+          "kind": "function",
+          "signature": "(turnPath: string, messageId: string) => string | null",
+          "doc": "The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id."
+        },
+        {
           "name": "upsertChatInteraction",
           "kind": "function",
           "signature": "(list: ChatInteraction[], interaction: ChatInteraction) => ChatInteraction[]",
@@ -31792,6 +31847,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -32085,6 +32141,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -32154,6 +32211,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
