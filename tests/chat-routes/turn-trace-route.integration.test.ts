@@ -89,10 +89,12 @@ it('serves a turn its receipt names to the thread owner as OTLP, 404 to another 
     expect(exportErrors).toEqual([])
     expect(receipt).toMatchObject({ type: 'turn', traceId: expect.stringMatching(/^[0-9a-f]{32}$/) })
 
-    // Another exporter's span in the same trace and tenant: a box agent recording the prompt and a leaked key.
+    // Another exporter's span in the same trace and tenant, joined to the turn's tree the way a traceparent joins it:
+    // a box agent recording the prompt and a leaked key.
     const leak = `Bearer ${appKey}`
     expect(detectCredential(leak)).toBeDefined()
-    intelligence.rows.push({ ...intelligence.rows[0]!, id: `${receipt.traceId}:00000000000000aa`, name: 'agent.box.llm',
+    const rootRow = intelligence.rows.find((row) => row.name === 'agent_app.turn')!
+    intelligence.rows.push({ ...rootRow, id: `${receipt.traceId}:00000000000000aa`, parentSpanId: rootRow.id.split(':')[1], name: 'agent.box.llm',
       attributes: { 'otel.scope.name': 'box-agent', 'input.value': 'When is my estimated payment due?', 'http.request.header.authorization': leak } })
 
     // The router hands the path segment over as it arrived: still URL-encoded.
