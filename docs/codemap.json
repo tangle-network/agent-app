@@ -1,8 +1,8 @@
 {
   "generator": "agent-docs",
-  "title": "aa",
+  "title": "agent-app",
   "source": "tsup.config `entry`",
-  "slug": null,
+  "slug": "tangle-network/agent-app",
   "entries": [
     {
       "id": "./agent-enrollment",
@@ -1823,6 +1823,12 @@
           "kind": "function",
           "signature": "(opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager",
           "doc": "Create a workspace key manager that handles key provisioning and budget tracking"
+        },
+        {
+          "name": "DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS",
+          "kind": "const",
+          "signature": "number",
+          "doc": "Default child-key reuse floor; set minRemainingLifetimeMs to cover the caller's execution policy and safety margin."
         },
         {
           "name": "DurableWorkspaceKeyConditionalWrites",

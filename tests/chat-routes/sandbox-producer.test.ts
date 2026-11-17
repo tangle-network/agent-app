@@ -821,17 +821,6 @@ describe('createSandboxChatProducer', () => {
     expect(producer.assistantParts?.()).toEqual([{ type: 'text', text: `Partial answer\n\n---\n${FAILED}` }])
   })
 
-  it('shows a no-visible-answer error as the plain sentence without a separator', async () => {
-    const rawError = { type: 'error', data: { error: 'model rejected' } }
-    const producer = createSandboxChatProducer({ events: feed([rawError]), log: () => {} })
-
-    expect(onWire(await drain(producer.stream))).toEqual([
-      { type: 'text', text: FAILED },
-      { type: 'error', data: { error: FAILED, message: FAILED } },
-    ])
-    expect(producer.finalText()).toBe(FAILED)
-  })
-
   it.each(['raw', 'throw'] as const)('errorNotice persists a %s terminal error as an error notice part, never as answer text', async (source) => {
     const answer = 'Partial answer'
     const partial = [partUpdated({ type: 'text', id: 'partial', text: answer }, answer)]

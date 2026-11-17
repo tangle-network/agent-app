@@ -240,7 +240,7 @@ export interface DurableWorkspaceKeyManagerOptions {
 }
 
 const DEFAULT_KEY_LIFETIME_MS = 55 * 60_000
-/** Default reuse floor: a 15 min turn plus a 5 min margin; this package sets no turn limit, so longer turns pass their own. */
+/** Default child-key reuse floor; set minRemainingLifetimeMs to cover the caller's execution policy and safety margin. */
 export const DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS = 20 * 60_000
 const DEFAULT_LEASE_MS = 60_000
 const DEFAULT_LEASE_WAIT_MS = 15_000

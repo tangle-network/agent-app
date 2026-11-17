@@ -150,6 +150,7 @@ describe('a failed turn never shows the person the raw failure reason', () => {
   })
 
   it.each([
+    { error: HARNESS_FAILURE },
     { message: HARNESS_FAILURE, code: 'AGENT_EXECUTION_FAILED', name: 'TimeoutError', origin: 'runtime', endpoint: '/agents/run/stream' },
     { message: HARNESS_FAILURE, stack: `Error: ${HARNESS_FAILURE}\n at run (/srv/runtime.js:1:1)` },
     { message: HARNESS_FAILURE, turnId: { message: HARNESS_FAILURE }, code: { message: HARNESS_FAILURE },

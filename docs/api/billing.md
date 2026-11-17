@@ -4,7 +4,7 @@
 
 Source: `src/billing/index.ts`
 
-36 exports.
+37 exports.
 
 ### `createIdentityBoundWorkspaceKeyManager`
 
@@ -36,6 +36,14 @@ Source: `src/billing/index.ts`
 
 ```ts
 (opts: WorkspaceKeyManagerOptions) => WorkspaceKeyManager
+```
+
+### `DEFAULT_MIN_REMAINING_KEY_LIFETIME_MS`
+
+`const` — Default child-key reuse floor; set minRemainingLifetimeMs to cover the caller's execution policy and safety margin.
+
+```ts
+number
 ```
 
 ### `DurableWorkspaceKeyConditionalWrites`
