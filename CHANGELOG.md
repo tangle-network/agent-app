@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.23
+
+- feat(runtime): lower reasoning effort on Router turn rounds that only choose tools (#1566)
+
 ## 4.0.22
 
 - feat(runtime): say on each model call span what the call produced (#1564)
