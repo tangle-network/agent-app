@@ -656,14 +656,14 @@ try {
     assert.deepEqual(await json('/host-cancel', { ...stoppedTarget, retryAttemptId: 'wrong-retry' }), { requested: false, reason: 'stale-host' })
     assert.deepEqual(await json('/host-unknown', stoppedTarget), { requested: false, reason: 'stale-host' })
     assert.equal((await request('/host-repeat', stoppedTarget)).status, 409, 'A repeated start cannot replace the live controller')
-    const unrelated = { ...identity('host-other'), scope: 'workspace' as const }
-    await acquire(unrelated)
+    const hostStopOtherOwner = { ...identity('host-other'), scope: 'workspace' as const }
+    await acquire(hostStopOtherOwner)
     // An editor other than the sender may Stop the captured workspace invocation.
     const otherEditorStop = await request('/host-cancel', stoppedTarget, 'second-editor')
     assert.equal(otherEditorStop.status, 200)
     assert.deepEqual(await otherEditorStop.json(), { requested: true })
     assert.deepEqual(await json('/host-cancel', stoppedTarget), { requested: true })
-    assert.equal((await hostPeek('host-stop'))?.lockId, unrelated.lockId)
+    assert.equal((await hostPeek('host-stop'))?.lockId, hostStopOtherOwner.lockId)
     stoppedAdmission.release.resolve(200)
     const stoppedResult = await bounded(stopped.settled, 'stopped admission response')
     assert.equal(stoppedResult.status, 409)
@@ -674,8 +674,8 @@ try {
     assert.equal((await database.prepare('SELECT * FROM host_steps WHERE thread_id = ?').bind('host-stop').all()).results.length, 0,
       'Stop precedes afterAuthorize and resource acquisition')
     assert.deepEqual(await (await hostRead('/host-running?threadId=host-stop')).json(), { running: [] })
-    assert.equal((await hostPeek('host-stop'))?.lockId, unrelated.lockId, 'Stopped admission neither acquires nor releases the other owner')
-    await json('/release', unrelated)
+    assert.equal((await hostPeek('host-stop'))?.lockId, hostStopOtherOwner.lockId, 'Stopped admission neither acquires nor releases the other owner')
+    await json('/release', hostStopOtherOwner)
     assert.equal(await hostPeek('host-stop'), null)
     await staleHost(stoppedTarget)
     checks.push('host: cookie editor Stop before paid admission gates all target work; exact other-thread owner survives')
@@ -704,7 +704,7 @@ try {
     const normalOwner = (await hostPeek('host-stop'))!
     assert(normalOwner?.cancellation)
     assert.equal(normalOwner.cancellation.requestedAt, undefined)
-    const oldExact = { ...unrelated, turnStreamId: unrelated.turnStreamId }
+    const oldExact = { ...hostStopOtherOwner, turnStreamId: hostStopOtherOwner.turnStreamId }
     assert.deepEqual(await json('/stop', oldExact), { requested: false, reason: 'stale-owner' }, 'Old exact stream control cannot Stop the new workspace generation')
     const normalSettlement = await bounded(active.settling.promise, 'detached terminal lifecycle')
     normalSettlement.end('settled')
@@ -829,9 +829,9 @@ try {
     await bounded(refusalBarrier.entered.promise, 'real held-lock refusal captured before return')
     await bounded(active.entered.promise, 'dispatch already began before the lock refusal')
     const modelsAtRefusalStop = modelRequests
-    const refused = await database.prepare('SELECT detail FROM host_refusals WHERE thread_id = ?').bind(refusalThread).all<{ detail: string }>()
-    assert.equal(refused.results.length, 1)
-    const refusalSnapshot = JSON.parse(refused.results[0]!.detail) as { status: number; body: string }
+    const hostLockRefusalRows = await database.prepare('SELECT detail FROM host_refusals WHERE thread_id = ?').bind(refusalThread).all<{ detail: string }>()
+    assert.equal(hostLockRefusalRows.results.length, 1)
+    const refusalSnapshot = JSON.parse(hostLockRefusalRows.results[0]!.detail) as { status: number; body: string }
     assert.deepEqual(await json('/host-cancel', refusalTarget), { requested: true })
     await bounded(active.aborted.promise, 'Stop closes the already-started refusal-path model call')
     refusalBarrier.release.resolve()
