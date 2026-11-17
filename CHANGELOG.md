@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.25
+
+- feat(turn-trace): serve a turn's trace to its owner from the receipt's traceUrl (#1569)
+
 ## 4.0.24
 
 - fix(runtime): send the answer call that replaces a cancelled lower-effort call with tool_choice none (#1567)
