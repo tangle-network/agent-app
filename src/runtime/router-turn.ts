@@ -239,8 +239,10 @@ export interface RouterTurnOptions {
   /**
    * Sent as `reasoning_effort` instead of `reasoningEffort` on a model call that follows a tool round, so a round
    * that only chooses tools reasons less. Such a call that writes a word is cancelled at that word, before it reaches
-   * the turn, and sent again at `reasoningEffort`, as is one that ends without a tool call, so the one call that
-   * writes the answer runs at full effort. The call that opens the turn runs at `reasoningEffort`. Streamed turns only.
+   * the turn, and sent again at `reasoningEffort` with `tool_choice: "none"`: the same tools are listed, so the prompt
+   * prefix and its cache are unchanged, but the call must write the answer, and the turn ends after it. One that ends
+   * with neither a tool call nor a word is sent again at `reasoningEffort` with tools allowed. The call that opens the
+   * turn runs at `reasoningEffort`. Streamed turns only.
    */
   toolRoundEffort?: string
   /**
@@ -528,7 +530,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     options.stream !== false && !useResponses(model)
     ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
     : extraBody
-  const streamTurnFor = (model: string, effort?: string, sent?: (response: Response) => void) => (options.stream === false ? createOpenAICompatCompletionTurn
+  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => void) => (options.stream === false ? createOpenAICompatCompletionTurn
     : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
@@ -537,7 +539,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
-    extraBody: effort ? { ...bodyFor(model), reasoning_effort: effort } : bodyFor(model),
+    extraBody: { ...bodyFor(model), ...body },
     ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
     ...(sent ? { fetchImpl: async (input, init) => { const response = await (fetchImpl ?? fetch)(input, init); sent(response); return response } }
       : fetchImpl ? { fetchImpl } : {}),
@@ -585,7 +587,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     transportState.currentModel = model
     const { toolRoundEffort } = options
     const streamTurn = toolRoundEffort && options.stream !== false
-      ? toolRoundsAt(streamTurnFor(model), sent => streamTurnFor(model, toolRoundEffort, sent))
+      ? toolRoundsAt(streamTurnFor(model), streamTurnFor(model, { tool_choice: 'none' }),
+        sent => streamTurnFor(model, { reasoning_effort: toolRoundEffort }, sent))
       : streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -767,10 +770,11 @@ type StreamTurn = (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
 
 /**
  * `answer` for the call that opens the turn; after a tool round, `toolRound`, kept only when it calls a tool. A call
- * that writes a word is cancelled there, its connection closed so the model writes no more, and `answer` is sent in
- * its place, so a lower-effort call never writes the answer and the answer is written once.
+ * that writes a word is cancelled there, its connection closed so the model writes no more, and `write` is sent in its
+ * place: full effort, the same tools listed but `tool_choice: "none"`, so it writes the answer, once, and the turn ends
+ * after it. A call that ends with neither a tool call nor a word is sent again as `answer`, tools allowed.
  */
-function toolRoundsAt(answer: StreamTurn, toolRound: (sent: (response: Response) => void) => StreamTurn): StreamTurn {
+function toolRoundsAt(answer: StreamTurn, write: StreamTurn, toolRound: (sent: (response: Response) => void) => StreamTurn): StreamTurn {
   return async function* (messages) {
     if (messages.at(-1)?.role !== 'tool') { yield* answer(messages); return }
     let response: Response | undefined
@@ -782,8 +786,9 @@ function toolRoundsAt(answer: StreamTurn, toolRound: (sent: (response: Response)
       yield event
     }
     if (calledTool) return
-    if (wrote) await response?.body?.cancel().catch(() => {})
-    yield* answer(messages)
+    if (!wrote) { yield* answer(messages); return }
+    await response?.body?.cancel().catch(() => {})
+    yield* write(messages)
   }
 }
 
