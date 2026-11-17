@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.26
+
+- fix(turn-trace): keep error text out of the owner's trace; make the route test prove its filters (#1570)
+
 ## 4.0.25
 
 - feat(turn-trace): serve a turn's trace to its owner from the receipt's traceUrl (#1569)
