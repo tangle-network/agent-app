@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.16
+
+- test: align failure coverage and generated references (#1556)
+
 ## 4.0.15
 
 - fix(chat): allowlist failure fields and shrink classification (#1552)
