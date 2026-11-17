@@ -139,7 +139,7 @@ _155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./trace`](api/trace.md) | 13 | `missions` |
 | [`./turn-health`](api/turn-health.md) | 31 | `alerting`, `launch-invariants` |
 | [`./turn-stream`](api/turn-stream.md) | 73 | `chat-routes`, `crypto`, `stream` |
-| [`./turn-trace`](api/turn-trace.md) | 28 | `redact` |
+| [`./turn-trace`](api/turn-trace.md) | 31 | `redact` |
 | [`./vault`](api/vault.md) | 23 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
 | [`./vault/collaboration`](api/vault-collaboration.md) | 13 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
 | [`./vault/lazy`](api/vault-lazy.md) | 3 | `crypto`, `sandbox`, `store`, `teams`, `web`, `web-react` |
@@ -1396,11 +1396,11 @@ Depends on: `chat-routes`, `crypto`, `stream`
 
 ## `./turn-trace`
 
-Source: `src/turn-trace/index.ts` · 28 exports
+Source: `src/turn-trace/index.ts` · 31 exports
 
 Depends on: `redact`
 
-`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `formatServerTiming`, `IntelligenceTurnTraceSinkOptions`, `nextCallIndex`, `OtlpSpan`, `otlpTraceId`, `parseServerTiming`, `resolveIngestKey`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnPhaseTiming`, `TurnPhaseTimingOptions`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
+`buildTurnTraceOtelSpans`, `createIntelligenceTurnTraceReader`, `createIntelligenceTurnTraceSink`, `createTurnTrace`, `CreateTurnTraceOptions`, `formatServerTiming`, `IntelligenceTurnTraceSinkOptions`, `nextCallIndex`, `OtlpSpan`, `OtlpTraceExport`, `otlpTraceId`, `parseServerTiming`, `resolveIngestKey`, `serverTimingAttrs`, `ServerTimingEntry`, `summarizeTurnSpans`, `tracedModelFetch`, `TracedModelFetchOptions`, `TURN_SPAN_KINDS`, `TurnPhaseTiming`, `TurnPhaseTimingOptions`, `TurnSpan`, `TurnSpanAttrs`, `TurnSpanKind`, `TurnSpanRecord`, `TurnTrace`, `turnTraceId`, `TurnTraceReader`, `TurnTraceSink`, `TurnTraceSnapshot`, `TurnTraceSummary`
 
 [Full API →](api/turn-trace.md)
 
