@@ -7,24 +7,27 @@
  */
 import type { TurnTrace } from '../turn-trace/recorder'
 
-/** Pass a producer's stream through unchanged, recording `produce.setup` until its first event and `produce.settle`
- *  from the request after its last event until it ends. */
-export async function* traceProducerStream<T>(stream: AsyncIterable<T>, trace: TurnTrace): AsyncGenerator<T> {
-  const iterator = stream[Symbol.asyncIterator]()
-  let first = true
-  let asked = Date.now()
-  try {
-    for (;;) {
-      const next = await iterator.next()
-      // Only the first wait and the last are the producer's own; the waits between events are its model and tools.
-      if (first) trace.record('produce.setup', 'other', asked, Date.now())
-      else if (next.done) trace.record('produce.settle', 'other', asked, Date.now())
-      first = false
-      if (next.done) return
-      yield next.value
-      asked = Date.now()
-    }
-  } finally {
-    await iterator.return?.()
+/** A producer's stream, unchanged, recording `produce.setup` until its first event and `produce.settle` from the request
+ *  after its last event until it ends. It only times `next`; `return` and `throw` reach the producer's own iterator
+ *  untouched, so `yield*` over it behaves exactly as over the producer (a producer reads an early `return` as a stop). */
+export function traceProducerStream<T>(stream: AsyncIterable<T>, trace: TurnTrace): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator](): AsyncIterator<T> {
+      const inner = stream[Symbol.asyncIterator]()
+      let first = true
+      return {
+        async next(...args: [] | [undefined]) {
+          const asked = Date.now()
+          const result = await inner.next(...args)
+          // Only the first wait and the last are the producer's own; the waits between events are its model and tools.
+          if (first) trace.record('produce.setup', 'other', asked, Date.now())
+          else if (result.done) trace.record('produce.settle', 'other', asked, Date.now())
+          first = false
+          return result
+        },
+        ...(inner.return ? { return: inner.return.bind(inner) } : {}),
+        ...(inner.throw ? { throw: inner.throw.bind(inner) } : {}),
+      }
+    },
   }
 }
