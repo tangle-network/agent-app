@@ -12,6 +12,9 @@
 
 import { DurableTurnCancellation, readTurnCancellationIdentity, type TurnCancellationIdentity, type TurnCancellationSocketMeta } from './cancellation-do'
 import { DEFAULT_RUNNING_TURN_LEASE_MS } from '../stream/turn-buffer'
+import type { ChatTurnRequestContext } from '../chat-routes/turn-route-contracts'
+import type { TurnHostControlTarget } from '../chat-routes/turn-progress'
+import { HostedTurn } from './hosted-turn'
 
 import {
   ACTIVITY_TTL_MS,
@@ -20,6 +23,8 @@ import {
   TURN_STREAM_PATHS,
   TURN_STREAM_STORAGE_KEYS,
   TURN_STREAM_TOKEN_HEADER,
+  TURN_HOST_CANCEL_PATH,
+  TURN_HOST_CONTROL_PATH,
   activeTurnLock,
   createTurnLock,
   interruptedReleaseApplies,
@@ -136,7 +141,7 @@ export interface TurnStreamDOOptions {
    * again. Needs compatibility date 2026-10-01 or later, or the flag `durable_object_io_tasks_prevent_eviction`; the
    * CPU limit and the code update strategy this class needs are in `createChatTurnRoutes`' `turnHost`.
    */
-  turnRoutes?(env: unknown): { turn(request: Request, ctx: { waitUntil?(promise: Promise<unknown>): void; hosted: true }): Promise<Response> }
+  turnRoutes?(env: unknown): { turn(request: Request, ctx: ChatTurnRequestContext & { hosted: true }): Promise<Response> }
 }
 
 /** Durable turn-event storage, workspace signals, and the single-flight turn
@@ -148,6 +153,7 @@ export class TurnStreamDO {
   protected readonly env: unknown
   protected readonly options: TurnStreamDOOptions
   private readonly cancellation: DurableTurnCancellation
+  private readonly hostedTurn: HostedTurn
 
   // Workspace channel: recent thread.created markers (in-memory, best-effort)
   // + durable responding set (threadId → startedAt) that survives eviction.
@@ -158,6 +164,7 @@ export class TurnStreamDO {
     this.state = state
     this.env = env
     this.options = options
+    this.hostedTurn = new HostedTurn(state)
     this.cancellation = new DurableTurnCancellation(state,
       input => this.loadActiveLock(Date.now(), turnLockStorageKey(input.scope, input.threadId)),
       lock => this.state.storage.put(turnLockStorageKey(lock.scope, lock.threadId), lock))
@@ -238,9 +245,16 @@ export class TurnStreamDO {
 
     // A per-turn object runs only the browser's turn request it was sent, without its capability, under its own waitUntil.
     if (this.options.turnRoutes && !this.state.id?.name) {
-      const headers = new Headers(request.headers)
-      headers.delete(TURN_STREAM_TOKEN_HEADER)
-      return this.options.turnRoutes(this.env).turn(new Request(request, { headers }), { waitUntil: this.state.waitUntil?.bind(this.state), hosted: true })
+      if (url.pathname === TURN_HOST_CANCEL_PATH) {
+        if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed' }, 405)
+        return jsonResponse(this.hostedTurn.requestCancellation(await jsonBody(request)))
+      }
+      if (url.pathname === TURN_HOST_CONTROL_PATH) {
+        if (request.method !== 'GET' || request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') return jsonResponse({ error: 'Upgrade required' }, 400)
+        const target = this.hostedTurn.controlTarget(url)
+        return target ? this.acceptSocket({ host: target }) : jsonResponse({ error: 'Host invocation changed' }, 409)
+      }
+      return this.hostedTurn.run(request, (forwarded, ctx) => this.options.turnRoutes!(this.env).turn(forwarded, ctx))
     }
 
     if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
@@ -334,6 +348,10 @@ export class TurnStreamDO {
     if (!sessionId) return new Response('Missing sessionId', { status: 400 })
     const scope = url.searchParams.get('scope') === 'workspace' ? 'workspace' : 'thread'
 
+    return this.acceptSocket({ sessionId, scope, synced: false, ...(control ? { cancellation: control } : {}) } satisfies SocketMeta)
+  }
+
+  private acceptSocket(metadata: unknown): Response {
     const PairCtor = (globalThis as { WebSocketPair?: new () => Record<number, unknown> }).WebSocketPair
     if (!PairCtor) {
       return new Response('WebSocket upgrades require the Cloudflare runtime', { status: 501 })
@@ -347,7 +365,7 @@ export class TurnStreamDO {
     // (frames can drop). The client issues a `sync` once open; replay happens
     // there.
     this.state.acceptWebSocket(server)
-    server.serializeAttachment({ sessionId, scope, synced: false, ...(control ? { cancellation: control } : {}) } satisfies SocketMeta)
+    server.serializeAttachment(metadata)
 
     return new Response(null, { status: 101, webSocket: client } as ResponseInit)
   }
@@ -361,6 +379,11 @@ export class TurnStreamDO {
    * fan-out.
    */
   async webSocketMessage(ws: TurnStreamSocket, message: string | ArrayBuffer): Promise<void> {
+    const host = (ws.deserializeAttachment() as { host?: TurnHostControlTarget } | null)?.host
+    if (host) {
+      this.hostedTurn.sync(ws, message, host)
+      return
+    }
     const meta = ws.deserializeAttachment() as SocketMeta | null
     if (!meta || meta.synced) return
     try {

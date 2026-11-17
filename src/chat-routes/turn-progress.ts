@@ -19,6 +19,11 @@
  * caller already handles. A client that does not send the header gets exactly
  * the responses it got before.
  *
+ * The separate opt-in host-control envelope starts after identity/editor/thread
+ * authorization, before paid admission. Its control event grants no execution
+ * permission. Full admission still precedes accepted progress and all execution;
+ * a later refusal is carried by turn.response. Legacy callers are unchanged.
+ *
  * Product work that only an admitted turn may do (resolving its profile and
  * model, any write) belongs in `prepareTurn`, which runs after admission and,
  * on a progress-first stream, inside it with its own named stages.
@@ -32,6 +37,29 @@
 export const TURN_PROGRESS_HEADER = 'x-turn-progress'
 /** The only value of {@link TURN_PROGRESS_HEADER}. The route echoes it on a progress-first response. */
 export const TURN_PROGRESS_FIRST = 'first'
+
+/** Opt in to the hosted invocation's identity envelope before paid admission. */
+export const TURN_HOST_CONTROL_HEADER = 'x-turn-host-control'
+export const TURN_HOST_CONTROL_FIRST = 'first'
+/** A control address, never paid admission, execution authority or assistant content. */
+export const TURN_HOST_CONTROL_EVENT = 'turn.host.control'
+export interface TurnHostControlTarget {
+  hostId: string
+  workspaceId: string
+  threadId: string
+  clientTurnId?: string
+  retryAttemptId?: string
+}
+export type TurnHostControlEvent = { type: typeof TURN_HOST_CONTROL_EVENT; data: TurnHostControlTarget }
+
+/** Validate the envelope without interpreting its opaque host id as authority. */
+export function isTurnHostControlEvent(value: unknown): value is TurnHostControlEvent {
+  const event = value as Partial<TurnHostControlEvent> | null
+  const target = event?.data
+  return event?.type === TURN_HOST_CONTROL_EVENT && !!target
+    && [target.hostId, target.workspaceId, target.threadId].every(value => typeof value === 'string' && !!value.trim())
+    && [target.clientTurnId, target.retryAttemptId].every(value => value === undefined || typeof value === 'string' && !!value.trim())
+}
 
 /** Stream event naming the turn's current stage. Non-terminal and never turn content. */
 export const TURN_PHASE_EVENT = 'session.run.phase'
@@ -161,18 +189,23 @@ export async function turnResponseEventFor(response: Response): Promise<{ type: 
  * handling runs unchanged. Any other event resolves to a `Response` whose body
  * starts at that event and continues with the rest of the stream. A response
  * that is not progress-first is returned as it is.
+ * Opt-in host envelopes require onHostControl; its receipt is not admission.
  */
 export async function settleTurnResponse(
   response: Response,
   onPhase: (phase: TurnPhaseData) => void,
   onIntent?: (intent: TurnIntentData) => void,
+  onHostControl?: (target: TurnHostControlTarget) => void,
 ): Promise<Response> {
-  if (response.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST || !response.body) return response
+  if ((response.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST
+    && response.headers.get(TURN_HOST_CONTROL_HEADER) !== TURN_HOST_CONTROL_FIRST) || !response.body) return response
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffer = ''
   let ended = false
+  const requiresHostControl = response.headers.get(TURN_HOST_CONTROL_HEADER) === TURN_HOST_CONTROL_FIRST
+  let hostControlReceived = false
   for (;;) {
     let newline = buffer.indexOf('\n')
     while (newline < 0) {
@@ -204,6 +237,21 @@ export async function settleTurnResponse(
       event = JSON.parse(line)
     } catch {
       event = null
+    }
+    if (isTurnHostControlEvent(event)) {
+      if (!requiresHostControl || hostControlReceived || !onHostControl) {
+        await reader.cancel().catch(() => {})
+        throw new Error('Unexpected hosted control identity or missing onHostControl handler')
+      }
+      buffer = buffer.slice(newline + 1)
+      try { onHostControl(event.data) }
+      catch (error) { await reader.cancel().catch(() => {}); throw error }
+      hostControlReceived = true
+      continue
+    }
+    if (requiresHostControl && !hostControlReceived) {
+      await reader.cancel().catch(() => {})
+      throw new Error('The hosted envelope did not begin with a valid control identity')
     }
     if (isTurnPhaseEvent(event)) {
       buffer = buffer.slice(newline + 1)

@@ -65,9 +65,6 @@ import { errorResponse, namedModelRefusal, validateTurnBody, type AdmittedTurn, 
 import { createAdmittedTurnRunner } from './turn-execution'
 import { earlyTurnWork, type AfterAuthorizeWork } from './early-turn-work'
 import {
-  INTENT_LINE_TIMEOUT_MS,
-  INTENT_LINE_HISTORY_MESSAGES,
-  INTENT_LINE_MAX_CHARS,
   type ChatRouteEvent,
   type ChatTurnAfterAuthorizeRelease,
   type ChatTurnRequestContext,
@@ -79,10 +76,14 @@ import {
   TURN_INTENT_EVENT,
   TURN_PROGRESS_FIRST,
   TURN_PROGRESS_HEADER,
+  TURN_HOST_CONTROL_HEADER,
+  TURN_HOST_CONTROL_FIRST,
+  TURN_HOST_CONTROL_EVENT,
   TURN_ROUTE_PHASE_MESSAGES,
   turnResponseEventFor,
   type TurnIntentEvent,
   type TurnRoutePhase,
+  type TurnHostControlTarget,
 } from './turn-progress'
 import { ChatTurnInputError } from './wire'
 import { resolveTurnStorage, turnStorageBindings, type ResolvedChatTurnRoutesOptions } from './route-storage'
@@ -90,25 +91,34 @@ import { createDefaultChatBackend, type ChatTurnDefaultBackend } from './default
 import { createChatPrewarm } from './route-prewarm'
 import { cancelChatTurn } from './cancellation'
 import { forwardTurnToHost, type TurnHost } from '../turn-stream/adapters'
+import type { TurnHostControlNamespace } from '../turn-stream/cancellation'
+import { turnControlResponse } from './turn-event-stream'
+import { startTurnIntentLine } from './turn-intent'
 
 export * from './turn-route-contracts'
 
-/** Parse and validate the body, then authorize the caller. */
-async function admitTurn<TContext, TResource>(
-  request: Request, trace: TurnTrace, options: CreateChatTurnRoutesOptions<TContext, TResource>,
-  waitUntil: ChatTurnRequestContext['waitUntil'],
-): Promise<({ ok: true } & AdmittedTurn<TContext>) | { ok: false; response: Response }> {
+async function parseTurn(request: Request, trace: TurnTrace): Promise<ParsedTurnBody | Response> {
   const parse = trace.start('admission.parse', 'admission')
   const [rawBody, badBody] = await parseJsonObjectBody(request)
-  if (badBody) return { ok: false, response: badBody }
+  if (badBody) return badBody
   let parsed: ParsedTurnBody
   try {
     parsed = validateTurnBody(rawBody)
   } catch (err) {
-    if (err instanceof ChatTurnInputError) return { ok: false, response: errorResponse(err) }
+    if (err instanceof ChatTurnInputError) return errorResponse(err)
     throw err
   }
   parse.end()
+  return parsed
+}
+
+/** Parse once, then authorize execution; early host identity never replaces this gate. */
+async function admitTurn<TContext, TResource>(
+  request: Request, trace: TurnTrace, options: CreateChatTurnRoutesOptions<TContext, TResource>,
+  waitUntil: ChatTurnRequestContext['waitUntil'], parsedBody?: ParsedTurnBody,
+): Promise<({ ok: true } & AdmittedTurn<TContext>) | { ok: false; response: Response }> {
+  const parsed = parsedBody ?? await parseTurn(request, trace)
+  if (parsed instanceof Response) return { ok: false, response: parsed }
   const prefetch = options.prefetch && startTurnPrefetch(options.prefetch, { request, body: parsed.payload, trace })
   let handedOff = false
   try {
@@ -154,43 +164,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     ? undefined
     : (traceOptions?.sink ?? createIntelligenceTurnTraceSink({ project: options.projectId }))
 
-  /** Start the admitted turn's intent line; resolves to the line, or null. Never rejects. */
-  function startIntentLine(admitted: AdmittedTurn<TContext>): Promise<string | null> | undefined {
-    const intentLine = options.intentLine
-    if (!intentLine) return undefined
-    const { parsed, auth } = admitted
-    const threadId = parsed.payload.threadId
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const deadline = new Promise<null>((resolve) => {
-      timer = setTimeout(() => {
-        controller.abort()
-        resolve(null)
-      }, intentLine.timeoutMs ?? INTENT_LINE_TIMEOUT_MS)
-    })
-    const generated = (async () => {
-      const history = (await options.store.listMessages(threadId))
-        .slice(-INTENT_LINE_HISTORY_MESSAGES)
-        .map((message) => ({ role: message.role, content: message.content }))
-      const text = await intentLine.generate({
-        content: parsed.content,
-        history,
-        tenantId: auth.tenantId,
-        userId: auth.userId,
-        threadId,
-        context: auth.context,
-        signal: controller.signal,
-      })
-      const line = typeof text === 'string' ? text.trim().replace(/\s+/g, ' ') : ''
-      return line ? line.slice(0, INTENT_LINE_MAX_CHARS) : null
-    })().catch((err) => {
-      if (!controller.signal.aborted) {
-        log('[chat-routes] intent line failed; showing none', { error: err instanceof Error ? err.message : String(err) })
-      }
-      return null
-    })
-    return Promise.race([generated, deadline]).finally(() => clearTimeout(timer))
-  }
+  const startIntentLine = (admitted: AdmittedTurn<TContext>, stop?: AbortSignal) => startTurnIntentLine(options, log, admitted, stop)
   const runAdmittedTurn = createAdmittedTurnRunner({
     options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
   })
@@ -206,6 +180,10 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
       return response
     } catch (err) {
       if ((err as { remote?: unknown } | null)?.remote === true) throw err
+      // No second execution owner after the opt-in host might have published H.
+      if (request.headers.get(TURN_HOST_CONTROL_HEADER) === TURN_HOST_CONTROL_FIRST) {
+        return Response.json({ error: 'The turn host is unavailable.', code: 'turn_control_unavailable' }, { status: 503 })
+      }
       log('[chat-routes] turn host unavailable; the turn runs in this request', {
         class: 'turn_host_unavailable', error: err instanceof Error ? err.name : typeof err })
       return withD1QueryCount(() => turn(request, ctx))
@@ -218,7 +196,31 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     // beyond what it says, and nothing runs for a caller who is not admitted.
     // The turn's clock starts at the request, so admission is inside its trace.
     const requestContext = ctx?.waitUntil ? { ...ctx, waitUntil: ctx.waitUntil.bind(ctx) } : ctx
-    const admitted = await admitTurn(request, createTurnTrace({ d1QueryCounter: currentD1QueryCounter() }), options, requestContext?.waitUntil)
+    const trace = createTurnTrace({ d1QueryCounter: currentD1QueryCounter() })
+    if (request.headers.get(TURN_HOST_CONTROL_HEADER) === TURN_HOST_CONTROL_FIRST) {
+      const control = requestContext?.hosted && requestContext.hostControl
+      if (!options.authorizeHostControl) {
+        return Response.json({ error: 'Early hosted control is unavailable.', code: 'turn_control_unavailable' }, { status: 503 })
+      }
+      const parsed = await parseTurn(request, trace)
+      if (parsed instanceof Response) return parsed
+      const identity = await options.authorizeHostControl({ request, body: parsed.payload })
+      if (!identity.ok) return identity.response
+      if (!control) return Response.json({ error: 'The turn host is unavailable.', code: 'turn_control_unavailable' }, { status: 503 })
+      const namespace = turnHost?.namespace as TurnHostControlNamespace | undefined
+      if (!namespace || typeof namespace.idFromString !== 'function') {
+        return Response.json({ error: 'The host control binding is unavailable.', code: 'turn_control_unavailable' }, { status: 503 })
+      }
+      if (!identity.tenantId.trim()) return new Response('Invalid control identity', { status: 403 })
+      const target: TurnHostControlTarget = { hostId: control.hostId, workspaceId: identity.tenantId,
+        threadId: parsed.payload.threadId, ...(parsed.payload.turnId ? { clientTurnId: parsed.payload.turnId } : {}),
+        ...(parsed.payload.retryAttemptId ? { retryAttemptId: parsed.payload.retryAttemptId } : {}) }
+      await control.bind(target, { namespace, auth: turnHost!.auth })
+      const admission = admitTurn(request, trace, options, requestContext?.waitUntil, parsed)
+        .then(result => result.ok ? result : result.response)
+      return progressFirstTurn(request, requestContext, admission, target)
+    }
+    const admitted = await admitTurn(request, trace, options, requestContext?.waitUntil)
     if (!admitted.ok) return admitted.response
     if (request.headers.get(TURN_PROGRESS_HEADER) !== TURN_PROGRESS_FIRST) return runTurn(request, requestContext, admitted)
     return progressFirstTurn(request, requestContext, admitted)
@@ -234,7 +236,9 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
    * failure) becomes one `turn.response` event that `settleTurnResponse` turns
    * back into that response on the client.
    */
-  function progressFirstTurn(request: Request, ctx: ChatTurnRequestContext | undefined, admitted: AdmittedTurn<TContext>): Response {
+  function progressFirstTurn(request: Request, ctx: ChatTurnRequestContext | undefined,
+    admission: AdmittedTurn<TContext> | Promise<AdmittedTurn<TContext> | Response>, control?: TurnHostControlTarget,
+  ): Response {
     const receivedAt = Date.now()
     const encoder = new TextEncoder()
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>()
@@ -252,30 +256,34 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     const progress: TurnProgressCallback = (phase, message) => {
       void writeEvent(buildTurnPhaseEvent(phase, message, { sinceRequestMs: Date.now() - receivedAt }))
     }
-    progress('accepted', progressMessages.accepted)
-
-    // The intent line reaches the client between whole NDJSON lines: before the
-    // turn's own stream, or at a line boundary of it (its chunks can split lines).
-    const intent = startIntentLine(admitted)
+    if (control) void writeEvent({ type: TURN_HOST_CONTROL_EVENT, data: { ...control } })
     let piping = false
     let atLineStart = true
     let pendingIntent: TurnIntentEvent | null = null
-    if (intent) {
-      void intent.then((text) => {
-        if (!text || clientGone) return
-        const event: TurnIntentEvent = { type: TURN_INTENT_EVENT, data: { text, sinceRequestMs: Date.now() - receivedAt } }
-        if (!piping || atLineStart) void writeEvent(event)
-        else pendingIntent = event
-      })
-    }
 
     const pump = (async () => {
       let inner: Response
       try {
-        inner = await runTurn(request, ctx, admitted, progress, intent)
+        const admitted = await admission
+        if (admitted instanceof Response) inner = admitted
+        else if (control && admitted.auth.tenantId !== control.workspaceId) inner = new Response('Control identity changed', { status: 403 })
+        else if (ctx?.hostControl?.signal.aborted) inner = turnControlResponse(ctx.hostControl.signal)
+        else {
+          progress('accepted', progressMessages.accepted)
+          // Intent is execution work: never start it before full admission/Stop gate.
+          const intent = startIntentLine(admitted, ctx?.hostControl?.signal)
+          if (intent) void intent.then(text => {
+            if (!text || clientGone) return
+            const event: TurnIntentEvent = { type: TURN_INTENT_EVENT, data: { text, sinceRequestMs: Date.now() - receivedAt } }
+            if (!piping || atLineStart) void writeEvent(event)
+            else pendingIntent = event
+          })
+          inner = await runTurn(request, ctx, admitted, progress, intent)
+        }
       } catch (err) {
         log('[chat-routes] turn failed before it streamed', { error: err instanceof Error ? err.message : String(err) })
-        inner = err instanceof Response ? err
+        inner = ctx?.hostControl?.signal.aborted && err === ctx.hostControl.signal.reason
+          ? turnControlResponse(ctx.hostControl.signal) : err instanceof Response ? err
           : Response.json({ error: 'The turn failed before it started. Try again.' }, { status: 500 })
       }
       if (!inner.body || !inner.headers.get('x-turn-id')) {
@@ -314,6 +322,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
         'Content-Type': 'application/x-ndjson',
         'Cache-Control': 'no-cache',
         [TURN_PROGRESS_HEADER]: TURN_PROGRESS_FIRST,
+        ...(control ? { [TURN_HOST_CONTROL_HEADER]: TURN_HOST_CONTROL_FIRST } : {}),
       },
     })
   }
@@ -350,6 +359,7 @@ export function createChatTurnRoutes<TContext = void, TResource = unknown>(
     progress?: TurnProgressCallback,
     startedIntent?: Promise<string | null>,
   ): Promise<Response> {
+    if (ctx?.hostControl?.signal.aborted) return turnControlResponse(ctx.hostControl.signal)
     const early = startAfterAuthorize(request, admitted, ctx?.waitUntil)
     try {
       return await runAdmittedTurn(request, ctx, admitted, early, progress, startedIntent)

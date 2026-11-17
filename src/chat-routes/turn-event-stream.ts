@@ -1,5 +1,13 @@
 /** Stream framing, event inspection and cancellation around a chat producer. */
 import type { ChatRouteEvent } from './turn-route-contracts'
+import { TurnCancellationRequestedError, TurnControlUnavailableError } from '../turn-stream/cancellation'
+
+/** One safe pre-execution response for the server-owned host control signal. */
+export function turnControlResponse(signal: AbortSignal): Response {
+  const requested = signal.reason instanceof TurnCancellationRequestedError
+  return Response.json({ error: requested ? 'Stop was requested for this turn.' : 'Turn control was lost.',
+    code: requested ? 'turn_cancel_requested' : 'turn_control_unavailable' }, { status: requested ? 409 : 503 })
+}
 
 /** The original data of a failure event whose reason a producer withheld from the person. A Symbol key: JSON, and so
  *  the wire and the turn buffer, drops it, while the route's own hooks read it through {@link serverFailureData}. */
@@ -147,7 +155,7 @@ export function concatStreams(streams: ReadableStream<Uint8Array>[]): ReadableSt
 }
 
 /**
- * Stop a producer pull as soon as an opted-in caller disconnects.
+ * Stop a producer pull when its request or maintained owner control aborts.
  * `AsyncIterator.return()` alone cannot interrupt a pending `next()` call, so
  * race each pull with the request signal and close the source in `finally`.
  */
@@ -171,7 +179,7 @@ function nextWithAbort<T>(
   iterator: AsyncIterator<T>,
   signal: AbortSignal,
 ): Promise<IteratorResult<T>> {
-  if (signal.aborted) return Promise.reject(new Error('chat turn cancelled'))
+  if (signal.aborted) return Promise.reject(cancellationReason(signal))
   return new Promise((resolve, reject) => {
     let settled = false
     const cleanup = () => signal.removeEventListener('abort', onAbort)
@@ -179,7 +187,7 @@ function nextWithAbort<T>(
       if (settled) return
       settled = true
       cleanup()
-      reject(new Error('chat turn cancelled'))
+      reject(cancellationReason(signal))
     }
     signal.addEventListener('abort', onAbort, { once: true })
     if (signal.aborted) {
@@ -203,6 +211,14 @@ function nextWithAbort<T>(
         },
       )
   })
+}
+
+/** Only maintained control errors cross this boundary. An arbitrary abort reason
+ *  may contain credentials or producer text and retains the existing generic error. */
+function cancellationReason(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason
+  return reason instanceof TurnCancellationRequestedError || reason instanceof TurnControlUnavailableError
+    ? reason : new Error('chat turn cancelled')
 }
 
 const ABORT_CLEANUP_TIMEOUT_MS = 50
