@@ -206,7 +206,7 @@ interface IntelligenceSpanRow {
  */
 const OMITTED_ATTRS: ReadonlySet<string> = new Set([
   'service.name', 'tangle.project', 'otel.scope.name', 'otel.scope.version', 'otel.original_attributes', 'otel.attribute_collisions',
-  'error.message',
+  // MUTATION: keep error text
 ])
 
 /**
