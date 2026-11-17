@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.22
+
+- feat(runtime): say on each model call span what the call produced (#1564)
+
 ## 4.0.21
 
 - fix(create-agent-app): scaffold agent-interface 5.10.27 (#1563)
