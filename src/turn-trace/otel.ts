@@ -218,7 +218,7 @@ function turnTraceExport(rows: IntelligenceSpanRow[], executionId: string, proje
   const ours = rows.filter((row) =>
     row.attributes?.['otel.scope.name'] === SCOPE.name && row.attributes?.['otel.scope.version'] === SCOPE.version)
   const spanId = (row: IntelligenceSpanRow) => row.id.slice(row.id.lastIndexOf(':') + 1)
-  const kept = new Set(ours.filter((row) => row.name === 'agent_app.turn' && row.attributes?.['tangle.execution_id'] === executionId).map(spanId))
+  const kept = new Set(ours.filter((row) => row.name === 'agent_app.turn' // MUTATION: any root).map(spanId))
   if (kept.size === 0) return null
   // The roots' descendants, whatever order the rows come in.
   for (let size = -1; size !== kept.size;) {
