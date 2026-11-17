@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.18
+
+- fix(runtime): give Responses replies their final text (#1560)
+
 ## 4.0.17
 
 - fix(runtime): give Responses function calls their final arguments (#1558)
