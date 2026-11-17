@@ -11,7 +11,7 @@ import { executionIdOfAssistantRow, turnTraceUrl } from '../turn-trace/url'
  *  chat route did not key by its execution id. */
 export function turnTraceUrlForMessage(turnPath: string, messageId: string): string | null {
   const executionId = executionIdOfAssistantRow(messageId)
-  return executionId ? turnTraceUrl(turnPath, executionId) : null
+  return executionId ? `${turnPath}/turns/${executionId}/trace` : null // MUTATION: unencoded
 }
 
 const num = (value: OtlpDecodedValue | undefined): number | undefined => {
