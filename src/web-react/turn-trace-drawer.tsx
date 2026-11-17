@@ -28,6 +28,16 @@ export interface TurnTraceDrawerProps {
 
 const seconds = (ms: number | undefined) => (ms === undefined ? 'unknown' : `${(ms / 1000).toFixed(1)} s`)
 
+/** The turn's headline numbers, each with its unit. */
+function summaryLine(trace: TurnTraceFlow): string {
+  return [
+    `${seconds(trace.wallMs ?? trace.flow.totalMs)} in all`,
+    `first output after ${seconds(trace.firstVisibleMs)}`,
+    `first answer text after ${seconds(trace.firstTextMs)}`,
+    ...(trace.coveragePct === undefined ? [] : [`${trace.coveragePct}% of the time inside a named step`]),
+  ].join(' · ')
+}
+
 /** The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download. */
 export function TurnTraceDrawer({ traceUrl, open, onOpenChange, renderIcon, fetchImpl }: TurnTraceDrawerProps) {
   const [state, setState] = useState<TraceState>({ status: 'loading' })
@@ -67,35 +77,37 @@ export function TurnTraceDrawer({ traceUrl, open, onOpenChange, renderIcon, fetc
           <SheetTitle>Turn trace</SheetTitle>
           <SheetDescription>
             {state.status === 'ready'
-              ? `${seconds(state.trace.wallMs ?? state.trace.flow.totalMs)} in all · first output after ${seconds(state.trace.firstVisibleMs)} · first answer text after ${seconds(state.trace.firstTextMs)}${state.trace.coveragePct === undefined ? '' : ` · ${state.trace.coveragePct}% of the time inside a named step`}`
+              ? summaryLine(state.trace)
               : 'Where this turn spent its time: each step, model call and tool call, on one clock.'}
           </SheetDescription>
         </SheetHeader>
-        {state.status === 'loading' && <p className="text-sm text-muted-foreground">Reading the trace…</p>}
-        {state.status === 'pending' && (
-          <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
-            <p>This turn's trace is not stored yet. It is saved a few seconds after the turn finishes.</p>
-            <Button variant="outline" size="sm" onClick={retry}>Read again</Button>
-          </div>
-        )}
-        {state.status === 'failed' && (
-          <div className="flex flex-col items-start gap-2 text-sm">
-            <p role="alert">{state.message}</p>
-            <Button variant="outline" size="sm" onClick={retry}>Try again</Button>
-          </div>
-        )}
-        {state.status === 'ready' && (
-          <>
-            <div className="rounded-md border border-border bg-secondary p-2">
-              <FlowWaterfall trace={state.trace.flow} defaultView="spans" {...(renderIcon ? { renderIcon } : {})} />
+        <div className="flex flex-col gap-4 px-4 pb-6">
+          {state.status === 'loading' && <p className="text-sm text-muted-foreground">Reading the trace…</p>}
+          {state.status === 'pending' && (
+            <div className="flex flex-col items-start gap-2 text-sm text-muted-foreground">
+              <p>This turn's trace is not stored yet. It is saved a few seconds after the turn finishes.</p>
+              <Button variant="outline" size="sm" onClick={retry}>Read again</Button>
             </div>
-            <div>
-              <Button asChild variant="outline" size="sm">
-                <a href={downloadHref ?? undefined} download={`turn-${state.trace.traceId}.otlp.json`}>Download OTLP</a>
-              </Button>
+          )}
+          {state.status === 'failed' && (
+            <div className="flex flex-col items-start gap-2 text-sm">
+              <p role="alert">{state.message}</p>
+              <Button variant="outline" size="sm" onClick={retry}>Try again</Button>
             </div>
-          </>
-        )}
+          )}
+          {state.status === 'ready' && (
+            <>
+              <div className="rounded-md border border-border bg-secondary p-2">
+                <FlowWaterfall trace={state.trace.flow} defaultView="spans" {...(renderIcon ? { renderIcon } : {})} />
+              </div>
+              <div>
+                <Button asChild variant="outline" size="sm">
+                  <a href={downloadHref ?? undefined} download={`turn-${state.trace.traceId}.otlp.json`}>Download OTLP</a>
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   )
@@ -104,6 +116,9 @@ export function TurnTraceDrawer({ traceUrl, open, onOpenChange, renderIcon, fetc
 export interface TurnTraceButtonProps extends Omit<TurnTraceDrawerProps, 'open' | 'onOpenChange'> {
   label?: string
 }
+
+const TRACE_ACTION_CLASS = 'inline-flex items-center gap-1 rounded p-0.5 text-xs text-muted-foreground transition '
+  + 'hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /** A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row. */
 export function TurnTraceButton({ label = 'Trace', ...drawer }: TurnTraceButtonProps) {
@@ -115,7 +130,7 @@ export function TurnTraceButton({ label = 'Trace', ...drawer }: TurnTraceButtonP
         onClick={() => setOpen(true)}
         aria-label="Open this turn's trace"
         title="Open this turn's trace"
-        className="inline-flex items-center gap-1 rounded p-0.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={TRACE_ACTION_CLASS}
       >
         <Activity className="h-3.5 w-3.5" aria-hidden />
         {label}

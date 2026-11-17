@@ -69,6 +69,12 @@ export function turnTraceFlow(exported: unknown): TurnTraceFlow | null {
       ...(a.approx === true ? { approx: true } : {}),
     }
   })
+  // Token totals over the model calls only: their children (network, stream) carry none of their own.
+  const calls = flow.filter((span) => span.kind === 'model' && span.promptTokens !== undefined)
+  const total = (key: 'promptTokens' | 'completionTokens') =>
+    calls.length === 0 ? undefined : calls.reduce((sum, span) => sum + (span[key] ?? 0), 0)
+  const promptTokens = total('promptTokens')
+  const completionTokens = total('completionTokens')
   const modelCalls = num(attr['tangle.turn.model_calls'])
   const toolCalls = num(attr['tangle.turn.tool_calls'])
   const wallMs = num(attr['tangle.turn.wall_ms'])
@@ -80,6 +86,8 @@ export function turnTraceFlow(exported: unknown): TurnTraceFlow | null {
     flow: {
       spans: flow,
       totalMs: nanosToMs(root.end_time_unix_nano) - origin,
+      ...(promptTokens !== undefined ? { promptTokens } : {}),
+      ...(completionTokens !== undefined ? { completionTokens } : {}),
       ...(modelCalls !== undefined ? { modelCalls } : {}),
       ...(toolCalls !== undefined ? { toolCalls } : {}),
       errors: flow.filter((span) => span.status === 'failed').length,
