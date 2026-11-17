@@ -52,6 +52,7 @@ export interface OpenAIStreamChunk {
     completion_tokens?: number
     /** Prompt tokens the provider served from its prompt cache (Gemini implicit caching, OpenAI, Anthropic through the Router). */
     prompt_tokens_details?: { cached_tokens?: number | null } | null
+    completion_tokens_details?: { reasoning_tokens?: number | null } | null
   } | null
 }
 
@@ -81,7 +82,8 @@ interface PartialToolCall {
  */
 export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): AsyncIterable<LoopEvent> {
   const calls = new Map<number, PartialToolCall>()
-  let usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number } | undefined
+  let usage: Extract<LoopEvent, { type: 'usage' }>['usage'] | undefined
+  let finishReason: string | undefined
   for await (const chunk of chunks) {
     // Usage can ride a chunk with an empty choices array — read it before the
     // choice guard. Each report is cumulative, so the last one is the call's.
@@ -89,14 +91,17 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
       // Cumulative like the rest, but a provider may send the details on an earlier chunk only: keep the largest.
       const reported = chunk.usage.prompt_tokens_details?.cached_tokens
       const cached = typeof reported === 'number' ? Math.max(reported, usage?.cachedPromptTokens ?? 0) : usage?.cachedPromptTokens
+      const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens ?? usage?.reasoningTokens
       usage = {
         promptTokens: chunk.usage.prompt_tokens ?? 0,
         completionTokens: chunk.usage.completion_tokens ?? 0,
         ...(typeof cached === 'number' ? { cachedPromptTokens: cached } : {}),
+        ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
       }
     }
     const choice = chunk.choices?.[0]
     if (!choice) continue
+    finishReason = choice.finish_reason ?? finishReason
     const content = choice.delta?.content
     if (content) yield { type: 'text', text: content }
     const reasoning = choice.delta?.reasoning_content ?? choice.delta?.thinking
@@ -114,7 +119,7 @@ export async function* toLoopEvents(chunks: AsyncIterable<OpenAIStreamChunk>): A
       }
     }
   }
-  if (usage) yield { type: 'usage', usage }
+  if (usage) yield { type: 'usage', usage, ...(finishReason ? { finishReason } : {}) }
   for (const [, c] of [...calls.entries()].sort((a, b) => a[0] - b[0])) {
     if (!c.name) continue
     yield {
@@ -517,7 +522,9 @@ interface ResponsesEvent {
   summary_index?: number
   item?: ResponsesItem
   response?: { model?: string; output?: ResponsesItem[]; error?: { code?: string; message?: string }
-    usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number | null } | null } }
+    status?: string; incomplete_details?: { reason?: string } | null
+    usage?: { input_tokens?: number; output_tokens?: number; input_tokens_details?: { cached_tokens?: number | null } | null
+      output_tokens_details?: { reasoning_tokens?: number | null } | null } }
   error?: { code?: string; message?: string }
   message?: string
 }
@@ -619,9 +626,12 @@ async function* streamResponses(
           const model = event.response?.model
           if (attribution && !reported && model) report(servedFromBody(model, attribution.requestedModel))
           const usage = event.response?.usage
-          yield { ...(model ? { model } : {}), choices: [],
+          // Why the call ended: the reason it is incomplete, else its status.
+          const finish = event.response?.incomplete_details?.reason ?? event.response?.status
+          yield { ...(model ? { model } : {}), choices: finish ? [{ finish_reason: finish }] : [],
             ...(usage ? { usage: { prompt_tokens: usage.input_tokens ?? 0, completion_tokens: usage.output_tokens ?? 0,
-              ...(usage.input_tokens_details ? { prompt_tokens_details: usage.input_tokens_details } : {}) } } : {}) }
+              ...(usage.input_tokens_details ? { prompt_tokens_details: usage.input_tokens_details } : {}),
+              ...(usage.output_tokens_details ? { completion_tokens_details: usage.output_tokens_details } : {}) } } : {}) }
           return
         }
         case 'response.failed':

@@ -65,5 +65,7 @@ export type LoopEvent =
       type: 'tool_call'
       call: import('@tangle-network/agent-runtime/tool-loop').ToolLoopCall
     }
-  | { type: 'usage'; usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number } }
+  /** One model call's usage, with why the call ended (`finish_reason`, or a Responses status) when the provider says. */
+  | { type: 'usage'; usage: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number; reasoningTokens?: number }
+      finishReason?: string }
   | { type: 'other'; event: unknown }

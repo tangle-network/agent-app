@@ -93,7 +93,7 @@ export type RouterTurnEvent =
   | { type: 'tool'; callId: string; toolName: string; status: 'running'; input: Record<string, unknown>; startedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'completed'; output: unknown; startedAt: number; endedAt: number }
   | { type: 'tool'; callId: string; toolName: string; status: 'error'; error: { code: string; message: string }; startedAt: number; endedAt: number }
-  | { type: 'usage'; promptTokens: number; completionTokens: number; cachedPromptTokens?: number }
+  | { type: 'usage'; promptTokens: number; completionTokens: number; cachedPromptTokens?: number; reasoningTokens?: number }
   | ({ type: 'tool_event' } & RouterTurnToolEvent)
 
 export interface RouterTurnFailure {
@@ -423,11 +423,12 @@ function renderResult(outcome: RouterTurnToolOutcome, limit = TOOL_RESULT_LIMIT)
   return text.length > limit ? `${text.slice(0, limit)}…` : text
 }
 
-/** Add one model call's usage to the turn's totals and to that call's span. */
+/** Add one model call's usage to the turn's totals, and it and why the call ended to that call's span. */
 function addCallUsage(
   usage: RouterTurnOutcome['usage'],
-  call: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number },
+  call: { promptTokens: number; completionTokens: number; cachedPromptTokens?: number; reasoningTokens?: number },
   span: TurnSpan | undefined,
+  finishReason?: string,
 ): void {
   usage.promptTokens += call.promptTokens
   usage.completionTokens += call.completionTokens
@@ -438,7 +439,21 @@ function addCallUsage(
     'gen_ai.usage.input_tokens': call.promptTokens,
     'gen_ai.usage.output_tokens': call.completionTokens,
     ...(cached !== undefined ? { 'gen_ai.usage.cache_read.input_tokens': cached } : {}),
+    ...(call.reasoningTokens !== undefined ? { 'gen_ai.usage.reasoning_tokens': call.reasoningTokens } : {}),
+    ...(finishReason ? { 'gen_ai.response.finish_reasons': finishReason } : {}),
   })
+}
+
+/** What each model call wrote, on its span: answer characters and function calls, zero when it wrote neither. */
+function callOutput(state: { lastModelSpan: TurnSpan | undefined }) {
+  let made = { span: undefined as TurnSpan | undefined, textChars: 0, toolCalls: 0 }
+  return (textChars: number, toolCalls: number) => {
+    const span = state.lastModelSpan
+    if (made.span !== span) made = { span, textChars: 0, toolCalls: 0 }
+    made.textChars += textChars
+    made.toolCalls += toolCalls
+    span?.set({ 'tangle.model.text_chars': made.textChars, 'tangle.model.tool_calls': made.toolCalls })
+  }
 }
 
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
@@ -472,6 +487,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const traceId = options.traceId !== undefined ? turnTraceId(options.traceId) : options.trace?.traceId
   const { trace } = options
   const transportState = { currentModel: options.model, lastModelSpan: undefined as TurnSpan | undefined }
+  const wrote = callOutput(transportState)
   const { fetchImpl } = createRouterTurnTransport(options, trace, transportState, signal, attempts, attemptTimeoutMs, baseDelayMs, pause)
 
   const extraBody = {
@@ -616,13 +632,15 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           trace?.markFirstText()
           if (!segmentOpen) { segments.push(''); segmentOpen = true }
           segments[segments.length - 1] += event.text
+          wrote(event.text.length, 0)
           emit({ type: 'text', segment: segments.length, delta: event.text })
         } else if (event.type === 'reasoning' && event.text) {
           reasoning.deltas++
           reasoning.chars += event.text.length
           emit({ type: 'reasoning', delta: event.text })
         } else if (event.type === 'usage') {
-          addCallUsage(usage, event.usage, transportState.lastModelSpan)
+          addCallUsage(usage, event.usage, transportState.lastModelSpan, event.finishReason)
+          wrote(0, 0)
           emit({ type: 'usage', ...event.usage })
         } else if (event.type === 'tool_call_start') {
           emit({ type: 'tool_start', toolName: byFunction.get(event.toolName)?.name ?? event.toolName })
@@ -633,6 +651,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           // The loop yields this event before extracting its call. Normalize a missing id once,
           // so execution, progress, result and replay history reuse the displayed identity.
           event.call.toolCallId ||= callIdOf(undefined, event.call.toolName)
+          wrote(0, 1)
           const callId = event.call.toolCallId
           started.set(callId, Date.now())
           emit({ type: 'tool', callId, toolName: tool?.name ?? event.call.toolName, status: 'running',
