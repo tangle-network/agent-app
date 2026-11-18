@@ -140,6 +140,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
   const root = process.env.AGENT_APP_QUALIFICATION_EVIDENCE_DIR ?? tmpdir()
   let evidence: string | undefined
   let worker: ReturnType<typeof createTestHarness> | undefined
+  type AdmissionResponse = Response | Awaited<ReturnType<ReturnType<typeof createTestHarness>['fetch']>>
   type Snapshot = {
     arm: string; turnId: string; finished: boolean; clientCancelled: boolean; returned: string[]
     error?: { name: string; message: string }; terminalError?: { name: string; message: string }
@@ -148,7 +149,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     rows: Array<{ seq: number; event: string }>; status: string | null
   }
   const records: Array<{ arm: string; wire: string; readerEnded: boolean; readerError?: { name: string; message: string }; snapshots: Array<{ label: string; state: Snapshot }> }> = []
-  const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<Pick<Response, 'status' | 'body'>>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
+  const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<AdmissionResponse>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
   const requests: Array<{ name: string; abort: AbortController; settled: boolean; cleanup: boolean }> = []
   const stages: Array<{ name: string; state: 'pending' | 'fulfilled' | 'rejected'; deadlineObserved: boolean; error?: { name: string; message: string } }> = []
   const retained: Array<{ name: string; promise: Promise<unknown> }> = []
