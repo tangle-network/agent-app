@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.35
+
+- feat(runtime): shapeRequest shapes a Router request's decoded body before it is traced and gzipped (#1579)
+
 ## 4.0.34
 
 - fix(turn-trace): keep tracedModelFetch's doc comment on tracedModelFetch (#1578)
