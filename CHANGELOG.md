@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.30
+
+- feat(turn-trace): name a hybrid turn's settle: the wait for a speculatively started box and its release (#1574)
+
 ## 4.0.29
 
 - fix(web-react): keep the trace download's object URL for a minute so Safari finishes it (#1573)
