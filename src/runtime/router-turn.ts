@@ -291,6 +291,12 @@ export interface RouterTurnOptions {
    * other origins send bodies as they are. An explicit threshold wins; a negative value disables gzip.
    */
   gzipRequestAboveBytes?: number
+  /**
+   * Shape each model request's JSON body before it is traced, compressed and sent: the product's payload policy, such
+   * as a `max_tokens` floor or a model's effort rule. `fetchImpl` cannot do this for a large request, which reaches it
+   * already compressed (`gzipRequestAboveBytes`); this hook always reads the decoded body.
+   */
+  shapeRequest?(body: Record<string, unknown>): Record<string, unknown>
 }
 
 const DEFAULT_BUDGET_MS = 90_000
@@ -811,11 +817,13 @@ function createRouterTurnTransport(
     ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
     : options.fetchImpl
   // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
-  const sendOnce: typeof fetch | undefined = trace
+  const traced: typeof fetch | undefined = trace
     ? tracedModelFetch(trace, baseFetch ?? fetch, {
       onSpan: span => { transportState.lastModelSpan = span; span.set({ 'gen_ai.request.model': transportState.currentModel }) },
     })
     : baseFetch
+  // The product shapes the body first, so its span and the wire carry the request as shaped.
+  const sendOnce: typeof fetch | undefined = options.shapeRequest ? shapeRequestBodies(options.shapeRequest, traced ?? fetch) : traced
   const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
       const firstSentAt = Date.now()
@@ -850,4 +858,16 @@ function createRouterTurnTransport(
     }
     : sendOnce
   return { fetchImpl }
+}
+
+/** Apply `shapeRequest` to a JSON object body; any other body is sent as it is. */
+function shapeRequestBodies(shape: NonNullable<RouterTurnOptions['shapeRequest']>, send: typeof fetch): typeof fetch {
+  return (input, init) => {
+    const body = init?.body
+    if (typeof body !== 'string') return send(input, init)
+    let parsed: unknown
+    try { parsed = JSON.parse(body) } catch { return send(input, init) }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return send(input, init)
+    return send(input, { ...init, body: JSON.stringify(shape(parsed as Record<string, unknown>)) })
+  }
 }
