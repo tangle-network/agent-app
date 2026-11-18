@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.31
+
+- fix(turn-trace): a box tool that failed exports as failed though its span was recorded whole (#1575)
+
 ## 4.0.30
 
 - feat(turn-trace): name a hybrid turn's settle: the wait for a speculatively started box and its release (#1574)
