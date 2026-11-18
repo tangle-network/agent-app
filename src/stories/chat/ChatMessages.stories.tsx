@@ -127,7 +127,7 @@ function TwoAgentsStream(args: ChatMessagesProps) {
     ...message,
     parts: message.parts!.map((part, index) => index === 5 ? { ...part, text: answer.slice(0, length) } : part),
   })
-  return <div data-stream-length={length} data-stream-complete={length === answer.length}><ChatMessages {...args} messages={messages} /></div>
+  return <div data-stream-length={length} data-answer-characters={answer.slice(0, length).replace(/\s/g, '').length} data-stream-complete={length === answer.length}><ChatMessages {...args} messages={messages} /></div>
 }
 
 export const TwoAgentsAnswering: Story = {

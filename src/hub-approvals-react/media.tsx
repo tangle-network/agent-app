@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Bookmark, Camera, ChevronLeft, ChevronRight, Heart, MessageCircle, MoreHorizontal, Repeat2, Search, Send, Share2, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { useMediaQuery } from '../web-react/media-query'
 import { Button } from '@tangle-network/ui/primitives'
 import type { HubActionPreview, HubPreviewMedia } from '../hub-approvals'
 import { embeddedPreviewImage, linkedText } from './email'
@@ -20,17 +21,6 @@ export function previewMediaSource(value: string | undefined, kind: 'image' | 'v
     const url = new URL(value)
     return window.location.origin !== 'null' && url.origin === window.location.origin ? value : undefined
   } catch { return undefined }
-}
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(true)
-  useEffect(() => {
-    const preference = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(preference.matches)
-    update(); preference.addEventListener('change', update)
-    return () => preference.removeEventListener('change', update)
-  }, [])
-  return reduced
 }
 
 function MediaAsset({ media, active = true, fit = 'cover' }: { media: HubPreviewMedia; active?: boolean; fit?: 'contain' | 'cover' }) {
@@ -76,7 +66,7 @@ function Carousel({ media, square = false }: { media: readonly HubPreviewMedia[]
   const id = useId()
   const viewport = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
-  const reduced = useReducedMotion()
+  const reduced = useMediaQuery('(prefers-reduced-motion: reduce)')
   const go = (next: number) => {
     const element = viewport.current
     if (element) element.scrollTo({ left: element.clientWidth * next, behavior: reduced ? 'auto' : 'smooth' })
