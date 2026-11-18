@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.39
+
+- fix(chat-routes): close committed sources during buffered replay
+
 ## 4.0.38
 
 - fix(web-react): let controlled hosts clear drafts on acceptance (#1582)
