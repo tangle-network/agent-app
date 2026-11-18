@@ -38,7 +38,7 @@
  */
 
 import { platformBaseUrlFromEnv } from './deployment'
-import { PLATFORM_BUSY_BUDGET_MS, sendThroughPlatformBusy, sleepUnlessAborted } from './platform-busy'
+import { type PlatformBusyWait, sendThroughPlatformBusy, sleepUnlessAborted } from './platform-busy'
 
 // Backoff while Platform cannot answer a delegation: 250 ms doubling to 5 s, with jitter.
 const UNAVAILABLE_BASE_DELAY_MS = 250
@@ -276,8 +276,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
     return token
   }
 
-  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown },
-    wait?: Parameters<typeof sendThroughPlatformBusy>[1]) {
+  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown }, wait?: PlatformBusyWait) {
     try {
       const response = await sendThroughPlatformBusy(signal => fetchImpl(`${base}${path}`, {
         method: init.method,
@@ -296,7 +295,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
     }
   }
 
-  async function delegateOnce(request: DelegatedKeyRequest, wait: Parameters<typeof call>[2]): Promise<DelegatedKeyOutcome<DelegatedKey>> {
+  async function delegateOnce(request: DelegatedKeyRequest, wait?: PlatformBusyWait): Promise<DelegatedKeyOutcome<DelegatedKey>> {
     if (!request.sourceKey.startsWith(KEY_PREFIX)) return failure(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
     if (request.expiresAt.getTime() <= now()) return failure(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
     const name = canonicalDelegatedKeyName({ serviceName: options.serviceName, product: request.product, name: request.name })
@@ -346,7 +345,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
   /** Wait before the next attempt, or answer false when the window or the signal says stop. */
   async function backoff(attempt: number, deadline: number, signal: AbortSignal | undefined): Promise<boolean> {
     const delay = Math.min(UNAVAILABLE_MAX_DELAY_MS, UNAVAILABLE_BASE_DELAY_MS * 2 ** attempt) * (0.5 + Math.random() / 2)
-    if (signal?.aborted || Date.now() + delay > deadline) return false
+    if (Date.now() + delay > deadline) return false
     return sleepUnlessAborted(delay, signal)
   }
 
@@ -356,8 +355,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       const deadline = Date.now() + Math.max(0, retry?.forMs ?? 0)
       for (let attempt = 0; ; attempt++) {
         // A busy Platform is waited out inside 8 s, or inside the retry window when that ends sooner.
-        const busyDeadline = Math.min(Date.now() + PLATFORM_BUSY_BUDGET_MS, retry ? deadline : Number.POSITIVE_INFINITY)
-        const outcome = await delegateOnce(request, { deadline: busyDeadline, signal: retry?.signal })
+        const outcome = await delegateOnce(request, retry && { deadline, signal: retry.signal })
         if (outcome.succeeded || outcome.error.code !== 'delegated_key.unavailable' || !retry) return outcome
         if (!(await backoff(attempt, deadline, retry.signal))) return outcome
       }

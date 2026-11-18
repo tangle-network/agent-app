@@ -9,15 +9,18 @@
  */
 
 /** Longest one Platform call waits out a busy writer, from its first attempt. */
-export const PLATFORM_BUSY_BUDGET_MS = 8_000
+const PLATFORM_BUSY_BUDGET_MS = 8_000
 /** Longest one attempt waits for Platform; an attempt after a busy answer also ends at the deadline. */
 const PLATFORM_REQUEST_TIMEOUT_MS = 10_000
 /** Least time a further attempt needs to be worth sending. */
 const MIN_ATTEMPT_MS = 250
 
+/** A caller's own end for the wait, when it comes before the 8 s budget, and a signal that stops it early. */
+export interface PlatformBusyWait { deadline?: number; signal?: AbortSignal }
+
 /** Wait `ms`, or less when `signal` aborts first; answers whether the wait ran its course. */
 export async function sleepUnlessAborted(ms: number, signal?: AbortSignal): Promise<boolean> {
-  await new Promise<void>((resolve) => {
+  if (!signal?.aborted) await new Promise<void>((resolve) => {
     const timer = setTimeout(resolve, ms)
     signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
   })
@@ -29,19 +32,16 @@ async function busyWaitMs(response: Response): Promise<number | null> {
   if (response.status !== 503) return null
   const body = await response.clone().json().catch(() => null) as { error?: { code?: unknown } } | null
   if (body?.error?.code !== 'PLATFORM_BUSY') return null
-  const seconds = Number(response.headers.get('retry-after') ?? Number.NaN)
-  return (seconds > 0 && Number.isFinite(seconds) ? seconds : 1) * 1_000 * (1 + Math.random())
+  // Retry-After is whole seconds; a missing, past or unreadable one means Platform's usual 1 s.
+  return Math.max(1, Number(response.headers.get('retry-after')) || 0) * 1_000 * (1 + Math.random())
 }
 
-export async function sendThroughPlatformBusy(
-  send: (signal: AbortSignal) => Promise<Response>,
-  wait: { deadline?: number; signal?: AbortSignal } = {},
-): Promise<Response> {
-  const deadline = wait.deadline ?? Date.now() + PLATFORM_BUSY_BUDGET_MS
+export async function sendThroughPlatformBusy(send: (signal: AbortSignal) => Promise<Response>, wait: PlatformBusyWait = {}): Promise<Response> {
+  const deadline = Math.min(Date.now() + PLATFORM_BUSY_BUDGET_MS, wait.deadline ?? Number.POSITIVE_INFINITY)
   let response = await send(AbortSignal.timeout(PLATFORM_REQUEST_TIMEOUT_MS))
   for (;;) {
     const delay = await busyWaitMs(response)
-    if (delay === null || wait.signal?.aborted || Date.now() + delay + MIN_ATTEMPT_MS > deadline) return response
+    if (delay === null || Date.now() + delay + MIN_ATTEMPT_MS > deadline) return response
     if (!(await sleepUnlessAborted(delay, wait.signal))) return response
     await response.body?.cancel().catch(() => {})
     response = await send(AbortSignal.timeout(Math.min(PLATFORM_REQUEST_TIMEOUT_MS, deadline - Date.now())))
