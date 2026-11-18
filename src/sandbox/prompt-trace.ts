@@ -92,7 +92,7 @@ function createPromptTrace(trace: TurnTrace, parent: TurnSpan | undefined, meta:
         if (!tools.has(id) && (status === 'completed' || status === 'error') && ranMs >= 0) {
           // A failed tool exports as failed, the same as one whose running part this side saw end in error.
           return void tools.set(id, trace.record('tool.call', 'tool', Math.max(startedAt, now - ranMs), now,
-            toolAttrs(id, String(part?.tool ?? 'tool')), generation ?? prompt, status === 'error' ? 'tool_error' : undefined))
+            toolAttrs(id, String(part?.tool ?? 'tool')), generation ?? prompt)) // MUTATION: no error
         }
         startTool(id, String(part?.tool ?? 'tool'))
         if (status === 'completed' || status === 'error') tools.get(id)?.end(undefined, status === 'error' ? 'tool_error' : undefined)
