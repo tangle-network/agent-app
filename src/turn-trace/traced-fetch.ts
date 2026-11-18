@@ -54,25 +54,6 @@ export interface TracedModelFetchOptions {
   onSpan?: (span: TurnSpan) => void
 }
 
-/**
- * `fetch` for a model request, recording one `model.call` span per send: the
- * wall time from the request to the end of its body, the time to the first
- * byte, and the Router's own `Server-Timing` so the wait before the first byte
- * splits into network and server time.
- *
- * Children partition the call:
- * - `network`: the wait for headers, less the Router's server time;
- * - `router.pre_upstream`: the Router's work before its provider fetch
- *   (`upstream_start`), split by its own steps (see {@link recordRouterSteps});
- * - `router.upstream_wait`: the provider's time to response headers
- *   (`upstream_headers`);
- * - `model.stream`: headers to the end of the body.
- * Without a `Server-Timing` header the first byte's wait is one `model.wait`
- * span, because the split is not known.
- *
- * The response body is passed through unchanged; the span ends when the body
- * ends, errors or is cancelled.
- */
 /** FNV-1a over a string, as 8 hex: a fingerprint that tells two prompts apart without carrying their text. */
 function fingerprint(text: string): string {
   let hash = 0x811c9dc5
@@ -100,6 +81,25 @@ function prefixAttrs(body: unknown): Record<string, string | number> {
   }
 }
 
+/**
+ * `fetch` for a model request, recording one `model.call` span per send: the
+ * wall time from the request to the end of its body, the time to the first
+ * byte, and the Router's own `Server-Timing` so the wait before the first byte
+ * splits into network and server time.
+ *
+ * Children partition the call:
+ * - `network`: the wait for headers, less the Router's server time;
+ * - `router.pre_upstream`: the Router's work before its provider fetch
+ *   (`upstream_start`), split by its own steps (see {@link recordRouterSteps});
+ * - `router.upstream_wait`: the provider's time to response headers
+ *   (`upstream_headers`);
+ * - `model.stream`: headers to the end of the body.
+ * Without a `Server-Timing` header the first byte's wait is one `model.wait`
+ * span, because the split is not known.
+ *
+ * The response body is passed through unchanged; the span ends when the body
+ * ends, errors or is cancelled.
+ */
 export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options: TracedModelFetchOptions = {}): typeof fetch {
   return async (input, init) => {
     const sentAt = Date.now()
