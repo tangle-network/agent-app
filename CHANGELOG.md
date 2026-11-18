@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.41
+
+- docs: regenerate the transcript module code map (#1586)
+
 ## 4.0.40
 
 - perf(web-react): render only visible answer text and honor reduced motion (#1584)
