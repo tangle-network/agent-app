@@ -126,6 +126,14 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(model.attrs).toMatchObject({ 'http.status_code': 200, 'server_timing.upstream_start_ms': 40, 'gen_ai.request.model': 'requested/model',
       'gen_ai.usage.input_tokens': 900, 'gen_ai.usage.output_tokens': 12 })
     expect(model.attrs.ttft_ms).toBeGreaterThan(0)
+    // Each send fingerprints its prompt's parts, so a turn whose provider cache misses shows which part changed: within
+    // one turn the system message and tools are the same on both calls, and the request grows after them.
+    const [first, second] = spans.filter((span) => span.name === 'model.call').sort((a, b) => a.startMs - b.startMs)
+    for (const key of ['gen_ai.request.system_fnv', 'gen_ai.request.tools_fnv']) {
+      expect(first!.attrs[key]).toMatch(/^[0-9a-f]{8}$/)
+      expect(second!.attrs[key]).toBe(first!.attrs[key])
+    }
+    expect(second!.attrs['gen_ai.request.body_chars']).toBeGreaterThan(first!.attrs['gen_ai.request.body_chars'] as number)
 
     // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
     // that ends in the spend hold right before the provider fetch.
