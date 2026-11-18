@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.29
+
+- fix(web-react): keep the trace download's object URL for a minute so Safari finishes it (#1573)
+
 ## 4.0.28
 
 - feat(turn-trace): name the producer's own setup and settle, and give box tool calls their real duration (#1572)
