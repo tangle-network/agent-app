@@ -5,6 +5,7 @@ import { TurnStreamDO as PublishedTurnStreamDO, TURN_STREAM_PATHS as PUBLISHED_T
 import { acquireDurableTurnLock, peekDurableTurnLock, releaseDurableTurnLock, parkDurableTurnLock, createDurableTurnLock,
   createDurableObjectTurnEventStore, releaseInterruptedDurableTurnLock, reconcileStaleDurableTurnLock, type TurnStreamNamespaceLike } from '../../src/turn-stream/adapters'
 import { connectDurableTurnCancellation, requestDurableTurnCancellation, type TurnCancellationIdentity } from '../../src/turn-stream/cancellation'
+import type { TurnHostControlNamespace } from '../../src/turn-stream/cancellation'
 import { mintTurnStreamToken, TURN_STREAM_PATHS, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, turnLockStorageKey, type TurnStreamTokenClaims } from '../../src/turn-stream/core'
 import type { StaleTurnLockOwnerProbeResult } from '../../src/chat-routes/stale-turn-lock'
 import { createChatTurnOwnership } from '../../src/chat-routes/turn-ownership'
@@ -14,6 +15,7 @@ interface Statement {
 }
 export interface StopFixtureEnv {
   TURNS: TurnStreamNamespaceLike
+  HOST_TURNS: TurnHostControlNamespace & { newUniqueId(): unknown }
   SHORT_TURNS: TurnStreamNamespaceLike
   OUTAGE_TURNS: TurnStreamNamespaceLike
   DEFERRED_TURNS: TurnStreamNamespaceLike

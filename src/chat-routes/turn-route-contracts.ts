@@ -12,9 +12,10 @@ import type { ModelPolicy } from '../policy-filters/index'
 import type { PersistedChatMessageForTurn, TurnEventStore } from '../stream/index'
 import type { D1LikeForTurns } from '../stream/turn-buffer'
 import type { TurnStreamAuth } from '../turn-stream/adapters'
+import type { TurnHostControlNamespace } from '../turn-stream/cancellation'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
 import type { TurnTraceReader } from '../turn-trace/otel'
-import type { TurnRoutePhase } from './turn-progress'
+import type { TurnHostControlTarget, TurnRoutePhase } from './turn-progress'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { AgentMention, ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { RouterTurnProducerOptions } from './router-producer'
@@ -249,6 +250,13 @@ export interface ChatTurnRequestContext {
   executionLimits?: ChatTurnExecutionLimits
   /** Set by `TurnStreamDO` on the turn it runs for `turnHost`: the route runs it there, never forwarding it again. */
   hosted?: boolean
+  /** Supplied only by the existing per-turn host. Independent of browser disconnect;
+   *  retain through the owned drain/disposal and forward this context unchanged. */
+  hostControl?: {
+    readonly hostId: string
+    readonly signal: AbortSignal
+    bind(target: TurnHostControlTarget, owner: { namespace: TurnHostControlNamespace; auth: TurnStreamAuth }): Promise<void>
+  }
 }
 
 /** A workspace agent a turn is addressed to, resolved by the product from an
@@ -689,6 +697,14 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  - The class's `turnRoutes` must pass `ctx` through unchanged: its `hosted` mark stops the object forwarding the
    *    turn again. */
   turnHost?: import('../turn-stream/adapters').TurnHost
+  /** Opt-in early host-control identity, before full paid authorization. Verify the
+   *  caller's identity, editor access and the actual thread's workspace. Return the
+   *  canonical workspace as tenantId; this grants no permission to execute. Only
+   *  requests with x-turn-host-control:first call it; an unavailable host still
+   *  refuses execution after this identity check. Legacy HTTP refusals
+   *  are unchanged. Any authorized editor may Stop the exact workspace invocation. */
+  authorizeHostControl?(args: { request: Request; body: ChatTurnRequestPayload }): Promise<
+    { ok: true; tenantId: string } | { ok: false; response: Response }>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
@@ -840,7 +856,8 @@ export interface ChatTurnRoutes {
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. A request with
    *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
-   *  authorized (`./turn-progress`). */
+   *  authorized (`./turn-progress`). The separate opt-in hosted control
+   *  envelope requires authorizeHostControl and a client control handler. */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** POST — stop the exact authorized execution; unavailable unless configured. */
   cancel(request: Request): Promise<Response>

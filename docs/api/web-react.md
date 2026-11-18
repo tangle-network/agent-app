@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-550 exports.
+556 exports.
 
 ### `acceptRejectionReason`
 
@@ -2118,6 +2118,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -3758,6 +3766,30 @@ type TrackedChatStreamCallbacks
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -3812,6 +3844,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`
