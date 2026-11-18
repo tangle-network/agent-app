@@ -176,16 +176,10 @@ export function createHybridTurnProducer(options: HybridTurnProducerOptions): Ch
   }
 
   let settled: Promise<void> | undefined
-  // The settle runs after the answer, before the row is written: each wait in it is named in the turn's trace.
-  const step = <T>(name: string, work: () => Promise<T>) =>
-    router.trace ? router.trace.measure(`hybrid.settle.${name}`, 'sandbox', work) : work()
   const settle = () => settled ??= (async () => {
     abort.abort(new Error('The hybrid turn settled'))
-    const starting = box.started ?? start
-    // A box the speculator started is waited out before it is released.
-    if (starting) await step('box_start', () => starting.catch(() => undefined))
-    const results = await step('release', () =>
-      Promise.allSettled([Promise.resolve().then(() => box.dispose?.()), Promise.resolve().then(() => onSettled?.())]))
+    await (box.started ?? start)?.catch(() => undefined)
+    const results = await Promise.allSettled([Promise.resolve().then(() => box.dispose?.()), Promise.resolve().then(() => onSettled?.())])
     for (const result of results) if (result.status === 'rejected') {
       console.error(JSON.stringify({ event: 'hybrid_turn_settle_failed', error: redactErrorMessage(result.reason) }))
     }
