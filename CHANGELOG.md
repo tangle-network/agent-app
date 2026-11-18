@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.34
+
+- fix(turn-trace): keep tracedModelFetch's doc comment on tracedModelFetch (#1578)
+
 ## 4.0.33
 
 - fix(chat-routes): a one-model chain has no default first-answer deadline (#1577)
