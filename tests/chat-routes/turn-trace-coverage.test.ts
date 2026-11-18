@@ -37,7 +37,9 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
       await sleep(60)
       response.writeHead(200, {
         'content-type': 'text/event-stream',
-        'server-timing': 'auth;dur=12.0, t_authed;dur=14.0, t_admitted;dur=25.0, dispatch_row;dur=4.0, spend_authorize;dur=8.0, upstream_start;dur=40.0, upstream_headers;dur=80.0',
+        // As long as the production Router's breakdown (30+ metrics), which fills most of a span's attribute budget.
+        'server-timing': ['auth;dur=12.0, t_authed;dur=14.0, t_admitted;dur=25.0, dispatch_row;dur=4.0, spend_authorize;dur=8.0, upstream_start;dur=40.0, upstream_headers;dur=80.0',
+          ...Array.from({ length: 34 }, (_, step) => `router_step_${step};dur=${step}.0`)].join(', '),
       })
       await sleep(80)
       const chunks = call === 1
@@ -45,7 +47,7 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
           { choices: [], usage: { prompt_tokens: 900, completion_tokens: 12 } }]
         : [{ model: 'served/model', choices: [{ delta: { content: 'Four rooms ' } }] },
           { model: 'served/model', choices: [{ delta: { content: 'are ready.' } }] },
-          { choices: [], usage: { prompt_tokens: 950, completion_tokens: 6 } }]
+          { choices: [], usage: { prompt_tokens: 950, completion_tokens: 6, prompt_tokens_details: { cached_tokens: 800 } } }]
       for (const chunk of chunks) {
         response.write(`data: ${JSON.stringify(chunk)}\n\n`)
         await sleep(40)
@@ -134,6 +136,10 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
       expect(second!.attrs[key]).toBe(first!.attrs[key])
     }
     expect(second!.attrs['gen_ai.request.body_chars']).toBeGreaterThan(first!.attrs['gen_ai.request.body_chars'] as number)
+    // A span full of Server-Timing detail still keeps each call's usage, set last when its stream ends: since the
+    // fingerprints (#1578) a production call lost its output and cached tokens to the attribute bound.
+    expect(first!.attrs).toMatchObject({ 'gen_ai.usage.output_tokens': 12, 'gen_ai.response.finish_reasons': 'tool_calls' })
+    expect(second!.attrs).toMatchObject({ 'gen_ai.usage.input_tokens': 950, 'gen_ai.usage.output_tokens': 6, 'gen_ai.usage.cache_read.input_tokens': 800 })
 
     // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
     // that ends in the spend hold right before the provider fetch.
