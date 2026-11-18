@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.37
+
+- feat(chat-routes): control hosted turns before admission (#1565)
+
 ## 4.0.36
 
 - fix(turn-trace): a full span drops Server-Timing detail first and counts what it drops, so a model call keeps its usage (#1580)
