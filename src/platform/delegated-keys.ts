@@ -38,8 +38,8 @@
  */
 
 import { platformBaseUrlFromEnv } from './deployment'
+import { PLATFORM_BUSY_BUDGET_MS, sendThroughPlatformBusy, sleepUnlessAborted } from './platform-busy'
 
-const REQUEST_TIMEOUT_MS = 10_000
 // Backoff while Platform cannot answer a delegation: 250 ms doubling to 5 s, with jitter.
 const UNAVAILABLE_BASE_DELAY_MS = 250
 const UNAVAILABLE_MAX_DELAY_MS = 5_000
@@ -98,7 +98,8 @@ export interface DelegatedKeyRequest {
   expect?: { payerId?: string; sourceKeyId?: string; originAppId?: string | null }
   /**
    * Keep asking while Platform answers `delegated_key.unavailable` (no answer, 5xx, 429, busy), with jittered
-   * backoff, for at most `forMs` from the first attempt; then return that refusal. Platform's origin was unreachable
+   * backoff, for at most `forMs` from the first attempt; then return that refusal. Without it, only a busy Platform
+   * (`PLATFORM_BUSY`) is waited out, on its Retry-After, for at most 8 s. Platform's origin was unreachable
    * for 84.8 s and 54.5 s across restarts, and each such failure ended a member's Router turn, so a
    * turn-scoped mint passes about 90 000 here, inside its turn's budget. `signal` stops the wait early. A retried
    * request may have reached Platform; the next attempt uses the same name, so it replaces that child in its slot
@@ -275,9 +276,10 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
     return token
   }
 
-  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown }) {
+  async function call(path: string, init: { method: string; bearer: string; service: boolean; body?: unknown },
+    wait?: Parameters<typeof sendThroughPlatformBusy>[1]) {
     try {
-      const response = await fetchImpl(`${base}${path}`, {
+      const response = await sendThroughPlatformBusy(signal => fetchImpl(`${base}${path}`, {
         method: init.method,
         headers: {
           authorization: `Bearer ${init.bearer}`,
@@ -286,15 +288,15 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
         },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
         redirect: 'manual',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      })
+        signal,
+      }), wait)
       return { status: response.status, body: record(await response.json().catch(() => null)) }
     } catch {
       return null
     }
   }
 
-  async function delegateOnce(request: DelegatedKeyRequest): Promise<DelegatedKeyOutcome<DelegatedKey>> {
+  async function delegateOnce(request: DelegatedKeyRequest, wait: Parameters<typeof call>[2]): Promise<DelegatedKeyOutcome<DelegatedKey>> {
     if (!request.sourceKey.startsWith(KEY_PREFIX)) return failure(400, 'delegated_key.invalid_request', 'The source must be a linked sk-tan- key.')
     if (request.expiresAt.getTime() <= now()) return failure(400, 'delegated_key.invalid_request', 'The expiry must be in the future.')
     const name = canonicalDelegatedKeyName({ serviceName: options.serviceName, product: request.product, name: request.name })
@@ -314,7 +316,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
         scopes: [],
         expiresAt: request.expiresAt.toISOString(),
       },
-    })
+    }, wait)
     if (!result) return { succeeded: false, error: refusal(503, null) }
     const data = record(result.body?.data)
     if (result.status !== 201 || result.body?.success !== true || !data) {
@@ -345,11 +347,7 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
   async function backoff(attempt: number, deadline: number, signal: AbortSignal | undefined): Promise<boolean> {
     const delay = Math.min(UNAVAILABLE_MAX_DELAY_MS, UNAVAILABLE_BASE_DELAY_MS * 2 ** attempt) * (0.5 + Math.random() / 2)
     if (signal?.aborted || Date.now() + delay > deadline) return false
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, delay)
-      signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
-    })
-    return !signal?.aborted
+    return sleepUnlessAborted(delay, signal)
   }
 
   const client: PlatformDelegatedKeyClient = {
@@ -357,7 +355,9 @@ export function createPlatformDelegatedKeyClient(options: PlatformDelegatedKeyCl
       const retry = request.retryUnavailable
       const deadline = Date.now() + Math.max(0, retry?.forMs ?? 0)
       for (let attempt = 0; ; attempt++) {
-        const outcome = await delegateOnce(request)
+        // A busy Platform is waited out inside 8 s, or inside the retry window when that ends sooner.
+        const busyDeadline = Math.min(Date.now() + PLATFORM_BUSY_BUDGET_MS, retry ? deadline : Number.POSITIVE_INFINITY)
+        const outcome = await delegateOnce(request, { deadline: busyDeadline, signal: retry?.signal })
         if (outcome.succeeded || outcome.error.code !== 'delegated_key.unavailable' || !retry) return outcome
         if (!(await backoff(attempt, deadline, retry.signal))) return outcome
       }

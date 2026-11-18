@@ -11,8 +11,11 @@
  *   measured, up to the hold, without charging the owner's wallet again.
  *
  * A spent or insufficient cap answers 402 `agent_key.budget_exhausted`; any
- * other refusal keeps Platform's code. Web-standard fetch only.
+ * other refusal keeps Platform's code. A busy Platform (`PLATFORM_BUSY`) is
+ * waited out on its Retry-After for at most 8 s. Web-standard fetch only.
  */
+
+import { sendThroughPlatformBusy } from './platform-busy'
 
 export interface AgentSpendRefusal {
   status: 402 | 403 | 503
@@ -51,8 +54,6 @@ export interface PlatformAgentSpend {
   release(authorizationId: string): Promise<AgentSpendOutcome<null>>
 }
 
-const REQUEST_TIMEOUT_MS = 10_000
-
 function refusal(status: number, error?: PlatformBody['error']): AgentSpendRefusal {
   const code = error?.code
   if (code === 'KEY_BUDGET_EXHAUSTED' || code === 'KEY_BUDGET_EXCEEDED' || code === 'PRODUCT_BUDGET_EXCEEDED') {
@@ -87,7 +88,7 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
   async function call(path: string, body: unknown): Promise<{ status: number; body: PlatformBody } | null> {
     const token = typeof options.serviceToken === 'function' ? options.serviceToken() : options.serviceToken
     try {
-      const response = await fetchImpl(`${base}${path}`, {
+      const response = await sendThroughPlatformBusy(signal => fetchImpl(`${base}${path}`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${token}`,
@@ -96,8 +97,8 @@ export function createPlatformAgentSpend(options: PlatformAgentSpendOptions): Pl
         },
         body: JSON.stringify(body),
         redirect: 'manual',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      })
+        signal,
+      }))
       return { status: response.status, body: (await response.json().catch(() => ({}))) as PlatformBody }
     } catch {
       return null
