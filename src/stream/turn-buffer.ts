@@ -266,7 +266,8 @@ export interface BufferedTurnOptions {
 export interface BufferedTurnTap {
   /** Buffer one event: persist (coalesced, on the flush window) + best-effort
    *  live-deliver. Wire to a push source's per-event hook (e.g. agent-runtime
-   *  `handleChatTurn`'s `hooks.onEvent`). Marks the turn 'running' on first call. */
+   *  `handleChatTurn`'s `hooks.onEvent`). Marks the turn 'running' on first call.
+   *  `execution.started` commits its ordered prefix before this tap's live write. */
   onEvent(raw: unknown): Promise<void>
   /** Settle the turn: final flush + set status. Call after the producer resolves
    *  ('complete') or rejects ('error'). 'error' flushes what was produced first. */
@@ -396,6 +397,8 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       const line = JSON.stringify(ev)
       pending.push(ev)
       pendingChars += line?.length ?? 0
+      // Commit the native identity and its ordered prefix before our live write.
+      if (innerOf(ev)?.type === 'execution.started') await flush()
       if (!clientGone && opts.write) {
         try {
           // Live delivery carries a provisional ordering hint, not the persisted
