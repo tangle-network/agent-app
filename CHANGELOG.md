@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.36
+
+- fix(turn-trace): a full span drops Server-Timing detail first and counts what it drops, so a model call keeps its usage (#1580)
+
 ## 4.0.35
 
 - feat(runtime): shapeRequest shapes a Router request's decoded body before it is traced and gzipped (#1579)
