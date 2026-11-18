@@ -2,7 +2,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { expect, it } from 'vitest'
 import { traceSandboxPromptEvents } from '../src/sandbox/prompt-trace'
-import { createIntelligenceTurnTraceSink, createTurnTrace } from '../src/turn-trace/index'
+import { buildTurnTraceOtelSpans, createIntelligenceTurnTraceSink, createTurnTrace } from '../src/turn-trace/index'
 
 it('projects sidecar startup spans from the HTTP event stream into the exported turn trace', async () => {
   const exports: unknown[] = []
@@ -77,10 +77,13 @@ it('gives a box tool call the duration the box reported, though OpenCode sends t
       for (const line of (await response.text()).split('\n')) yield JSON.parse(line)
     }
     for await (const _event of traceSandboxPromptEvents(source(), { trace })) { /* pass through */ }
-    const tools = trace.finish().spans.filter(span => span.name === 'tool.call')
+    const snapshot = trace.finish()
+    const tools = snapshot.spans.filter(span => span.name === 'tool.call')
     expect(tools.map(span => Math.round(span.endMs - span.startMs))).toEqual([250, 40])
     expect(tools.every(span => span.attrs.approx === undefined && span.attrs['gen_ai.tool.name'] === 'bash')).toBe(true)
-    expect(tools[1]!.attrs['tool.status']).toBe('error')
+    // The failed tool exports as an OTLP error; the finished one as OK.
+    const exported = buildTurnTraceOtelSpans(snapshot).filter(span => span.name === 'tool.call')
+    expect(exported.map(span => span.status?.code)).toEqual([1, 2])
   } finally {
     server.closeAllConnections()
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

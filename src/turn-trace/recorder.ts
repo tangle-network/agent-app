@@ -118,7 +118,8 @@ export interface TurnTrace {
   /** Name the turn's execution id once it is known. Spans recorded earlier keep their times. */
   bind(executionId: string): void
   start(name: string, kind: TurnSpanKind, attrs?: TurnSpanAttrs, parent?: TurnSpan): TurnSpan
-  record(name: string, kind: TurnSpanKind, startMs: number, endMs: number, attrs?: TurnSpanAttrs, parent?: TurnSpan): TurnSpan
+  /** A span whose times are already known; `error` marks it failed, as `end` does for an open one. */
+  record(name: string, kind: TurnSpanKind, startMs: number, endMs: number, attrs?: TurnSpanAttrs, parent?: TurnSpan, error?: unknown): TurnSpan
   /** Run `work` inside a span; the span ends when it settles, failed if it throws. */
   measure<T>(name: string, kind: TurnSpanKind, work: (span: TurnSpan) => Promise<T> | T, attrs?: TurnSpanAttrs, parent?: TurnSpan): Promise<T>
   /**
@@ -330,7 +331,8 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     return handle
   }
 
-  const add = (name: string, kind: TurnSpanKind, startMs: number, endMs: number | undefined, attrs: TurnSpanAttrs | undefined, parent: TurnSpan | undefined): TurnSpan => {
+  const add = (name: string, kind: TurnSpanKind, startMs: number, endMs: number | undefined, attrs: TurnSpanAttrs | undefined, parent: TurnSpan | undefined,
+    error?: unknown): TurnSpan => {
     if (finished) return inert(rootId)
     if (records.size >= maxSpans) {
       dropped++
@@ -345,6 +347,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       startMs,
       endMs: endMs ?? startMs,
       attrs: attrs ? boundedAttrs(attrs) : {},
+      ...(error === undefined ? {} : { error: errorText(error) }),
     })
     if (endMs === undefined) open.add(spanId)
     return handleFor(spanId)
@@ -376,7 +379,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       traceId = turnTraceId(id)
     },
     start: (name, kind, attrs, parent) => add(name, kind, now(), undefined, attrs, parent),
-    record: (name, kind, startMs, endMs, attrs, parent) => add(name, kind, startMs, Math.max(startMs, endMs), attrs, parent),
+    record: (name, kind, startMs, endMs, attrs, parent, error) => add(name, kind, startMs, Math.max(startMs, endMs), attrs, parent, error),
     async measure(name, kind, work, attrs, parent) {
       const span = trace.start(name, kind, attrs, parent)
       try {
