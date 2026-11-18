@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-331 exports.
+337 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -1414,6 +1414,14 @@ interface HybridTurnProducerOptions
 (event: unknown) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -2438,6 +2446,30 @@ interface StreamingSniffer
 "The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn"
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -2500,6 +2532,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => boolean
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`

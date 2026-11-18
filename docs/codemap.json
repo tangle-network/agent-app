@@ -3661,6 +3661,12 @@
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
         },
         {
+          "name": "isTurnHostControlEvent",
+          "kind": "function",
+          "signature": "(value: unknown) => value is TurnHostControlEvent",
+          "doc": "Validate the envelope without interpreting its opaque host id as authority."
+        },
+        {
           "name": "isTurnIntentEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnIntentEvent",
@@ -4429,6 +4435,24 @@
           "doc": "The failure a completed run with an aborted tool call settles with."
         },
         {
+          "name": "TURN_HOST_CONTROL_EVENT",
+          "kind": "const",
+          "signature": "\"turn.host.control\"",
+          "doc": "A control address, never paid admission, execution authority or assistant content."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": null
+        },
+        {
+          "name": "TURN_HOST_CONTROL_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-host-control\"",
+          "doc": "Opt in to the hosted invocation's identity envelope before paid admission."
+        },
+        {
           "name": "TURN_INTENT_EVENT",
           "kind": "const",
           "signature": "\"session.run.intent\"",
@@ -4475,6 +4499,18 @@
           "kind": "function",
           "signature": "(prompt: string | readonly ChatTurnPartInput[]) => boolean",
           "doc": "Whether the turn carries files."
+        },
+        {
+          "name": "TurnHostControlEvent",
+          "kind": "type",
+          "signature": "type TurnHostControlEvent",
+          "doc": null
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnIntentData",
@@ -26271,6 +26307,12 @@
           "doc": "One server-owned connection on the existing authenticated DO transport, with retained cancellation replay."
         },
         {
+          "name": "connectHostedTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<TurnCancellationC…",
+          "doc": "Owned by the original hosted request, never its browser."
+        },
+        {
           "name": "createDurableObjectTurnEventStore",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, auth: TurnStreamAuth) => TurnEventStore",
@@ -26433,6 +26475,12 @@
           "doc": "The product authorizes Stop first."
         },
         {
+          "name": "requestHostedTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<{ requested: bool…",
+          "doc": "Call only after product identity/editor/actual-thread authorization."
+        },
+        {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
@@ -26443,6 +26491,18 @@
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
           "doc": "Channel for a thread's viewer signals."
+        },
+        {
+          "name": "TURN_HOST_CANCEL_PATH",
+          "kind": "const",
+          "signature": "\"/turn-host/cancel\"",
+          "doc": "Server-only control on an existing unnamed host; never a turn start endpoint."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_PATH",
+          "kind": "const",
+          "signature": "\"/turn-host/control\"",
+          "doc": "The same host's server-owned connection revokes execution permission on reset."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -26515,6 +26575,18 @@
           "kind": "function",
           "signature": "(objectId: string) => string",
           "doc": "The capability name of a per-turn object, which `newUniqueId` leaves without a channel name."
+        },
+        {
+          "name": "TurnHostControlNamespace",
+          "kind": "interface",
+          "signature": "interface TurnHostControlNamespace",
+          "doc": "Unique-id reconstruction is required; idFromName(hostId) addresses a different object."
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnLockAcquireInput",
@@ -30110,6 +30182,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnHostControlEvent",
+          "kind": "function",
+          "signature": "(value: unknown) => value is TurnHostControlEvent",
+          "doc": "Validate the envelope without interpreting its opaque host id as authority."
+        },
+        {
           "name": "isTurnIntentEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnIntentEvent",
@@ -31340,6 +31418,24 @@
           "doc": "Drives an anchor-click download from an already-resolved blob."
         },
         {
+          "name": "TURN_HOST_CONTROL_EVENT",
+          "kind": "const",
+          "signature": "\"turn.host.control\"",
+          "doc": "A control address, never paid admission, execution authority or assistant content."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": null
+        },
+        {
+          "name": "TURN_HOST_CONTROL_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-host-control\"",
+          "doc": "Opt in to the hosted invocation's identity envelope before paid admission."
+        },
+        {
           "name": "TURN_INTENT_EVENT",
           "kind": "const",
           "signature": "\"session.run.intent\"",
@@ -31380,6 +31476,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnHostControlEvent",
+          "kind": "type",
+          "signature": "type TurnHostControlEvent",
+          "doc": null
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnIntentData",
