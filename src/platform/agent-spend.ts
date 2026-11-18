@@ -1,3 +1,5 @@
+import { sendThroughPlatformBusy } from './platform-busy'
+
 /**
  * Bill work an agent app runs for a Platform agent key to that key's one cap.
  *
@@ -14,8 +16,6 @@
  * other refusal keeps Platform's code. A busy Platform (`PLATFORM_BUSY`) is
  * waited out on its Retry-After for at most 8 s. Web-standard fetch only.
  */
-
-import { sendThroughPlatformBusy } from './platform-busy'
 
 export interface AgentSpendRefusal {
   status: 402 | 403 | 503
