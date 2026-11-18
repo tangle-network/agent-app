@@ -172,10 +172,14 @@ function randomHex(bytes: number): string {
   return Array.from(out, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
+/** At most {@link MAX_ATTRS} attributes, the Router's `server_timing.*` breakdown last: a model call's span keeps its
+ *  model, token counts and finish reason, which arrive when its stream ends, and loses timing detail instead. */
 function boundedAttrs(attrs: TurnSpanAttrs): TurnSpanAttrs {
   const out: TurnSpanAttrs = {}
   let count = 0
-  for (const [key, value] of Object.entries(attrs)) {
+  const timing = (key: string) => key.startsWith('server_timing.')
+  const entries = Object.entries(attrs)
+  for (const [key, value] of [...entries.filter(([key]) => !timing(key)), ...entries.filter(([key]) => timing(key))]) {
     if (count >= MAX_ATTRS) break
     if (typeof value === 'number' && !Number.isFinite(value)) continue
     out[key.slice(0, 80)] = typeof value === 'string' ? value.slice(0, MAX_ATTR_STRING) : value
