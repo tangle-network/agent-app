@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { channel } from 'node:diagnostics_channel'
+import { Socket } from 'node:net'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -180,6 +182,122 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     assert(milliseconds > 0, 'Shared admission observation/cleanup budget exhausted')
     return milliseconds
   }
+  type SocketState = { socketId: number; destroyed: boolean | null; readyState: string }
+  type SocketEvent = { kind: string; atNs: string | null; cleanup: boolean; requestId?: number; socketId?: number; hadError?: boolean | null; code?: string; states?: SocketState[] }
+  type SocketWitness = { id: number; socket: Socket; endpoint: { localAddress: string; localPort: number; remoteAddress: string; remotePort: number }; requestIds: number[]; closed: boolean; closeAtNs: string | null; closePromise: Promise<void>; removeListeners(): void; listenersRemoved: boolean }
+  const socketEvents: SocketEvent[] = [], socketDiagnosticErrors: Array<{ code: string; atNs: string | null }> = []
+  const socketWitnesses: SocketWitness[] = [], socketRequestIds = new WeakMap<object, number>()
+  const socketTimes: Record<string, string | null> = {}
+  let socketRequestCount = 0, socketMatchedSends = 0, socketDiagnosticErrorCount = 0
+  let socketExpected = false, socketSubscribed = false, socketOverflow = false, socketClockFailed = false
+  let socketCleanupStarted = false
+  const socketNow = () => { try { return process.hrtime.bigint().toString() } catch { socketClockFailed = true; return null } }
+  const socketClockOriginNs = socketNow()
+  const socketDiagnosticError = (code: string) => {
+    socketDiagnosticErrorCount++
+    try {
+      if (socketDiagnosticErrors.length < 8) socketDiagnosticErrors.push({ code, atNs: socketNow() })
+      else socketOverflow = true
+    } catch { socketOverflow = true }
+  }
+  const socketState = (witness: SocketWitness): SocketState => {
+    try {
+      const ready = witness.socket.readyState
+      return { socketId: witness.id, destroyed: witness.socket.destroyed,
+        readyState: ['opening', 'open', 'readOnly', 'writeOnly', 'closed'].includes(ready) ? ready : 'unknown' }
+    } catch { socketDiagnosticError('socket-state-read'); return { socketId: witness.id, destroyed: null, readyState: 'unknown' } }
+  }
+  const socketEvent = (kind: string, fields: Omit<SocketEvent, 'kind' | 'atNs' | 'cleanup'> = {}) => {
+    try {
+      if (socketEvents.length < 32) socketEvents.push({ kind, atNs: socketNow(), cleanup: socketCleanupStarted, ...fields })
+      else socketOverflow = true
+    } catch { socketDiagnosticError('event-capture') }
+  }
+  const socketMark = (kind: string) => {
+    try {
+      if (!Object.hasOwn(socketTimes, kind)) socketTimes[kind] = socketNow()
+      socketEvent(kind, { states: socketWitnesses.map(socketState) })
+    } catch { socketDiagnosticError('mark-capture') }
+  }
+  const socketChannel = channel('undici:client:sendHeaders')
+  const socketObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+  const onSocketHeaders = (message: unknown) => {
+    try {
+      if (!socketObject(message) || !socketObject(message.request)) { socketDiagnosticError('diagnostic-payload-shape'); return }
+      const request = message.request
+      if (typeof request.method !== 'string' || typeof request.path !== 'string') { socketDiagnosticError('diagnostic-request-shape'); return }
+      if (request.method !== 'POST' || request.path !== '/admission-start/disconnect') return
+      socketMatchedSends++
+      const socket = message.socket
+      if (!(socket instanceof Socket)) { socketDiagnosticError('diagnostic-not-socket'); return }
+      let requestId = socketRequestIds.get(request)
+      if (requestId === undefined) {
+        if (socketRequestCount >= 4) { socketOverflow = true; socketDiagnosticError('request-cardinality'); return }
+        requestId = ++socketRequestCount; socketRequestIds.set(request, requestId)
+      }
+      let witness = socketWitnesses.find(item => item.socket === socket)
+      if (!witness) {
+        if (socketWitnesses.length >= 4) { socketOverflow = true; socketDiagnosticError('socket-cardinality'); return }
+        const { localAddress, localPort, remoteAddress, remotePort } = socket
+        const loopback = (value: unknown): value is string => value === '127.0.0.1' || value === '::1' || value === '::ffff:127.0.0.1'
+        if (!loopback(localAddress) || !loopback(remoteAddress) || typeof localPort !== 'number' || typeof remotePort !== 'number'
+          || !Number.isInteger(localPort) || !Number.isInteger(remotePort) || localPort < 1 || remotePort < 1 || localPort > 65535 || remotePort > 65535) {
+          socketDiagnosticError('non-loopback-or-missing-endpoint'); return
+        }
+        let actualClose!: () => void
+        const closePromise = new Promise<void>(resolve => { actualClose = resolve })
+        const owned: SocketWitness = { id: socketWitnesses.length + 1, socket,
+          endpoint: { localAddress, localPort, remoteAddress, remotePort },
+          requestIds: [], closed: false, closeAtNs: null, closePromise, listenersRemoved: false, removeListeners: () => {} }
+        const onClose = (hadError: boolean) => {
+          // Only this actual event fulfills the retained promise; flags/errors/deadlines never do.
+          owned.closed = true; owned.closeAtNs ??= socketNow()
+          try { socketEvent('socket-close', { socketId: owned.id, hadError: typeof hadError === 'boolean' ? hadError : null }) }
+          catch { socketDiagnosticError('socket-close-capture') }
+          finally { actualClose() }
+        }
+        const onEnd = () => { try { socketEvent('socket-end', { socketId: owned.id }) } catch { socketDiagnosticError('socket-end-capture') } }
+        const onError = (error: unknown) => {
+          try {
+            const code = socketObject(error) && typeof error.code === 'string' && ['UND_ERR_ABORTED', 'ECONNRESET', 'EPIPE', 'ABORT_ERR'].includes(error.code) ? error.code : 'other'
+            socketEvent('socket-error', { socketId: owned.id, code })
+          } catch { socketDiagnosticError('socket-error-capture') }
+        }
+        owned.removeListeners = () => {
+          try { socket.off('close', onClose); socket.off('end', onEnd); socket.off('error', onError); owned.listenersRemoved = true }
+          catch { socketDiagnosticError('socket-listener-cleanup') }
+        }
+        socketWitnesses.push(owned); retained.push({ name: 'actual-socket-close:' + owned.id, promise: closePromise })
+        socket.on('close', onClose); socket.on('end', onEnd); socket.on('error', onError)
+        witness = owned
+      }
+      if (!witness.requestIds.includes(requestId)) witness.requestIds.push(requestId)
+      socketEvent('send-headers', { requestId, socketId: witness.id, states: [socketState(witness)] })
+    } catch { socketDiagnosticError('diagnostic-callback') }
+  }
+  const startSocketObservation = () => {
+    socketExpected = true
+    try { socketChannel.subscribe(onSocketHeaders); socketSubscribed = true; socketMark('diagnostics-subscribed') }
+    catch { socketDiagnosticError('diagnostic-subscribe') }
+  }
+  const unsubscribeSocketObservation = () => {
+    if (!socketSubscribed) return
+    try { socketChannel.unsubscribe(onSocketHeaders); socketSubscribed = false; socketMark('diagnostics-unsubscribed') }
+    catch { socketDiagnosticError('diagnostic-unsubscribe') }
+  }
+  const socketObservation = () => {
+    const sockets = socketWitnesses.map(witness => ({ socketId: witness.id, requestIds: [...witness.requestIds], endpoint: witness.endpoint,
+      state: socketState(witness), actualCloseObserved: witness.closed, closeAtNs: witness.closeAtNs,
+      actualClosePromiseState: witness.closed ? 'fulfilled' : 'pending', listenersRemoved: witness.listenersRemoved }))
+    return {
+      clock: 'Node process.hrtime.bigint nanoseconds; do not compare to Worker Date.now', clockOriginNs: socketClockOriginNs,
+      collectionWindow: 'sendHeaders from disconnect start through precleanup partial receipt; captured socket events through ordinary cleanup deadline',
+      expected: socketExpected, subscribed: socketSubscribed, matchedSends: socketMatchedSends, requestCount: socketRequestCount,
+      confidence: !socketExpected ? 'NOT_STARTED' : socketOverflow || socketClockFailed || socketDiagnosticErrorCount > 0 ? 'UNKNOWN_CAPTURE' : socketRequestCount === 1 && socketWitnesses.length === 1 ? 'UNIQUE_REQUEST_AND_SOCKET' : 'UNKNOWN_MISSING_OR_MULTIPLE',
+      overflow: socketOverflow, diagnosticErrorCount: socketDiagnosticErrorCount, diagnosticErrors: [...socketDiagnosticErrors],
+      method: 'POST', path: '/admission-start/disconnect', times: { ...socketTimes }, events: [...socketEvents], sockets,
+    }
+  }
   const inner = (raw: string) => { const event = JSON.parse(raw); return event.kind === 'event' ? event.event : event }
   const admissionRows = (state: Snapshot) => state.rows.filter(row => inner(row.event).type === 'execution.started')
   const admissionWrites = (state: Snapshot) => state.writes.filter(write => inner(write.line).type === 'execution.started')
@@ -213,6 +331,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     return result
   }
   const start = async (arm: string) => {
+    if (arm === 'disconnect') startSocketObservation()
     const abort = new AbortController()
     const record: typeof records[number] = { arm, wire: '', readerEnded: false, snapshots: [] }
     const client: typeof clients[number] = { arm, abort, headersSettled: false, drainSettled: false }
@@ -236,20 +355,23 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
         }
         record.wire += decoder.decode()
         record.readerEnded = true
-      } catch (error) { record.readerError = errorRecord(error) }
+      } catch (error) { record.readerError = errorRecord(error); if (arm === 'disconnect') socketMark('reader-error-observed') }
       finally { reader.releaseLock() }
     })()
-    void client.drained.then(() => { client.drainSettled = true }, () => { client.drainSettled = true })
+    void client.drained.then(() => { client.drainSettled = true; if (arm === 'disconnect') socketMark('reader-drain-fulfilled') }, () => { client.drainSettled = true; if (arm === 'disconnect') socketMark('reader-drain-rejected') })
     return record
   }
   const ownership = () => [
+    ...socketWitnesses.filter(witness => !witness.closed).map(witness => ({ resource: 'actual-socket-close:' + witness.id, state: 'OWNED_UNKNOWN' })),
+    ...socketWitnesses.filter(witness => !witness.listenersRemoved).map(witness => ({ resource: 'socket-listeners:' + witness.id, state: 'OWNED_UNKNOWN' })),
+    ...(socketSubscribed ? [{ resource: 'diagnostics-subscription', state: 'OWNED_UNKNOWN' }] : []),
     ...clients.filter(client => !client.headersSettled || !client.drainSettled).map(client => ({ resource: 'http-reader:' + client.arm, state: 'OWNED_UNKNOWN' })),
     ...requests.filter(request => !request.settled).map(request => ({ resource: 'http-request:' + request.name, state: 'OWNED_UNKNOWN' })),
     ...(worker && !workerClosed ? [{ resource: 'workerd-harness', state: 'OWNED_UNKNOWN', closeState }] : []),
     ...stages.filter(stage => stage.state === 'pending' && stage.deadlineObserved).map(stage => ({ resource: 'operation:' + stage.name, state: 'OWNED_UNKNOWN' })),
   ]
   const receipt = (kind: string) => ({ kind, passed, failure: failure ? errorRecord(failure) : null, records, stages,
-    cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
+    socketObservation: socketObservation(), cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
     cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0,
     limits: 'Real local HTTP/workerd/D1/tap only; deadlines observe retained operations, never fake closure; no Runtime pre-enqueue/native backend/key/paid model/physical termination claim' })
   const writeReceipt = (name: string, kind: string, deadline: number) => {
@@ -335,7 +457,9 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
       return current.appends.some(append => append.sqlSettledAt && !append.confirmedAt && append.rows.some(row => inner(row.event).type === 'execution.started')) ? current : null
     }, 'real disconnect-arm admission SQL settles before its confirmation is released', 30_000)
     await snapshot('disconnect', 'actual admission SQL done while HTTP client still waits')
+    socketMark('before-original-abort')
     clients[2]!.abort.abort()
+    socketMark('after-original-abort')
     await demand('reader-drain:disconnect', clients[2]!.drained!)
     assert(disconnectWire.readerError, 'The actual HTTP reader was severed')
     await until(async () => (await state('disconnect')).clientCancelled ? true : null, 'workerd observes the actual HTTP stream cancellation', 30_000)
@@ -350,9 +474,10 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     assert(admissionWrites(disconnected)[0]!.error, 'The real canceled stream rejected its writer; the tap swallowed that failure')
     assert.equal(disconnected.status, 'complete')
     passed = true
-  } catch (error) { failure = error }
+  } catch (error) { failure = error; socketMark('case-failure-observed') }
   finally {
     cleaning = true
+    socketMark('finally-entered-before-partial')
     // Freeze the original failure and precleanup wire/snapshots FIRST. A
     // stalled release, reader or close cannot prevent this partial receipt.
     if (evidence) {
@@ -363,6 +488,8 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     }
     // Abort already-owned observation I/O, then start ALL ordinary releases
     // concurrently. No one unresolved owner serially prevents another cleanup.
+    unsubscribeSocketObservation() // Freeze the matched set before transport cleanup; socket listeners remain.
+    socketCleanupStarted = true; socketMark('cleanup-started')
     for (const request of requests) if (!request.cleanup && !request.settled) request.abort.abort()
     for (const client of clients) client.abort.abort()
     const releases = clients.map(async client => {
@@ -379,7 +506,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
       await observe('cleanup-releases-before-close', releaseGroup, Math.min(cleanupDeadline, Date.now() + 10_000))
       if (worker) {
         closeState = 'pending'
-        try { await worker.close(); workerClosed = true; closeState = 'fulfilled' }
+        try { socketMark('harness-close-started'); await worker.close(); workerClosed = true; closeState = 'fulfilled'; socketMark('harness-close-fulfilled') }
         catch (error) { closeState = 'rejected'; cleanupErrors.push('harness: ' + errorRecord(error).message); throw error }
       }
     })()
@@ -392,9 +519,13 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
       return observe('cleanup-reader:' + client.arm,
         Promise.allSettled([...(client.headers ? [client.headers] : []), ...(client.drained ? [client.drained] : []), ...(lateBody ? [lateBody] : [])]), cleanupDeadline)
     })
-    const completed = await Promise.all([observe('cleanup-release-group', releaseGroup, cleanupDeadline), observe('harness-close', close, cleanupDeadline), ...drains])
+    const socketCloses = socketWitnesses.map(witness => observe('cleanup-actual-socket-close:' + witness.id, witness.closePromise, cleanupDeadline))
+    const completed = await Promise.all([observe('cleanup-release-group', releaseGroup, cleanupDeadline), observe('harness-close', close, cleanupDeadline), ...drains, ...socketCloses])
     for (const observed of completed) if (observed.stage.state !== 'fulfilled' || observed.stage.deadlineObserved) cleanupErrors.push(observed.stage.name + ' unresolved/failed at cleanup deadline')
     for (const request of requests) if (!request.settled) request.abort.abort()
+    unsubscribeSocketObservation()
+    for (const witness of socketWitnesses) witness.removeListeners()
+    socketMark('socket-listeners-removed')
     if (ownership().length) cleanupErrors.push('unresolved owners remain UNKNOWN')
     if (evidence) {
       try {
@@ -402,7 +533,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
         if (final.stage.state !== 'fulfilled' || final.stage.deadlineObserved) cleanupErrors.push('final receipt write remains UNKNOWN')
       } catch (error) { cleanupErrors.push('final receipt: ' + errorRecord(error).message) }
       console.info('Actual shared admission final status:', JSON.stringify({ evidence, passed, workerClosed,
-        cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0, ownedResources: ownership(), stages }))
+        cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0, ownedResources: ownership(), stages, socketObservation: socketObservation() }))
     }
   }
   if (failure) throw failure
