@@ -148,7 +148,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     rows: Array<{ seq: number; event: string }>; status: string | null
   }
   const records: Array<{ arm: string; wire: string; readerEnded: boolean; readerError?: { name: string; message: string }; snapshots: Array<{ label: string; state: Snapshot }> }> = []
-  const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<Response>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
+  const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<Pick<Response, 'status' | 'body'>>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
   const requests: Array<{ name: string; abort: AbortController; settled: boolean; cleanup: boolean }> = []
   const stages: Array<{ name: string; state: 'pending' | 'fulfilled' | 'rejected'; deadlineObserved: boolean; error?: { name: string; message: string } }> = []
   const retained: Array<{ name: string; promise: Promise<unknown> }> = []
@@ -217,7 +217,9 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     const client: typeof clients[number] = { arm, abort, headersSettled: false, drainSettled: false }
     records.push(record); clients.push(client) // Register the real request owner BEFORE awaiting headers.
     const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(remaining(observationDeadline, observationDeadline - Date.now()))])
-    client.headers = fetch(new URL('/admission-start/' + arm, url!), { method: 'POST', headers: MEMBER, signal })
+    client.headers = arm === 'disconnect'
+      ? worker!.getWorker().fetch(new URL('/admission-start/' + arm, url!), { method: 'POST', headers: MEMBER, signal })
+      : fetch(new URL('/admission-start/' + arm, url!), { method: 'POST', headers: MEMBER, signal })
     void client.headers.then(() => { client.headersSettled = true }, () => { client.headersSettled = true; client.drainSettled = true })
     const response = await demand('start-headers:' + arm, client.headers, Math.min(observationDeadline, Date.now() + 30_000))
     assert.equal(response.status, 200)
