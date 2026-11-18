@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.32
+
+- fix(platform): every delegation and modelKey waits out PLATFORM_BUSY inside 8 s (#1576)
+
 ## 4.0.31
 
 - fix(turn-trace): a box tool that failed exports as failed though its span was recorded whole (#1575)
