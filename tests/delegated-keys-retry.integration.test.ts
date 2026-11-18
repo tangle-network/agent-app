@@ -153,12 +153,13 @@ describe('delegate through a Platform outage', () => {
 describe('wait out a busy Platform by default', () => {
   it('mints for an un-opted delegation and for modelKey once a short backlog clears', async () => {
     const { delegation, spend, delegated, modelKey } = await bothCallers({ calls: 2 })
-    expect(delegated.outcome).toMatchObject({ succeeded: true, value: { id: 'key_child' } })
-    expect(modelKey.outcome).toEqual({ succeeded: true, value: { key: 'sk-tan-childxxxxxxxxxxxx', keyId: 'key_child' } })
-    for (const p of [delegation, spend]) {
-      expect(p.attempts).toHaveLength(3)
-      expectJitteredRetryAfter(p.gaps())
-    }
+    expect({ delegated: delegated.outcome, modelKey: modelKey.outcome, attempts: [delegation.attempts.length, spend.attempts.length] })
+      .toMatchObject({
+        delegated: { succeeded: true, value: { id: 'key_child' } },
+        modelKey: { succeeded: true, value: { key: 'sk-tan-childxxxxxxxxxxxx', keyId: 'key_child' } },
+        attempts: [3, 3],
+      })
+    for (const p of [delegation, spend]) expectJitteredRetryAfter(p.gaps())
     for (const { elapsedMs } of [delegated, modelKey]) expect(elapsedMs).toBeLessThan(BUSY_BUDGET_MS)
   }, 20_000)
 
@@ -167,8 +168,8 @@ describe('wait out a busy Platform by default', () => {
     expect(delegated.outcome).toMatchObject({ succeeded: false, error: { status: 503, code: 'delegated_key.unavailable' } })
     expect(modelKey.outcome).toMatchObject({ succeeded: false, error: { status: 503, code: 'agent_key.spend_unavailable' } })
     for (const p of [delegation, spend]) {
-      // 8 s holds four to seven waits of 1-2 s, each followed by an attempt with at least 250 ms left.
-      expect(p.attempts.length).toBeGreaterThanOrEqual(4)
+      // 8 s holds three to seven waits of 1-2 s, each followed by an attempt with at least 250 ms left.
+      expect(p.attempts.length, `${p === delegation ? 'delegate' : 'modelKey'} attempts`).toBeGreaterThanOrEqual(4)
       expect(p.attempts.length).toBeLessThanOrEqual(8)
       expectJitteredRetryAfter(p.gaps())
     }
