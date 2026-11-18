@@ -14,6 +14,7 @@ import type { D1LikeForTurns } from '../stream/turn-buffer'
 import type { TurnStreamAuth } from '../turn-stream/adapters'
 import type { TurnHostControlNamespace } from '../turn-stream/cancellation'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
+import type { TurnTraceReader } from '../turn-trace/otel'
 import type { TurnHostControlTarget, TurnRoutePhase } from './turn-progress'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { AgentMention, ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
@@ -573,6 +574,10 @@ export interface ChatTurnTraceOptions<TContext> {
   sink?: TurnTraceSink
   /** Labels for the root span, e.g. the workspace id. Called once per exported turn. */
   labels?(info: { identity: ChatTurnIdentity; executionId: string; context: TContext }): TurnSpanAttrs
+  /** Reads a turn's trace back for {@link ChatTurnRoutes.trace}. Default with no `sink`: `createIntelligenceTurnTraceReader({
+   *  project: projectId })`. A product with its own sink passes the reader for the same store; without one, the turn
+   *  receipt names no `traceUrl` and the route answers 404. */
+  read?: TurnTraceReader
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
@@ -845,8 +850,9 @@ export const INTENT_LINE_MAX_CHARS = 240
 export interface ChatTurnRoutes {
   /** POST — warm the server-authorized workspace lock (and with `prewarm: 'box'` its box, under `ctx.waitUntil`); verify a named thread first. */
   prewarm(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
-  /** POST — run one turn, streaming NDJSON. First line is
-   *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
+  /** POST — run one turn, streaming NDJSON. First line is the receipt
+   *  `{type:'turn', turnId, traceId?, traceUrl?}`: the replay handle, the turn's
+   *  OTLP trace id and where {@link trace} serves it; the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. A request with
    *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
@@ -858,6 +864,11 @@ export interface ChatTurnRoutes {
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>
+  /** GET — the turn's own trace as OTLP JSON, for its owner: the waterfall a product shows and a member downloads. Mount
+   *  it at `<turn path>/turns/:turnId/trace`, the `traceUrl` the turn receipt names; `turnId` is the turn's execution
+   *  id. The caller is authorized as `running` on the turn's thread, so only a caller who may read that thread gets it;
+   *  everyone else, and a turn whose trace is not stored yet, gets 404. Metadata only: the turn exporter's spans. */
+  trace(request: Request, params: { turnId: string }): Promise<Response>
   /** GET `?threadId=` — the reconnect-discovery endpoint: the turn ids still
    *  running on a thread, so a client that reloaded mid-turn can re-attach to
    *  the live stream via {@link replay} instead of losing it. Returns `[]` when

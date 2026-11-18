@@ -10,6 +10,7 @@ import {
   type PersistedChatMessageForTurn,
 } from '../stream/index'
 import type { TurnTraceSink, TurnTraceSnapshot } from '../turn-trace/recorder'
+import { traceProducerStream } from './producer-trace'
 import { createNativeTimingTransfer, type NativeTimingTransfer } from './native-turn-timing'
 import { createChatTurnOwnership } from './turn-ownership'
 import {
@@ -59,6 +60,7 @@ interface TurnExecutionOptions<TContext, TResource> {
   progressMessages: Record<TurnRoutePhase, string>
   traceOptions: ChatTurnTraceOptions<TContext> | undefined
   traceSink: TurnTraceSink | undefined
+  traceReceipt(request: Request, executionId: string): Record<string, string>
   startIntentLine(admitted: AdmittedTurn<TContext>, stop?: AbortSignal): Promise<string | null> | undefined
   log(message: string, meta?: Record<string, unknown>): void
 }
@@ -69,7 +71,7 @@ export function createAdmittedTurnRunner<TContext, TResource>(dependencies: Turn
 }
 
 async function runAdmittedTurn<TContext, TResource>({
-  options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, startIntentLine, log,
+  options, draftStore, draftTuning, progressMessages, traceOptions, traceSink, traceReceipt, startIntentLine, log,
 }: TurnExecutionOptions<TContext, TResource>,
   request: Request,
   ctx: ChatTurnRequestContext | undefined,
@@ -280,7 +282,7 @@ async function runAdmittedTurn<TContext, TResource>({
       scopeId: payload.threadId,
       coalesce: coalesceDeltas,
     })
-    const turnMarker = { type: 'turn', turnId: turnStreamId }
+    const turnMarker = { type: 'turn', turnId: turnStreamId, ...traceReceipt(request, executionId) }
     await state.tap.onEvent(turnMarker)
     await stopRenewal() // the tap renews the running row from here
     if (state.completionHandoff) await state.tap!.detach()
@@ -547,7 +549,7 @@ function createTurnEngine<TContext, TResource>(
               void cleanup.catch(() => {})
             }
             state.producer = await started
-            yield* state.producer.stream
+            yield* traceProducerStream(state.producer.stream, trace)
           }
           let source: AsyncIterable<ChatRouteEvent> = redact ? redactEvents(producerStream(), redact) : producerStream()
           // A durable owner connection already carries exact authenticated Stop.

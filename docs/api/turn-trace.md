@@ -4,7 +4,7 @@
 
 Source: `src/turn-trace/index.ts`
 
-28 exports.
+33 exports.
 
 ### `buildTurnTraceOtelSpans`
 
@@ -12,6 +12,14 @@ Source: `src/turn-trace/index.ts`
 
 ```ts
 (snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtlpSpan[]
+```
+
+### `createIntelligenceTurnTraceReader`
+
+`function` — Read a turn's trace back from Tangle Intelligence with the key its sink sends under (the same options), so a chat route can show a turn's owner its own waterfall.
+
+```ts
+(options: Omit<IntelligenceTurnTraceSinkOptions, "onError">) => TurnTraceReader
 ```
 
 ### `createIntelligenceTurnTraceSink`
@@ -36,6 +44,14 @@ Source: `src/turn-trace/index.ts`
 
 ```ts
 interface CreateTurnTraceOptions
+```
+
+### `executionIdOfAssistantRow`
+
+`function` — The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key.
+
+```ts
+(messageId: string) => string | null
 ```
 
 ### `formatServerTiming`
@@ -68,6 +84,14 @@ interface IntelligenceTurnTraceSinkOptions
 
 ```ts
 interface OtlpSpan
+```
+
+### `OtlpTraceExport`
+
+`interface` — The body of `POST /v1/traces`.
+
+```ts
+interface OtlpTraceExport
 ```
 
 ### `otlpTraceId`
@@ -206,6 +230,14 @@ interface TurnTrace
 (executionId: string) => string
 ```
 
+### `TurnTraceReader`
+
+`type` — One finished turn's spans as an OTLP JSON export, read back from where its sink sent them; null when the store holds no trace for that execution (not exported yet, past retention, or written by anoth…
+
+```ts
+type TurnTraceReader
+```
+
 ### `TurnTraceSink`
 
 `type` — Where a finished turn's trace goes.
@@ -228,4 +260,12 @@ interface TurnTraceSnapshot
 
 ```ts
 interface TurnTraceSummary
+```
+
+### `turnTraceUrl`
+
+`function` — `routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`.
+
+```ts
+(turnPath: string, executionId: string) => string
 ```

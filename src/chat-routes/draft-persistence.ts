@@ -424,9 +424,4 @@ export function rowIdOf(inserted: unknown): string | null {
   return typeof id === 'string' && id ? id : null
 }
 
-/** The default deterministic assistant-row id for a turn. Readable on purpose
- *  (an operator grepping a transcript row id finds the run), and stable across
- *  re-entries because every input already is. */
-export function assistantRowIdForTurn(turnKey: string): string {
-  return `assistant:${turnKey}`
-}
+export { assistantRowIdForTurn } from '../turn-trace/url'

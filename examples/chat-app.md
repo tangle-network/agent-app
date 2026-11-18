@@ -113,7 +113,9 @@ keeps the readiness claim below the DO idle-eviction window. This is an
 optimization: send still performs the authenticated single-flight acquire.
 
 
-Mount `routes.replay(request, {turnId})`, `routes.running(request)`, and configured
+Mount `routes.replay(request, {turnId})`, `routes.running(request)`,
+`routes.trace(request, {turnId})` at `<turn path>/turns/:turnId/trace` (the receipt's
+`traceUrl`; see [the owner's view](../docs/turn-trace.md#the-owners-view)), and configured
 `routes.interactions.list/answer` handlers as in the scaffold Worker. Replay
 handles are separate from client message identifiers. A deliberate retry keeps
 `turnId` and supplies a new `retryAttemptId`; transport retries reuse both.

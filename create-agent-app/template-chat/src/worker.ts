@@ -128,6 +128,9 @@ export function createChatWorker(assembly: WorkerAssembly = defaultAssembly): Ex
       }
       const replay = pathname.match(/^\/api\/chat\/replay\/([^/]+)$/)
       if (replay && method === 'GET') return app.routes.replay(request, { turnId: replay[1]! })
+      // The receipt's traceUrl: the turn's own trace, for whoever may read its thread.
+      const trace = pathname.match(/^\/api\/chat\/turns\/([^/]+)\/trace$/)
+      if (trace && method === 'GET') return app.routes.trace(request, { turnId: trace[1]! })
       // Reconnect discovery: which turns are still live on a thread, so a page
       // reloaded mid-turn re-attaches via /replay instead of losing the run.
       if (pathname === '/api/chat/running' && method === 'GET') return app.routes.running(request)

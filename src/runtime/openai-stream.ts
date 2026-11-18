@@ -653,20 +653,23 @@ async function* readOpenAISseFrames(body: ReadableStream<Uint8Array>): AsyncGene
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') return
-      yield data
+  // A consumer that stops reading early unlocks the body, so its caller can cancel it and close the connection.
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const data = trimmed.slice(5).trim()
+        if (data === '[DONE]') return
+        yield data
+      }
     }
-  }
+  } finally { reader.releaseLock() }
 }
 
 

@@ -1,5 +1,53 @@
 # Changelog
 
+## 4.0.34
+
+- fix(turn-trace): keep tracedModelFetch's doc comment on tracedModelFetch (#1578)
+
+## 4.0.33
+
+- fix(chat-routes): a one-model chain has no default first-answer deadline (#1577)
+
+## 4.0.32
+
+- fix(platform): every delegation and modelKey waits out PLATFORM_BUSY inside 8 s (#1576)
+
+## 4.0.31
+
+- fix(turn-trace): a box tool that failed exports as failed though its span was recorded whole (#1575)
+
+## 4.0.30
+
+- feat(turn-trace): name a hybrid turn's settle: the wait for a speculatively started box and its release (#1574)
+
+## 4.0.29
+
+- fix(web-react): keep the trace download's object URL for a minute so Safari finishes it (#1573)
+
+## 4.0.28
+
+- feat(turn-trace): name the producer's own setup and settle, and give box tool calls their real duration (#1572)
+
+## 4.0.27
+
+- feat(web-react): a Trace drawer that shows a member their own turn's waterfall and its OTLP (#1571)
+
+## 4.0.26
+
+- fix(turn-trace): keep error text out of the owner's trace; make the route test prove its filters (#1570)
+
+## 4.0.25
+
+- feat(turn-trace): serve a turn's trace to its owner from the receipt's traceUrl (#1569)
+
+## 4.0.24
+
+- fix(runtime): send the answer call that replaces a cancelled lower-effort call with tool_choice none (#1567)
+
+## 4.0.23
+
+- feat(runtime): lower reasoning effort on Router turn rounds that only choose tools (#1566)
+
 ## 4.0.22
 
 - feat(runtime): say on each model call span what the call produced (#1564)
