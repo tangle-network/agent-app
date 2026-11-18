@@ -12,9 +12,13 @@ import { createTurnTrace } from '../../src/turn-trace/index'
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 it('names the settle wait for a speculatively started box and its release', async () => {
+  // The box finishes starting 300 ms after the Router has answered, so the settle waits most of that out.
+  let boxReady: (box: SandboxInstance) => void = () => {}
+  const started = new Promise<SandboxInstance>((resolve) => { boxReady = resolve })
   const server = createServer((request, response) => {
     request.resume()
     request.on('end', () => {
+      setTimeout(() => boxReady({ id: 'speculative-box' } as unknown as SandboxInstance), 300)
       response.writeHead(200, { 'content-type': 'text/event-stream' })
       response.end(`data: ${JSON.stringify({ model: 'served/model', choices: [{ delta: { content: 'Your estimate is ready.' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`)
     })
@@ -28,7 +32,7 @@ it('names the settle wait for a speculatively started box and its release', asyn
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, userMessage: 'Estimate my tax.',
       box: {
         // The speculator started the box at admission; it is still starting when the Router has answered.
-        started: sleep(400).then(() => ({ id: 'speculative-box' }) as unknown as SandboxInstance),
+        started,
         acquire: async () => ({ id: 'speculative-box' }) as unknown as SandboxInstance,
         runTask: async () => 'unused',
         dispose: () => sleep(60),
@@ -39,7 +43,7 @@ it('names the settle wait for a speculatively started box and its release', asyn
     const span = (name: string) => spans.find((s) => s.name === name)
     const boxStart = span('hybrid.settle.box_start')
     const release = span('hybrid.settle.release')
-    expect(boxStart && boxStart.endMs - boxStart.startMs).toBeGreaterThanOrEqual(150)
+    expect(boxStart && boxStart.endMs - boxStart.startMs).toBeGreaterThanOrEqual(200)
     expect(release && release.endMs - release.startMs).toBeGreaterThanOrEqual(55)
     expect(release!.startMs).toBeGreaterThanOrEqual(boxStart!.endMs)
   } finally {
