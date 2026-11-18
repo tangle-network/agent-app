@@ -85,4 +85,25 @@ describe('gzipRequestAboveBytes', () => {
     expect(received.map(request => request.encoding)).toEqual(['gzip', null, null, null, 'gzip'])
   })
 
+  // A product's payload policy rewrote only string bodies in its `fetchImpl`, which sees a large request already
+  // gzipped, so Tax's rule for gpt-6-luna (an effort with tools is refused; send `none`) never reached its first call.
+  it('shapes a gzipped request: the hook reads the decoded body and the Router reads the shaped JSON', async () => {
+    received.length = 0
+    const encodings: Array<string | null> = []
+    const forward: typeof fetch = (input, init) => {
+      encodings.push(new Headers(init?.headers).get('content-encoding'))
+      return fetch(`${baseUrl}${new URL(String(input)).pathname.replace(/^\/v1/, '')}`, init)
+    }
+    const shaped: Array<Record<string, unknown>> = []
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'openai/gpt-6-luna', api: 'chat', reasoningEffort: 'low',
+      systemPrompt: systemPrompt.slice(0, 40_000), userMessage: 'Hi.', repeat: false, fetchImpl: forward,
+      shapeRequest: body => { shaped.push(body); return { ...body, reasoning_effort: 'none' } } })
+    expect(outcome.failure).toBeUndefined()
+    expect(shaped).toHaveLength(1)
+    expect(shaped[0]).toMatchObject({ model: 'openai/gpt-6-luna', reasoning_effort: 'low' })
+    expect(encodings).toEqual(['gzip'])
+    expect((received[0]?.body as unknown as Record<string, unknown>).reasoning_effort).toBe('none')
+    expect(received[0]?.body.messages.find(message => message.role === 'system')?.content).toContain(systemPrompt.slice(0, 1_000))
+  })
+
 })
