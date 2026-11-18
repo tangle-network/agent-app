@@ -611,14 +611,10 @@ export function streamWithModelFailover(
       throw err
     }
 
-    for (const event of handle.buffered) yield event
-
     const live = handle.iterator
-    if (!live) {
-      handle.abort()
-      return
-    }
     try {
+      for (const event of handle.buffered) yield event
+      if (!live) return
       for (;;) {
         const next = await live.next()
         if (next.done) return
@@ -628,7 +624,7 @@ export function streamWithModelFailover(
       // The consumer may abandon this generator mid-turn (client drop); close
       // the underlying stream rather than leaking it.
       handle.abort()
-      await closeIterator(live, options.log)
+      if (live) await closeIterator(live, options.log)
     }
   })()
 
