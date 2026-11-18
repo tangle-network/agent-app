@@ -56,7 +56,7 @@ describe('agent-app Tailwind source entry', () => {
   }
   const markers = [
     { owner: '@tangle-network/agent-app', candidate: 'text-[12.5px]', selector: '.text-\\[12\\.5px\\]' },
-    { owner: '@tangle-network/sandbox-ui', candidate: 'w-[17px]', selector: '.w-\\[17px\\]' },
+    { owner: '@tangle-network/sandbox-ui', candidate: 'w-[268px]', selector: '.w-\\[268px\\]' },
     // ui's Dialog panel: the class apps lost when they scanned only sandbox-ui.
     { owner: '@tangle-network/ui', candidate: 'translate-x-[-50%]', selector: '.translate-x-\\[-50\\%\\]' },
   ] as const
