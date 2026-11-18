@@ -292,11 +292,14 @@ export interface RouterTurnOptions {
    */
   gzipRequestAboveBytes?: number
   /**
-   * Shape each model request's JSON body before it is traced, compressed and sent: the product's payload policy, such
-   * as a `max_tokens` floor or a model's effort rule. `fetchImpl` cannot do this for a large request, which reaches it
-   * already compressed (`gzipRequestAboveBytes`); this hook always reads the decoded body.
+   * Shape each model request's JSON body once, before it is sent, traced and compressed: the product's payload policy,
+   * such as a `max_tokens` floor or a model's effort rule. `fetchImpl` cannot do this for a large request, which reaches
+   * it already compressed (`gzipRequestAboveBytes`); this hook always reads the decoded body. The body is the wire
+   * format of `request.url`'s endpoint (chat completions carries `messages`; the Responses API carries `input` and
+   * `reasoning`). It must not change `model`, which the trace and the served-model check read before shaping. A throw
+   * fails the call without a resend.
    */
-  shapeRequest?(body: Record<string, unknown>): Record<string, unknown>
+  shapeRequest?(body: Record<string, unknown>, request: { url: string }): Record<string, unknown>
 }
 
 const DEFAULT_BUDGET_MS = 90_000
@@ -817,13 +820,11 @@ function createRouterTurnTransport(
     ? gzipRequestBodies(options.fetchImpl ?? fetch, gzipAbove)
     : options.fetchImpl
   // Each HTTP send is its own `model.call` span, so a retried 503 is visible beside the send that answered.
-  const traced: typeof fetch | undefined = trace
+  const sendOnce: typeof fetch | undefined = trace
     ? tracedModelFetch(trace, baseFetch ?? fetch, {
       onSpan: span => { transportState.lastModelSpan = span; span.set({ 'gen_ai.request.model': transportState.currentModel }) },
     })
     : baseFetch
-  // The product shapes the body first, so its span and the wire carry the request as shaped.
-  const sendOnce: typeof fetch | undefined = options.shapeRequest ? shapeRequestBodies(options.shapeRequest, traced ?? fetch) : traced
   const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
       const firstSentAt = Date.now()
@@ -857,7 +858,8 @@ function createRouterTurnTransport(
       }
     }
     : sendOnce
-  return { fetchImpl }
+  // The product shapes the body once, before any send, so every attempt's span and wire carry the request as shaped.
+  return { fetchImpl: options.shapeRequest ? shapeRequestBodies(options.shapeRequest, fetchImpl ?? fetch) : fetchImpl }
 }
 
 /** Apply `shapeRequest` to a JSON object body; any other body is sent as it is. */
@@ -868,6 +870,7 @@ function shapeRequestBodies(shape: NonNullable<RouterTurnOptions['shapeRequest']
     let parsed: unknown
     try { parsed = JSON.parse(body) } catch { return send(input, init) }
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return send(input, init)
-    return send(input, { ...init, body: JSON.stringify(shape(parsed as Record<string, unknown>)) })
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    return send(input, { ...init, body: JSON.stringify(shape(parsed as Record<string, unknown>, { url })) })
   }
 }

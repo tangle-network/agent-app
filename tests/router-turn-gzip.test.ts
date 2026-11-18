@@ -97,13 +97,23 @@ describe('gzipRequestAboveBytes', () => {
     const shaped: Array<Record<string, unknown>> = []
     const outcome = await runRouterTurn({ apiKey: 'k', model: 'openai/gpt-6-luna', api: 'chat', reasoningEffort: 'low',
       systemPrompt: systemPrompt.slice(0, 40_000), userMessage: 'Hi.', repeat: false, fetchImpl: forward,
-      shapeRequest: body => { shaped.push(body); return { ...body, reasoning_effort: 'none' } } })
+      shapeRequest: (body, request) => { shaped.push({ ...body, url: request.url }); return { ...body, reasoning_effort: 'none' } } })
     expect(outcome.failure).toBeUndefined()
     expect(shaped).toHaveLength(1)
-    expect(shaped[0]).toMatchObject({ model: 'openai/gpt-6-luna', reasoning_effort: 'low' })
+    expect(shaped[0]).toMatchObject({ model: 'openai/gpt-6-luna', reasoning_effort: 'low', url: expect.stringMatching(/\/chat\/completions$/) })
     expect(encodings).toEqual(['gzip'])
     expect((received[0]?.body as unknown as Record<string, unknown>).reasoning_effort).toBe('none')
     expect(received[0]?.body.messages.find(message => message.role === 'system')?.content).toContain(systemPrompt.slice(0, 1_000))
+  })
+
+  it('fails a call whose shaping throws, once, with nothing sent', async () => {
+    received.length = 0
+    let calls = 0
+    const outcome = await runRouterTurn({ apiKey: 'k', model: 'm', baseUrl, systemPrompt: 'Short.', userMessage: 'Hi.', repeat: false,
+      retry: { attempts: 3, baseDelayMs: 1 }, shapeRequest: () => { calls += 1; throw new Error('policy refused the request') } })
+    expect(outcome.failure).toBeDefined()
+    expect(calls).toBe(1)
+    expect(received).toHaveLength(0)
   })
 
 })
