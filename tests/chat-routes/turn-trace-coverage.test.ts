@@ -140,6 +140,8 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     // fingerprints (#1578) a production call lost its output and cached tokens to the attribute bound.
     expect(first!.attrs).toMatchObject({ 'gen_ai.usage.output_tokens': 12, 'gen_ai.response.finish_reasons': 'tool_calls' })
     expect(second!.attrs).toMatchObject({ 'gen_ai.usage.input_tokens': 950, 'gen_ai.usage.output_tokens': 6, 'gen_ai.usage.cache_read.input_tokens': 800 })
+    // What the bound did drop is counted on the span, so a cap never deletes an attribute unseen.
+    expect(second!.attrs['tangle.attrs_dropped']).toBeGreaterThan(0)
 
     // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
     // that ends in the spend hold right before the provider fetch.
