@@ -9181,7 +9181,8 @@
       "id": "./hub-approvals-react",
       "source": "src/hub-approvals-react/index.tsx",
       "dependsOn": [
-        "hub-approvals"
+        "hub-approvals",
+        "web-react"
       ],
       "error": null,
       "exports": [
