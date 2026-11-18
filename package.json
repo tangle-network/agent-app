@@ -1008,7 +1008,7 @@
   "dependencies": {
     "@tangle-network/agent-core": "^1.0.1",
     "@tangle-network/agent-trace-contract": "^2.2.0",
-    "@tangle-network/charts": "^4.0.21",
+    "@tangle-network/charts": "^4.0.23",
     "proper-lockfile": "4.1.2"
   }
 }
