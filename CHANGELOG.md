@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.28
+
+- feat(turn-trace): name the producer's own setup and settle, and give box tool calls their real duration (#1572)
+
 ## 4.0.27
 
 - feat(web-react): a Trace drawer that shows a member their own turn's waterfall and its OTLP (#1571)
