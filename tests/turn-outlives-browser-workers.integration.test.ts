@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { it } from 'vitest'
 import { createTestHarness } from 'wrangler'
+import { createBufferedTurnTap, createD1TurnEventStore } from '../src/stream/turn-buffer'
 
 /**
  * Real local workerd, D1, the shared chat routes and an authenticated TurnStreamDO subclass
@@ -134,7 +135,7 @@ it.runIf(process.env.WORKERD_WAIT_UNTIL_PROBE === '1')('measures how long a Work
   }
 }, 300_000)
 
-it('commits a quiet native admission before its own HTTP write, preserves SQL refusal and survives reader disconnect', async () => {
+it('commits native admission before writes and preserves D1 through HTTP loss and a real canceled writer', async () => {
   const caseStartedAt = Date.now()
   const observationDeadline = caseStartedAt + 180_000
   const cleanupDeadline = caseStartedAt + 230_000
@@ -150,6 +151,16 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     writes: Array<{ line: string; invokedAt: number; returnedAt?: number; error?: { name: string; message: string } }>
     rows: Array<{ seq: number; event: string }>; status: string | null
   }
+  type NodeCounterpart = {
+    name: string; runtime: string; turnId: string; cancelCallbackCount: number; cancelMethodSettled: boolean
+    readerLockReleased: boolean; admissionAcknowledged: boolean; mainFlowComplete: boolean; tapDone: boolean
+    writes: Array<{ line: string; returned: boolean; error?: { name: string; message: string } }>
+    rows: Array<{ seq: number; event: string }>; tail: Array<{ seq: number; event: string }>; status: string | null
+    failure: { name: string; message: string } | null; terminalError: { name: string; message: string } | null; cleanupErrors: string[]
+  }
+  const httpCounterpart = { name: 'HTTP_DISCONNECT_COMPLETES', runtime: 'actual HTTP/socket and Workerd tap/D1', mainFlowComplete: false }
+  let nodeCounterpart: NodeCounterpart | undefined, nodeProducer: Promise<void> | undefined
+  let nodeTap: ReturnType<typeof createBufferedTurnTap> | undefined, nodeProducerSettled = false, nodeReaderLocked = false
   const records: Array<{ arm: string; wire: string; readerEnded: boolean; readerError?: { name: string; message: string }; snapshots: Array<{ label: string; state: Snapshot }> }> = []
   const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<AdmissionResponse>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
   const requests: Array<{ name: string; abort: AbortController; settled: boolean; cleanup: boolean }> = []
@@ -362,6 +373,9 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     return record
   }
   const ownership = () => [
+    ...(nodeProducer && !nodeProducerSettled ? [{ resource: 'node-canceled-reader-producer', state: 'OWNED_UNKNOWN' }] : []),
+    ...(nodeReaderLocked ? [{ resource: 'node-stream-reader-lock', state: 'OWNED_UNKNOWN' }] : []),
+    ...(nodeTap && !nodeCounterpart?.tapDone ? [{ resource: 'node-buffered-tap-finalization', state: 'OWNED_UNKNOWN' }] : []),
     ...socketWitnesses.filter(witness => !witness.closed).map(witness => ({ resource: 'actual-socket-close:' + witness.id, state: 'OWNED_UNKNOWN' })),
     ...socketWitnesses.filter(witness => !witness.listenersRemoved).map(witness => ({ resource: 'socket-listeners:' + witness.id, state: 'OWNED_UNKNOWN' })),
     ...(socketSubscribed ? [{ resource: 'diagnostics-subscription', state: 'OWNED_UNKNOWN' }] : []),
@@ -371,7 +385,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     ...stages.filter(stage => stage.state === 'pending' && stage.deadlineObserved).map(stage => ({ resource: 'operation:' + stage.name, state: 'OWNED_UNKNOWN' })),
   ]
   const receipt = (kind: string) => ({ kind, passed, failure: failure ? errorRecord(failure) : null, records, stages,
-    socketObservation: socketObservation(), cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
+    counterparts: { http: httpCounterpart, node: nodeCounterpart }, socketObservation: socketObservation(), cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
     cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0,
     limits: 'Real local HTTP/workerd/D1/tap only; deadlines observe retained operations, never fake closure; no Runtime pre-enqueue/native backend/key/paid model/physical termination claim' })
   const writeReceipt = (name: string, kind: string, deadline: number) => {
@@ -462,17 +476,123 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     socketMark('after-original-abort')
     await demand('reader-drain:disconnect', clients[2]!.drained!)
     assert(disconnectWire.readerError, 'The actual HTTP reader was severed')
-    await until(async () => (await state('disconnect')).clientCancelled ? true : null, 'workerd observes the actual HTTP stream cancellation', 30_000)
+    assert.equal(socketObservation().confidence, 'UNIQUE_REQUEST_AND_SOCKET')
+    assert.equal(socketMatchedSends, 1)
+    const actualSocket = socketWitnesses[0]!
+    await demand('http-actual-socket-close-before-release', actualSocket.closePromise, Math.min(observationDeadline, Date.now() + 30_000))
+    assert.equal(socketObservation().confidence, 'UNIQUE_REQUEST_AND_SOCKET')
+    assert(actualSocket.closed && actualSocket.closeAtNs && socketTimes['before-original-abort'])
+    assert(BigInt(actualSocket.closeAtNs) >= BigInt(socketTimes['before-original-abort']))
+    socketMark('http-confirmation-release-started')
+    assert(socketTimes['http-confirmation-release-started'])
+    assert(BigInt(actualSocket.closeAtNs) < BigInt(socketTimes['http-confirmation-release-started']))
+    assert.equal(cleaning, false, 'Physical HTTP socket retirement precedes main-flow release and cleanup')
     await release('disconnect', { confirmation: true, progress: true, terminal: true })
     await until(async () => (await state('disconnect')).finished ? true : null, 'disconnected tap owner completes its original store operation', 30_000)
-    const disconnected = await snapshot('disconnect', 'persisted admission survives actual closed-writer failure')
-    assert.equal(disconnected.clientCancelled, true)
+    const disconnected = await snapshot('disconnect', 'HTTP_DISCONNECT_COMPLETES: original producer and D1 complete before cleanup')
     assert.equal(disconnected.error, undefined); assert.equal(disconnected.terminalError, undefined)
     assert.equal(disconnected.returned.includes('admission'), true)
     assert.equal(admissionRows(disconnected).length, 1)
     assert.equal(admissionWrites(disconnected).length, 1)
-    assert(admissionWrites(disconnected)[0]!.error, 'The real canceled stream rejected its writer; the tap swallowed that failure')
+    const persistedAdmission = admissionRows(disconnected)[0]!
+    const attemptedAdmission = admissionWrites(disconnected)[0]!
+    const confirmedAppend = disconnected.appends.find(append => append.rows.some(row => row.event === persistedAdmission.event))!
+    assert(confirmedAppend.confirmedAt && confirmedAppend.sqlSettledAt)
+    assert(confirmedAppend.confirmedAt <= attemptedAdmission.invokedAt)
+    assert.equal(attemptedAdmission.line, persistedAdmission.event)
+    assert.deepEqual(inner(persistedAdmission.event).data, { sandboxId: 'proof-box', sessionId: 'proof-native-session', executionId: 'native-disconnect' })
+    assert.deepEqual(disconnected.rows.map(row => row.seq), [1, 2])
+    assert.deepEqual(disconnected.rows.map(row => inner(row.event).type), ['text', 'execution.started'])
+    assert.equal(inner(disconnected.rows[0]!.event).text, 'prefix ')
     assert.equal(disconnected.status, 'complete')
+    assert.equal(disconnected.finished, true)
+    assert.equal(cleaning, false, 'HTTP producer acknowledgement and actual D1 completion precede test cleanup')
+    httpCounterpart.mainFlowComplete = true
+    socketMark('http-main-flow-complete')
+
+    // Generic tap + Node standard Web Streams; only DB operations execute in Workerd.
+    const { DB } = await demand('node-counterpart-public-env', worker.getWorker<{ DB: Parameters<typeof createD1TurnEventStore>[0] }>().getEnv())
+    const actualStore = createD1TurnEventStore(DB)
+    const turnId = 'real-reader-cancel-' + crypto.randomUUID()
+    const node: NodeCounterpart = nodeCounterpart = {
+      name: 'REAL_READER_CANCEL_D1_WRITER_REJECTION', runtime: 'Node standard Web Streams/tap; actual Workerd D1 binding', turnId,
+      cancelCallbackCount: 0, cancelMethodSettled: false, readerLockReleased: false, admissionAcknowledged: false,
+      mainFlowComplete: false, tapDone: false, writes: [], rows: [], tail: [], status: null,
+      failure: null, terminalError: null, cleanupErrors: [],
+    }
+    let controller!: ReadableStreamDefaultController<Uint8Array>
+    const body = new ReadableStream<Uint8Array>({
+      start(value) { controller = value },
+      cancel() { node.cancelCallbackCount++ },
+    })
+    const reader = body.getReader(); nodeReaderLocked = true
+    let realEnqueueError: unknown
+    const tap = nodeTap = createBufferedTurnTap({ turnId, scopeId: 'real-reader-cancel-proof', store: actualStore,
+      write: line => {
+        const write: typeof node.writes[number] = { line, returned: false }; node.writes.push(write)
+        try { controller.enqueue(new TextEncoder().encode(line + '\n')); write.returned = true }
+        catch (error) { realEnqueueError = error; write.error = errorRecord(error); throw error }
+      },
+    })
+    // One actual task owns every onEvent/done/reader operation. Cleanup never races a second done.
+    nodeProducer = (async () => {
+      try {
+        await tap.onEvent({ type: 'text', text: 'node prefix ' })
+        const prefix = await reader.read()
+        assert.equal(prefix.done, false)
+        assert.equal(new TextDecoder().decode(prefix.value), node.writes[0]!.line + '\n')
+        assert.equal(inner(node.writes[0]!.line).text, 'node prefix ')
+        await reader.cancel('owned-reader-cancel-proof'); node.cancelMethodSettled = true
+        assert.equal(node.cancelCallbackCount, 1, 'Only actual reader.cancel invokes the real underlying callback')
+        reader.releaseLock(); nodeReaderLocked = false; node.readerLockReleased = true
+        const admission = { kind: 'event', event: { type: 'execution.started', data: {
+          sandboxId: 'proof-node-box', sessionId: 'proof-node-session', executionId: 'native-node-canceled-reader',
+        } } }
+        await tap.onEvent(admission); node.admissionAcknowledged = true
+        assert(realEnqueueError instanceof TypeError, 'Actual enqueue against the canceled controller must throw')
+        assert.equal(node.writes.length, 2)
+        const attempted = node.writes[1]!
+        assert.equal(attempted.returned, false)
+        assert.deepEqual(attempted.error, errorRecord(realEnqueueError))
+        assert.deepEqual(inner(attempted.line), admission.event)
+        const admitted = await actualStore.read(turnId, 0)
+        assert.deepEqual(admitted.map(row => row.seq), [1, 2])
+        assert.equal(admitted[1]!.event, attempted.line, 'The acknowledged original admission bytes are already in actual D1')
+        assert.equal(inner(admitted[0]!.event).text, 'node prefix ')
+        await tap.onEvent({ type: 'text', text: 'later A' })
+        await tap.onEvent({ type: 'text', text: 'B' })
+        await tap.done('complete'); node.tapDone = true
+        node.rows = await actualStore.read(turnId, 0)
+        node.status = await actualStore.getStatus(turnId)
+        assert(actualStore.readTail, 'The maintained actual D1 store supplies its real tail query')
+        node.tail = await actualStore.readTail(turnId, 2)
+        assert.equal(node.status, 'complete')
+        assert.deepEqual(node.rows.map(row => row.seq), [1, 2, 3])
+        assert.deepEqual(node.rows.map(row => inner(row.event).type), ['text', 'execution.started', 'text'])
+        assert.equal(node.rows[1]!.event, attempted.line)
+        assert.equal(inner(node.rows[2]!.event).text, 'later AB')
+        assert.equal(node.rows.filter(row => inner(row.event).type === 'text').map(row => inner(row.event).text).join(''), 'node prefix later AB')
+        assert.deepEqual(node.tail, node.rows.slice(-2).reverse())
+        assert.equal(node.writes.length, 2, 'The real writer failure suppresses every later live write, without losing later persistence')
+        assert.equal(node.writes.filter(write => inner(write.line).type === 'execution.started' && write.returned).length, 0)
+        assert.equal(cleaning, false, 'Actual Node tap completion and D1 reads precede test cleanup')
+        node.mainFlowComplete = true
+      } catch (error) { node.failure = errorRecord(error); throw error }
+      finally {
+        if (!node.tapDone) {
+          try { await tap.done('error'); node.tapDone = true }
+          catch (error) { node.terminalError = errorRecord(error) }
+        }
+        if (nodeReaderLocked) {
+          try { await reader.cancel('owned-reader-failure-cleanup'); reader.releaseLock(); nodeReaderLocked = false; node.readerLockReleased = true }
+          catch (error) { node.cleanupErrors.push(errorRecord(error).message) }
+        }
+      }
+    })()
+    void nodeProducer.then(() => { nodeProducerSettled = true }, () => { nodeProducerSettled = true })
+    await demand('node-canceled-reader-producer', nodeProducer)
+    assert.equal(node.failure, null); assert.equal(node.terminalError, null)
+    assert.deepEqual(node.cleanupErrors, [])
     passed = true
   } catch (error) { failure = error; socketMark('case-failure-observed') }
   finally {
@@ -504,6 +624,10 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
       // Give ordinary owned releases a finite chance, then start the actual
       // close even if a request has not returned. Keep both promises retained.
       await observe('cleanup-releases-before-close', releaseGroup, Math.min(cleanupDeadline, Date.now() + 10_000))
+      if (nodeProducer) {
+        const nodeOwner = await observe('cleanup-node-producer-before-harness-close', nodeProducer, Math.min(cleanupDeadline, Date.now() + 10_000))
+        if (nodeOwner.stage.state === 'pending' || nodeOwner.stage.deadlineObserved) cleanupErrors.push('Node producer remains UNKNOWN before harness close')
+      }
       if (worker) {
         closeState = 'pending'
         try { socketMark('harness-close-started'); await worker.close(); workerClosed = true; closeState = 'fulfilled'; socketMark('harness-close-fulfilled') }
@@ -533,7 +657,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
         if (final.stage.state !== 'fulfilled' || final.stage.deadlineObserved) cleanupErrors.push('final receipt write remains UNKNOWN')
       } catch (error) { cleanupErrors.push('final receipt: ' + errorRecord(error).message) }
       console.info('Actual shared admission final status:', JSON.stringify({ evidence, passed, workerClosed,
-        cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0, ownedResources: ownership(), stages, socketObservation: socketObservation() }))
+        cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0, ownedResources: ownership(), stages, counterparts: { http: httpCounterpart, node: nodeCounterpart }, socketObservation: socketObservation() }))
     }
   }
   if (failure) throw failure
