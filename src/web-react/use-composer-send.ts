@@ -1,4 +1,4 @@
-/** Optimistic send admission, rejected-draft recovery, and explicit retry. */
+/** Draft clearing policy, rejected-draft recovery, and explicit retry. */
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatComposerProps, ComposerFilePart, ComposerSendOutcome, ComposerSendRejected, ComposerSendResult } from './chat-composer-types'
 
@@ -35,7 +35,7 @@ interface FailedSend {
   restored: boolean
 }
 
-type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'onSendFailed' | 'attachmentsNotReadyMessage' | 'selectedSkillId'> & {
+type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'onSendFailed' | 'clearOnSend' | 'attachmentsNotReadyMessage' | 'selectedSkillId'> & {
   text: string
   textRef: { current: string }
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -48,7 +48,7 @@ type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'o
   canSubmitAttachmentsOnly: boolean
 }
 
-export function useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, attachmentsNotReadyMessage, selectedSkillId }: ComposerSendOptions) {
+export function useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, clearOnSend = true, attachmentsNotReadyMessage, selectedSkillId }: ComposerSendOptions) {
   // A restored draft gets the caret back where the user left it — same
   // post-render rule as the seed above, but to the recorded offsets rather than
   // to the end, so a failed send returns the user to the word they were on.
@@ -95,8 +95,8 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
     [onSendFailed, sendFailureMessage, setText],
   )
 
-  // Hand the message to the host and watch the outcome. The input has already
-  // been cleared by the caller — this only decides whether it comes back.
+  // Hand the message to the host and watch the outcome. Send owns the clearing
+  // policy; this retains the same rejected-draft recovery for either policy.
   const dispatchSend = useCallback(
     (draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
       let outcome: ComposerSendResult
@@ -150,11 +150,14 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
     const el = textareaRef.current
     const caret = { start: el?.selectionStart ?? text.length, end: el?.selectionEnd ?? text.length }
     setFailedSend(null)
-    setText('')
-    textRef.current = ''
+    if (clearOnSend) {
+      setText('')
+      textRef.current = ''
+    }
     dispatchSend(text, trimmed, parts, caret)
   }, [
     text,
+    clearOnSend,
     sendBlockedByStream,
     disabled,
     sendDisabled,
