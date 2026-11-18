@@ -69,7 +69,8 @@ function download(body: string, traceId: string): void {
   const href = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
   const link = Object.assign(document.createElement('a'), { href, download: `turn-${traceId}.otlp.json` })
   link.click()
-  setTimeout(() => URL.revokeObjectURL(href), 0)
+  // Safari starts the download after the click returns; revoking at once can cancel it.
+  setTimeout(() => URL.revokeObjectURL(href), 60_000)
 }
 
 /** The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download. */
