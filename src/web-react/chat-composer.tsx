@@ -15,7 +15,7 @@
  * does. Size and count limits stay the host's job — `useComposerAttachments`
  * owns them, because they depend on what is already staged.
  *
- * A REJECTED send never destroys the draft. The input clears optimistically —
+ * A REJECTED send never destroys the draft. By default the input clears optimistically —
  * the composer stays editable while a turn streams precisely so the next
  * message can be typed against a live answer, and holding the sent text in the
  * box until the server confirms would put the clear on a collision course with
@@ -25,7 +25,8 @@
  * the reason, and reports `onSendFailed` so the host can restore the
  * attachments it consumed. If the user has already typed a replacement, the
  * unsent text is shown in the notice with its own Retry instead of overwriting
- * what they typed — neither draft is ever destroyed.
+ * what they typed — neither draft is ever destroyed. Controlled hosts may set
+ * `clearOnSend={false}` and clear at their acceptance boundary, guarding later edits.
  *
  * Styling contract matches the rest of `web-react`: Tailwind over the shared
  * design tokens (`bg-card`, `border-border`, `text-foreground`, `bg-primary`, …)
@@ -92,6 +93,7 @@ function useChatComposerViewState({
   onSend,
   onSendParts,
   onSendFailed,
+  clearOnSend,
   sendFailureMessage = DEFAULT_SEND_FAILURE,
   onCancel,
   isStreaming = false,
@@ -260,7 +262,7 @@ function useChatComposerViewState({
   const sendBlockedByStream = isStreaming && !canSubmitWhileBusy
   const canSend = hasSendable && !sendBlockedByStream && !disabled && !sendDisabled
 
-  const { failedSend, setFailedSend, send, retryFailedSend } = useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, attachmentsNotReadyMessage, selectedSkillId })
+  const { failedSend, setFailedSend, send, retryFailedSend } = useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, clearOnSend, attachmentsNotReadyMessage, selectedSkillId })
 
   // Cmd/Ctrl+L focuses the composer from anywhere — the shortcut the hint
   // advertises. Scoped to when the shortcut is enabled and not disabled.
