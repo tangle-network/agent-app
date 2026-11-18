@@ -67,15 +67,15 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
-  // The draft comes back only when the box is still empty. If the user typed a
-  // replacement while the send was in flight, overwriting it would trade one
-  // lost message for another — the unsent text is held in the notice instead,
-  // where Retry can send it without touching what they typed.
+  // Restore an empty box, or leave an unchanged retained draft and its caret
+  // alone. A distinct replacement stays in the box; the rejected draft is held
+  // in the notice, where Retry can send it without touching the replacement.
   const failSend = useCallback(
     (error: unknown, draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
       const message = sendFailureText(error, sendFailureMessage)
-      const restored = textRef.current === ''
-      if (restored) {
+      const retained = !clearOnSend && textRef.current === draft
+      const restored = retained || textRef.current === ''
+      if (restored && !retained) {
         const el = textareaRef.current
         setText(draft)
         if (el && el.value === draft) {
@@ -92,7 +92,7 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
       setFailedSend({ message, text: draft, trimmed, parts, restored })
       onSendFailed?.({ message, text: draft, parts, error, restored })
     },
-    [onSendFailed, sendFailureMessage, setText],
+    [onSendFailed, sendFailureMessage, setText, clearOnSend],
   )
 
   // Hand the message to the host and watch the outcome. Send owns the clearing

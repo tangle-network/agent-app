@@ -107,9 +107,9 @@ export interface ComposerSendFailure {
   parts: ComposerFilePart[]
   /** Whatever the handler threw / rejected with, or the `{ ok: false }` value. */
   error: unknown
-  /** True when the draft was put back in the textarea (the box was empty).
-   *  False means the user had typed a replacement, so the unsent text is held in
-   *  the notice instead. */
+  /** True when the draft remains in the textarea: restored into an empty box,
+   *  or retained unchanged with `clearOnSend={false}`. False means a distinct
+   *  replacement is in the box, so the unsent text is held in the notice. */
   restored: boolean
 }
 
