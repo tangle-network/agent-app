@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.38
+
+- fix(web-react): let controlled hosts clear drafts on acceptance (#1582)
+
 ## 4.0.37
 
 - feat(chat-routes): control hosted turns before admission (#1565)
