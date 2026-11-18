@@ -133,10 +133,13 @@ it.runIf(process.env.WORKERD_WAIT_UNTIL_PROBE === '1')('measures how long a Work
 }, 300_000)
 
 it('commits a quiet native admission before its own HTTP write, preserves SQL refusal and survives reader disconnect', async () => {
+  const caseStartedAt = Date.now()
+  const observationDeadline = caseStartedAt + 180_000
+  const cleanupDeadline = caseStartedAt + 230_000
+  const receiptDeadline = caseStartedAt + 237_000 // Existing case bound remains 240 s.
   const root = process.env.AGENT_APP_QUALIFICATION_EVIDENCE_DIR ?? tmpdir()
-  await mkdir(root, { recursive: true })
-  const evidence = await mkdtemp(join(root, 'native-admission-'))
-  const worker = createTestHarness({ workers: [{ configPath }] })
+  let evidence: string | undefined
+  let worker: ReturnType<typeof createTestHarness> | undefined
   type Snapshot = {
     arm: string; turnId: string; finished: boolean; clientCancelled: boolean; returned: string[]
     error?: { name: string; message: string }; terminalError?: { name: string; message: string }
@@ -145,19 +148,60 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     rows: Array<{ seq: number; event: string }>; status: string | null
   }
   const records: Array<{ arm: string; wire: string; readerEnded: boolean; readerError?: { name: string; message: string }; snapshots: Array<{ label: string; state: Snapshot }> }> = []
-  const clients: Array<{ arm: string; abort: AbortController; drained: Promise<void> }> = []
+  const clients: Array<{ arm: string; abort: AbortController; headers?: Promise<Response>; headersSettled: boolean; drained?: Promise<void>; drainSettled: boolean }> = []
+  const requests: Array<{ name: string; abort: AbortController; settled: boolean; cleanup: boolean }> = []
+  const stages: Array<{ name: string; state: 'pending' | 'fulfilled' | 'rejected'; deadlineObserved: boolean; error?: { name: string; message: string } }> = []
+  const retained: Array<{ name: string; promise: Promise<unknown> }> = []
   const cleanupErrors: string[] = []
-  let failure: unknown, url: URL | undefined, workerClosed = false, passed = false
+  let failure: unknown, url: URL | undefined, workerClosed = false, passed = false, cleaning = false
+  let closeState: 'not-started' | 'pending' | 'fulfilled' | 'rejected' = 'not-started'
+  const errorRecord = (error: unknown) => ({ name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) })
+  // Observation deadlines retain the actual operation and its eventual result;
+  // they neither cancel a close nor report an unresolved owner as closed.
+  const observe = async <T,>(name: string, promise: Promise<T>, deadline: number) => {
+    const stage: typeof stages[number] = { name, state: 'pending', deadlineObserved: false }
+    stages.push(stage); retained.push({ name, promise })
+    let value: T | undefined, error: unknown, finish!: () => void
+    const settled = new Promise<void>(resolve => { finish = resolve })
+    const timer = setTimeout(() => { stage.deadlineObserved = true; finish() }, Math.max(0, deadline - Date.now()))
+    void promise.then(result => { value = result; stage.state = 'fulfilled'; clearTimeout(timer); finish() },
+      cause => { error = cause; stage.state = 'rejected'; stage.error = errorRecord(cause); clearTimeout(timer); finish() })
+    await settled
+    return { stage, value, error }
+  }
+  const demand = async <T,>(name: string, promise: Promise<T>, deadline = observationDeadline): Promise<T> => {
+    const observed = await observe(name, promise, deadline)
+    if (observed.stage.state !== 'fulfilled' || observed.stage.deadlineObserved) throw observed.error ?? new Error(name + ' is unresolved at its evidence deadline; owner remains UNKNOWN')
+    return observed.value!
+  }
+  const remaining = (deadline: number, maximum = 30_000) => {
+    const milliseconds = Math.min(maximum, deadline - Date.now())
+    assert(milliseconds > 0, 'Shared admission observation/cleanup budget exhausted')
+    return milliseconds
+  }
   const inner = (raw: string) => { const event = JSON.parse(raw); return event.kind === 'event' ? event.event : event }
   const admissionRows = (state: Snapshot) => state.rows.filter(row => inner(row.event).type === 'execution.started')
   const admissionWrites = (state: Snapshot) => state.writes.filter(write => inner(write.line).type === 'execution.started')
+  const http = async (name: string, path: string, init: RequestInit = {}, json = false) => {
+    const deadline = Math.min(cleaning ? cleanupDeadline : observationDeadline, Date.now() + 30_000)
+    const abort = new AbortController(), owner = { name, abort, settled: false, cleanup: cleaning }
+    requests.push(owner) // Own the abort before starting or awaiting headers.
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(remaining(deadline))])
+    const actual = (async () => {
+      const response = await fetch(new URL(path, url!), { ...init, headers: { ...MEMBER, ...init.headers }, signal })
+      const body: unknown = json ? await response.json() : await response.text()
+      return { status: response.status, body }
+    })()
+    void actual.then(() => { owner.settled = true }, () => { owner.settled = true })
+    return demand('http:' + name, actual, deadline) // One budget covers headers AND body.
+  }
   const state = async (arm: string): Promise<Snapshot> => {
-    const response = await fetch(new URL('/admission-state/' + arm, url!), { headers: MEMBER })
+    const response = await http('state:' + arm, '/admission-state/' + arm, {}, true)
     assert.equal(response.status, 200)
-    return response.json() as Promise<Snapshot>
+    return response.body as Snapshot
   }
   const release = async (arm: string, input: { confirmation?: boolean; progress?: boolean; terminal?: boolean }) => {
-    const response = await fetch(new URL('/admission-release/' + arm, url!), { method: 'POST', headers: { ...MEMBER, 'content-type': 'application/json' }, body: JSON.stringify(input) })
+    const response = await http('release:' + arm, '/admission-release/' + arm, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
     assert.equal(response.status, 204)
   }
   const snapshot = async (arm: string, label: string) => {
@@ -169,12 +213,16 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
   }
   const start = async (arm: string) => {
     const abort = new AbortController()
-    const response = await fetch(new URL('/admission-start/' + arm, url!), { method: 'POST', headers: MEMBER, signal: abort.signal })
-    assert.equal(response.status, 200)
     const record: typeof records[number] = { arm, wire: '', readerEnded: false, snapshots: [] }
-    records.push(record)
+    const client: typeof clients[number] = { arm, abort, headersSettled: false, drainSettled: false }
+    records.push(record); clients.push(client) // Register the real request owner BEFORE awaiting headers.
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(remaining(observationDeadline, observationDeadline - Date.now()))])
+    client.headers = fetch(new URL('/admission-start/' + arm, url!), { method: 'POST', headers: MEMBER, signal })
+    void client.headers.then(() => { client.headersSettled = true }, () => { client.headersSettled = true; client.drainSettled = true })
+    const response = await demand('start-headers:' + arm, client.headers, Math.min(observationDeadline, Date.now() + 30_000))
+    assert.equal(response.status, 200)
     const reader = response.body!.getReader()
-    const drained = (async () => {
+    client.drained = (async () => {
       const decoder = new TextDecoder()
       try {
         for (;;) {
@@ -185,16 +233,39 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
         }
         record.wire += decoder.decode()
         record.readerEnded = true
-      } catch (error) { record.readerError = { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) } }
+      } catch (error) { record.readerError = errorRecord(error) }
       finally { reader.releaseLock() }
     })()
-    clients.push({ arm, abort, drained })
+    void client.drained.then(() => { client.drainSettled = true }, () => { client.drainSettled = true })
     return record
   }
+  const ownership = () => [
+    ...clients.filter(client => !client.headersSettled || !client.drainSettled).map(client => ({ resource: 'http-reader:' + client.arm, state: 'OWNED_UNKNOWN' })),
+    ...requests.filter(request => !request.settled).map(request => ({ resource: 'http-request:' + request.name, state: 'OWNED_UNKNOWN' })),
+    ...(worker && !workerClosed ? [{ resource: 'workerd-harness', state: 'OWNED_UNKNOWN', closeState }] : []),
+    ...stages.filter(stage => stage.state === 'pending' && stage.deadlineObserved).map(stage => ({ resource: 'operation:' + stage.name, state: 'OWNED_UNKNOWN' })),
+  ]
+  const receipt = (kind: string) => ({ kind, passed, failure: failure ? errorRecord(failure) : null, records, stages,
+    cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
+    cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0,
+    limits: 'Real local HTTP/workerd/D1/tap only; deadlines observe retained operations, never fake closure; no Runtime pre-enqueue/native backend/key/paid model/physical termination claim' })
+  const writeReceipt = (name: string, kind: string, deadline: number) => {
+    assert(evidence, 'Evidence directory unavailable')
+    let report: unknown = receipt(kind), bytes = JSON.stringify(report, null, 2) + '\n'
+    if (Buffer.byteLength(bytes) > 256 * 1024) {
+      cleanupErrors.push('receipt-overflow: observations UNKNOWN')
+      report = { kind, failure: failure ? errorRecord(failure) : null, captureOverflow: true, originalBytes: Buffer.byteLength(bytes), ownedResources: ownership(), workerClosed, cleanupComplete: false }
+      bytes = JSON.stringify(report, null, 2) + '\n'
+    }
+    return writeFile(join(evidence, name), bytes, { mode: 0o600, signal: AbortSignal.timeout(remaining(deadline, 3_000)) })
+  }
   try {
-    url = (await worker.listen()).url
-    assert.equal((await fetch(new URL('/seed', url), { method: 'POST' })).status, 204)
-    assert.equal((await fetch(new URL('/admission-start/healthy', url), { method: 'POST' })).status, 401)
+    await demand('evidence-root', mkdir(root, { recursive: true }))
+    evidence = await demand('evidence-directory', mkdtemp(join(root, 'native-admission-')))
+    worker = createTestHarness({ workers: [{ configPath }] })
+    url = (await demand('harness-listen', worker.listen())).url
+    assert.equal((await http('seed', '/seed', { method: 'POST' })).status, 204)
+    assert.equal((await http('anonymous-refusal', '/admission-start/healthy', { method: 'POST', headers: { cookie: '' } })).status, 401)
     const healthyWire = await start('healthy')
     const first = await until(async () => {
       const current = await state('healthy')
@@ -239,7 +310,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     assert.deepEqual(healthy.rows.map(row => inner(row.event).type), ['text', 'execution.started', 'execution.started', 'text'])
     assert.deepEqual(admissionRows(healthy).map(row => inner(row.event).data), Array.from({ length: 2 }, () => ({ sandboxId: 'proof-box', sessionId: 'proof-native-session', executionId: 'native-healthy' })))
     assert.equal(inner(healthy.rows[3]!.event).text, 'AB', 'Ordinary following deltas remain concatenation-preserving and coalesced')
-    await clients[0]!.drained
+    await demand('reader-drain:healthy', clients[0]!.drained!)
     assert.equal(healthyWire.readerEnded, true); assert.equal(healthyWire.readerError, undefined)
     assert.deepEqual(healthyWire.wire.trim().split('\n').slice(1).filter(line => inner(line).type === 'execution.started'), admissionRows(healthy).map(row => row.event))
 
@@ -252,7 +323,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     assert.deepEqual(admissionWrites(refused), [])
     assert.deepEqual(admissionRows(refused), [])
     assert.equal(refused.status, 'error'); assert.equal(refused.terminalError, undefined)
-    await clients[1]!.drained
+    await demand('reader-drain:sql-failure', clients[1]!.drained!)
     assert(!failureWire.wire.includes('execution.started'))
 
     const disconnectWire = await start('disconnect')
@@ -262,7 +333,7 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     }, 'real disconnect-arm admission SQL settles before its confirmation is released', 30_000)
     await snapshot('disconnect', 'actual admission SQL done while HTTP client still waits')
     clients[2]!.abort.abort()
-    await clients[2]!.drained
+    await demand('reader-drain:disconnect', clients[2]!.drained!)
     assert(disconnectWire.readerError, 'The actual HTTP reader was severed')
     await until(async () => (await state('disconnect')).clientCancelled ? true : null, 'workerd observes the actual HTTP stream cancellation', 30_000)
     await release('disconnect', { confirmation: true, progress: true, terminal: true })
@@ -278,26 +349,61 @@ it('commits a quiet native admission before its own HTTP write, preserves SQL re
     passed = true
   } catch (error) { failure = error }
   finally {
-    for (const client of clients) {
+    cleaning = true
+    // Freeze the original failure and precleanup wire/snapshots FIRST. A
+    // stalled release, reader or close cannot prevent this partial receipt.
+    if (evidence) {
+      try {
+        const partial = await observe('partial-receipt', writeReceipt('partial.json', 'PARTIAL_BEFORE_CLEANUP', receiptDeadline), Math.min(receiptDeadline, Date.now() + 3_000))
+        if (partial.stage.state !== 'fulfilled' || partial.stage.deadlineObserved) cleanupErrors.push('partial receipt write remains UNKNOWN')
+      } catch (error) { cleanupErrors.push('partial receipt: ' + errorRecord(error).message) }
+    }
+    // Abort already-owned observation I/O, then start ALL ordinary releases
+    // concurrently. No one unresolved owner serially prevents another cleanup.
+    for (const request of requests) if (!request.cleanup && !request.settled) request.abort.abort()
+    for (const client of clients) client.abort.abort()
+    const releases = clients.map(async client => {
       try {
         await release(client.arm, { confirmation: true, progress: true, terminal: true })
         await until(async () => (await state(client.arm)).finished ? true : null, 'owned tap cleanup finishes ' + client.arm, 30_000)
         await snapshot(client.arm, 'final actual owner cleanup complete')
-      } catch (error) { cleanupErrors.push(client.arm + ': ' + (error instanceof Error ? error.message : String(error))) }
-      client.abort.abort()
-      await client.drained
+      } catch (error) { cleanupErrors.push(client.arm + ': ' + errorRecord(error).message) }
+    })
+    const releaseGroup = Promise.all(releases)
+    const close = (async () => {
+      // Give ordinary owned releases a finite chance, then start the actual
+      // close even if a request has not returned. Keep both promises retained.
+      await observe('cleanup-releases-before-close', releaseGroup, Math.min(cleanupDeadline, Date.now() + 10_000))
+      if (worker) {
+        closeState = 'pending'
+        try { await worker.close(); workerClosed = true; closeState = 'fulfilled' }
+        catch (error) { closeState = 'rejected'; cleanupErrors.push('harness: ' + errorRecord(error).message); throw error }
+      }
+    })()
+    const drains = clients.map(client => {
+      // A response arriving after its header-observation deadline still owns
+      // a real body. Cancel that actual body if no reader was established.
+      const lateBody = client.headers?.then(async response => {
+        if (!client.drained) { await response.body?.cancel(); client.drainSettled = true }
+      }, () => { client.drainSettled = true })
+      return observe('cleanup-reader:' + client.arm,
+        Promise.allSettled([...(client.headers ? [client.headers] : []), ...(client.drained ? [client.drained] : []), ...(lateBody ? [lateBody] : [])]), cleanupDeadline)
+    })
+    const completed = await Promise.all([observe('cleanup-release-group', releaseGroup, cleanupDeadline), observe('harness-close', close, cleanupDeadline), ...drains])
+    for (const observed of completed) if (observed.stage.state !== 'fulfilled' || observed.stage.deadlineObserved) cleanupErrors.push(observed.stage.name + ' unresolved/failed at cleanup deadline')
+    for (const request of requests) if (!request.settled) request.abort.abort()
+    if (ownership().length) cleanupErrors.push('unresolved owners remain UNKNOWN')
+    if (evidence) {
+      try {
+        const final = await observe('final-receipt', writeReceipt('receipt.json', 'FINAL_OBSERVATION', receiptDeadline), receiptDeadline)
+        if (final.stage.state !== 'fulfilled' || final.stage.deadlineObserved) cleanupErrors.push('final receipt write remains UNKNOWN')
+      } catch (error) { cleanupErrors.push('final receipt: ' + errorRecord(error).message) }
+      console.info('Actual shared admission final status:', JSON.stringify({ evidence, passed, workerClosed,
+        cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0, ownedResources: ownership(), stages }))
     }
-    try { await worker.close(); workerClosed = true }
-    catch (error) { cleanupErrors.push('harness: ' + (error instanceof Error ? error.message : String(error))) }
-    const report = { passed, failure: failure instanceof Error ? { name: failure.name, message: failure.message } : null,
-      records, cleanupErrors, workerClosed, cleanupComplete: workerClosed && cleanupErrors.length === 0,
-      limits: 'Real local HTTP/workerd/D1/tap only; no Runtime enqueue-before-hook, native backend, key, paid model or physical termination claim' }
-    const bytes = JSON.stringify(report, null, 2) + '\n'
-    assert(Buffer.byteLength(bytes) <= 256 * 1024, 'Admission evidence bound exceeded')
-    await writeFile(join(evidence, 'receipt.json'), bytes, { mode: 0o600 })
-    console.info('Actual shared admission final status:', JSON.stringify({ evidence, passed, workerClosed, cleanupComplete: report.cleanupComplete }))
   }
   if (failure) throw failure
   assert.deepEqual(cleanupErrors, [])
   assert(passed && workerClosed)
+  assert.deepEqual(ownership(), [], 'Pending operation/reader/harness owners remain UNKNOWN, never closed by a deadline race')
 }, 240_000)
