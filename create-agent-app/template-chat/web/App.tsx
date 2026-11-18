@@ -72,7 +72,11 @@ function Workspace({ session }: { session: Session }) {
     contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}
     prewarm={{ url: '/api/chat/prewarm' }}>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
-    {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? <div className="h-full min-h-0"><LocalSessionHistoryPanel sessions={threads} hrefForSession={threadHref} newSessionHref="/" emptyTitle="No conversations yet" /></div> : <p role="status" className="p-6">Loading History…</p>
+    {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? (
+        <div className="h-full min-h-0">
+          <LocalSessionHistoryPanel sessions={threads} hrefForSession={threadHref} newSessionHref="/" emptyTitle="No conversations yet" />
+        </div>
+      ) : <p role="status" className="p-6">Loading History…</p>
       : <AgentWorkspaceCompanion tabs={workspaceTools} persistenceKey={`workspace:${session.user.id}:tools`}><Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} /></AgentWorkspaceCompanion>}
   </AgentWorkspaceLayout>
 }

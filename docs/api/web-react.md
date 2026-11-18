@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-556 exports.
+557 exports.
 
 ### `acceptRejectionReason`
 
@@ -2204,6 +2204,14 @@ interface LinkLikeProps
 
 ```ts
 (record: ProvenanceRecord) => ProvenanceSource[]
+```
+
+### `LocalSessionHistoryPanel`
+
+`function` — Search a complete, newest-first session list already loaded by the workspace.
+
+```ts
+({ sessions, ...props }: Pick<SessionHistoryPanelProps, "className" | "emptyTitle" | "hrefForSession" | "newSessionHref…
 ```
 
 ### `mediaTypeForMentionPath`
