@@ -190,7 +190,7 @@ const peer = createServer((request, response) => {
 })
 let modelUrl = ''
 function start() {
-  return new Miniflare(convertV4MiniflareOptions({ resourcePersistencePath: resolve(directory, 'state'),
+  return new Miniflare(convertV4MiniflareOptions({ cf: resolve(directory, 'cf.json'), resourcePersistencePath: resolve(directory, 'state'),
     workers: [{ name: 'stop-fixture', modules: true, compatibilityDate,
       compatibilityFlags, scriptPath: bundlePath, modulesRoot: bundleDirectory,
       durableObjects: Object.fromEntries([['TURNS', 'FixtureTurnStream'], ['SHORT_TURNS', 'ShortTurnStream'],
