@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.33
+
+- fix(chat-routes): a one-model chain has no default first-answer deadline (#1577)
+
 ## 4.0.32
 
 - fix(platform): every delegation and modelKey waits out PLATFORM_BUSY inside 8 s (#1576)
