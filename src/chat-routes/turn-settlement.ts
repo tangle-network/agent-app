@@ -206,4 +206,3 @@ export function createTurnSettlement<TContext, TResource>(
   }
   return { endTrace, exportTraceInBackground, startLifecycle, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle }
 }
-
