@@ -559,8 +559,7 @@ it('commits native admission before writes and preserves D1 through HTTP loss an
         assert.deepEqual(admitted.map(row => row.seq), [1, 2])
         assert.equal(admitted[1]!.event, attempted.line, 'The acknowledged original admission bytes are already in actual D1')
         assert.equal(inner(admitted[0]!.event).text, 'node prefix ')
-        await tap.onEvent({ type: 'text', text: 'later A' })
-        await tap.onEvent({ type: 'text', text: 'B' })
+        await tap.onEvent({ type: 'text', text: 'later AB' })
         await tap.done('complete'); node.tapDone = true
         node.rows = await actualStore.read(turnId, 0)
         node.status = await actualStore.getStatus(turnId)
