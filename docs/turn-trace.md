@@ -22,6 +22,8 @@ agent_app.turn                       wall time of the turn; coverage and time pe
 ├─ tool.call                         an app tool, sandbox_exec or sandbox_run
 │  ├─ sandbox.claim                  the box a tool call waited for
 │  └─ sandbox.exec                   the command, sent with the turn's trace id
+├─ produce.setup                     the product producer's own time before its first event: its keys, reads, prompt, a box it resolves itself
+├─ produce.settle                    after its last event until its stream ends: the cleanup it runs before returning (revocations, a charge)
 ├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, get_running or list_running, egress, liveness, finalize, resume, create, wait_running)
 ├─ sandbox.lease.*                   the foreground provisioning lease a product's single-flight takes: inspect, acquire, release
 ├─ sandbox.spend.*                   the spend seam around the claim: before_provision, observe

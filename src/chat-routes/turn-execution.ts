@@ -11,6 +11,7 @@ import {
 } from '../stream/index'
 import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
 import { otlpTraceId } from '../turn-trace/otel'
+import { traceProducerStream } from './producer-trace'
 import { noteMeasuredTurnFacts, readableTurnFailure } from '../turn-trace/turn-facts'
 import { createNativeTimingTransfer, type NativeTimingTransfer } from './native-turn-timing'
 import { createChatTurnOwnership } from './turn-ownership'
@@ -749,7 +750,7 @@ function createTurnEngine<TContext, TResource>(
               void cleanup.catch(() => {})
             }
             state.producer = await started
-            yield* state.producer.stream
+            yield* traceProducerStream(state.producer.stream, trace)
           }
           let source: AsyncIterable<ChatRouteEvent> = redact ? redactEvents(producerStream(), redact) : producerStream()
           // A durable owner connection already carries exact authenticated Stop.
