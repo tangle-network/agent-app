@@ -1062,6 +1062,58 @@ try {
     }
     assert.equal((await database.prepare('SELECT * FROM messages WHERE thread_id = ?').bind('host-denied').all()).results.length, 0)
     checks.push('host: opt-in paid refusal unwraps correctly; legacy HTTP refusal and denied identity remain unchanged')
+
+    // Exercise the public browser helper, not only the raw hosted-response settlement helper.
+    const { streamChatTurn } = await import('../../src/web-react/chat-stream')
+    const browserRefusals: Array<{ mode: 'stop' | 'control-loss'; error: Error & { code?: string } }> = []
+    for (const mode of ['stop', 'control-loss'] as const) {
+      const thread = mode === 'control-loss' ? 'host-control-loss' : 'host-public-stop'
+      const client = `public-${mode}`
+      if (mode === 'stop') await database.prepare('INSERT INTO threads VALUES (?, ?)').bind(thread, 'workspace').all()
+      if (mode === 'control-loss') {
+        await staleHost(await lost.receipt.promise)
+        assert.equal(await hostPeek(thread), null, 'Prior control-loss owner is retired before reusing its thread')
+      }
+      const paid = admission(client)
+      const received = deferred<TurnHostControlTarget>()
+      const socket = { entered: deferred<void>(), release: deferred<void>(), revoked: deferred<void>() }
+      if (mode === 'control-loss') hostControlLosses.set(client, socket)
+      const before = { models: modelRequests, intents: hostIntents }
+      let failure: unknown
+      const completed = streamChatTurn({
+        start: () => request('/host-turn', { threadId: thread, turnId: client, content: 'Preserve the hosted refusal code.' }),
+        callbacks: { onHostControl: target => received.resolve(target) },
+        maxReconnects: 0,
+      }).catch(error => { failure = error })
+      const target = await bounded(received.promise, 'public helper receives synchronous H before paid admission')
+      await bounded(paid.entered.promise, 'public helper paid admission barrier')
+      if (mode === 'stop') {
+        const cancellation = json('/host-cancel', target)
+        assert.deepEqual(await bounded(cancellation, 'separately observed exact-H cancellation'), { requested: true })
+      } else {
+        await bounded(socket.entered.promise, 'public helper actual control socket ready')
+        socket.release.resolve()
+        await bounded(socket.revoked.promise, 'public helper original execution permission revoked')
+      }
+      paid.release.resolve(200)
+      await bounded(completed, 'public helper rejects the real hosted refusal')
+      assert(failure instanceof Error, 'The public helper must reject an actual hosted refusal')
+      await staleHost(target)
+      assert.equal(await hostPeek(thread), null)
+      assert.equal(modelRequests, before.models)
+      assert.equal(hostIntents, before.intents)
+      assert.equal((await database.prepare('SELECT * FROM messages WHERE thread_id = ?').bind(thread).all()).results.length, 0)
+      browserRefusals.push({ mode, error: failure })
+      console.log(JSON.stringify({ event: 'public_hosted_refusal', mode,
+        expectedCode: mode === 'stop' ? 'turn_cancel_requested' : 'turn_control_unavailable',
+        actualCode: (failure as Error & { code?: string }).code ?? null,
+        modelCalls: modelRequests - before.models, originalOwnerReleased: true }))
+    }
+    for (const { mode, error } of browserRefusals) {
+      assert.equal(error.code, mode === 'stop' ? 'turn_cancel_requested' : 'turn_control_unavailable',
+        `public streamChatTurn preserves the actual hosted ${mode} refusal code`)
+      checks.push(`browser: public streamChatTurn preserves the actual hosted ${mode} refusal code`)
+    }
   }
   console.log(JSON.stringify({ checks, consumerRoot, scope: transportOnly ? 'transport-only' : 'complete-product-route',
     consumerRevision: execFileSync('git', ['-C', consumerRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),

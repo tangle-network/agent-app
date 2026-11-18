@@ -562,8 +562,8 @@ export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeCh
   const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase),
     opts.callbacks.onIntent, opts.callbacks.onHostControl)
   if (!res.ok || !res.body) {
-    const { error: e } = await res.json().catch(() => ({})) as { error?: string | { code?: string; message?: string } }
-    throw Object.assign(new Error((typeof e === 'string' ? e : e?.message) ?? `HTTP ${res.status}`), { code: typeof e === 'object' ? e?.code : undefined })
+    const { error: e, code } = await res.json().catch(() => ({})) as { code?: string; error?: string | { code?: string; message?: string } }
+    throw Object.assign(new Error((typeof e === 'string' ? e : e?.message) ?? `HTTP ${res.status}`), { code: (typeof e === 'object' ? e?.code : undefined) ?? code })
   }
   // Headers arrive before the body, so a reset before the marker still has a
   // replay id. The body marker remains authoritative when it arrives.
