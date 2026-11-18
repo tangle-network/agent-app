@@ -9,17 +9,23 @@ const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] }
 const results = []
 try {
   for (const width of [1280, 390]) for (const theme of ['agent-dark', 'agent-light']) {
-    const context = await browser.newContext({ viewport: { width, height: 900 }, recordVideo: { dir: out } })
+    const reducedMotion = width === 390 ? 'reduce' : 'no-preference'
+    const context = await browser.newContext({ reducedMotion, viewport: { width, height: 900 }, recordVideo: { dir: out } })
     const page = await context.newPage()
     await page.goto(`http://127.0.0.1:6098/iframe.html?id=chat-chatmessages--two-agents-answering&globals=agentTheme:${theme}`)
     await page.waitForSelector('[data-stream-length="0"]')
     await page.evaluate(() => document.fonts.ready)
     await page.evaluate(() => {
+      window.__reveal = []
       window.__shifts = []
       window.__streamStartedAt = 0
       const stream = document.querySelector('[data-stream-length]')
       new MutationObserver(() => {
-        if (Number(stream.dataset.streamLength) > 0) window.__streamStartedAt ||= performance.now()
+        if (!Number(stream.dataset.streamLength)) return
+        window.__streamStartedAt ||= performance.now()
+        const body = stream.querySelector('[aria-label="Answer from Research Lead"] .agent-app-message-copy')
+        const visible = (body?.textContent ?? '').replace(/\s/g, '').length
+        window.__reveal.push({ visible, received: Number(stream.dataset.answerCharacters) })
       }).observe(stream, { attributes: true, attributeFilter: ['data-stream-length'] })
       window.__observer = new PerformanceObserver((list) => {
         for (const e of list.getEntries()) if (!e.hadRecentInput && window.__streamStartedAt && e.startTime >= window.__streamStartedAt) window.__shifts.push({
@@ -39,13 +45,16 @@ try {
       if (entry.at - last > 1000 || entry.at - start > 5000) { session = 0; start = entry.at }
       session += entry.value; last = entry.at; total = Math.max(total, session)
     }
-    results.push({ width, theme, total, shifts })
+    const reveal = await page.evaluate(() => window.__reveal)
+    results.push({ width, theme, reducedMotion, total, shifts, reveal })
     await page.screenshot({ path: `${out}/${width}-${theme}.png`, fullPage: true })
     await context.close()
   }
   await writeFile(`${out}/cls.json`, JSON.stringify(results, null, 2))
   console.log(JSON.stringify(results.map(({ width, theme, total }) => ({ width, theme, cls: total }))))
-  if (results.some((r) => r.total !== 0)) process.exitCode = 1
+  if (results.some(r => r.total !== 0 || !r.reveal.length || (
+    r.reducedMotion === 'reduce' && r.reveal.some(({ visible, received }) => visible !== received)
+  ))) process.exitCode = 1
 } finally {
   await browser.close()
   server.kill()
