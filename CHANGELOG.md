@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.40
+
+- perf(web-react): render only visible answer text and honor reduced motion (#1584)
+
 ## 4.0.39
 
 - fix(chat-routes): close committed sources during buffered replay
