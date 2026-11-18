@@ -26,10 +26,21 @@ export interface StopFixtureEnv {
 }
 export interface StopFixtureContext { waitUntil(promise: Promise<unknown>): void }
 export class FixtureTurnStream extends TurnStreamDO {
+  /** After `/fixture/close?lost=1`, the owner's three reconnects are refused (503): control that cannot be re-established. */
+  async fetch(request: Request) {
+    const refusals = Number(await this.state.storage.get('fixture:refused-upgrades') ?? 0)
+    if (refusals > 0 && request.headers.get('Upgrade') === 'websocket') {
+      await this.state.storage.put('fixture:refused-upgrades', refusals - 1)
+      return new Response('Fixture control outage', { status: 503 })
+    }
+    return super.fetch(request)
+  }
+
   protected async handleProductRequest(request: Request, url: URL) {
     if (url.pathname === '/fixture/sockets') return Response.json({ open: this.state.getWebSockets()
       .filter(socket => (socket as unknown as { readyState: number }).readyState === 1).length })
     if (url.pathname === '/fixture/close') {
+      if (url.searchParams.get('lost') === '1') await this.state.storage.put('fixture:refused-upgrades', 3)
       for (const socket of this.state.getWebSockets()) socket.close(1011, 'Fixture connection loss')
       return Response.json({ closed: true })
     }
@@ -251,7 +262,7 @@ export async function handleDurableStopTransport(request: Request, env: StopFixt
     const key = turnLockChannelKey(input.workspaceId, input.threadId, input.scope)
     const tokenKey = url.pathname === '/cross-channel' ? turnLockChannelKey('another-workspace', input.threadId, input.scope) : key
     const headers: Record<string, string> = url.pathname === '/raw-unauthenticated' ? {} : { [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(tokenKey, auth.secret) }
-    const path = url.pathname === '/close' ? '/fixture/close' : url.pathname === '/sockets' ? '/fixture/sockets'
+    const path = url.pathname === '/close' ? `/fixture/close${url.search}` : url.pathname === '/sockets' ? '/fixture/sockets'
       : url.pathname === '/raw-lock' ? '/fixture/raw-lock' : url.pathname === '/complete-deferred' ? '/fixture/complete-deferred' : '/chat-turn-lock/peek'
     const response = await namespace.get(namespace.idFromName(key)).fetch(`https://fixture.internal${path}`,
       { method: 'POST', headers, body: JSON.stringify(input) })

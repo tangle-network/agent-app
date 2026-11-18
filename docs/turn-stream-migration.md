@@ -38,8 +38,9 @@ Viewer forwarders keep minting their existing channel token; never derive server
 `createDurableTurnLock` opts in with `cancellationOf(args)` and requires the route's `turnStreamId`.
 The adapter persists that identity with the acquired lock and establishes its owner control connection before returning acquisition.
 `createChatTurnRoutes` passes the effective `args.admissionSignal` to `produce`, including dispatch-first producers; pass it to `createHybridTurnProducer`, Router calls and tool I/O.
-An owner connection failure before admission releases only its acquired lock generation.
-Losing an active control connection aborts the signal with `turn_control_unavailable`; it cannot silently leave an uncancellable producer running.
+A first control socket that fails before its sync, for any reason the object did not decide, is opened once more; an owner connection failure before admission then releases only its acquired lock generation.
+A control socket that drops after its sync is reopened up to three times, 0, 0.5 and 1 s apart, and the new sync replays a Stop the object recorded meanwhile.
+The object's own decision (a 4xx, its release or ownership-lost notice, an ownership close, an unreadable reply) or a fourth failure aborts the signal with `turn_control_unavailable`; a producer never keeps running once its control cannot be re-established.
 
 Products with a custom lock adapter use `acquireDurableTurnLock` with `cancellation: { turnStreamId }`, then
 `connectDurableTurnCancellation(namespace, identity, auth)` before returning `{ acquired: true, handle, cancellation }`.
