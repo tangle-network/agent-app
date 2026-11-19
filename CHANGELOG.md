@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.43
+
+- fix(catalog): select current available GPT and Fable families (#1588)
+
 ## 4.0.42
 
 - Support Sandbox UI 11 and update the generated chat starter (#1587)
