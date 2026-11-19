@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.49
+
+- fix: persist opening text before quiet progress (#1595)
+
 ## 4.0.48
 
 - fix: retain locked historical harness labels (#1590)
