@@ -265,7 +265,7 @@ export function HarnessPicker({ value, onChange, available, optionsOverride, def
     ...(defaultOption ? [{ value: '', label: defaultOption.label, icon: <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" /> }] : []),
     ...(isHarness(value) && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h), ...optionsOverride?.[h] })),
   ]
-  return <ChoicePicker {...rest} variant={variant} value={value} onChange={(v) => onChange(v as Harness | '')} options={options} placeholder="Select harness" title="Harness" />
+  return <ChoicePicker {...rest} variant={variant} value={value} onChange={(v) => onChange(v as Harness | '')} options={options} placeholder={rest.lockReason !== undefined && value ? harnessLabel(value) : 'Select harness'} title="Harness" />
 }
 
 export interface AgentSessionControlsProps {
