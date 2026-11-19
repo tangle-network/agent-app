@@ -22,6 +22,7 @@ export interface RouterModel {
     output_modalities?: string[]
   }
   supported_parameters?: string[]
+  availability?: { status?: string }
   routeability?: {
     status?: string
     routeable?: boolean
@@ -145,8 +146,8 @@ const EXCLUDED_ID = /(embedding|tts|transcribe|whisper|audio|realtime|image|lyri
  */
 const DEFAULT_CANDIDATE_RULES: Array<{ providers: string[]; match: RegExp }> = [
   { providers: ['zai', 'z-ai'], match: /^glm-5\.3$/ },
-  { providers: ['openai'], match: /^gpt-6\.1-sol$/ },
-  { providers: ['openai'], match: /^gpt-6-astra$/ },
+  { providers: ['openai'], match: /^gpt-\d+(?:\.\d+)?-sol$/ },
+  { providers: ['openai'], match: /^gpt-\d+(?:\.\d+)?-astra$/ },
   { providers: ['anthropic'], match: /^claude-sonnet-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-opus-[\d-]+$/ },
   { providers: ['anthropic'], match: /^claude-haiku-[\d-]+$/ },
@@ -174,6 +175,7 @@ const RECOMMENDED_FAMILIES: Array<{
   match: RegExp
   minVersion: number[]
 }> = [
+  { provider: 'anthropic', match: /^claude-fable-\d+(?:[-.]\d+)*$/, minVersion: [5, 2] },
   { provider: 'anthropic', match: /^claude-opus-\d+(?:[-.]\d+)*$/, minVersion: [5, 5] },
   { provider: 'anthropic', match: /^claude-sonnet-\d+(?:[-.]\d+)*$/, minVersion: [5, 5] },
   { provider: 'openai', match: /^gpt-\d+(?:\.\d+)?-sol$/, minVersion: [6] },
@@ -326,6 +328,7 @@ export function isChatCapableModel(m: RouterModel): boolean {
 const isChatModel = isChatCapableModel
 
 function isRouteable(m: RouterModel): boolean {
+  if (m.availability?.status === 'unavailable') return false
   const routeability = m.routeability
   if (!routeability) return true
   const chatEndpoint = routeability.endpoints?.chat_completions
