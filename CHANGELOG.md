@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.46
+
+- fix(create-agent-app): land saved threads at the user's last sentence (#1592)
+
 ## 4.0.45
 
 - fix: commit native admission before buffered live delivery (#1585)
