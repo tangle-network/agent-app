@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.47
+
+- docs: regenerate codemap for the KNOWN_HARNESSES doc comment (#1594)
+- fix(create-agent-app): ride template engine cohort to agent-interface 5.10.28 (#1593)
+
 ## 4.0.46
 
 - fix(create-agent-app): land saved threads at the user's last sentence (#1592)
