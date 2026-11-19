@@ -1,6 +1,8 @@
-import { existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { existsSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { join } from 'node:path'
 
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -62,6 +64,21 @@ describe.skipIf(!hasChromium)('meterPage in Chromium', () => {
       expect(requestEvents).toBeGreaterThan(toServer)
     } finally {
       await browser.close()
+    }
+
+    const evidenceDir = process.env.AGENT_APP_QUALIFICATION_EVIDENCE_DIR
+    if (evidenceDir) {
+      const completion = JSON.stringify({
+        case: 'src/signoff/browser-budget.browser.test.ts: counts cached immutable assets once, as the server sees them',
+        node: process.version,
+        pid: process.pid,
+        completionPoint: 'all assertions and awaited browser.close completed; file and afterAll success still required',
+      }) + '\n'
+      if (Buffer.byteLength(completion) > 4096) throw new Error('Browser completion evidence exceeds its byte bound')
+      writeFileSync(join(evidenceDir, `browser-budget-completion-${randomUUID()}.json`), completion, {
+        flag: 'wx',
+        mode: 0o600,
+      })
     }
   })
 })
