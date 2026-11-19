@@ -9,7 +9,7 @@
  */
 import type { D1Database } from '@cloudflare/workers-types'
 import { createChatTurnRoutes, type ChatTurnMessageStore, type ChatTurnRequestContext } from '../../src/chat-routes/turn-routes'
-import { createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/turn-buffer'
+import { createBufferedTurnTap, createD1TurnEventStore, TURN_EVENTS_MIGRATION_SQL } from '../../src/stream/turn-buffer'
 import { peekDurableTurnLock, type TurnStreamNamespaceLike } from '../../src/turn-stream/adapters'
 import { TurnStreamDO, type TurnStreamDOState } from '../../src/turn-stream/do'
 
@@ -116,10 +116,127 @@ export class TurnOutlivesBrowserDO extends TurnStreamDO {
   }
 }
 
+type AdmissionArm = 'healthy' | 'sql-failure' | 'disconnect'
+type AdmissionRecord = {
+  arm: AdmissionArm; turnId: string; finished: boolean; clientCancelled: boolean
+  returned: string[]; error?: { name: string; message: string }; terminalError?: { name: string; message: string }
+  appends: Array<{ rows: Array<{ seq: number; event: string }>; invokedAt: number; sqlSettledAt?: number; confirmedAt?: number; error?: { name: string; message: string } }>
+  writes: Array<{ line: string; invokedAt: number; returnedAt?: number; error?: { name: string; message: string } }>
+}
+// Three test-owned HTTP operations, never a production cache or receipt store.
+// Control requests release only barriers; they never await another request's I/O.
+const admissionArms = new Map<AdmissionArm, { record: AdmissionRecord; confirmation(): void; progress(): void; terminal(): void }>()
+
+async function admissionProof(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }, route: string, arm: string): Promise<Response> {
+  if (request.headers.get('cookie') !== 'session=member') return new Response('Not a member', { status: 401 })
+  if (arm !== 'healthy' && arm !== 'sql-failure' && arm !== 'disconnect') return new Response('Unknown arm', { status: 404 })
+  if (route === 'admission-state') {
+    const entry = admissionArms.get(arm)
+    if (!entry) return new Response('No owned admission operation', { status: 404 })
+    const store = createD1TurnEventStore(env.DB)
+    return Response.json({ ...entry.record, rows: await store.read(entry.record.turnId, 0), status: await store.getStatus(entry.record.turnId) })
+  }
+  if (route === 'admission-release') {
+    const entry = admissionArms.get(arm)
+    if (!entry) return new Response('No owned admission operation', { status: 404 })
+    const input = await request.json() as { confirmation?: boolean; progress?: boolean; terminal?: boolean }
+    if (input.confirmation) entry.confirmation()
+    if (input.progress) entry.progress()
+    if (input.terminal) entry.terminal()
+    return new Response(null, { status: 204 })
+  }
+  if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 })
+  if (admissionArms.has(arm)) return new Response('Operation already owned', { status: 409 })
+  const turnId = `buffer-${arm}`
+  if (arm === 'sql-failure') {
+    // The real SQLite INSERT fails. No storage promise/result is fabricated.
+    await env.DB.prepare(`CREATE TRIGGER proof_native_admission_failure BEFORE INSERT ON turn_events
+      WHEN NEW.turnId='buffer-sql-failure' AND (json_extract(NEW.event,'$.type')='execution.started'
+        OR json_extract(NEW.event,'$.event.type')='execution.started')
+      BEGIN SELECT RAISE(ABORT,'proof-native-admission-sql-refusal'); END`).run()
+  }
+  let confirm!: () => void, progress!: () => void, terminal!: () => void
+  const confirmation = new Promise<void>(resolve => { confirm = resolve })
+  const followingProgress = new Promise<void>(resolve => { progress = resolve })
+  const terminalRelease = new Promise<void>(resolve => { terminal = resolve })
+  const record: AdmissionRecord = { arm, turnId, finished: false, clientCancelled: false, returned: [], appends: [], writes: [] }
+  admissionArms.set(arm, { record, confirmation: confirm, progress, terminal })
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({
+    start(value) {
+      controller = value
+      // The existing probe's HTTP opener permits observing a held response.
+      // It is transport metadata, never a producer event or tap write.
+      controller.enqueue(new TextEncoder().encode('open\n'))
+    },
+    cancel() { record.clientCancelled = true },
+  })
+  const actualStore = createD1TurnEventStore(env.DB)
+  let admissionConfirmed = false
+  const tap = createBufferedTurnTap({ turnId, scopeId: 'native-admission-proof',
+    store: { ...actualStore, append: async (id, rows) => {
+      // Start the actual owned SQL operation FIRST. Passive observations add
+      // no logging await or replacement store; only its confirmation is held.
+      const actualAppend = actualStore.append(id, rows)
+      const append: AdmissionRecord['appends'][number] = { rows, invokedAt: Date.now() }
+      record.appends.push(append)
+      try {
+        await actualAppend
+        append.sqlSettledAt = Date.now()
+        const containsAdmission = rows.some(row => {
+          const event = JSON.parse(row.event)
+          return (event.kind === 'event' ? event.event : event).type === 'execution.started'
+        })
+        if (containsAdmission && !admissionConfirmed) await confirmation
+        append.confirmedAt = Date.now()
+        if (containsAdmission) admissionConfirmed = true
+      } catch (error) {
+        append.error = { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) }
+        throw error
+      }
+    } },
+    write: line => {
+      const write: AdmissionRecord['writes'][number] = { line, invokedAt: Date.now() }
+      record.writes.push(write)
+      try {
+        controller.enqueue(new TextEncoder().encode(line + '\n'))
+        write.returnedAt = Date.now()
+      } catch (error) {
+        write.error = { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) }
+        throw error // Actual closed HTTP stream error; the tap owns swallowing it.
+      }
+    },
+  })
+  ctx.waitUntil((async () => {
+    try {
+      await tap.onEvent({ type: 'text', text: 'prefix ' }); record.returned.push('prefix')
+      const admission = { type: 'execution.started', data: { sandboxId: 'proof-box', sessionId: 'proof-native-session', executionId: `native-${arm}` } }
+      await tap.onEvent({ kind: 'event', event: admission }); record.returned.push('admission')
+      await followingProgress
+      if (arm === 'healthy') {
+        await tap.onEvent(admission); record.returned.push('matching-admission')
+        await tap.onEvent({ type: 'text', text: 'A' })
+        await tap.onEvent({ type: 'text', text: 'B' }); record.returned.push('progress')
+      }
+      await terminalRelease
+    } catch (error) {
+      record.error = { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) }
+    } finally {
+      try { await tap.done(record.error ? 'error' : 'complete') }
+      catch (error) { record.terminalError = { name: error instanceof Error ? error.name : 'UnknownError', message: error instanceof Error ? error.message : String(error) } }
+      if (arm === 'sql-failure') await env.DB.prepare('DROP TRIGGER proof_native_admission_failure').run()
+      try { controller.close() } catch { /* Actual canceled stream is already closed. */ }
+      record.finished = true
+    }
+  })())
+  return new Response(body, { headers: { 'content-type': 'application/x-ndjson' } })
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
     const url = new URL(request.url)
     const [, route, workspaceId = '', turnId = ''] = url.pathname.split('/')
+    if (route === 'admission-start' || route === 'admission-state' || route === 'admission-release') return admissionProof(request, env, ctx, route, workspaceId)
     if (route === 'seed') {
       const ddl = `${TURN_EVENTS_MIGRATION_SQL};
         CREATE TABLE IF NOT EXISTS proof_messages (id TEXT PRIMARY KEY,thread_id TEXT,role TEXT,content TEXT,parts TEXT);

@@ -1,5 +1,8 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createChatTurnRoutes, createRouterTurnProducer, type ChatTurnMessageStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
@@ -235,6 +238,29 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     const complete = spans.find((span) => span.name === 'persist.on_turn_complete')!
     expect(complete.endMs - complete.startMs).toBeGreaterThanOrEqual(75)
     expect(complete.startMs).toBeGreaterThanOrEqual(calls[1]!.startMs)
-    expect(summary.largestGapMs).toBeLessThan(60)
+    try {
+      expect(summary.largestGapMs).toBeLessThan(60)
+    } catch (failure) {
+      // Failure-only finished snapshot. Never capture request contents or credential attributes.
+      try {
+        const maxSpans = 128, maxBytes = 32 * 1024
+        const context = { node: process.version, pid: process.pid, traceId: snapshot!.traceId, rootSpanId: snapshot!.rootSpanId,
+          startedAt: snapshot!.startedAt, endedAt: snapshot!.endedAt, summary, spanCount: spans.length }
+        let observation = JSON.stringify({ ...context, captureOverflow: spans.length > maxSpans,
+          spans: spans.length > maxSpans ? [] : spans.map(({ spanId, parentSpanId, name, kind, startMs, endMs, unfinished }) =>
+            ({ spanId, parentSpanId, name, kind, startMs, endMs, unfinished })) })
+        if (Buffer.byteLength(observation + '\n') > maxBytes) observation = JSON.stringify({ ...context, captureOverflow: true })
+        if (Buffer.byteLength(observation + '\n') > maxBytes) observation = JSON.stringify({ node: process.version, pid: process.pid, captureOverflow: true, observation: 'UNKNOWN' })
+        const root = process.env.AGENT_APP_QUALIFICATION_EVIDENCE_DIR
+        if (root) {
+          try { writeFileSync(join(root, 'trace-gap-failure-' + randomUUID() + '.json'), observation + '\n', { flag: 'wx', mode: 0o600 }) }
+          catch { try { console.error('TURN_TRACE_GAP_CAPTURE_FAILURE file=UNKNOWN') } catch { /* Preserve the original assertion. */ } }
+        }
+        console.error('TURN_TRACE_GAP_FAILURE_SNAPSHOT ' + observation)
+      } catch {
+        try { console.error('TURN_TRACE_GAP_CAPTURE_FAILURE observation=UNKNOWN') } catch { /* Preserve the original assertion. */ }
+      }
+      throw failure
+    }
   })
 })
