@@ -26,7 +26,6 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   pi: '.pi/skills',
   prime: '.prime/agent/skills',
   hermes: null,
-  forge: null,
   grok: null,
   nanocode: null,
   exo: null,
