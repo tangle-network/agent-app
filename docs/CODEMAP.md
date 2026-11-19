@@ -55,7 +55,7 @@ _155 entries — tsup.config `entry`. Regenerate with `agent-docs`._
 | [`./hosted-agent/react`](api/hosted-agent-react.md) | 29 | — |
 | [`./hosted-agent/react/styles`](api/hosted-agent-react-styles.md) | 0 | — |
 | [`./hub-approvals`](api/hub-approvals.md) | 31 | — |
-| [`./hub-approvals-react`](api/hub-approvals-react.md) | 24 | `hub-approvals` |
+| [`./hub-approvals-react`](api/hub-approvals-react.md) | 24 | `hub-approvals`, `web-react` |
 | [`./intakes`](api/intakes.md) | 29 | — |
 | [`./intakes/drizzle`](api/intakes-drizzle.md) | 18 | — |
 | [`./integrations`](api/integrations.md) | 10 | — |
@@ -614,7 +614,7 @@ Source: `src/hub-approvals/index.ts` · 31 exports
 
 Source: `src/hub-approvals-react/index.tsx` · 24 exports
 
-Depends on: `hub-approvals`
+Depends on: `hub-approvals`, `web-react`
 
 `HubActionPreviewView`, `HubActionReceiptCard`, `HubActionReceiptCardProps`, `HubApprovalDecision`, `HubApprovalDock`, `HubApprovalDockProps`, `HubApprovalPermissions`, `HubApprovalPhasePill`, `HubApprovalReceipts`, `HubApprovalReceiptsProps`, `HubApprovalRow`, `HubApprovalRowProps`, `HubApprovalsList`, `HubApprovalsListProps`, `HubApprovalWaitNote`, `HubPreviewFeedback`, `HubPreviewFeedbackProps`, `HubProviderMark`, `openPhaseLabel`, `ReviewFeedbackDraft`, `ReviewFeedbackForm`, `ReviewFeedbackFormHandle`, `ReviewFeedbackFormProps`, `ReviewVerdict`
 

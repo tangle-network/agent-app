@@ -11823,7 +11823,7 @@ class StaleApprovalError
 
 ## `./hub-approvals-react`
 
-Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`
+Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`, `web-react`
 
 ### `HubActionPreviewView`
 

@@ -8,6 +8,7 @@
  * once still *types out* instead of popping in).
  */
 
+import { useMediaQuery } from './media-query'
 import { useEffect, useRef, useState } from 'react'
 
 /** Define configuration options for controlling smooth text reveal animation rates */
@@ -45,19 +46,21 @@ export function nextRevealCount(
  * the reveal.
  */
 export function useSmoothText(target: string, enabled: boolean, opts?: SmoothRevealOptions): string {
+  const reducedMotion = useMediaQuery(enabled ? '(prefers-reduced-motion: reduce)' : undefined, false)
+  const animate = enabled && !reducedMotion
   const [, force] = useState(0)
   const shownRef = useRef(0)
   const lastTargetRef = useRef('')
 
   // New message / rewritten prefix → restart the reveal from zero.
-  if (!target.startsWith(lastTargetRef.current.slice(0, Math.floor(shownRef.current)))) {
+  if (!animate) shownRef.current = target.length
+  else if (target !== lastTargetRef.current && !target.startsWith(lastTargetRef.current.slice(0, Math.floor(shownRef.current)))) {
     shownRef.current = 0
   }
   lastTargetRef.current = target
-  if (!enabled) shownRef.current = target.length
 
   useEffect(() => {
-    if (!enabled) return
+    if (!animate || shownRef.current >= target.length) return
     let raf = 0
     let last: number | null = null
     const tick = (t: number) => {
@@ -65,10 +68,11 @@ export function useSmoothText(target: string, enabled: boolean, opts?: SmoothRev
       last = t
       const targetLen = lastTargetRef.current.length
       if (shownRef.current < targetLen) {
+        const visible = Math.floor(shownRef.current)
         shownRef.current = nextRevealCount(shownRef.current, targetLen, dt, opts)
-        force((n) => n + 1)
+        if (Math.floor(shownRef.current) !== visible) force((n) => n + 1)
         // Keep painting while there is still backlog to reveal.
-        raf = requestAnimationFrame(tick)
+        if (shownRef.current < targetLen) raf = requestAnimationFrame(tick)
       }
       // Caught up: stop the loop. A later `target` growth re-renders this hook
       // (target is read fresh below), and the next render's effect — re-run
@@ -78,7 +82,7 @@ export function useSmoothText(target: string, enabled: boolean, opts?: SmoothRev
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, target])
+  }, [animate, target])
 
   return target.slice(0, Math.floor(shownRef.current))
 }

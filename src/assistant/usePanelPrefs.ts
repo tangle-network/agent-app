@@ -216,33 +216,7 @@ export function usePanelPrefs(
   };
 }
 
-/**
- * Whether a media query matches, read synchronously on first render so the
- * panel never first-paints in the wrong layout. A runtime without matchMedia
- * (jsdom, some webviews) keeps `fallback` instead of throwing; the panel lives
- * in the always-mounted shell.
- */
-export function useMediaQuery(query: string, fallback = true): boolean {
-  const [matches, setMatches] = useState(() =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(query).matches
-      : fallback,
-  );
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      typeof window.matchMedia !== "function"
-    ) {
-      return;
-    }
-    const mq = window.matchMedia(query);
-    const update = () => setMatches(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, [query]);
-  return matches;
-}
+export { useMediaQuery } from "../web-react/media-query";
 
 /** The viewport's width, tracked across resizes. Without a window it is
  *  unbounded, so server renders lay the panel out as docked. */
