@@ -40,6 +40,7 @@
 
 import { useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
+  isHarness,
   isModelCompatibleWithHarness,
   snapHarnessToModel,
   snapModelToHarness,
@@ -64,7 +65,6 @@ const HARNESS_LABELS: Partial<Record<Harness, readonly [name: string, descriptio
   'factory-droids': ['Factory Droids'],
   cursor: ['Cursor'],
   hermes: ['Hermes'],
-  forge: ['Forge'],
   pi: ['Pi'],
   openclaw: ['OpenClaw'],
   acp: ['ACP'],
@@ -260,10 +260,10 @@ export type HarnessPickerProps = Omit<ChoicePickerProps, 'value' | 'onChange' | 
 export function HarnessPicker({ value, onChange, available, optionsOverride, defaultOption, variant = 'chip', ...rest }: HarnessPickerProps) {
   // Quiet inherits the trigger's tone, so the mark lifts with the label on hover.
   const glyph = (h: Harness) => <HarnessGlyph harness={h} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
-  const ids = available ?? (Object.keys(HARNESS_LABELS) as Harness[])
+  const ids = (available ?? (Object.keys(HARNESS_LABELS) as Harness[])).filter(isHarness)
   const options = [
     ...(defaultOption ? [{ value: '', label: defaultOption.label, icon: <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" /> }] : []),
-    ...(value && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h), ...optionsOverride?.[h] })),
+    ...(isHarness(value) && !ids.includes(value) ? [value, ...ids] : ids).map((h) => ({ value: h, label: harnessLabel(h), description: HARNESS_LABELS[h]?.[1], icon: glyph(h), ...optionsOverride?.[h] })),
   ]
   return <ChoicePicker {...rest} variant={variant} value={value} onChange={(v) => onChange(v as Harness | '')} options={options} placeholder="Select harness" title="Harness" />
 }
@@ -402,7 +402,7 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   // (#802); the current harness stays listed so a pinned pair never loses its
   // own row.
   const offeredHarnesses = (availableHarnesses ?? (Object.keys(HARNESS_LABELS) as Harness[]))
-    .filter((h) => h === harness || isModelCompatibleWithHarness(h, model))
+    .filter((h) => isHarness(h) && (h === harness || isModelCompatibleWithHarness(h, model)))
 
   const selectedModel = models.find((m) => m.id === model)
   const showEffort = selectedModel?.supportsReasoning ?? true
