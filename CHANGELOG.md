@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.48
+
+- fix: retain locked historical harness labels (#1590)
+
 ## 4.0.47
 
 - docs: regenerate codemap for the KNOWN_HARNESSES doc comment (#1594)
