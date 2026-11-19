@@ -311,6 +311,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   const startedAt = Date.now()
   let seq = 0
   let clientGone = false
+  let firstTextCommitted = false
   let pending: unknown[] = []
   let lastFlush = Date.now()
   let started = false
@@ -397,8 +398,13 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       const line = JSON.stringify(ev)
       pending.push(ev)
       pendingChars += line?.length ?? 0
-      // Commit the native identity and its ordered prefix before our live write.
-      if (innerOf(ev)?.type === 'execution.started') await flush()
+      // Commit native identity or the first visible text and its ordered prefix.
+      const firstText = !firstTextCommitted && deltaTypeOf(ev) === 'text' &&
+        (innerOf(ev)!.text as string).trim().length > 0
+      if (innerOf(ev)?.type === 'execution.started' || firstText) {
+        await flush()
+        if (firstText) firstTextCommitted = true
+      }
       if (!clientGone && opts.write) {
         try {
           // Live delivery carries a provisional ordering hint, not the persisted
