@@ -103,11 +103,10 @@ and reload the saved `?threadId=...` URL. Inspect persisted assistant text and
 model/token metadata, not only a successful HTTP connection or optimistic user
 message. A second message uses the same thread ID as the agent session ID.
 
-History is `/?view=history`; its search and sorting cover the existing API's
-pages, not only the capped rail. Native links retain normal browser navigation.
-The shared stream client resumes a dropped stream; reopening a running thread
-uses existing replay handles and durable rows without appending the same text
-twice. Verify that live behavior separately on the target environment.
+At `/?view=history`, the workspace passes its complete thread list to
+`LocalSessionHistoryPanel`. Search and sorting reuse those rows. Thread links
+support normal browser navigation. Reopen a running thread on the target
+environment to verify that its stream resumes and each message appears once.
 
 The existing upload endpoint returns inline or sandbox `parts`. The template
 uses `ChatComposer.onSendParts` rather than pretending those responses are the

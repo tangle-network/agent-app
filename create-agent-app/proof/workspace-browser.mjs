@@ -246,6 +246,20 @@ try {
   await page.reload()
   await page.getByRole('link', { name: 'History', exact: true }).first().click()
   await page.getByRole('heading', { name: 'History', exact: true }).waitFor()
+  const search = page.getByRole('searchbox', { name: 'Search sessions' })
+  const historyReads = []
+  const countHistoryRead = request => {
+    if (new URL(request.url()).pathname === '/api/threads') historyReads.push(request.method())
+  }
+  page.on('request', countHistoryRead)
+  await search.fill('no matching conversation')
+  await page.getByText('No sessions match “no matching conversation”.', { exact: true }).waitFor()
+  await page.getByRole('combobox', { name: 'Sort sessions' }).click()
+  await page.getByRole('option', { name: 'Oldest' }).click()
+  await search.fill('')
+  await page.getByRole('link', { name: 'Saved workspace proof', exact: true }).last().waitFor()
+  page.off('request', countHistoryRead)
+  assert.deepEqual(historyReads, [])
   await page.getByRole('link', { name: 'Saved workspace proof', exact: true }).last().click()
   await page.waitForURL(`${origin}${href}`)
   await page.getByText('Send a message to continue this thread.', { exact: true }).waitFor()
