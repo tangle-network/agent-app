@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChatComposer, ChatMessages, InteractionPlanCard, InteractionQuestionCard,
   chatTurnRequestInit, createInteractionAnswerSubmitter, persistedPartToInteraction,
-  streamChatTurn, useChatInteractions,
+  streamChatTurn, useChatInteractions, useChatScroll,
   type ChatUiMessage, type ChatStreamCallbacks, type ComposerFilePart,
 } from '@tangle-network/agent-app/web-react'
 import { json, post, threadHref, toUiMessage, type Message, type Thread } from './api'
@@ -26,6 +26,7 @@ export function Conversation({ initialThreadId, onThread, onChanged }: {
   const productName = useRef(document.title)
   const asks = useChatInteractions({ mode: 'durable' })
   const uploads = useInlineUploads()
+  const transcript = useChatScroll()
   const submitAnswer = useMemo(() => createInteractionAnswerSubmitter({
     url: '/api/chat/interactions', body: { threadId },
   }), [threadId])
@@ -65,10 +66,15 @@ export function Conversation({ initialThreadId, onThread, onChanged }: {
     async function open() {
       if (!initialThreadId) return
       try {
-        await refresh(initialThreadId, signal)
-        const { running } = await json<{ running: string[] }>(
-          `/api/chat/running?threadId=${encodeURIComponent(initialThreadId)}`, { signal },
-        )
+        // The saved transcript paints as soon as it lands; the running-turn
+        // probe travels alongside it instead of after it, so the editor is
+        // usable one round trip sooner on an idle thread.
+        const [, { running }] = await Promise.all([
+          refresh(initialThreadId, signal),
+          json<{ running: string[] }>(
+            `/api/chat/running?threadId=${encodeURIComponent(initialThreadId)}`, { signal },
+          ),
+        ])
         if (running.length) {
           setBusy(true)
           // Replay is an event view, not a second transcript. On reload, keep
@@ -180,8 +186,14 @@ export function Conversation({ initialThreadId, onThread, onChanged }: {
   const empty = !threadId && messages.length === 0
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {!empty && <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4" aria-label="Conversation">
-        <div className="mx-auto w-full max-w-[820px]">
+      {!empty && <div
+        ref={transcript.viewportRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Conversation"
+        className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4"
+      >
+        <div ref={transcript.contentRef} className="mx-auto w-full max-w-[820px]">
           <>{opening && <p role="status" className="text-sm text-muted-foreground">Loading conversation…</p>}</>
           <ChatMessages messages={messages} loading={busy && asks.pending.length === 0} error={error} renderExtras={(message) => {
             const names = (message.parts ?? []).filter((part) => part.type === 'file' || part.type === 'image')
