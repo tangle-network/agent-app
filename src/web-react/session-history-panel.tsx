@@ -1,5 +1,5 @@
 /** History search, rows, and bulk actions over caller-owned session data. */
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { sessionLabel, UNTITLED_SESSION_LABEL, type SessionRailAction, type SessionSort, type SessionSummary } from '../session-shell/index'
 import { Button, Checkbox, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@tangle-network/ui/primitives'
 import { ShellHeader } from '@tangle-network/sandbox-ui/workspace'
@@ -235,6 +235,27 @@ function useSessionHistoryPanelViewState({
     validAgeDays, parsedAgeDays, emptyTitle, emptyDescription, isSearching, searchTerm, hrefForSession,
     respondingSessionIds, untitledLabel, formatTimestamp, onRename, onDelete, renameLabel,
     extraActions, sentinelRef, bulkTarget, bulkBusy, setBulkTarget, setBulkError, bulkError, confirmBulkAction }
+}
+
+const noHistoryRequest = () => {}
+
+/** Search a complete, newest-first session list already loaded by the workspace. */
+export function LocalSessionHistoryPanel({ sessions, ...props }: Pick<SessionHistoryPanelProps,
+  'hrefForSession' | 'newSessionHref' | 'emptyTitle' | 'linkComponent' | 'className'
+> & { sessions: SessionSummary[] }) {
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<SessionSort>('newest')
+  const ordered = useMemo(() => sort === 'newest' ? sessions : [...sessions].sort(
+    (a, b) => (Date.parse(a.updatedAt ?? '') || 0) - (Date.parse(b.updatedAt ?? '') || 0),
+  ), [sessions, sort])
+  const needle = query.trim().toLocaleLowerCase()
+  const items = useMemo(() => needle
+    ? ordered.filter(session => sessionLabel(session).toLocaleLowerCase().includes(needle))
+    : ordered, [ordered, needle])
+  return <SessionHistoryPanel {...props} hasAnySessions={sessions.length > 0}
+    query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort}
+    history={{ items, hasMore: false, isLoadingFirst: false, isLoadingMore: false, isError: false,
+      loadMore: noHistoryRequest, retry: noHistoryRequest, reload: noHistoryRequest }} />
 }
 
 type SessionHistoryPanelViewState = ReturnType<typeof useSessionHistoryPanelViewState>

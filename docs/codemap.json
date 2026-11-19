@@ -30249,6 +30249,12 @@
           "doc": "The sources still resolving — rendered as their own state, never as an absence."
         },
         {
+          "name": "LocalSessionHistoryPanel",
+          "kind": "function",
+          "signature": "({ sessions, ...props }: Pick<SessionHistoryPanelProps, \"className\" | \"emptyTitle\" | \"hrefForSession\" | \"newSessionHref…",
+          "doc": "Search a complete, newest-first session list already loaded by the workspace."
+        },
+        {
           "name": "mediaTypeForMentionPath",
           "kind": "function",
           "signature": "(path: string) => string | undefined",

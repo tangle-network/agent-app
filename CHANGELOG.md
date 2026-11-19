@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.42
+
+- Support Sandbox UI 11 and update the generated chat starter (#1587)
+
 ## 4.0.41
 
 - docs: regenerate the transcript module code map (#1586)

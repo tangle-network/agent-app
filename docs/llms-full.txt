@@ -39060,6 +39060,14 @@ interface LinkLikeProps
 (record: ProvenanceRecord) => ProvenanceSource[]
 ```
 
+### `LocalSessionHistoryPanel`
+
+`function` — Search a complete, newest-first session list already loaded by the workspace.
+
+```ts
+({ sessions, ...props }: Pick<SessionHistoryPanelProps, "className" | "emptyTitle" | "hrefForSession" | "newSessionHref…
+```
+
 ### `mediaTypeForMentionPath`
 
 `function` — The `image/*` mime for a mention path by extension, or `undefined` for anything not in the known image set (dispatched as `type: 'file'`).
