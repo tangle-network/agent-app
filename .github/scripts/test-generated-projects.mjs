@@ -280,18 +280,21 @@ function installAndRunScaffolder({
     if (!/^\/assets\/\*\n\s+Cache-Control: public, max-age=31536000, immutable$/m.test(headers)) {
       throw new Error('Chat build did not emit dist/client/_headers with immutable /assets/*')
     }
-    // Playwright is the repository's proof driver, not a dependency available
-    // to the fresh generated browser build. The child shares the scrubbed HOME.
-    // Invoke the installed proof driver directly: pnpm exec would reinstall the
-    // repository when its store differs from the deliberately scrubbed HOME.
-    run(process.execPath, [playwrightCli, 'install', 'chromium'], { env })
+    // Only the proof driver's versioned browser binaries survive across runs.
+    // Project dependencies, credentials and browser profiles stay in the fresh workspace.
+    const browserEnv = {
+      ...env,
+      PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ??
+        join(process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'), 'agent-app', 'proof-browsers'),
+    }
+    run(process.execPath, [playwrightCli, 'install', '--only-shell', 'chromium'], { env: browserEnv })
     // Keep sanitized proof diagnostics and browser evidence after the scrubbed
     // project/home scratch is removed, including when the Worker dies mid-flow.
     const evidenceRoot = join(process.env.XDG_STATE_HOME ?? join(homedir(), '.local', 'state'), 'agent-app', 'generated-proof')
     mkdirSync(evidenceRoot, { recursive: true, mode: 0o700 })
     const evidence = process.env.VERIFICATION_DIR ?? mkdtempSync(join(evidenceRoot, 'workspace-'))
     process.stdout.write(`Generated workspace evidence retained at ${evidence}\n`)
-    run(process.execPath, [workspaceProof, project, evidence], { env })
+    run(process.execPath, [workspaceProof, project, evidence], { env: browserEnv })
   }
   assertEqual(
     readFileSync(workspacePath, 'utf8'),
