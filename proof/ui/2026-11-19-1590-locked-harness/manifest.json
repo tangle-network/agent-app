@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "scope": "Real Storybook component-fixture before/after evidence for locked historical harness identity; no production or full-qualification claim",
+  "repository": "https://github.com/tangle-network/agent-app",
+  "pullRequest": 1590,
+  "sources": [
+    {
+      "phase": "before",
+      "head": "c339c3eaf42ed2d91f99f937d4fe673c006907b8",
+      "tree": "667e66ca64c48c825e6829840086545f653f841a",
+      "expectedLockedLabel": "forge",
+      "actualLockedLabel": "Select harness",
+      "productExit": 1,
+      "captureExit": 0,
+      "custodyExit": 0,
+      "passed": false,
+      "journeyCompleted": true
+    },
+    {
+      "phase": "after",
+      "head": "4ac8bc73134d9e3565b36d64611947bb9d3749bc",
+      "tree": "18439f179762996e88af52607afc33c264f11238",
+      "expectedLockedLabel": "forge",
+      "actualLockedLabel": "forge",
+      "productExit": 0,
+      "captureExit": 0,
+      "custodyExit": 0,
+      "passed": true,
+      "journeyCompleted": true
+    }
+  ],
+  "historicalStory": {
+    "path": "src/stories/chat-controls/AgentSessionControls.stories.tsx",
+    "sha256": "2c8b03c18a4dc5d117167a1776e41ed0d30efe966c54d9a603b4ca7563b94414",
+    "sameBytesOnBothHeads": true,
+    "historicalValue": "forge"
+  },
+  "directCallbackCount": "unobserved",
+  "fullQualification": "not claimed by these artifacts",
+  "files": [
+    {
+      "name": "before-locked-desktop-dark-1440.png",
+      "phase": "before",
+      "bytes": 14774,
+      "sha256": "5597644676062785af251d9ae871d26bf091f143f0a62f73bdcfd757f86c33bf",
+      "state": "locked-desktop",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "before-locked-phone-light-390.png",
+      "phase": "before",
+      "bytes": 12192,
+      "sha256": "0f4dd997ce57d5b5b4415add738144c2a57d2c0d5293617b270d2ca051fd2b14",
+      "state": "locked-phone",
+      "theme": "light",
+      "widthPx": 390,
+      "heightPx": 844
+    },
+    {
+      "name": "before-locked-hover-dark-1440.png",
+      "phase": "before",
+      "bytes": 26082,
+      "sha256": "fa79e422b31a5cc1f50455b83cdc030da171278da20b80845b3b8bd60c39e7e7",
+      "state": "locked-hover",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "before-locked-focus-dark-1440.png",
+      "phase": "before",
+      "bytes": 26968,
+      "sha256": "278e15e1da469cf9e89ba9978d39fb82981f762f9a28e91207c6f1ce75874aee",
+      "state": "locked-focus",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "before-active-claude-code-light-390.png",
+      "phase": "before",
+      "bytes": 27362,
+      "sha256": "b7413bdd395cd14c56da65da96288ce617d4ccec6a3fb424b9419eed2c814ea5",
+      "state": "active-claude-code",
+      "theme": "light",
+      "widthPx": 390,
+      "heightPx": 844
+    },
+    {
+      "name": "before-locked-harness-journey.webm",
+      "phase": "before",
+      "bytes": 294736,
+      "sha256": "ee57a0c6b5f98d2899d29fa669492d9c46bdf2488e79eec93648c409e0d11579",
+      "state": "locked-desktop-to-phone-and-active-selection",
+      "themeSequence": [
+        "dark",
+        "light"
+      ],
+      "widthPx": 1440,
+      "heightPx": 960,
+      "durationSeconds": 9.12
+    },
+    {
+      "name": "after-locked-desktop-dark-1440.png",
+      "phase": "after",
+      "bytes": 14584,
+      "sha256": "bca8cffc0f6193f770efadfb4397df5353d08d12002c6df060def5a08e01b4ab",
+      "state": "locked-desktop",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "after-locked-phone-light-390.png",
+      "phase": "after",
+      "bytes": 11700,
+      "sha256": "ee932b66a2a64feb42c204d8bcaaa0494858ec01fb0430de8b1abb56d444be62",
+      "state": "locked-phone",
+      "theme": "light",
+      "widthPx": 390,
+      "heightPx": 844
+    },
+    {
+      "name": "after-locked-hover-dark-1440.png",
+      "phase": "after",
+      "bytes": 25394,
+      "sha256": "8e4256552d1883f8579a6256bb4a3857f991cb7e30fd9da6634d5ed350d5092d",
+      "state": "locked-hover",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "after-locked-focus-dark-1440.png",
+      "phase": "after",
+      "bytes": 26277,
+      "sha256": "c63fc6ee79bae2ea8bf77e2b17759935be4994d16603e559f5ba956cf6a8d7fb",
+      "state": "locked-focus",
+      "theme": "dark",
+      "widthPx": 1440,
+      "heightPx": 960
+    },
+    {
+      "name": "after-active-claude-code-light-390.png",
+      "phase": "after",
+      "bytes": 27362,
+      "sha256": "b7413bdd395cd14c56da65da96288ce617d4ccec6a3fb424b9419eed2c814ea5",
+      "state": "active-claude-code",
+      "theme": "light",
+      "widthPx": 390,
+      "heightPx": 844
+    },
+    {
+      "name": "after-locked-harness-journey.webm",
+      "phase": "after",
+      "bytes": 302492,
+      "sha256": "15e7a08caea7f191d0981c404a3965fbffff5d3bad22d7f4d4233ced3a069a14",
+      "state": "locked-desktop-to-phone-and-active-selection",
+      "themeSequence": [
+        "dark",
+        "light"
+      ],
+      "widthPx": 1440,
+      "heightPx": 960,
+      "durationSeconds": 8.6
+    }
+  ]
+}
