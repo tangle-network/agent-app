@@ -136,7 +136,7 @@ class HarnessSelectionError
 
 ### `KNOWN_HARNESSES`
 
-`const` — Recognized backend identities, including IDs needed by historical sessions.
+`const` — Recognized backend identities for new sessions.
 
 ```ts
 readonly Harness[]
