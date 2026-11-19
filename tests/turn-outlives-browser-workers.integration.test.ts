@@ -384,7 +384,7 @@ it('commits native admission before writes and preserves D1 through HTTP loss an
     ...(worker && !workerClosed ? [{ resource: 'workerd-harness', state: 'OWNED_UNKNOWN', closeState }] : []),
     ...stages.filter(stage => stage.state === 'pending' && stage.deadlineObserved).map(stage => ({ resource: 'operation:' + stage.name, state: 'OWNED_UNKNOWN' })),
   ]
-  const receipt = (kind: string) => ({ kind, passed, failure: failure ? errorRecord(failure) : null, records, stages,
+  const receipt = (kind: string) => ({ kind, testHost: { node: process.version, pid: process.pid }, passed, failure: failure ? errorRecord(failure) : null, records, stages,
     counterparts: { http: httpCounterpart, node: nodeCounterpart }, socketObservation: socketObservation(), cleanupErrors, workerClosed, closeState, ownedResources: ownership(), retainedOperationNames: retained.map(operation => operation.name),
     cleanupComplete: workerClosed && cleanupErrors.length === 0 && ownership().length === 0,
     limits: 'Real local HTTP/workerd/D1/tap only; deadlines observe retained operations, never fake closure; no Runtime pre-enqueue/native backend/key/paid model/physical termination claim' })
