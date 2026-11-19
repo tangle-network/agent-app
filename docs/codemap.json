@@ -8498,7 +8498,7 @@
           "name": "KNOWN_HARNESSES",
           "kind": "const",
           "signature": "readonly Harness[]",
-          "doc": "Recognized backend identities, including IDs needed by historical sessions."
+          "doc": "Recognized backend identities for new sessions."
         },
         {
           "name": "modelProvider",
