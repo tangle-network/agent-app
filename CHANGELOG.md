@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.45
+
+- fix: commit native admission before buffered live delivery (#1585)
+
 ## 4.0.44
 
 - fix: retire Forge from shared harness and profile pickers (#1589)
