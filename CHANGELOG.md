@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.44
+
+- fix: retire Forge from shared harness and profile pickers (#1589)
+
 ## 4.0.43
 
 - fix(catalog): select current available GPT and Fable families (#1588)
