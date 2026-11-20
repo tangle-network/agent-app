@@ -52,7 +52,7 @@ export async function connectHostedTurnCancellation(namespace: TurnHostControlNa
   const response = await hostedCancellationRequest(namespace, target, auth, true)
   if (!response) throw new TurnControlUnavailableError('The host id is invalid')
   const controller = new AbortController()
-  const close = await observeCancellationSocket(response, controller, () => controller.abort(new TurnControlUnavailableError()))
+  const close = await observeCancellationSocket(response, controller, () => {})
   return { signal: controller.signal, close }
 }
 
