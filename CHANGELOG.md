@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.52
+
+- fix(deps): accept @tangle-network/agent-eval 2 (#1597)
+
 ## 4.0.51
 
 - fix(turn-stream): reconnect a dropped durable Stop socket and replay Stop (#1581)
