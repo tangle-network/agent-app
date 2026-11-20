@@ -257,6 +257,10 @@ export interface RouterTurnOptions {
   /** At most this many tool calls run. The next one is refused before it runs and the turn ends
    *  with `turn_tool_limit`. */
   maxToolCalls?: number
+  /** How many of one model call's tool calls run at once (the tool loop's `maxConcurrentToolCalls`; agent-runtime
+   *  10.0.8 or later). Default 1, one at a time. Results still reach the model and `onEvent` in call order. Raise it
+   *  only for tools that do not depend on each other finishing first. */
+  maxConcurrentToolCalls?: number
   /** Replace a domain-specific tool result; return undefined to use the shared serialization and limit. */
   renderToolResult?: (toolName: string, outcome: RouterTurnToolOutcome) => string | undefined
   /**
@@ -474,6 +478,14 @@ function callOutput(state: { lastModelSpan: TurnSpan | undefined }) {
   }
 }
 
+/** Every tool-call id earlier messages carry, so an id the turn makes up never repeats one. */
+function toolCallIdsIn(messages: NonNullable<RouterTurnOptions['history']>): Set<string> {
+  return new Set(messages.flatMap(message => [
+    ...('tool_calls' in message ? (message.tool_calls ?? []).map(call => call.id) : []),
+    ...('tool_call_id' in message && message.tool_call_id ? [message.tool_call_id] : []),
+  ]))
+}
+
 export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterTurnOutcome> {
   // A continued turn answers the last user message in its checkpoint.
   const lastUser = options.continueFrom?.messages.filter(message => message.role === 'user').at(-1)?.content
@@ -566,14 +578,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   const toolCalls: RouterTurnOutcome['toolCalls'] = []
   const toolEvents: RouterTurnToolEvent[] = []
   const started = new Map<string, number>()
-  const priorCallIds = new Set((options.continueFrom?.messages ?? options.history ?? []).flatMap(message => [
-    ...('tool_calls' in message ? (message.tool_calls ?? []).map(call => call.id) : []),
-    ...('tool_call_id' in message && message.tool_call_id ? [message.tool_call_id] : []),
-  ]))
+  const priorCallIds = toolCallIdsIn(options.continueFrom?.messages ?? options.history ?? [])
   let segmentOpen = false
   let toolsRan = 0
   let checkpoint: LoopMessage[] | null = null
-  let toolLimitReached = false
+  // The first call refused at `maxToolCalls`: the turn ends at its result, after calls run at once ahead of it report.
+  let refusedCallId: string | undefined
   const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => {
     if (id) return id
@@ -610,6 +620,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       isExecutableTool: name => byFunction.has(name),
       deadlineMs: deadline,
       ...(options.maxToolTurns !== undefined ? { maxToolTurns: options.maxToolTurns } : {}),
+      maxConcurrentToolCalls: options.maxConcurrentToolCalls,
       labelFor: call => byFunction.get(call.toolName)?.name ?? call.toolName,
       renderResult: (label, outcome) => options.renderToolResult?.(label, outcome) ?? renderResult(outcome, options.toolResultLimit),
       executeToolCall: async (call: LoopToolCall, context) => {
@@ -617,7 +628,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
         if (!tool) return { ok: false, code: 'unknown_tool', message: `No tool named ${call.toolName}` }
         if (signal?.aborted) return { ok: false, code: 'aborted', message: 'The turn was cancelled before this tool ran.' }
         if (options.maxToolCalls !== undefined && toolsRan >= options.maxToolCalls) {
-          toolLimitReached = true
+          refusedCallId ??= call.toolCallId
           return { ok: false, code: 'tool_limit', message: 'The turn reached its tool-call limit.' }
         }
         toolsRan++
@@ -703,7 +714,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           : { type: 'tool', callId, toolName, status: 'error', startedAt, endedAt: Date.now(),
             error: { code: step.outcome.code, message: step.outcome.message } })
         // The refused call never ran; the turn ends here rather than asking the model again.
-        if (toolLimitReached) return 'tool_limit'
+        if (callId === refusedCallId) return 'tool_limit'
       } else if (step.kind === 'capped') {
         if (step.stopReason === 'deadline' && step.messages) checkpoint = step.messages
         return step.stopReason
