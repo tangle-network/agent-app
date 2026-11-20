@@ -61,8 +61,8 @@ export interface ComposerSendRejected {
  * this existed — reads as accepted, so wiring stays unchanged; a thrown error, a
  * rejected promise, or `{ ok: false }` is the rejection that restores the draft.
  * A handler that resolves only when the whole turn finishes still reports
- * correctly: the input already cleared on dispatch, so the answer only decides
- * whether the draft comes back.
+ * correctly: with the default clearing policy the input cleared on dispatch,
+ * so the answer only decides whether the draft comes back.
  */
 export type ComposerSendOutcome = void | { ok: true } | ComposerSendRejected
 export type ComposerSendResult = ComposerSendOutcome | Promise<ComposerSendOutcome>
@@ -107,9 +107,9 @@ export interface ComposerSendFailure {
   parts: ComposerFilePart[]
   /** Whatever the handler threw / rejected with, or the `{ ok: false }` value. */
   error: unknown
-  /** True when the draft was put back in the textarea (the box was empty).
-   *  False means the user had typed a replacement, so the unsent text is held in
-   *  the notice instead. */
+  /** True when the draft remains in the textarea: restored into an empty box,
+   *  or retained unchanged with `clearOnSend={false}`. False means a distinct
+   *  replacement is in the box, so the unsent text is held in the notice. */
   restored: boolean
 }
 
@@ -156,6 +156,10 @@ export interface ChatComposerProps {
   onSendFailed?: (failure: ComposerSendFailure) => void
   /** Notice copy when the handler names no reason of its own. */
   sendFailureMessage?: string
+  /** Clear the draft optimistically on dispatch. Defaults to true.
+   *  Set false for a controlled host that clears at its actual acceptance
+   *  boundary and protects edits made after dispatch. */
+  clearOnSend?: boolean
   /** Stop the in-flight turn; shown in place of Send while `isStreaming`. */
   onCancel?: () => void
   isStreaming?: boolean
@@ -166,7 +170,7 @@ export interface ChatComposerProps {
   sendDisabled?: boolean
   placeholder?: string
 
-  /** Controlled value. Omit for self-managed internal state (cleared on send). */
+  /** Controlled value. Omit for self-managed internal state (cleared on send by default). */
   value?: string
   onValueChange?: (value: string) => void
   /** Initial text in uncontrolled mode; ignored when `value` is provided. */

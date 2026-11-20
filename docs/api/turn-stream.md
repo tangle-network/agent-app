@@ -4,7 +4,7 @@
 
 Source: `src/turn-stream/index.ts`
 
-73 exports.
+79 exports.
 
 ### `acquireDurableTurnLock`
 
@@ -60,6 +60,14 @@ number
 
 ```ts
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
+```
+
+### `connectHostedTurnCancellation`
+
+`function` — Owned by the original hosted request, never its browser.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<TurnCancellationC…
 ```
 
 ### `createDurableObjectTurnEventStore`
@@ -278,6 +286,14 @@ interface ReconcileStaleDurableTurnLockOptions
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
+### `requestHostedTurnCancellation`
+
+`function` — Call only after product identity/editor/actual-thread authorization.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<{ requested: bool…
+```
+
 ### `scopeIndexChannelKey`
 
 `function` — Running-turn index for the optional Durable Object turn-event backend.
@@ -292,6 +308,22 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ```ts
 (workspaceId: string, threadId: string) => string
+```
+
+### `TURN_HOST_CANCEL_PATH`
+
+`const` — Server-only control on an existing unnamed host; never a turn start endpoint.
+
+```ts
+"/turn-host/cancel"
+```
+
+### `TURN_HOST_CONTROL_PATH`
+
+`const` — The same host's server-owned connection revokes execution permission on reset.
+
+```ts
+"/turn-host/control"
 ```
 
 ### `TURN_LOCK_TTL_MS`
@@ -388,6 +420,22 @@ interface TurnHost
 
 ```ts
 (objectId: string) => string
+```
+
+### `TurnHostControlNamespace`
+
+`interface` — Unique-id reconstruction is required; idFromName(hostId) addresses a different object.
+
+```ts
+interface TurnHostControlNamespace
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnLockAcquireInput`

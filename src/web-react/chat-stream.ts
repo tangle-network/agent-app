@@ -33,6 +33,7 @@ import {
   TURN_PHASE_EVENT,
   type TurnIntentData,
   type TurnPhaseData,
+  type TurnHostControlTarget,
 } from '../chat-routes/turn-progress'
 
 // The `/chat-routes` wire contract, re-exported for turn-body construction —
@@ -79,6 +80,12 @@ export {
   TURN_RESPONSE_EVENT,
   TURN_ROUTE_PHASE_MESSAGES,
   TURN_STREAM_LOST_CODE,
+  TURN_HOST_CONTROL_HEADER,
+  TURN_HOST_CONTROL_FIRST,
+  TURN_HOST_CONTROL_EVENT,
+  isTurnHostControlEvent,
+  type TurnHostControlTarget,
+  type TurnHostControlEvent,
   type TurnIntentData,
   type TurnIntentEvent,
   type TurnPhaseData,
@@ -110,6 +117,8 @@ export interface ChatStreamToolResult {
 /** Define callbacks to handle events and data during a chat streaming session */
 export interface ChatStreamCallbacks {
   onTurnId?: (turnId: string) => void
+  /** Opt-in hosted control only; this receipt does not mean paid admission. */
+  onHostControl?: (target: TurnHostControlTarget) => void
   /** The turn's current stage (`session.run.phase`), before its first output and between tool calls. */
   onPhase?: (phase: TurnPhaseData) => void
   /** The turn's intent line (`session.run.intent`): show it as a labeled status line until the first `onText`. */
@@ -550,10 +559,11 @@ export function defaultReconnectDelayMs(attempt: number, rand: () => number = Ma
  */
 export async function streamChatTurn(opts: StreamChatOptions): Promise<ConsumeChatStreamResult> {
   // A progress-first response answers refusals in-stream; settle it into the response it stands for.
-  const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase))
+  const res = await settleTurnResponse(await opts.start(), (phase) => opts.callbacks.onPhase?.(phase),
+    opts.callbacks.onIntent, opts.callbacks.onHostControl)
   if (!res.ok || !res.body) {
-    const { error: e } = await res.json().catch(() => ({})) as { error?: string | { code?: string; message?: string } }
-    throw Object.assign(new Error((typeof e === 'string' ? e : e?.message) ?? `HTTP ${res.status}`), { code: typeof e === 'object' ? e?.code : undefined })
+    const { error: e, code } = await res.json().catch(() => ({})) as { code?: string; error?: string | { code?: string; message?: string } }
+    throw Object.assign(new Error((typeof e === 'string' ? e : e?.message) ?? `HTTP ${res.status}`), { code: (typeof e === 'object' ? e?.code : undefined) ?? code })
   }
   // Headers arrive before the body, so a reset before the marker still has a
   // replay id. The body marker remains authoritative when it arrives.

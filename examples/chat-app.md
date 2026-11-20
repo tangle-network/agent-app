@@ -58,6 +58,25 @@ producers keep the lock until backend termination is observed; lost observation
 never permits another dispatch. `turnLock: false` is the explicit opt-out.
 The buffer serves live reconnect; message storage serves durable history.
 
+### Stop while a hosted browser turn awaits paid admission
+
+Opt in through the browser-safe `TURN_HOST_CONTROL_HEADER`/`TURN_HOST_CONTROL_FIRST`
+exports and configure `authorizeHostControl` on the same hosted routes. This
+callback verifies cookie identity, editor access and the actual thread's canonical
+workspace; full `authorize` still decides paid execution. Read the early receipt
+with `settleTurnResponse`'s `onHostControl` handler (or `streamChatTurn`'s callback),
+without treating it as accepted progress or assistant output.
+
+The product Stop action independently verifies editor/thread access, then calls
+`requestHostedTurnCancellation` with that exact receipt and its server-side auth.
+Another authorized workspace editor may Stop it. Keep client turn, retry attempt,
+host and server replay IDs distinct; never resolve an old client ID to the latest
+workspace lock. An accepted Stop is intent for this live invocation, not final
+settlement or permanent replay suppression. Retain pending browser Stop until its
+receipt and acknowledgement, suppress automatic resubmission, and capture that
+request's controller so a late acknowledgement cannot abort a successor. Tab loss
+before acknowledgement remains unknown; ordinary tab loss alone does not Stop.
+
 ### Prewarm the same lock before send
 
 Mount `routes.prewarm(request)` at the existing POST prewarm route. It uses the
@@ -94,7 +113,9 @@ keeps the readiness claim below the DO idle-eviction window. This is an
 optimization: send still performs the authenticated single-flight acquire.
 
 
-Mount `routes.replay(request, {turnId})`, `routes.running(request)`, and configured
+Mount `routes.replay(request, {turnId})`, `routes.running(request)`,
+`routes.trace(request, {turnId})` at `<turn path>/turns/:turnId/trace` (the receipt's
+`traceUrl`; see [the owner's view](../docs/turn-trace.md#the-owners-view)), and configured
 `routes.interactions.list/answer` handlers as in the scaffold Worker. Replay
 handles are separate from client message identifiers. A deliberate retry keeps
 `turnId` and supplies a new `retryAttemptId`; transport retries reuse both.

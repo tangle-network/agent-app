@@ -47,7 +47,8 @@
  *   delivered on the first pass, 8/8 with one re-run, at a cost of 1 extra turn
  *   in 9). Default `0`, so the behavior is unchanged unless a product asks.
  * - A responsive chain of length 1 costs no extra call or latency and remains
- *   byte-identical to no failover. A silent chain is now deliberately bounded.
+ *   byte-identical to no failover. A silent chain of two or more models is
+ *   bounded by the first-answer deadline; one model keeps only its open deadline.
  */
 
 import {
@@ -293,8 +294,11 @@ export interface ModelFailoverStreamOptions {
   openTimeoutMs?: number
   /**
    * Hard deadline from the source's first lifecycle event to its first
-   * answer-bearing event. Default 60 seconds. Processing/lifecycle events do
-   * not commit the attempt and do not extend this deadline.
+   * answer-bearing event. Default 60 seconds when the chain has another model
+   * to fail over to; a one-model chain has no default deadline, because ending
+   * its only attempt loses an answer a slow first token was still bringing.
+   * Processing/lifecycle events do not commit the attempt and do not extend
+   * this deadline.
    */
   firstResponseTimeoutMs?: number
   /** Override the commit-point rule. Default {@link isCommittingSandboxEvent}. */
@@ -392,13 +396,14 @@ function resolveTimeoutMs(value: number | undefined, fallback: number, label: st
 
 const TIMED_OUT = Symbol('model-attempt-timed-out')
 
-function deadlineAfter(timeoutMs: number): {
+function deadlineAfter(timeoutMs: number | null): {
   promise: Promise<typeof TIMED_OUT>
   clear: () => void
 } {
   let timer: ReturnType<typeof setTimeout> | undefined
+  // No deadline: a promise that never settles, so the race is the stream alone.
   const promise = new Promise<typeof TIMED_OUT>((resolve) => {
-    timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs)
+    if (timeoutMs !== null) timer = setTimeout(() => resolve(TIMED_OUT), timeoutMs)
   })
   return {
     promise,
@@ -488,11 +493,19 @@ export function streamWithModelFailover(
     DEFAULT_MODEL_STREAM_OPEN_TIMEOUT_MS,
     'openTimeoutMs',
   )
-  const firstResponseTimeoutMs = resolveTimeoutMs(
-    options.firstResponseTimeoutMs,
-    DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS,
-    'firstResponseTimeoutMs',
-  )
+  // A deadline exists to walk the chain. With one model there is nowhere to
+  // walk, so the default only turned a slow first token into a lost answer:
+  // a 2026-11-13 Discovery director turn ended at 60 s on its only model, and
+  // on 2026-11-18 the same director's first reasoning token took 296 s on a
+  // 295k-token context. The open deadline still bounds a stream that never
+  // opens; a product that wants this bound for one model names it.
+  const firstResponseTimeoutMs = options.firstResponseTimeoutMs === undefined && options.models.length < 2
+    ? null
+    : resolveTimeoutMs(
+      options.firstResponseTimeoutMs,
+      DEFAULT_MODEL_FIRST_RESPONSE_TIMEOUT_MS,
+      'firstResponseTimeoutMs',
+    )
   const liveLifecycle = options.liveLifecycleEvents === true
   const progress = createProgressQueue()
   let serving: string | undefined
@@ -528,7 +541,7 @@ export function streamWithModelFailover(
             model,
             timeoutMs: pass.outcome.timeoutCode === 'model_stream_open_timeout'
               ? openTimeoutMs
-              : firstResponseTimeoutMs,
+              : firstResponseTimeoutMs ?? 0,
           }
         } else {
           finalTimeout = undefined
@@ -598,14 +611,10 @@ export function streamWithModelFailover(
       throw err
     }
 
-    for (const event of handle.buffered) yield event
-
     const live = handle.iterator
-    if (!live) {
-      handle.abort()
-      return
-    }
     try {
+      for (const event of handle.buffered) yield event
+      if (!live) return
       for (;;) {
         const next = await live.next()
         if (next.done) return
@@ -615,7 +624,7 @@ export function streamWithModelFailover(
       // The consumer may abandon this generator mid-turn (client drop); close
       // the underlying stream rather than leaking it.
       handle.abort()
-      await closeIterator(live, options.log)
+      if (live) await closeIterator(live, options.log)
     }
   })()
 
@@ -669,7 +678,7 @@ function createModelAttemptDrainer(
   attemptState: { index: number },
   options: ModelFailoverStreamOptions,
   openTimeoutMs: ReturnType<typeof resolveTimeoutMs>,
-  firstResponseTimeoutMs: ReturnType<typeof resolveTimeoutMs>,
+  firstResponseTimeoutMs: number | null,
   committing: (event: unknown) => boolean,
   liveLifecycle: boolean,
   progress: ReturnType<typeof createProgressQueue>,

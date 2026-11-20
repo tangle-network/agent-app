@@ -1,5 +1,106 @@
 # Changelog
 
+## 4.0.49
+
+- fix: persist opening text before quiet progress (#1595)
+
+## 4.0.48
+
+- fix: retain locked historical harness labels (#1590)
+
+## 4.0.47
+
+- docs: regenerate codemap for the KNOWN_HARNESSES doc comment (#1594)
+- fix(create-agent-app): ride template engine cohort to agent-interface 5.10.28 (#1593)
+
+## 4.0.46
+
+- fix(create-agent-app): land saved threads at the user's last sentence (#1592)
+
+## 4.0.45
+
+- fix: commit native admission before buffered live delivery (#1585)
+
+## 4.0.44
+
+- fix: retire Forge from shared harness and profile pickers (#1589)
+
+## 4.0.43
+
+- fix(catalog): select current available GPT and Fable families (#1588)
+
+## 4.0.42
+
+- Support Sandbox UI 11 and update the generated chat starter (#1587)
+
+## 4.0.41
+
+- docs: regenerate the transcript module code map (#1586)
+
+## 4.0.40
+
+- perf(web-react): render only visible answer text and honor reduced motion (#1584)
+
+## 4.0.39
+
+- fix(chat-routes): close committed sources during buffered replay
+
+## 4.0.38
+
+- fix(web-react): let controlled hosts clear drafts on acceptance (#1582)
+
+## 4.0.37
+
+- feat(chat-routes): control hosted turns before admission (#1565)
+
+## 4.0.36
+
+- fix(turn-trace): a full span drops Server-Timing detail first and counts what it drops, so a model call keeps its usage (#1580)
+
+## 4.0.35
+
+- feat(runtime): shapeRequest shapes a Router request's decoded body before it is traced and gzipped (#1579)
+
+## 4.0.34
+
+- fix(turn-trace): keep tracedModelFetch's doc comment on tracedModelFetch (#1578)
+
+## 4.0.33
+
+- fix(chat-routes): a one-model chain has no default first-answer deadline (#1577)
+
+## 4.0.32
+
+- fix(platform): every delegation and modelKey waits out PLATFORM_BUSY inside 8 s (#1576)
+
+## 4.0.31
+
+- fix(turn-trace): a box tool that failed exports as failed though its span was recorded whole (#1575)
+
+## 4.0.30
+
+- feat(turn-trace): name a hybrid turn's settle: the wait for a speculatively started box and its release (#1574)
+
+## 4.0.29
+
+- fix(web-react): keep the trace download's object URL for a minute so Safari finishes it (#1573)
+
+## 4.0.28
+
+- feat(turn-trace): name the producer's own setup and settle, and give box tool calls their real duration (#1572)
+
+## 4.0.27
+
+- feat(web-react): a Trace drawer that shows a member their own turn's waterfall and its OTLP (#1571)
+
+## 4.0.26
+
+- fix(turn-trace): keep error text out of the owner's trace; make the route test prove its filters (#1570)
+
+## 4.0.25
+
+- feat(turn-trace): serve a turn's trace to its owner from the receipt's traceUrl (#1569)
+
 ## 4.0.24
 
 - fix(runtime): send the answer call that replaces a cancelled lower-effort call with tool_choice none (#1567)

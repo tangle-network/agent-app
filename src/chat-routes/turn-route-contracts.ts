@@ -12,8 +12,10 @@ import type { ModelPolicy } from '../policy-filters/index'
 import type { PersistedChatMessageForTurn, TurnEventStore } from '../stream/index'
 import type { D1LikeForTurns } from '../stream/turn-buffer'
 import type { TurnStreamAuth } from '../turn-stream/adapters'
+import type { TurnHostControlNamespace } from '../turn-stream/cancellation'
 import type { TurnSpan, TurnSpanAttrs, TurnTrace, TurnTraceSink, TurnTraceSummary } from '../turn-trace/recorder'
-import type { TurnRoutePhase } from './turn-progress'
+import type { TurnTraceReader } from '../turn-trace/otel'
+import type { TurnHostControlTarget, TurnRoutePhase } from './turn-progress'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import type { AgentMention, ChatTurnPartInput, ChatTurnRequestPayload } from './wire'
 import type { RouterTurnProducerOptions } from './router-producer'
@@ -248,6 +250,13 @@ export interface ChatTurnRequestContext {
   executionLimits?: ChatTurnExecutionLimits
   /** Set by `TurnStreamDO` on the turn it runs for `turnHost`: the route runs it there, never forwarding it again. */
   hosted?: boolean
+  /** Supplied only by the existing per-turn host. Independent of browser disconnect;
+   *  retain through the owned drain/disposal and forward this context unchanged. */
+  hostControl?: {
+    readonly hostId: string
+    readonly signal: AbortSignal
+    bind(target: TurnHostControlTarget, owner: { namespace: TurnHostControlNamespace; auth: TurnStreamAuth }): Promise<void>
+  }
 }
 
 /** A workspace agent a turn is addressed to, resolved by the product from an
@@ -565,6 +574,10 @@ export interface ChatTurnTraceOptions<TContext> {
   sink?: TurnTraceSink
   /** Labels for the root span, e.g. the workspace id. Called once per exported turn. */
   labels?(info: { identity: ChatTurnIdentity; executionId: string; context: TContext }): TurnSpanAttrs
+  /** Reads a turn's trace back for {@link ChatTurnRoutes.trace}. Default with no `sink`: `createIntelligenceTurnTraceReader({
+   *  project: projectId })`. A product with its own sink passes the reader for the same store; without one, the turn
+   *  receipt names no `traceUrl` and the route answers 404. */
+  read?: TurnTraceReader
 }
 
 /** Define options to configure chat turn routes including authorization, storage, and event buffering */
@@ -684,6 +697,14 @@ export interface CreateChatTurnRoutesOptions<TContext = void, TResource = unknow
    *  - The class's `turnRoutes` must pass `ctx` through unchanged: its `hosted` mark stops the object forwarding the
    *    turn again. */
   turnHost?: import('../turn-stream/adapters').TurnHost
+  /** Opt-in early host-control identity, before full paid authorization. Verify the
+   *  caller's identity, editor access and the actual thread's workspace. Return the
+   *  canonical workspace as tenantId; this grants no permission to execute. Only
+   *  requests with x-turn-host-control:first call it; an unavailable host still
+   *  refuses execution after this identity check. Legacy HTTP refusals
+   *  are unchanged. Any authorized editor may Stop the exact workspace invocation. */
+  authorizeHostControl?(args: { request: Request; body: ChatTurnRequestPayload }): Promise<
+    { ok: true; tenantId: string } | { ok: false; response: Response }>
   /** Pre-turn readiness gate that can short-circuit with a product `Response`
    *  before the producer runs (the user row is already persisted). Runs after
    *  `turnLock.acquire`, before `beforeTurn`. Omit → always proceed.
@@ -829,18 +850,25 @@ export const INTENT_LINE_MAX_CHARS = 240
 export interface ChatTurnRoutes {
   /** POST — warm the server-authorized workspace lock (and with `prewarm: 'box'` its box, under `ctx.waitUntil`); verify a named thread first. */
   prewarm(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
-  /** POST — run one turn, streaming NDJSON. First line is
-   *  `{type:'turn', turnId}` (the replay handle); the rest is the engine's
+  /** POST — run one turn, streaming NDJSON. First line is the receipt
+   *  `{type:'turn', turnId, traceId?, traceUrl?}`: the replay handle, the turn's
+   *  OTLP trace id and where {@link trace} serves it; the rest is the engine's
    *  event protocol. Pass the platform's `waitUntil` so the turn keeps
    *  running (and buffering) after a client disconnect. A request with
    *  `TURN_PROGRESS_HEADER` gets a progress-first stream once it is
-   *  authorized (`./turn-progress`). */
+   *  authorized (`./turn-progress`). The separate opt-in hosted control
+   *  envelope requires authorizeHostControl and a client control handler. */
   turn(request: Request, ctx?: ChatTurnRequestContext): Promise<Response>
   /** POST — stop the exact authorized execution; unavailable unless configured. */
   cancel(request: Request): Promise<Response>
   /** GET — replay a buffered turn from `?fromSeq=` (0 = everything), then
    *  follow it live until it completes. */
   replay(request: Request, params: { turnId: string }): Promise<Response>
+  /** GET — the turn's own trace as OTLP JSON, for its owner: the waterfall a product shows and a member downloads. Mount
+   *  it at `<turn path>/turns/:turnId/trace`, the `traceUrl` the turn receipt names; `turnId` is the turn's execution
+   *  id. The caller is authorized as `running` on the turn's thread, so only a caller who may read that thread gets it;
+   *  everyone else, and a turn whose trace is not stored yet, gets 404. Metadata only: the turn exporter's spans. */
+  trace(request: Request, params: { turnId: string }): Promise<Response>
   /** GET `?threadId=` — the reconnect-discovery endpoint: the turn ids still
    *  running on a thread, so a client that reloaded mid-turn can re-attach to
    *  the live stream via {@link replay} instead of losing it. Returns `[]` when

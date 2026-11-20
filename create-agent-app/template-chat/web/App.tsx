@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { CirclePlus, History, KeyRound } from 'lucide-react'
 import { AgentWorkspaceCompanion, AgentWorkspaceLayout } from '@tangle-network/agent-app/workspace-react'
-import { SessionHistoryPanel, useSessionHistory, type FetchSessionPage } from '@tangle-network/agent-app/web-react'
-import type { SessionSort } from '@tangle-network/agent-app/session-shell'
+import { LocalSessionHistoryPanel } from '@tangle-network/agent-app/web-react'
 import { ApiAccess } from './ApiAccess'
 import { Conversation } from './Conversation'
 import { workspaceTools } from './workspace-tools'
@@ -44,21 +43,6 @@ function Auth({ onAuthenticated }: { onAuthenticated: () => Promise<void> }) {
   </main>
 }
 
-const fetchHistory: FetchSessionPage = async ({ q, sort, signal }) => {
-  const threads = await listThreads(signal)
-  const items = threads.filter((thread) => (thread.title ?? '').toLocaleLowerCase().includes(q.toLocaleLowerCase()))
-    .sort((a, b) => (Date.parse(a.updatedAt ?? '') - Date.parse(b.updatedAt ?? '')) * (sort === 'oldest' ? 1 : -1))
-  return { items, nextCursor: null }
-}
-function HistoryPage({ threads }: { threads: Thread[] }) {
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<SessionSort>('newest')
-  const history = useSessionHistory({ fetchPage: fetchHistory, q: query.trim(), sort, initialPage: { items: threads, nextCursor: null } })
-  return <div className="h-full min-h-0"><SessionHistoryPanel history={history} hasAnySessions={threads.length > 0}
-    query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort}
-    hrefForSession={threadHref} newSessionHref="/" emptyTitle="No conversations yet" /></div>
-}
-
 function Workspace({ session }: { session: Session }) {
   const [threads, setThreads] = useState<Thread[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -88,7 +72,11 @@ function Workspace({ session }: { session: Session }) {
     contentClassName="h-dvh min-h-0 overflow-hidden" defaultRailCollapsed={false}
     prewarm={{ url: '/api/chat/prewarm' }}>
     {error && <div role="alert" className="p-4 text-sm text-destructive">{error} <button className="underline" onClick={() => location.reload()}>Reload</button></div>}
-    {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? <HistoryPage threads={threads} /> : <p role="status" className="p-6">Loading History…</p>
+    {showApiAccess ? <ApiAccess /> : showHistory ? loaded ? (
+        <div className="h-full min-h-0">
+          <LocalSessionHistoryPanel sessions={threads} hrefForSession={threadHref} newSessionHref="/" emptyTitle="No conversations yet" />
+        </div>
+      ) : <p role="status" className="p-6">Loading History…</p>
       : <AgentWorkspaceCompanion tabs={workspaceTools} persistenceKey={`workspace:${session.user.id}:tools`}><Conversation initialThreadId={initialThreadId} onThread={setActiveId} onChanged={refreshThreads} /></AgentWorkspaceCompanion>}
   </AgentWorkspaceLayout>
 }

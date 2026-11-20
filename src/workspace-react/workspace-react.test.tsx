@@ -49,7 +49,7 @@ describe('AgentWorkspaceLayout', () => {
       },
     })
 
-    expect(screen.getByRole('link', { name: 'New' }).className).toContain('bg-[var(--accent-surface-strong)]')
+    expect(screen.getByRole('link', { name: 'New', current: 'page' })).toBeTruthy()
   })
 
   it('adds the shared History route to active navigation automatically', () => {
@@ -62,7 +62,7 @@ describe('AgentWorkspaceLayout', () => {
       },
     })
 
-    expect(screen.getByText('History').parentElement?.parentElement?.className).toContain('bg-[var(--accent-surface-strong)]')
+    expect(screen.getByRole('link', { name: 'History', current: 'page' })).toBeTruthy()
   })
 
   it('adds any number of registered apps and follows live row updates', () => {

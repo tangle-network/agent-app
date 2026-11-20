@@ -1,5 +1,8 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { randomUUID } from 'node:crypto'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createChatTurnRoutes, createRouterTurnProducer, type ChatTurnMessageStore } from '../../src/chat-routes/index'
 import { createMemoryTurnEventStore } from '../../src/stream/index'
@@ -37,7 +40,9 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
       await sleep(60)
       response.writeHead(200, {
         'content-type': 'text/event-stream',
-        'server-timing': 'auth;dur=12.0, t_authed;dur=14.0, t_admitted;dur=25.0, dispatch_row;dur=4.0, spend_authorize;dur=8.0, upstream_start;dur=40.0, upstream_headers;dur=80.0',
+        // As long as the production Router's breakdown (30+ metrics), which fills most of a span's attribute budget.
+        'server-timing': ['auth;dur=12.0, t_authed;dur=14.0, t_admitted;dur=25.0, dispatch_row;dur=4.0, spend_authorize;dur=8.0, upstream_start;dur=40.0, upstream_headers;dur=80.0',
+          ...Array.from({ length: 34 }, (_, step) => `router_step_${step};dur=${step}.0`)].join(', '),
       })
       await sleep(80)
       const chunks = call === 1
@@ -45,7 +50,7 @@ function startRouter(seen: IncomingHttpHeaders[], otlp: Array<{ authorization?: 
           { choices: [], usage: { prompt_tokens: 900, completion_tokens: 12 } }]
         : [{ model: 'served/model', choices: [{ delta: { content: 'Four rooms ' } }] },
           { model: 'served/model', choices: [{ delta: { content: 'are ready.' } }] },
-          { choices: [], usage: { prompt_tokens: 950, completion_tokens: 6 } }]
+          { choices: [], usage: { prompt_tokens: 950, completion_tokens: 6, prompt_tokens_details: { cached_tokens: 800 } } }]
       for (const chunk of chunks) {
         response.write(`data: ${JSON.stringify(chunk)}\n\n`)
         await sleep(40)
@@ -126,6 +131,20 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     expect(model.attrs).toMatchObject({ 'http.status_code': 200, 'server_timing.upstream_start_ms': 40, 'gen_ai.request.model': 'requested/model',
       'gen_ai.usage.input_tokens': 900, 'gen_ai.usage.output_tokens': 12 })
     expect(model.attrs.ttft_ms).toBeGreaterThan(0)
+    // Each send fingerprints its prompt's parts, so a turn whose provider cache misses shows which part changed: within
+    // one turn the system message and tools are the same on both calls, and the request grows after them.
+    const [first, second] = spans.filter((span) => span.name === 'model.call').sort((a, b) => a.startMs - b.startMs)
+    for (const key of ['gen_ai.request.system_fnv', 'gen_ai.request.tools_fnv']) {
+      expect(first!.attrs[key]).toMatch(/^[0-9a-f]{8}$/)
+      expect(second!.attrs[key]).toBe(first!.attrs[key])
+    }
+    expect(second!.attrs['gen_ai.request.body_chars']).toBeGreaterThan(first!.attrs['gen_ai.request.body_chars'] as number)
+    // A span full of Server-Timing detail still keeps each call's usage, set last when its stream ends: since the
+    // fingerprints (#1578) a production call lost its output and cached tokens to the attribute bound.
+    expect(first!.attrs).toMatchObject({ 'gen_ai.usage.output_tokens': 12, 'gen_ai.response.finish_reasons': 'tool_calls' })
+    expect(second!.attrs).toMatchObject({ 'gen_ai.usage.input_tokens': 950, 'gen_ai.usage.output_tokens': 6, 'gen_ai.usage.cache_read.input_tokens': 800 })
+    // What the bound did drop is counted on the span, so a cap never deletes an attribute unseen.
+    expect(second!.attrs['tangle.attrs_dropped']).toBeGreaterThan(0)
 
     // The Router's own steps hang under its pre-upstream span on every model call: auth, admission, then the dispatch
     // that ends in the spend hold right before the provider fetch.
@@ -219,6 +238,29 @@ describe('turn trace: a real turn through createChatTurnRoutes', () => {
     const complete = spans.find((span) => span.name === 'persist.on_turn_complete')!
     expect(complete.endMs - complete.startMs).toBeGreaterThanOrEqual(75)
     expect(complete.startMs).toBeGreaterThanOrEqual(calls[1]!.startMs)
-    expect(summary.largestGapMs).toBeLessThan(60)
+    try {
+      expect(summary.largestGapMs).toBeLessThan(60)
+    } catch (failure) {
+      // Failure-only finished snapshot. Never capture request contents or credential attributes.
+      try {
+        const maxSpans = 128, maxBytes = 32 * 1024
+        const context = { node: process.version, pid: process.pid, traceId: snapshot!.traceId, rootSpanId: snapshot!.rootSpanId,
+          startedAt: snapshot!.startedAt, endedAt: snapshot!.endedAt, summary, spanCount: spans.length }
+        let observation = JSON.stringify({ ...context, captureOverflow: spans.length > maxSpans,
+          spans: spans.length > maxSpans ? [] : spans.map(({ spanId, parentSpanId, name, kind, startMs, endMs, unfinished }) =>
+            ({ spanId, parentSpanId, name, kind, startMs, endMs, unfinished })) })
+        if (Buffer.byteLength(observation + '\n') > maxBytes) observation = JSON.stringify({ ...context, captureOverflow: true })
+        if (Buffer.byteLength(observation + '\n') > maxBytes) observation = JSON.stringify({ node: process.version, pid: process.pid, captureOverflow: true, observation: 'UNKNOWN' })
+        const root = process.env.AGENT_APP_QUALIFICATION_EVIDENCE_DIR
+        if (root) {
+          try { writeFileSync(join(root, 'trace-gap-failure-' + randomUUID() + '.json'), observation + '\n', { flag: 'wx', mode: 0o600 }) }
+          catch { try { console.error('TURN_TRACE_GAP_CAPTURE_FAILURE file=UNKNOWN') } catch { /* Preserve the original assertion. */ } }
+        }
+        console.error('TURN_TRACE_GAP_FAILURE_SNAPSHOT ' + observation)
+      } catch {
+        try { console.error('TURN_TRACE_GAP_CAPTURE_FAILURE observation=UNKNOWN') } catch { /* Preserve the original assertion. */ }
+      }
+      throw failure
+    }
   })
 })

@@ -54,6 +54,33 @@ export interface TracedModelFetchOptions {
   onSpan?: (span: TurnSpan) => void
 }
 
+/** FNV-1a over a string, as 8 hex: a fingerprint that tells two prompts apart without carrying their text. */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193)
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+/** Where a request's cacheable prefix stops matching the last one: fingerprints and lengths of its system message, its
+ *  tools and its first 4k and 16k characters. Metadata only; a body that is not a JSON chat request records nothing. */
+function prefixAttrs(body: unknown): Record<string, string | number> {
+  if (typeof body !== 'string') return {}
+  try {
+    const request = JSON.parse(body) as { messages?: Array<{ role?: string; content?: unknown }>; tools?: unknown }
+    const system = request.messages?.find(message => message.role === 'system')?.content
+    const systemText = typeof system === 'string' ? system : JSON.stringify(system ?? '')
+    const tools = JSON.stringify(request.tools ?? [])
+    return {
+      'gen_ai.request.body_chars': body.length,
+      'gen_ai.request.system_chars': systemText.length, 'gen_ai.request.system_fnv': fingerprint(systemText),
+      'gen_ai.request.tools_chars': tools.length, 'gen_ai.request.tools_fnv': fingerprint(tools),
+      'gen_ai.request.prefix_4k_fnv': fingerprint(body.slice(0, 4096)), 'gen_ai.request.prefix_16k_fnv': fingerprint(body.slice(0, 16384)),
+    }
+  } catch {
+    return {}
+  }
+}
+
 /**
  * `fetch` for a model request, recording one `model.call` span per send: the
  * wall time from the request to the end of its body, the time to the first
@@ -80,6 +107,7 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
       'gen_ai.operation.name': 'chat',
       'call.index': nextCallIndex(trace, 'model.call'),
       ...(options.model ? { 'gen_ai.request.model': options.model } : {}),
+      ...prefixAttrs(init?.body),
     }, options.parent)
     options.onSpan?.(span)
     let response: Response

@@ -1,4 +1,4 @@
-/** Optimistic send admission, rejected-draft recovery, and explicit retry. */
+/** Draft clearing policy, rejected-draft recovery, and explicit retry. */
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import type { ChatComposerProps, ComposerFilePart, ComposerSendOutcome, ComposerSendRejected, ComposerSendResult } from './chat-composer-types'
 
@@ -35,7 +35,7 @@ interface FailedSend {
   restored: boolean
 }
 
-type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'onSendFailed' | 'attachmentsNotReadyMessage' | 'selectedSkillId'> & {
+type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'onSendFailed' | 'clearOnSend' | 'attachmentsNotReadyMessage' | 'selectedSkillId'> & {
   text: string
   textRef: { current: string }
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -48,7 +48,7 @@ type ComposerSendOptions = Pick<ChatComposerProps, 'onSend' | 'onSendParts' | 'o
   canSubmitAttachmentsOnly: boolean
 }
 
-export function useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, attachmentsNotReadyMessage, selectedSkillId }: ComposerSendOptions) {
+export function useComposerSend({ text, textRef, textareaRef, setText, pendingFiles, sendFailureMessage, sendBlockedByStream, disabled, sendDisabled, canSubmitAttachmentsOnly, onSend, onSendParts, onSendFailed, clearOnSend = true, attachmentsNotReadyMessage, selectedSkillId }: ComposerSendOptions) {
   // A restored draft gets the caret back where the user left it — same
   // post-render rule as the seed above, but to the recorded offsets rather than
   // to the end, so a failed send returns the user to the word they were on.
@@ -67,15 +67,15 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
 
   const [failedSend, setFailedSend] = useState<FailedSend | null>(null)
 
-  // The draft comes back only when the box is still empty. If the user typed a
-  // replacement while the send was in flight, overwriting it would trade one
-  // lost message for another — the unsent text is held in the notice instead,
-  // where Retry can send it without touching what they typed.
+  // Restore an empty box, or leave an unchanged retained draft and its caret
+  // alone. A distinct replacement stays in the box; the rejected draft is held
+  // in the notice, where Retry can send it without touching the replacement.
   const failSend = useCallback(
     (error: unknown, draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
       const message = sendFailureText(error, sendFailureMessage)
-      const restored = textRef.current === ''
-      if (restored) {
+      const retained = !clearOnSend && textRef.current === draft
+      const restored = retained || textRef.current === ''
+      if (restored && !retained) {
         const el = textareaRef.current
         setText(draft)
         if (el && el.value === draft) {
@@ -92,11 +92,11 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
       setFailedSend({ message, text: draft, trimmed, parts, restored })
       onSendFailed?.({ message, text: draft, parts, error, restored })
     },
-    [onSendFailed, sendFailureMessage, setText],
+    [onSendFailed, sendFailureMessage, setText, clearOnSend],
   )
 
-  // Hand the message to the host and watch the outcome. The input has already
-  // been cleared by the caller — this only decides whether it comes back.
+  // Hand the message to the host and watch the outcome. Send owns the clearing
+  // policy; this retains the same rejected-draft recovery for either policy.
   const dispatchSend = useCallback(
     (draft: string, trimmed: string, parts: ComposerFilePart[], caret: { start: number; end: number }) => {
       let outcome: ComposerSendResult
@@ -150,11 +150,14 @@ export function useComposerSend({ text, textRef, textareaRef, setText, pendingFi
     const el = textareaRef.current
     const caret = { start: el?.selectionStart ?? text.length, end: el?.selectionEnd ?? text.length }
     setFailedSend(null)
-    setText('')
-    textRef.current = ''
+    if (clearOnSend) {
+      setText('')
+      textRef.current = ''
+    }
     dispatchSend(text, trimmed, parts, caret)
   }, [
     text,
+    clearOnSend,
     sendBlockedByStream,
     disabled,
     sendDisabled,

@@ -3377,7 +3377,7 @@ interface AssistantDraftWriterOptions
 
 ### `assistantRowIdForTurn`
 
-`function` — The default deterministic assistant-row id for a turn.
+`function` — The deterministic assistant-row id for a turn: readable on purpose (an operator grepping a transcript row id finds the run), and stable across re-entries because every input already is.
 
 ```ts
 (turnKey: string) => string
@@ -4687,6 +4687,14 @@ interface HybridTurnProducerOptions
 (event: unknown) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -5711,6 +5719,30 @@ interface StreamingSniffer
 "The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn"
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -5773,6 +5805,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => boolean
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`
@@ -10900,7 +10948,7 @@ class HarnessSelectionError
 
 ### `KNOWN_HARNESSES`
 
-`const` — Recognized backend identities, including IDs needed by historical sessions.
+`const` — Recognized backend identities for new sessions.
 
 ```ts
 readonly Harness[]
@@ -11775,7 +11823,7 @@ class StaleApprovalError
 
 ## `./hub-approvals-react`
 
-Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`
+Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`, `web-react`
 
 ### `HubActionPreviewView`
 
@@ -33876,6 +33924,14 @@ number
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
+### `connectHostedTurnCancellation`
+
+`function` — Owned by the original hosted request, never its browser.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<TurnCancellationC…
+```
+
 ### `createDurableObjectTurnEventStore`
 
 `function` — Optional Durable Object backend for {@link TurnEventStore}.
@@ -34092,6 +34148,14 @@ interface ReconcileStaleDurableTurnLockOptions
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
+### `requestHostedTurnCancellation`
+
+`function` — Call only after product identity/editor/actual-thread authorization.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<{ requested: bool…
+```
+
 ### `scopeIndexChannelKey`
 
 `function` — Running-turn index for the optional Durable Object turn-event backend.
@@ -34106,6 +34170,22 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ```ts
 (workspaceId: string, threadId: string) => string
+```
+
+### `TURN_HOST_CANCEL_PATH`
+
+`const` — Server-only control on an existing unnamed host; never a turn start endpoint.
+
+```ts
+"/turn-host/cancel"
+```
+
+### `TURN_HOST_CONTROL_PATH`
+
+`const` — The same host's server-owned connection revokes execution permission on reset.
+
+```ts
+"/turn-host/control"
 ```
 
 ### `TURN_LOCK_TTL_MS`
@@ -34202,6 +34282,22 @@ interface TurnHost
 
 ```ts
 (objectId: string) => string
+```
+
+### `TurnHostControlNamespace`
+
+`interface` — Unique-id reconstruction is required; idFromName(hostId) addresses a different object.
+
+```ts
+interface TurnHostControlNamespace
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnLockAcquireInput`
@@ -34417,6 +34513,14 @@ Source: `src/turn-trace/index.ts` · depends on `redact`
 (snapshot: TurnTraceSnapshot, labels?: TurnSpanAttrs) => OtlpSpan[]
 ```
 
+### `createIntelligenceTurnTraceReader`
+
+`function` — Read a turn's trace back from Tangle Intelligence with the key its sink sends under (the same options), so a chat route can show a turn's owner its own waterfall.
+
+```ts
+(options: Omit<IntelligenceTurnTraceSinkOptions, "onError">) => TurnTraceReader
+```
+
 ### `createIntelligenceTurnTraceSink`
 
 `function` — The sink a chat route or a Worker turn hands each finished trace to: one OTLP POST per turn, awaited, so a host that runs it under `waitUntil` keeps the isolate alive until delivery.
@@ -34439,6 +34543,14 @@ Source: `src/turn-trace/index.ts` · depends on `redact`
 
 ```ts
 interface CreateTurnTraceOptions
+```
+
+### `executionIdOfAssistantRow`
+
+`function` — The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key.
+
+```ts
+(messageId: string) => string | null
 ```
 
 ### `formatServerTiming`
@@ -34471,6 +34583,14 @@ interface IntelligenceTurnTraceSinkOptions
 
 ```ts
 interface OtlpSpan
+```
+
+### `OtlpTraceExport`
+
+`interface` — The body of `POST /v1/traces`.
+
+```ts
+interface OtlpTraceExport
 ```
 
 ### `otlpTraceId`
@@ -34609,6 +34729,14 @@ interface TurnTrace
 (executionId: string) => string
 ```
 
+### `TurnTraceReader`
+
+`type` — One finished turn's spans as an OTLP JSON export, read back from where its sink sent them; null when the store holds no trace for that execution (not exported yet, past retention, or written by anoth…
+
+```ts
+type TurnTraceReader
+```
+
 ### `TurnTraceSink`
 
 `type` — Where a finished turn's trace goes.
@@ -34631,6 +34759,14 @@ interface TurnTraceSnapshot
 
 ```ts
 interface TurnTraceSummary
+```
+
+### `turnTraceUrl`
+
+`function` — `routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`.
+
+```ts
+(turnPath: string, executionId: string) => string
 ```
 
 
@@ -36722,7 +36858,7 @@ interface WithFreeRouteLimitOptions
 
 ## `./web-react`
 
-Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/index.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `acceptRejectionReason`
 
@@ -38836,6 +38972,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -38914,6 +39058,14 @@ interface LinkLikeProps
 
 ```ts
 (record: ProvenanceRecord) => ProvenanceSource[]
+```
+
+### `LocalSessionHistoryPanel`
+
+`function` — Search a complete, newest-first session list already loaded by the workspace.
+
+```ts
+({ sessions, ...props }: Pick<SessionHistoryPanelProps, "className" | "emptyTitle" | "hrefForSession" | "newSessionHref…
 ```
 
 ### `mediaTypeForMentionPath`
@@ -40476,6 +40628,30 @@ type TrackedChatStreamCallbacks
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -40530,6 +40706,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`
@@ -40594,6 +40786,62 @@ type TurnResponseData
 
 ```ts
 type TurnRoutePhase
+```
+
+### `TurnTraceButton`
+
+`function` — A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row.
+
+```ts
+({ label, ...drawer }: TurnTraceButtonProps) => Element
+```
+
+### `TurnTraceButtonProps`
+
+`interface`
+
+```ts
+interface TurnTraceButtonProps
+```
+
+### `TurnTraceDrawer`
+
+`function` — The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download.
+
+```ts
+({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
+```
+
+### `TurnTraceDrawerProps`
+
+`interface`
+
+```ts
+interface TurnTraceDrawerProps
+```
+
+### `turnTraceFlow`
+
+`function` — The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock.
+
+```ts
+(exported: unknown) => TurnTraceFlow | null
+```
+
+### `TurnTraceFlow`
+
+`interface`
+
+```ts
+interface TurnTraceFlow
+```
+
+### `turnTraceUrlForMessage`
+
+`function` — The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id.
+
+```ts
+(turnPath: string, messageId: string) => string | null
 ```
 
 ### `upsertChatInteraction`
@@ -41071,7 +41319,7 @@ interface WorkspaceSwitcherProps
 
 ## `./web-react/agent-profile-editor`
 
-Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/agent-profile-editor.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `AGENT_PROFILE_EDITOR_SECTIONS`
 
@@ -41425,7 +41673,7 @@ interface UseConfirmedMutationOptions
 
 ## `./web-react/document`
 
-Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/document.tsx` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `AppDocument`
 
@@ -41486,7 +41734,7 @@ interface AppDocumentProps
 
 ## `./web-react/terminal`
 
-Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `web`, `work-product`
+Source: `src/web-react/terminal.ts` · depends on `brand`, `catalog`, `chat-routes`, `chat-store`, `harness`, `hub-approvals`, `hub-approvals-react`, `interactions`, `missions`, `plans`, `platform`, `profile-editor`, `runtime`, `session-shell`, `theme`, `trace`, `turn-trace`, `web`, `work-product`
 
 ### `SandboxTerminalConnection`
 

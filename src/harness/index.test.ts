@@ -45,11 +45,10 @@ describe('harness taxonomy + coercion', () => {
     }
   })
 
-  it('includes forge and cursor from the canonical enum', () => {
-    expect(harnessTypeSchema.options).toContain('forge')
-    expect(harnessTypeSchema.options).toContain('cursor')
-    expect(isHarness('forge')).toBe(true)
-    expect(isHarness('cursor')).toBe(true)
+  it('refuses a retired session without silently changing its harness', () => {
+    expect(isHarness('forge')).toBe(false)
+    expect(() => resolveSessionHarness({ sessionHarness: 'forge', fallback: 'opencode' }))
+      .toThrow('harness_unknown')
   })
 })
 
@@ -88,7 +87,7 @@ describe('harness ↔ model compatibility (server-enforced)', () => {
   })
 
   it('uses Interface compatibility for canonical multi-provider backends', () => {
-    for (const harness of ['forge', 'cursor'] as const) {
+    for (const harness of ['amp', 'cursor'] as const) {
       expect(isModelCompatibleWithHarness(harness, 'openai/gpt-5')).toBe(true)
       expect(isModelCompatibleWithHarness(harness, 'anthropic/claude-sonnet-4-6')).toBe(true)
       expect(snapModelToHarness(harness, 'anthropic/claude-sonnet-4-6', CATALOG)).toBe('anthropic/claude-sonnet-4-6')

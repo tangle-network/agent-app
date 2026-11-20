@@ -40,6 +40,11 @@ export const TURN_STREAM_TOKEN_TTL_MS = 60_000
  *  attaches it when forwarding an authorized browser WebSocket handshake. */
 export const TURN_STREAM_TOKEN_HEADER = 'x-turn-stream-token'
 
+/** Server-only control on an existing unnamed host; never a turn start endpoint. */
+export const TURN_HOST_CANCEL_PATH = '/turn-host/cancel'
+/** The same host's server-owned connection revokes execution permission on reset. */
+export const TURN_HOST_CONTROL_PATH = '/turn-host/control'
+
 /** Server control authority is separate from the channel capabilities used by existing viewer forwarders. */
 export interface TurnStreamTokenClaims {
   purpose: 'turn-control' | 'turn-cancel' | 'turn-recovery'

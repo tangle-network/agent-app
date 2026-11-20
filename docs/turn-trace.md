@@ -22,6 +22,8 @@ agent_app.turn                       wall time of the turn; coverage and time pe
 ├─ tool.call                         an app tool, sandbox_exec or sandbox_run
 │  ├─ sandbox.claim                  the box a tool call waited for
 │  └─ sandbox.exec                   the command, sent with the turn's trace id
+├─ produce.setup                     the product producer's own time before its first event: its keys, reads, prompt, a box it resolves itself
+├─ produce.settle                    after its last event until its stream ends: the cleanup it runs before returning (revocations, a charge)
 ├─ sandbox.claim                     ensureWorkspaceSandbox: its steps are children (credentials, get_running or list_running, egress, liveness, finalize, resume, create, wait_running)
 ├─ sandbox.lease.*                   the foreground provisioning lease a product's single-flight takes: inspect, acquire, release
 ├─ sandbox.spend.*                   the spend seam around the claim: before_provision, observe
@@ -92,6 +94,7 @@ The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence store
 
 | Where | How to read it |
 |---|---|
+| The turn's owner | the turn receipt (the stream's `turn` event, after any progress events) names `traceId` (the OTLP id) and `traceUrl`; `routes.trace` serves it, below |
 | The turn response | `Server-Timing` on a turn sent without the progress-first header: `admission` (request to stream) and each `admission.*` span in start order, so `curl -sD - -o /dev/null` names where admission went; a progress-first stream reads the same spans from the sink |
 | Inside the turn | `args.trace.spans()` returns the spans recorded so far, so a product's own log line can carry the route's admission steps |
 | Tangle Intelligence (spans) | `GET /v1/traces/<otlpTraceId>/spans`; the root span `agent_app.turn` carries `tangle.trace_id`, `tangle.turn.coverage_pct`, `tangle.turn.wall_ms` and `tangle.turn.<kind>_ms` |
@@ -99,6 +102,20 @@ The trace id is `turnTraceId(executionId)`; the OTLP trace id Intelligence store
 | Hospitality | the turn's `web_turn_timing.record` JSON (`traceId`, `trace`) and its `hospitality_web_turn_timing` line |
 | Workers Logs | the `agent_app_turn_trace` line every `createChatTurnRoutes` turn writes: `project`, `executionId`, `otlpTraceId`, `failed`, `handedOff`, then the summary (`firstVisibleMs`, `firstTextMs`, `dispatchMs`, `admission`, `inputTokens`, `cachedInputTokens`, `wallMs`, `coveragePct`, `largestGapMs`, `byKind`, `modelCalls`, `toolCalls`) |
 | Legal | the `legal_turn_trace` log line (wall time, `coveragePct`, `byKind`, `largestGapMs`) |
+
+## The owner's view
+
+A member hill-climbs their own product from their own turns, so the route serves each turn's trace to whoever may read its thread.
+The turn receipt `{ type: 'turn', turnId, traceId, traceUrl }` names it; `traceId` appears whenever the turn exports, `traceUrl` when the route can read the trace back.
+`traceUrl` is the turn's path plus `/turns/<execution id>/trace` (`/api/chat` gives `/api/chat/turns/tax-agent%3A<thread>%3A3/trace`); mount `routes.trace(request, { turnId })` there, since a receipt names the URL whether or not the product serves it, and the execution id names the turn in history as well as live.
+The route takes the thread from the execution id (`deriveExecutionId` must reproduce it), runs the product's `authorize` as `running` on that thread, and answers OTLP JSON with `Cache-Control: private, no-store`.
+A refusal other than 401 or 5xx, an id of another project and a trace not exported yet all answer 404, so a non-owner learns nothing about whether the turn exists; Intelligence not answering is 502.
+The default reader, `createIntelligenceTurnTraceReader({ project })`, reads `GET /v1/traces/<otlpTraceId>/spans` with the key the default sink sends; a product with its own sink passes `turnTrace: { sink, read }` built from the same options.
+It returns only spans under this package's `turn-trace` scope beneath a root whose `tangle.execution_id` is this turn: another exporter's spans in the same trace and tenant (a box agent, the Router) can hold prompt or answer text, and the turn exporter writes metadata only.
+It also leaves out each failed span's error text (`error.message` and the status message): a thrown error can quote a prompt, an answer or a query's parameters, so a failed span keeps only its error status, and the root keeps `tangle.turn.failure_code`.
+The scope is read from the stored attributes, so an exporter holding the app's ingest key could claim it; today only the app's own sink holds that key.
+In the browser, `TurnTraceButton` (put it in `ChatMessages`' `renderExtras` or a product's message row) opens `TurnTraceDrawer` from `/web-react`: the turn's summary, its span waterfall (charts `FlowWaterfall`; pass sandbox-ui's `traceSpanMark` as `renderIcon` for brand marks) and Download OTLP.
+For a turn in history, `turnTraceUrlForMessage(turnPath, message.id)` gives the same URL from the assistant row's id; `turnTraceFlow` is the projection the drawer draws.
 
 ## Limits
 

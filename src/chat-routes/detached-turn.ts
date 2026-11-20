@@ -99,7 +99,8 @@ export interface DetachedTurnOptions {
    *  Forwarded to the producer; default 120 seconds. */
   openTimeoutMs?: SandboxChatProducerOptions['openTimeoutMs']
   /** Hard deadline after the source's first lifecycle event for the first
-   *  answer-bearing event. Forwarded to the producer; default 60 seconds. */
+   *  answer-bearing event. Forwarded to the producer; default 60 seconds when
+   *  the chain has a model to fail over to, none for a one-model chain. */
   firstResponseTimeoutMs?: SandboxChatProducerOptions['firstResponseTimeoutMs']
   /** Fired when a model is abandoned mid-chain (telemetry/alerting). */
   onModelFallback?: SandboxChatProducerOptions['onModelFallback']

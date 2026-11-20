@@ -118,7 +118,8 @@ export interface TurnTrace {
   /** Name the turn's execution id once it is known. Spans recorded earlier keep their times. */
   bind(executionId: string): void
   start(name: string, kind: TurnSpanKind, attrs?: TurnSpanAttrs, parent?: TurnSpan): TurnSpan
-  record(name: string, kind: TurnSpanKind, startMs: number, endMs: number, attrs?: TurnSpanAttrs, parent?: TurnSpan): TurnSpan
+  /** A span whose times are already known; `error` marks it failed, as `end` does for an open one. */
+  record(name: string, kind: TurnSpanKind, startMs: number, endMs: number, attrs?: TurnSpanAttrs, parent?: TurnSpan, error?: unknown): TurnSpan
   /** Run `work` inside a span; the span ends when it settles, failed if it throws. */
   measure<T>(name: string, kind: TurnSpanKind, work: (span: TurnSpan) => Promise<T> | T, attrs?: TurnSpanAttrs, parent?: TurnSpan): Promise<T>
   /**
@@ -171,16 +172,26 @@ function randomHex(bytes: number): string {
   return Array.from(out, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function boundedAttrs(attrs: TurnSpanAttrs): TurnSpanAttrs {
+const ATTRS_DROPPED = 'tangle.attrs_dropped'
+
+/** At most {@link MAX_ATTRS} attributes, the Router's `server_timing.*` breakdown last: a model call's span keeps its
+ *  model, token counts and finish reason, which arrive when its stream ends, and loses timing detail instead. What the
+ *  bound drops is counted on the span (`tangle.attrs_dropped`), so a cap never deletes an attribute unseen. */
+function boundedAttrs(attrs: TurnSpanAttrs): { attrs: TurnSpanAttrs; dropped: number } {
   const out: TurnSpanAttrs = {}
   let count = 0
-  for (const [key, value] of Object.entries(attrs)) {
-    if (count >= MAX_ATTRS) break
+  let dropped = 0
+  const timing = (key: string) => key.startsWith('server_timing.')
+  const entries = Object.entries(attrs).filter(([key]) => key !== ATTRS_DROPPED)
+  for (const [key, value] of [...entries.filter(([key]) => !timing(key)), ...entries.filter(([key]) => timing(key))]) {
     if (typeof value === 'number' && !Number.isFinite(value)) continue
+    if (count >= MAX_ATTRS) { dropped++; continue }
     out[key.slice(0, 80)] = typeof value === 'string' ? value.slice(0, MAX_ATTR_STRING) : value
     count++
   }
-  return out
+  const before = typeof attrs[ATTRS_DROPPED] === 'number' ? attrs[ATTRS_DROPPED] as number : 0
+  if (before + dropped > 0) out[ATTRS_DROPPED] = before + dropped
+  return { attrs: out, dropped }
 }
 
 function errorText(error: unknown): string {
@@ -290,6 +301,16 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
   let executionId = options.executionId ?? `pending_${randomHex(6)}`
   let traceId = turnTraceId(executionId)
   const records = new Map<string, TurnSpanRecord>()
+  // Each span's first attribute drop is logged once, by name and count; the count keeps growing on the span.
+  const droppedLogged = new Set<string>()
+  const bound = (id: string, name: string, attrs: TurnSpanAttrs): TurnSpanAttrs => {
+    const result = boundedAttrs(attrs)
+    if (result.dropped > 0 && !droppedLogged.has(id)) {
+      droppedLogged.add(id)
+      console.warn(JSON.stringify({ event: 'turn_trace_attrs_dropped', span: name, dropped: result.dropped, max: MAX_ATTRS }))
+    }
+    return result.attrs
+  }
   const open = new Set<string>()
   let dropped = 0
   let finished: TurnTraceSnapshot | undefined
@@ -313,7 +334,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       id,
       set(attrs) {
         const record = records.get(id)
-        if (record && !finished) record.attrs = boundedAttrs({ ...record.attrs, ...attrs })
+        if (record && !finished) record.attrs = bound(id, record.name, { ...record.attrs, ...attrs })
         return handle
       },
       end(attrs, error) {
@@ -321,7 +342,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
         if (!record || !open.has(id) || finished) return
         open.delete(id)
         record.endMs = Math.max(record.startMs, now())
-        if (attrs) record.attrs = boundedAttrs({ ...record.attrs, ...attrs })
+        if (attrs) record.attrs = bound(id, record.name, { ...record.attrs, ...attrs })
         if (error !== undefined) record.error = errorText(error)
       },
       child: (name, kind, attrs) => trace.start(name, kind, attrs, handle),
@@ -330,7 +351,8 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
     return handle
   }
 
-  const add = (name: string, kind: TurnSpanKind, startMs: number, endMs: number | undefined, attrs: TurnSpanAttrs | undefined, parent: TurnSpan | undefined): TurnSpan => {
+  const add = (name: string, kind: TurnSpanKind, startMs: number, endMs: number | undefined, attrs: TurnSpanAttrs | undefined, parent: TurnSpan | undefined,
+    error?: unknown): TurnSpan => {
     if (finished) return inert(rootId)
     if (records.size >= maxSpans) {
       dropped++
@@ -344,7 +366,8 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       kind,
       startMs,
       endMs: endMs ?? startMs,
-      attrs: attrs ? boundedAttrs(attrs) : {},
+      attrs: attrs ? bound(spanId, name, attrs) : {},
+      ...(error === undefined ? {} : { error: errorText(error) }),
     })
     if (endMs === undefined) open.add(spanId)
     return handleFor(spanId)
@@ -376,7 +399,7 @@ export function createTurnTrace(options: CreateTurnTraceOptions = {}): TurnTrace
       traceId = turnTraceId(id)
     },
     start: (name, kind, attrs, parent) => add(name, kind, now(), undefined, attrs, parent),
-    record: (name, kind, startMs, endMs, attrs, parent) => add(name, kind, startMs, Math.max(startMs, endMs), attrs, parent),
+    record: (name, kind, startMs, endMs, attrs, parent, error) => add(name, kind, startMs, Math.max(startMs, endMs), attrs, parent, error),
     async measure(name, kind, work, attrs, parent) {
       const span = trace.start(name, kind, attrs, parent)
       try {

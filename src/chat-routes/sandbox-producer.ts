@@ -148,7 +148,8 @@ export interface SandboxChatProducerOptions {
    *  so cold sandbox startup is not mislabeled as an inference failure. */
   openTimeoutMs?: number
   /** Hard deadline after the source's first lifecycle event for the first
-   *  answer-bearing event. Default 60 seconds. Processing/lifecycle events do
+   *  answer-bearing event. Default 60 seconds when the chain has a model to fail
+   *  over to, none for a one-model chain. Processing/lifecycle events do
    *  not extend it. */
   firstResponseTimeoutMs?: number
   /** Forward `start`/`status`/`model-processing`/session lifecycle to the

@@ -266,7 +266,8 @@ export interface BufferedTurnOptions {
 export interface BufferedTurnTap {
   /** Buffer one event: persist (coalesced, on the flush window) + best-effort
    *  live-deliver. Wire to a push source's per-event hook (e.g. agent-runtime
-   *  `handleChatTurn`'s `hooks.onEvent`). Marks the turn 'running' on first call. */
+   *  `handleChatTurn`'s `hooks.onEvent`). Marks the turn 'running' on first call.
+   *  `execution.started` commits its ordered prefix before this tap's live write. */
   onEvent(raw: unknown): Promise<void>
   /** Settle the turn: final flush + set status. Call after the producer resolves
    *  ('complete') or rejects ('error'). 'error' flushes what was produced first. */
@@ -310,6 +311,7 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
   const startedAt = Date.now()
   let seq = 0
   let clientGone = false
+  let firstTextCommitted = false
   let pending: unknown[] = []
   let lastFlush = Date.now()
   let started = false
@@ -396,6 +398,13 @@ export function createBufferedTurnTap(opts: BufferedTurnOptions): BufferedTurnTa
       const line = JSON.stringify(ev)
       pending.push(ev)
       pendingChars += line?.length ?? 0
+      // Commit native identity or the first visible text and its ordered prefix.
+      const firstText = !firstTextCommitted && deltaTypeOf(ev) === 'text' &&
+        (innerOf(ev)!.text as string).trim().length > 0
+      if (innerOf(ev)?.type === 'execution.started' || firstText) {
+        await flush()
+        if (firstText) firstTextCommitted = true
+      }
       if (!clientGone && opts.write) {
         try {
           // Live delivery carries a provisional ordering hint, not the persisted

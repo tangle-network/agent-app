@@ -4,7 +4,7 @@
 
 Source: `src/web-react/index.tsx`
 
-543 exports.
+557 exports.
 
 ### `acceptRejectionReason`
 
@@ -2118,6 +2118,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -2196,6 +2204,14 @@ interface LinkLikeProps
 
 ```ts
 (record: ProvenanceRecord) => ProvenanceSource[]
+```
+
+### `LocalSessionHistoryPanel`
+
+`function` — Search a complete, newest-first session list already loaded by the workspace.
+
+```ts
+({ sessions, ...props }: Pick<SessionHistoryPanelProps, "className" | "emptyTitle" | "hrefForSession" | "newSessionHref…
 ```
 
 ### `mediaTypeForMentionPath`
@@ -3758,6 +3774,30 @@ type TrackedChatStreamCallbacks
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -3812,6 +3852,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`
@@ -3876,6 +3932,62 @@ type TurnResponseData
 
 ```ts
 type TurnRoutePhase
+```
+
+### `TurnTraceButton`
+
+`function` — A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row.
+
+```ts
+({ label, ...drawer }: TurnTraceButtonProps) => Element
+```
+
+### `TurnTraceButtonProps`
+
+`interface`
+
+```ts
+interface TurnTraceButtonProps
+```
+
+### `TurnTraceDrawer`
+
+`function` — The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download.
+
+```ts
+({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element
+```
+
+### `TurnTraceDrawerProps`
+
+`interface`
+
+```ts
+interface TurnTraceDrawerProps
+```
+
+### `turnTraceFlow`
+
+`function` — The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock.
+
+```ts
+(exported: unknown) => TurnTraceFlow | null
+```
+
+### `TurnTraceFlow`
+
+`interface`
+
+```ts
+interface TurnTraceFlow
+```
+
+### `turnTraceUrlForMessage`
+
+`function` — The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id.
+
+```ts
+(turnPath: string, messageId: string) => string | null
 ```
 
 ### `upsertChatInteraction`

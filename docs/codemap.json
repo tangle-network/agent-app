@@ -2680,7 +2680,7 @@
           "name": "assistantRowIdForTurn",
           "kind": "function",
           "signature": "(turnKey: string) => string",
-          "doc": "The default deterministic assistant-row id for a turn."
+          "doc": "The deterministic assistant-row id for a turn: readable on purpose (an operator grepping a transcript row id finds the run), and stable across re-entries because every input already is."
         },
         {
           "name": "AssistantRowValues",
@@ -3661,6 +3661,12 @@
           "doc": "Progress the consumer may see before the commit point: it names no model output and carries no billing receipt, so streaming it live cannot duplicate an answer or bill an abandoned attempt."
         },
         {
+          "name": "isTurnHostControlEvent",
+          "kind": "function",
+          "signature": "(value: unknown) => value is TurnHostControlEvent",
+          "doc": "Validate the envelope without interpreting its opaque host id as authority."
+        },
+        {
           "name": "isTurnIntentEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnIntentEvent",
@@ -4429,6 +4435,24 @@
           "doc": "The failure a completed run with an aborted tool call settles with."
         },
         {
+          "name": "TURN_HOST_CONTROL_EVENT",
+          "kind": "const",
+          "signature": "\"turn.host.control\"",
+          "doc": "A control address, never paid admission, execution authority or assistant content."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": null
+        },
+        {
+          "name": "TURN_HOST_CONTROL_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-host-control\"",
+          "doc": "Opt in to the hosted invocation's identity envelope before paid admission."
+        },
+        {
           "name": "TURN_INTENT_EVENT",
           "kind": "const",
           "signature": "\"session.run.intent\"",
@@ -4475,6 +4499,18 @@
           "kind": "function",
           "signature": "(prompt: string | readonly ChatTurnPartInput[]) => boolean",
           "doc": "Whether the turn carries files."
+        },
+        {
+          "name": "TurnHostControlEvent",
+          "kind": "type",
+          "signature": "type TurnHostControlEvent",
+          "doc": null
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnIntentData",
@@ -8462,7 +8498,7 @@
           "name": "KNOWN_HARNESSES",
           "kind": "const",
           "signature": "readonly Harness[]",
-          "doc": "Recognized backend identities, including IDs needed by historical sessions."
+          "doc": "Recognized backend identities for new sessions."
         },
         {
           "name": "modelProvider",
@@ -9145,7 +9181,8 @@
       "id": "./hub-approvals-react",
       "source": "src/hub-approvals-react/index.tsx",
       "dependsOn": [
-        "hub-approvals"
+        "hub-approvals",
+        "web-react"
       ],
       "error": null,
       "exports": [
@@ -26271,6 +26308,12 @@
           "doc": "One server-owned connection on the existing authenticated DO transport, with retained cancellation replay."
         },
         {
+          "name": "connectHostedTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<TurnCancellationC…",
+          "doc": "Owned by the original hosted request, never its browser."
+        },
+        {
           "name": "createDurableObjectTurnEventStore",
           "kind": "function",
           "signature": "(namespace: TurnStreamNamespaceLike, auth: TurnStreamAuth) => TurnEventStore",
@@ -26433,6 +26476,12 @@
           "doc": "The product authorizes Stop first."
         },
         {
+          "name": "requestHostedTurnCancellation",
+          "kind": "function",
+          "signature": "(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<{ requested: bool…",
+          "doc": "Call only after product identity/editor/actual-thread authorization."
+        },
+        {
           "name": "scopeIndexChannelKey",
           "kind": "function",
           "signature": "(scopeId: string) => string",
@@ -26443,6 +26492,18 @@
           "kind": "function",
           "signature": "(workspaceId: string, threadId: string) => string",
           "doc": "Channel for a thread's viewer signals."
+        },
+        {
+          "name": "TURN_HOST_CANCEL_PATH",
+          "kind": "const",
+          "signature": "\"/turn-host/cancel\"",
+          "doc": "Server-only control on an existing unnamed host; never a turn start endpoint."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_PATH",
+          "kind": "const",
+          "signature": "\"/turn-host/control\"",
+          "doc": "The same host's server-owned connection revokes execution permission on reset."
         },
         {
           "name": "TURN_LOCK_TTL_MS",
@@ -26515,6 +26576,18 @@
           "kind": "function",
           "signature": "(objectId: string) => string",
           "doc": "The capability name of a per-turn object, which `newUniqueId` leaves without a channel name."
+        },
+        {
+          "name": "TurnHostControlNamespace",
+          "kind": "interface",
+          "signature": "interface TurnHostControlNamespace",
+          "doc": "Unique-id reconstruction is required; idFromName(hostId) addresses a different object."
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnLockAcquireInput",
@@ -26683,6 +26756,12 @@
           "doc": "The root span (`agent_app.turn`) carries the host's labels and the turn's numbers: wall time, the share inside child spans, and the time credited to each kind of span."
         },
         {
+          "name": "createIntelligenceTurnTraceReader",
+          "kind": "function",
+          "signature": "(options: Omit<IntelligenceTurnTraceSinkOptions, \"onError\">) => TurnTraceReader",
+          "doc": "Read a turn's trace back from Tangle Intelligence with the key its sink sends under (the same options), so a chat route can show a turn's owner its own waterfall."
+        },
+        {
           "name": "createIntelligenceTurnTraceSink",
           "kind": "function",
           "signature": "(options: IntelligenceTurnTraceSinkOptions) => TurnTraceSink",
@@ -26699,6 +26778,12 @@
           "kind": "interface",
           "signature": "interface CreateTurnTraceOptions",
           "doc": null
+        },
+        {
+          "name": "executionIdOfAssistantRow",
+          "kind": "function",
+          "signature": "(messageId: string) => string | null",
+          "doc": "The execution id an assistant row written by the chat route is keyed by, or null for a row it did not key."
         },
         {
           "name": "formatServerTiming",
@@ -26723,6 +26808,12 @@
           "kind": "interface",
           "signature": "interface OtlpSpan",
           "doc": "One span as an OTLP/HTTP JSON export carries it."
+        },
+        {
+          "name": "OtlpTraceExport",
+          "kind": "interface",
+          "signature": "interface OtlpTraceExport",
+          "doc": "The body of `POST /v1/traces`."
         },
         {
           "name": "otlpTraceId",
@@ -26827,6 +26918,12 @@
           "doc": "The turn's execution id as a trace id."
         },
         {
+          "name": "TurnTraceReader",
+          "kind": "type",
+          "signature": "type TurnTraceReader",
+          "doc": "One finished turn's spans as an OTLP JSON export, read back from where its sink sent them; null when the store holds no trace for that execution (not exported yet, past retention, or written by anoth…"
+        },
+        {
           "name": "TurnTraceSink",
           "kind": "type",
           "signature": "type TurnTraceSink",
@@ -26843,6 +26940,12 @@
           "kind": "interface",
           "signature": "interface TurnTraceSummary",
           "doc": "How much of the turn's wall time is inside named spans, and what the time was spent on."
+        },
+        {
+          "name": "turnTraceUrl",
+          "kind": "function",
+          "signature": "(turnPath: string, executionId: string) => string",
+          "doc": "`routes.trace` for one turn: the turn's path plus `/turns/<execution id>/trace`."
         }
       ]
     },
@@ -28489,6 +28592,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -30079,6 +30183,12 @@
           "doc": "Resolve if the interaction status is a terminal state excluding pending"
         },
         {
+          "name": "isTurnHostControlEvent",
+          "kind": "function",
+          "signature": "(value: unknown) => value is TurnHostControlEvent",
+          "doc": "Validate the envelope without interpreting its opaque host id as authority."
+        },
+        {
           "name": "isTurnIntentEvent",
           "kind": "function",
           "signature": "(event: unknown) => event is TurnIntentEvent",
@@ -30137,6 +30247,12 @@
           "kind": "function",
           "signature": "(record: ProvenanceRecord) => ProvenanceSource[]",
           "doc": "The sources still resolving — rendered as their own state, never as an absence."
+        },
+        {
+          "name": "LocalSessionHistoryPanel",
+          "kind": "function",
+          "signature": "({ sessions, ...props }: Pick<SessionHistoryPanelProps, \"className\" | \"emptyTitle\" | \"hrefForSession\" | \"newSessionHref…",
+          "doc": "Search a complete, newest-first session list already loaded by the workspace."
         },
         {
           "name": "mediaTypeForMentionPath",
@@ -31309,6 +31425,24 @@
           "doc": "Drives an anchor-click download from an already-resolved blob."
         },
         {
+          "name": "TURN_HOST_CONTROL_EVENT",
+          "kind": "const",
+          "signature": "\"turn.host.control\"",
+          "doc": "A control address, never paid admission, execution authority or assistant content."
+        },
+        {
+          "name": "TURN_HOST_CONTROL_FIRST",
+          "kind": "const",
+          "signature": "\"first\"",
+          "doc": null
+        },
+        {
+          "name": "TURN_HOST_CONTROL_HEADER",
+          "kind": "const",
+          "signature": "\"x-turn-host-control\"",
+          "doc": "Opt in to the hosted invocation's identity envelope before paid admission."
+        },
+        {
           "name": "TURN_INTENT_EVENT",
           "kind": "const",
           "signature": "\"session.run.intent\"",
@@ -31349,6 +31483,18 @@
           "kind": "const",
           "signature": "\"turn_stream_lost\"",
           "doc": "Error code {@link settleTurnResponse} reports when a progress-first stream closes before the turn started."
+        },
+        {
+          "name": "TurnHostControlEvent",
+          "kind": "type",
+          "signature": "type TurnHostControlEvent",
+          "doc": null
+        },
+        {
+          "name": "TurnHostControlTarget",
+          "kind": "interface",
+          "signature": "interface TurnHostControlTarget",
+          "doc": null
         },
         {
           "name": "TurnIntentData",
@@ -31397,6 +31543,48 @@
           "kind": "type",
           "signature": "type TurnRoutePhase",
           "doc": "Stages the shared route emits before the producer runs."
+        },
+        {
+          "name": "TurnTraceButton",
+          "kind": "function",
+          "signature": "({ label, ...drawer }: TurnTraceButtonProps) => Element",
+          "doc": "A message action that opens the turn's trace: put it in `ChatMessages`' `renderExtras` or a product's message row."
+        },
+        {
+          "name": "TurnTraceButtonProps",
+          "kind": "interface",
+          "signature": "interface TurnTraceButtonProps",
+          "doc": null
+        },
+        {
+          "name": "TurnTraceDrawer",
+          "kind": "function",
+          "signature": "({ traceUrl, open, onOpenChange, trigger, renderIcon, fetchImpl }: TurnTraceDrawerProps) => Element",
+          "doc": "The turn's trace in a side sheet: its summary, the span waterfall, and its OTLP JSON to download."
+        },
+        {
+          "name": "TurnTraceDrawerProps",
+          "kind": "interface",
+          "signature": "interface TurnTraceDrawerProps",
+          "doc": null
+        },
+        {
+          "name": "turnTraceFlow",
+          "kind": "function",
+          "signature": "(exported: unknown) => TurnTraceFlow | null",
+          "doc": "The OTLP JSON `routes.trace` answers, projected onto the inspector's trace on the turn's own clock."
+        },
+        {
+          "name": "TurnTraceFlow",
+          "kind": "interface",
+          "signature": "interface TurnTraceFlow",
+          "doc": null
+        },
+        {
+          "name": "turnTraceUrlForMessage",
+          "kind": "function",
+          "signature": "(turnPath: string, messageId: string) => string | null",
+          "doc": "The trace URL of the turn an assistant row answered, from the path the client posts turns to; null for a row the chat route did not key by its execution id."
         },
         {
           "name": "upsertChatInteraction",
@@ -31774,6 +31962,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -32067,6 +32256,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
@@ -32136,6 +32326,7 @@
         "session-shell",
         "theme",
         "trace",
+        "turn-trace",
         "web",
         "work-product"
       ],
