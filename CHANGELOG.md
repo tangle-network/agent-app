@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.51
+
+- fix(turn-stream): reconnect a dropped durable Stop socket and replay Stop (#1581)
+
 ## 4.0.50
 
 - feat(runtime): run a model call's tool calls concurrently in the Router turn (#1568)
