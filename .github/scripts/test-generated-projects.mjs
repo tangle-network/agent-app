@@ -263,6 +263,9 @@ function proveBareConsumer({ env, packedAgentApp, scratch, storeDir, agentEval }
     name === AGENT_EVAL ? agentEval : dependencyCohort[name] ?? installedVersion(name),
   ]))
   dependencies['@tangle-network/agent-app'] = `file:${packedAgentApp}`
+  // agent-integrations reaches mysql2, which peers @types/node without marking
+  // it optional; a TypeScript product carries it, so take the headless template's.
+  const template = JSON.parse(readFileSync(join(createAgentAppDir, 'template', '_package.json'), 'utf8'))
   writeJson(join(project, 'package.json'), {
     name: `bare-consumer-agent-eval-${agentEval.replaceAll('.', '-')}`,
     version: '0.0.0',
@@ -271,6 +274,7 @@ function proveBareConsumer({ env, packedAgentApp, scratch, storeDir, agentEval }
     engines: { node: NODE_RANGE },
     packageManager: `pnpm@${PNPM_VERSION}`,
     dependencies,
+    devDependencies: { '@types/node': template.devDependencies['@types/node'] },
   })
   writeFileSync(
     join(project, 'pnpm-workspace.yaml'),
