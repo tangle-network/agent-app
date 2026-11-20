@@ -18,7 +18,7 @@ The [signoff configuration](../signoff.config.mjs) owns the install command, ste
 ## Publishing and adoption
 
 1. For a dependency upgrade, check the published package against the shell's peer range. Update the development dependency, generated chat manifest and lockfile together. Regenerate the Brand projection if its input changes.
-2. Run `pnpm test:generated` after building the package. This installs the packed generator and shell into fresh projects and catches missing peers and exports.
+2. Run `pnpm test:generated` after building the package. This installs the packed generator and shell into fresh projects and catches missing peers and exports. It first installs the packed shell into bare consumers, beside the Agent Eval release under test and the lowest release of each major the peer range admits, and imports every public entry there; `--bare` runs only that stage.
 3. After merge, the publication workflow prepares the release tarballs and the tag job publishes the verified bytes. Check the registry version and integrity before updating consumers. [Publish workflow](../.github/workflows/publish.yml)
 4. For a product rollout, verify the installed lockfile, served revision and changed browser journey. A registry release is the handoff to consumers.
 
