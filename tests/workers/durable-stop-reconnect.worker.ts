@@ -1,14 +1,32 @@
 /**
  * workerd fixture for `durable-stop-reconnect-workers.integration.test.ts`: the shipped TurnStreamDO with two control
  * socket faults, and the shipped durable turn lock with Stop (`createDurableTurnLock` with `cancellationOf`) driven
- * through each. One scenario per request, each on its own workspace's object.
+ * through each. One scenario per request, each on its own workspace's object. `hosted-drop` drops a hosted turn's
+ * control socket inside the shipped per-turn host instead.
  */
 import { createDurableTurnLock, type TurnStreamNamespaceLike } from '../../src/turn-stream/adapters'
-import { requestDurableTurnCancellation } from '../../src/turn-stream/cancellation'
-import { mintTurnStreamToken, TURN_STREAM_TOKEN_HEADER, turnLockChannelKey, type TurnLockReleaseInput } from '../../src/turn-stream/core'
-import { TurnStreamDO } from '../../src/turn-stream/do'
+import { requestDurableTurnCancellation, type TurnHostControlNamespace } from '../../src/turn-stream/cancellation'
+import { mintTurnStreamToken, TURN_STREAM_TOKEN_HEADER, turnHostChannelKey, turnLockChannelKey, type TurnLockReleaseInput } from '../../src/turn-stream/core'
+import { TurnStreamDO, type TurnStreamDOState } from '../../src/turn-stream/do'
 
-interface Env { TURN_STREAM_DO: TurnStreamNamespaceLike; TURN_STREAM_AUTH_SECRET: string }
+interface Env {
+  TURN_STREAM_DO: TurnStreamNamespaceLike; HOST_TURN_DO: TurnHostControlNamespace & { newUniqueId(): unknown }
+  TURN_STREAM_AUTH_SECRET: string
+}
+
+/** A per-turn host whose turn binds its control socket, drops it, and reports how its control signal ended. */
+export class HostedFaultTurnStreamDO extends TurnStreamDO {
+  constructor(state: TurnStreamDOState, env: Env) {
+    super(state, env, { turnRoutes: () => ({ async turn(_request, ctx) {
+      const control = ctx.hostControl!
+      await control.bind({ hostId: control.hostId, workspaceId: 'workspace-hosted', threadId: 'hosted' },
+        { namespace: env.HOST_TURN_DO, auth: { secret: env.TURN_STREAM_AUTH_SECRET } })
+      for (const socket of state.getWebSockets()) socket.close(1011, 'Fixture transport loss')
+      await settle(control.signal, 4_000)
+      return Response.json({ acquired: true, afterDrop: reasonCode(control.signal) })
+    } }) })
+  }
+}
 
 export class FaultTurnStreamDO extends TurnStreamDO {
   /** `/fault/unanswered-sync` leaves the next control sync unanswered: the owner's socket is open but never synced. */
@@ -47,6 +65,11 @@ export default {
     const scenario = new URL(request.url).pathname.slice(1)
     const tenantId = `workspace-${scenario}`
     const auth = { secret: env.TURN_STREAM_AUTH_SECRET }
+    if (scenario === 'hosted-drop') {
+      const id = env.HOST_TURN_DO.newUniqueId()
+      return env.HOST_TURN_DO.get(id).fetch('https://turn-stream.internal/turn', { method: 'POST',
+        headers: { [TURN_STREAM_TOKEN_HEADER]: await mintTurnStreamToken(turnHostChannelKey(String(id)), auth.secret) } })
+    }
     const lock = createDurableTurnLock<null>({ namespace: env.TURN_STREAM_DO, auth, scopeOf: () => 'workspace', cancellationOf: () => true })
     const key = turnLockChannelKey(tenantId, scenario, 'workspace')
     const fault = async (path: string) => {
