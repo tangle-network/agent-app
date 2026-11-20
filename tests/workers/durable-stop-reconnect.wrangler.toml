@@ -7,9 +7,13 @@ compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
 name = "TURN_STREAM_DO"
 class_name = "FaultTurnStreamDO"
 
+[[durable_objects.bindings]]
+name = "HOST_TURN_DO"
+class_name = "HostedFaultTurnStreamDO"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["FaultTurnStreamDO"]
+new_sqlite_classes = ["FaultTurnStreamDO", "HostedFaultTurnStreamDO"]
 
 [vars]
 TURN_STREAM_AUTH_SECRET = "local-only-durable-stop-reconnect-integration-secret"
