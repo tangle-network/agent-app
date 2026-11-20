@@ -41,13 +41,13 @@
     "nanostores": "1.5.4"
   },
   "peerDependencies": {
-    "@tangle-network/agent-eval": "1.0.32",
+    "@tangle-network/agent-eval": "2.0.1",
     "@tangle-network/agent-integrations": "1.0.4"
   },
   "devDependencies": {
-    "@tangle-network/agent-eval": "1.0.32",
+    "@tangle-network/agent-eval": "2.0.1",
     "@tangle-network/agent-integrations": "1.0.4",
-    "@tangle-network/agent-knowledge": "23.0.3",
+    "@tangle-network/agent-knowledge": "23.0.7",
     "@cloudflare/workers-types": "^5.20261019.1",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",
