@@ -246,6 +246,18 @@ export interface RouterTurnOptions {
    */
   toolRoundEffort?: string
   /**
+   * Research ends this many ms after the hop started, and the model writes the answer from the tool results it has.
+   * After that time no tool round starts: the next model call after a tool round is the answer call (`tool_choice:
+   * "none"` at `reasoningEffort`, the same tools listed), and the turn ends after it. A call still choosing tools then
+   * is cancelled at that time, its connection closed (one still waiting for its response is closed when the response
+   * arrives), and the answer call is sent in its place; tool calls that arrive after the time are dropped before they
+   * run. A call already writing the answer goes on, tools already running finish, and the opening call is never cut,
+   * so a turn runs at least one tool round. When the time ends research, the trace records a `turn.answer_by` span at
+   * that moment, with `tangle.turn.answer_by` (`round`: before a call, `cut`: during one, `calls`: its tool calls were
+   * dropped) and `tangle.turn.answer_by_ms` (since the hop started). Unset, research runs until `budgetMs`.
+   */
+  answerByMs?: number
+  /**
    * The caller shows the model's reasoning as it streams (`onEvent` `reasoning` events). With `onEvent`, a
    * streamed chat call and the safe repeat on, the Router then releases the stream at the first reasoning frame
    * instead of holding it for the first word, and returns Gemini's thought summaries (gateway
@@ -551,8 +563,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     options.stream !== false && !useResponses(model)
     ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
     : extraBody
-  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => void) => (options.stream === false ? createOpenAICompatCompletionTurn
-    : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
+  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => Response) =>
+    (options.stream === false ? createOpenAICompatCompletionTurn : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
     model,
@@ -562,8 +574,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     })),
     extraBody: { ...bodyFor(model), ...body },
     ...(traceId ? { headers: { 'x-tangle-trace-id': traceId } } : {}),
-    ...(sent ? { fetchImpl: async (input, init) => { const response = await (fetchImpl ?? fetch)(input, init); sent(response); return response } }
-      : fetchImpl ? { fetchImpl } : {}),
+    ...(sent ? { fetchImpl: async (input, init) => sent(await (fetchImpl ?? fetch)(input, init)) } : fetchImpl ? { fetchImpl } : {}),
     onServedModel: served => {
       servedModel = served.servedModel
       if (served.servedModel) transportState.lastModelSpan?.set({ 'gen_ai.response.model': served.servedModel })
@@ -584,7 +595,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   let checkpoint: LoopMessage[] | null = null
   // The first call refused at `maxToolCalls`: the turn ends at its result, after calls run at once ahead of it report.
   let refusedCallId: string | undefined
-  const deadline = Date.now() + (options.budgetMs ?? DEFAULT_BUDGET_MS)
+  const hopStart = Date.now(), deadline = hopStart + (options.budgetMs ?? DEFAULT_BUDGET_MS)
   const callIdOf = (id: string | undefined, toolName: string) => {
     if (id) return id
     let fallback = `${toolName}-${started.size}`
@@ -604,10 +615,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
       }
     }
     transportState.currentModel = model
-    const { toolRoundEffort } = options
-    const streamTurn = toolRoundEffort && options.stream !== false
-      ? toolRoundsAt(streamTurnFor(model), streamTurnFor(model, { tool_choice: 'none' }),
-        sent => streamTurnFor(model, { reasoning_effort: toolRoundEffort }, sent))
+    const lowerEffort = Boolean(options.toolRoundEffort) && options.stream !== false
+    const answerBy = answerDeadline(options.answerByMs, hopStart, trace)
+    const streamTurn = lowerEffort || answerBy
+      ? afterToolRounds(streamTurnFor(model), streamTurnFor(model, { tool_choice: 'none' }),
+        sent => streamTurnFor(model, lowerEffort ? { reasoning_effort: options.toolRoundEffort } : {}, sent), lowerEffort, answerBy)
       : streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -787,29 +799,94 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
 }
 
 type StreamTurn = (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
+/** When a hop's research ends (`answerByMs`), and how the trace notes that it ended the research. */
+type AnswerBy = { at: number; fired: (how: 'round' | 'cut' | 'calls') => void }
+const LATE = Symbol('late')
+
+function answerDeadline(ms: number | undefined, start: number, trace: TurnTrace | undefined): AnswerBy | undefined {
+  return ms === undefined ? undefined : { at: start + ms, fired: how => {
+    const now = Date.now()
+    trace?.record('turn.answer_by', 'other', now, now, { 'tangle.turn.answer_by': how, 'tangle.turn.answer_by_ms': now - start })
+  } }
+}
 
 /**
- * `answer` for the call that opens the turn; after a tool round, `toolRound`, kept only when it calls a tool. A call
- * that writes a word is cancelled there, its connection closed so the model writes no more, and `write` is sent in its
- * place: full effort, the same tools listed but `tool_choice: "none"`, so it writes the answer, once, and the turn ends
- * after it. A call that ends with neither a tool call nor a word is sent again as `answer`, tools allowed.
+ * `answer` for the call that opens the turn; after a tool round, `toolRound`. With `lowerEffort` it is kept only when
+ * it calls a tool: a call that writes a word is cancelled there, its connection closed so the model writes no more, and
+ * `write` is sent in its place: full effort, the same tools listed but `tool_choice: "none"`, so it writes the answer,
+ * once, and the turn ends after it. A call that ends with neither a tool call nor a word is sent again as `answer`,
+ * tools allowed. Once `answerBy` passes, `write` replaces the next call after a tool round, a call still choosing tools
+ * is cut at that time and replaced by `write`, and tool calls that arrive after it are dropped for `write` (`answerByMs`).
  */
-function toolRoundsAt(answer: StreamTurn, write: StreamTurn, toolRound: (sent: (response: Response) => void) => StreamTurn): StreamTurn {
+function afterToolRounds(answer: StreamTurn, write: StreamTurn, toolRound: (sent: (response: Response) => Response) => StreamTurn,
+  lowerEffort: boolean, answerBy: AnswerBy | undefined): StreamTurn {
   return async function* (messages) {
     if (messages.at(-1)?.role !== 'tool') { yield* answer(messages); return }
-    let response: Response | undefined
+    const late = () => answerBy !== undefined && Date.now() >= answerBy.at
+    if (late()) { answerBy!.fired('round'); yield* write(messages); return }
+    let cut: (() => void) | undefined
+    let cutting = false
+    const calls = toolRound(response => {
+      const body = cuttable(response)
+      cut = body.cut
+      if (cutting) cut()
+      return body.response
+    })(messages)[Symbol.asyncIterator]()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // setTimeout runs a delay past 2^31 - 1 ms at once.
+    const passes = answerBy && new Promise<typeof LATE>(resolve => { timer = setTimeout(resolve, Math.min(answerBy.at - Date.now(), 2 ** 31 - 1), LATE) })
     let wrote = false
     let calledTool = false
-    for await (const event of toolRound(sent => { response = sent })(messages)) {
-      if (event.type === 'text' && event.text) { wrote = true; break }
-      calledTool ||= event.type === 'tool_call'
-      yield event
+    let rewrite = false
+    let ended = false
+    try {
+      for (;;) {
+        const next = calls.next()
+        const step = passes && !wrote && !calledTool ? await Promise.race([next, passes]) : await next
+        if (step === LATE) {
+          // Still choosing tools: close the call now; it ends on what it read, and nothing it read is kept.
+          answerBy!.fired('cut')
+          cutting = true
+          cut?.()
+          await next.catch(() => undefined)
+          rewrite = true
+          break
+        }
+        if (step.done) { ended = true; break }
+        const event = step.value
+        if (event.type === 'tool_call' && !calledTool && late()) { answerBy!.fired('calls'); rewrite = true; break }
+        if (lowerEffort && event.type === 'text' && event.text) { rewrite = true; break }
+        wrote ||= event.type === 'text' && Boolean(event.text)
+        calledTool ||= event.type === 'tool_call'
+        yield event
+      }
+    } finally {
+      clearTimeout(timer)
+      // Stopped before its end: release the call's reader, then close its connection.
+      if (!ended) { await calls.return?.(undefined)?.catch(() => undefined); cut?.() }
     }
-    if (calledTool) return
-    if (!wrote) { yield* answer(messages); return }
-    await response?.body?.cancel().catch(() => {})
-    yield* write(messages)
+    // A lower-effort call that ended with neither a tool call nor a word is sent again, tools allowed only in time.
+    if (!rewrite && lowerEffort && !calledTool && late()) { answerBy!.fired('round'); rewrite = true }
+    if (rewrite) yield* write(messages)
+    else if (lowerEffort && !calledTool) yield* answer(messages)
   }
+}
+
+/** `response` with a body the turn can end while the model writes it: `cut` cancels the original body, which closes
+ *  the connection, and whoever reads the returned body sees it end. */
+function cuttable(response: Response): { response: Response; cut: () => void } {
+  const source = response.body?.getReader()
+  if (!source) return { response, cut: () => {} }
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const { done, value } = await source.read()
+      if (!done) controller.enqueue(value)
+      else try { controller.close() } catch { /* its reader cancelled it first */ }
+    },
+    cancel: reason => source.cancel(reason),
+  })
+  return { response: new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers }),
+    cut: () => { source.cancel().catch(() => undefined) } }
 }
 
 function createRouterTurnTransport(
