@@ -51,7 +51,9 @@ export async function connectHostedTurnCancellation(namespace: TurnHostControlNa
 ): Promise<TurnCancellationConnection> {
   const response = await hostedCancellationRequest(namespace, target, auth, true)
   if (!response) throw new TurnControlUnavailableError('The host id is invalid')
-  return observeCancellationSocket(response)
+  const controller = new AbortController()
+  const close = await observeCancellationSocket(response, controller, () => controller.abort(new TurnControlUnavailableError()))
+  return { signal: controller.signal, close }
 }
 
 async function hostedCancellationRequest(namespace: TurnHostControlNamespace, target: TurnHostControlTarget,
@@ -95,50 +97,77 @@ export async function requestDurableTurnCancellation(namespace: TurnStreamNamesp
   return response.json()
 }
 
+/** Control failures the object decided (a 4xx, its release or ownership notice, an ownership close, an unreadable
+ *  reply): never retried. */
+const refused = new WeakSet<object>()
+
 /** One server-owned connection on the existing authenticated DO transport, with retained cancellation replay. */
 export async function connectDurableTurnCancellation(namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity,
   auth: TurnStreamAuth,
 ): Promise<TurnCancellationConnection> {
-  return observeCancellationSocket(await cancellationRequest(namespace, identity, auth, true))
+  const controller = new AbortController()
+  let closed = false
+  let closeSocket = () => {}
+  const open = async () => {
+    closeSocket = await observeCancellationSocket(await cancellationRequest(namespace, identity, auth, true), controller, lost)
+    if (closed) closeSocket()
+  }
+  // A socket that drops after its sync is reopened up to three times, 0, 0.5 and 1 s apart, and the new sync replays a
+  // Stop the object recorded meanwhile. A refusal the object decided, or a fourth failure, aborts the signal.
+  const lost = async (final: boolean) => {
+    for (let attempt = 0; !final && attempt < 3; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 500 * attempt))
+      if (closed || controller.signal.aborted) return
+      try { return await open() } catch (error) { final = refused.has(error as object) }
+    }
+    if (!closed) controller.abort(new TurnControlUnavailableError())
+  }
+  // A first socket that fails before its sync for any reason the object did not decide is opened once more.
+  await open().catch((error: unknown) => refused.has(error as object) ? Promise.reject(error) : open())
+  return { signal: controller.signal, close: () => { closed = true; closeSocket() } }
 }
 
-/** Shared retained-intent handshake and fail-closed socket lifecycle for both existing owners. */
-async function observeCancellationSocket(response: Response & { webSocket?: ControlSocket }): Promise<TurnCancellationConnection> {
-  if (response.status !== 101 || !response.webSocket) throw new TurnControlUnavailableError(`Turn control connection failed (HTTP ${response.status})`)
+/** Shared retained-intent handshake for both existing owners: resolves at the socket's first sync with its `close`, and
+ *  calls `lost` once if the socket fails after that. */
+async function observeCancellationSocket(response: Response & { webSocket?: ControlSocket }, controller: AbortController,
+  lost: (final: boolean) => void,
+): Promise<() => void> {
+  if (response.status !== 101 || !response.webSocket) {
+    const error = new TurnControlUnavailableError(`Turn control connection failed (HTTP ${response.status})`)
+    if (response.status >= 400 && response.status < 500) refused.add(error)
+    throw error
+  }
   const socket = response.webSocket
-  const controller = new AbortController()
   let closing = false
   let ready = false
   let resolveReady!: () => void
   let rejectReady!: (error: Error) => void
   const connected = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
-  const fail = () => {
-    if (closing) return
-    const error = new TurnControlUnavailableError()
-    if (!ready) rejectReady(error)
-    controller.abort(error)
-  }
   const close = () => { closing = true; clearTimeout(timer); try { socket.close(1000, 'Owner observation ended') } catch { /* Already closed. */ } }
-  const timer = setTimeout(() => { if (!ready) { fail(); close() } }, 10_000)
+  const fail = (final: boolean) => {
+    if (closing) return
+    close()
+    if (ready) return void lost(final)
+    const error = new TurnControlUnavailableError()
+    if (final) refused.add(error)
+    rejectReady(error)
+  }
+  const timer = setTimeout(() => fail(false), 10_000)
   socket.addEventListener('message', event => {
     let message: { type?: string; cancellationRequested?: boolean }
-    try { message = JSON.parse(String((event as MessageEvent).data)) } catch { fail(); close(); return }
-    if (message.type === 'turn.control.released') {
-      // A normal owner closes before its own cooperative release. Any release
-      // still observed here removes this producer's authority to continue I/O.
-      fail()
-      close(); return
-    }
-    if (message.type === 'turn.control.ownership-lost') { fail(); close(); return }
-    if (message.type !== 'turn.control' || typeof message.cancellationRequested !== 'boolean') { fail(); close(); return }
+    try { message = JSON.parse(String((event as MessageEvent).data)) } catch { fail(true); return }
+    // A normal owner closes before its own cooperative release, so a release (or an ownership loss) still observed here
+    // removes this producer's authority to continue I/O, as does a reply it cannot read.
+    if (message.type !== 'turn.control' || typeof message.cancellationRequested !== 'boolean') { fail(true); return }
     if (message.cancellationRequested) controller.abort(new TurnCancellationRequestedError())
     ready = true
     clearTimeout(timer)
     resolveReady()
   })
-  socket.addEventListener('close', fail)
-  socket.addEventListener('error', fail)
+  // 1008 is the object refusing a socket whose lock generation or host invocation changed.
+  socket.addEventListener('close', event => fail((event as { code?: number }).code === 1008))
+  socket.addEventListener('error', () => fail(false))
   try { socket.accept(); socket.send(JSON.stringify({ type: 'sync' })); await connected }
   catch (error) { close(); throw error }
-  return { signal: controller.signal, close }
+  return close
 }

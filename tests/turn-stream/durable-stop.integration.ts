@@ -580,8 +580,10 @@ try {
         assert.deepEqual(await json('/cancel', stopRequest), { succeeded: true, sandboxInterrupted: false, cancellationRequested: true }, 'Repeated Stop is idempotent')
         assert.equal((await readTarget()).responseStatus, 'running', 'Intent is not confirmed native completion or stopped metadata')
         assert.deepEqual(await json('/legacy-interrupt', owner), { released: false }, 'Legacy interrupt cannot release a cancellable producer early')
-      } else if (mode === 'transport-loss') await json('/close', owner)
-      else if (mode === 'external-release') {
+      } else if (mode === 'transport-loss') {
+        // A dropped socket alone is reopened; the turn ends when its reconnects are refused too.
+        await json('/close?lost=1', owner)
+      } else if (mode === 'external-release') {
         assert.deepEqual(await json('/release', owner), { released: true })
         await acquire(successor)
         assert.equal((await request('/cancel', stopRequest)).status, 409, 'The captured old target cannot request Stop for its successor')
