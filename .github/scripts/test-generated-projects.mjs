@@ -18,17 +18,22 @@ const NODE_RANGE = '>=22.13'
 const COMMAND_TIMEOUT_MS = 10 * 60 * 1000
 const PACK_TIMEOUT_MS = 2 * 60 * 1000
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const { packageManager, devDependencies } = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+const shellManifest = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8'))
+const { packageManager, devDependencies } = shellManifest
 const PNPM_VERSION = packageManager.replace(/^pnpm@/, '')
 const createAgentAppDir = join(repo, 'create-agent-app')
 const workspaceProof = fileURLToPath(new URL('../../create-agent-app/proof/workspace-browser.mjs', import.meta.url))
 const require = createRequire(import.meta.url)
+const semver = require('semver')
 const npmPackagePath = require.resolve('npm/package.json')
 const npmCli = join(dirname(npmPackagePath), 'bin', 'npm-cli.js')
 const playwrightCli = join(dirname(require.resolve('playwright/package.json')), 'cli.js')
 const dependencyCohort = process.env.AGENT_APP_TEST_COHORT
   ? JSON.parse(process.env.AGENT_APP_TEST_COHORT)
   : {}
+const AGENT_EVAL = '@tangle-network/agent-eval'
+// `--bare` proves only the bare consumers and skips the generated projects.
+const bareOnly = process.argv.includes('--bare')
 
 function commandLabel(command, args) {
   return [command, ...args].map((value) => JSON.stringify(value)).join(' ')
@@ -158,6 +163,142 @@ function assertGeneratedAppDefaults(project, env) {
   }
   const deploy = JSON.parse(readFileSync(join(project, 'package.json'), 'utf8')).scripts?.deploy
   if (!/\bsignoff\b/.test(deploy ?? '')) throw new Error(`generated chat deploy script does not run signoff: ${deploy}`)
+}
+
+// ── Bare consumers: the packed shell beside each admitted Agent Eval line ────
+//
+// A generated project pins one engine cohort, so it proves one Agent Eval
+// release. The peer range promises more: every major it admits. A bare consumer
+// is an empty project holding only the packed shell and the peers a product must
+// install (Agent Eval at the release under test, the others at the development
+// install), under the headless template's dependency policy: strict peers and
+// no automatic peer installs. It proves the release under test (the cohort's,
+// else the development install) and the lowest release of each major the peer
+// range admits.
+
+const installedVersion = (name) =>
+  JSON.parse(readFileSync(join(repo, 'node_modules', name, 'package.json'), 'utf8')).version
+
+function requiredPeers(manifest) {
+  const meta = manifest.peerDependenciesMeta ?? {}
+  return Object.keys(manifest.peerDependencies ?? {}).filter((name) => meta[name]?.optional !== true)
+}
+
+function agentEvalReleases(manifest) {
+  const range = manifest.peerDependencies?.[AGENT_EVAL]
+  if (!range) throw new Error(`package.json declares no ${AGENT_EVAL} peer`)
+  const floors = range.split('||').map((alternative) => {
+    const floor = semver.minVersion(alternative.trim())
+    if (!floor) throw new Error(`${AGENT_EVAL} peer alternative "${alternative.trim()}" admits no release`)
+    return floor.version
+  })
+  return [...new Set([dependencyCohort[AGENT_EVAL] ?? installedVersion(AGENT_EVAL), ...floors])]
+}
+
+// Runs inside a bare consumer. Imports every public JavaScript entry of the
+// installed shell. An entry whose static module graph loads Agent Eval must
+// import; any other entry may instead stop at an optional peer of the shell
+// that the consumer did not install. Prints one JSON summary and exits 1 on a
+// failed entry or when no entry loads Agent Eval (the graph scan found nothing).
+async function probeEntries(agentEval, expected) {
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { createRequire } = await import('node:module')
+  const { dirname, join, resolve } = await import('node:path')
+  const consumer = process.cwd()
+  const installed = JSON.parse(readFileSync(join(consumer, 'node_modules', agentEval, 'package.json'), 'utf8')).version
+  const manifestPath = createRequire(join(consumer, 'package.json')).resolve('@tangle-network/agent-app/package.json')
+  const root = dirname(manifestPath)
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  const optional = new Set(Object.entries(manifest.peerDependenciesMeta ?? {}).filter(([, meta]) => meta.optional).map(([name]) => name))
+  const packageOf = (specifier) => specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/')
+  const STATIC = /(?:^|[;\s])(?:import|export)\s*(?:[^'";]*?\sfrom\s*)?["']([^"']+)["']/g
+  const graph = new Map()
+  const bare = (file) => {
+    if (graph.has(file)) return graph.get(file)
+    const found = new Set()
+    graph.set(file, found)
+    for (const [, specifier] of readFileSync(file, 'utf8').matchAll(STATIC)) {
+      if (!specifier.startsWith('.')) found.add(packageOf(specifier))
+      else if (existsSync(resolve(dirname(file), specifier))) for (const name of bare(resolve(dirname(file), specifier))) found.add(name)
+    }
+    return found
+  }
+  const rows = []
+  for (const [key, target] of Object.entries(manifest.exports)) {
+    const file = typeof target === 'object' ? target.import : undefined
+    if (!file?.endsWith('.js')) continue
+    const id = `@tangle-network/agent-app${key.slice(1)}`
+    const loadsEval = bare(join(root, file)).has(agentEval)
+    try {
+      await import(id)
+      rows.push({ id, loadsEval, outcome: 'imported' })
+    } catch (error) {
+      const missing = error?.code === 'ERR_MODULE_NOT_FOUND' ? /Cannot find package '([^']+)'/.exec(error.message)?.[1] : undefined
+      const peer = missing && packageOf(missing)
+      rows.push(peer && optional.has(peer) && !loadsEval
+        ? { id, loadsEval, outcome: 'needs-optional-peer', peer }
+        : { id, loadsEval, outcome: 'failed', error: String(error?.message ?? error).split('\n')[0] })
+    }
+  }
+  const count = (predicate) => rows.filter(predicate).length
+  const summary = {
+    agentApp: manifest.version,
+    agentEval: installed,
+    entries: rows.length,
+    loadsAgentEval: rows.filter((row) => row.loadsEval).map((row) => row.id),
+    imported: count((row) => row.outcome === 'imported'),
+    needsOptionalPeer: count((row) => row.outcome === 'needs-optional-peer'),
+    failed: rows.filter((row) => row.outcome === 'failed'),
+  }
+  process.stdout.write(`${JSON.stringify(summary)}\n`)
+  const ok = installed === expected && summary.failed.length === 0 && summary.loadsAgentEval.length > 0
+  process.exit(ok ? 0 : 1)
+}
+
+function proveBareConsumer({ env, packedAgentApp, scratch, storeDir, agentEval }) {
+  const project = join(scratch, 'consumers', `agent-eval-${agentEval}`)
+  mkdirSync(project, { recursive: true })
+  const dependencies = Object.fromEntries(requiredPeers(shellManifest).map((name) => [
+    name,
+    name === AGENT_EVAL ? agentEval : dependencyCohort[name] ?? installedVersion(name),
+  ]))
+  dependencies['@tangle-network/agent-app'] = `file:${packedAgentApp}`
+  writeJson(join(project, 'package.json'), {
+    name: `bare-consumer-agent-eval-${agentEval.replaceAll('.', '-')}`,
+    version: '0.0.0',
+    private: true,
+    type: 'module',
+    engines: { node: NODE_RANGE },
+    packageManager: `pnpm@${PNPM_VERSION}`,
+    dependencies,
+  })
+  writeFileSync(
+    join(project, 'pnpm-workspace.yaml'),
+    readFileSync(join(createAgentAppDir, 'template', 'pnpm-workspace.yaml'), 'utf8'),
+  )
+  run('pnpm', ['install', '--strict-peer-dependencies', '--store-dir', storeDir], { cwd: project, env })
+  const source = `await (${probeEntries.toString()})(${JSON.stringify(AGENT_EVAL)}, ${JSON.stringify(agentEval)})`
+  run(process.execPath, ['--input-type=module', '--eval', source], { cwd: project, env })
+}
+
+// Every release is attempted so one report names each line's verdict.
+function proveBareConsumers({ env, packedAgentApp, scratch }) {
+  const storeDir = join(scratch, 'store')
+  const releases = agentEvalReleases(shellManifest)
+  const verdicts = releases.map((agentEval) => {
+    process.stdout.write(`\nBare consumer: packed ${shellManifest.name} beside ${AGENT_EVAL}@${agentEval}\n`)
+    try {
+      proveBareConsumer({ env, packedAgentApp, scratch, storeDir, agentEval })
+      return { agentEval, passed: true }
+    } catch (error) {
+      return { agentEval, passed: false, error: error.message }
+    }
+  })
+  process.stdout.write(`\nBare consumers (${AGENT_EVAL} peer ${shellManifest.peerDependencies[AGENT_EVAL]}): ${JSON.stringify(verdicts)}\n`)
+  const failed = verdicts.filter((verdict) => !verdict.passed)
+  if (failed.length > 0) {
+    throw new Error(`bare consumers failed beside ${failed.map((verdict) => `${AGENT_EVAL}@${verdict.agentEval}`).join(', ')}`)
+  }
 }
 
 function assertToolVersions(env) {
@@ -420,6 +561,9 @@ function main(scratch) {
       `${createAgentAppPack.name}@${createAgentAppPack.version} (${createAgentAppPack.entryCount} files).\n`,
   )
   process.stdout.write(`${JSON.stringify({ agentAppIntegrity: agentAppPack.integrity, scaffolderIntegrity: createAgentAppPack.integrity })}\n`)
+
+  proveBareConsumers({ env, packedAgentApp, scratch })
+  if (bareOnly) return
 
   for (const variant of ['headless', 'chat']) {
     installAndRunScaffolder({
