@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.50
+
+- feat(runtime): run a model call's tool calls concurrently in the Router turn (#1568)
+
 ## 4.0.49
 
 - fix: persist opening text before quiet progress (#1595)
