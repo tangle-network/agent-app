@@ -6,7 +6,7 @@ description: Wire product measurement and improvement to Agent Eval campaigns, o
 # Wire Eval Campaigns
 
 Use `@tangle-network/agent-app/eval-campaign` as the product-facing import.
-It composes Agent Eval `0.133.0`.
+It composes the Agent Eval releases that this package's `peerDependencies` admit.
 Do not recreate execution, scoring, data splitting, or optimization.
 
 ## Choose The Entry Point
@@ -22,12 +22,14 @@ Do not recreate execution, scoring, data splitting, or optimization.
 
 There is no default candidate generator.
 When `budget.generations` is greater than zero, pass exactly one of `method` or `proposer`.
+Give `describeArtifact` to the method or to `selfImprove`, never both; Agent Eval 2 refuses the pair before any spend.
 
 ## Supply Product Inputs
 
 1. Define `scenarios` with stable IDs.
 2. Implement `agent(surface, scenario, ctx)` against the real execution path.
-3. Report paid calls through `ctx.cost`.
+3. Report paid calls through `ctx.cost`, with their token usage.
+   Declare a call that cannot spend, such as a local retrieval, free with `maximumCharge: { externallyEnforcedMaximumUsd: 0 }`; Agent Eval 2 counts a zero-token call without that declaration as a stub.
 4. Define a `JudgeConfig`, or use `buildEnsembleJudge` for repeated independent judges.
 5. Keep method-selection cases separate from final comparison cases.
 6. Set a dollar limit and bounded concurrency.
