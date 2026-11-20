@@ -33,7 +33,7 @@ export interface GeneralAgentProfileOptions {
   model?: string
 }
 
-function generalAgentProfile(profile: AgentProfile): AgentProfile {
+function generalAgentProfile(profile: NonNullable<BackendConfig['profile']>): AgentProfile {
   if (Object.hasOwn(profile, 'interactions')) {
     throw new Error('A general-agent profile cannot override backend permission interactions')
   }
@@ -63,7 +63,7 @@ export async function buildGeneralAgentProfile(options: GeneralAgentProfileOptio
   }
   const model = options.model ?? GENERAL_AGENT_MODEL
   const search = await fetchTangleRouterSearchConfig({ model, apiKeyEnv: 'TANGLE_API_KEY' })
-  const routerProfile = buildTangleRouterSearchProfile(search, { model })
+  const routerProfile = generalAgentProfile(buildTangleRouterSearchProfile(search, { model }))
   // Configuration is a public Router response, not authority to send a credential elsewhere.
   for (const server of Object.values(routerProfile.mcp ?? {})) {
     if (server.transport !== 'http' || typeof server.url !== 'string'

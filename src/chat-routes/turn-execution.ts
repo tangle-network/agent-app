@@ -9,10 +9,8 @@ import {
   type BufferedTurnTap,
   type PersistedChatMessageForTurn,
 } from '../stream/index'
-import type { TurnTraceSink, TurnTraceSnapshot, TurnTraceSummary } from '../turn-trace/recorder'
-import { otlpTraceId } from '../turn-trace/otel'
+import type { TurnTraceSink, TurnTraceSnapshot } from '../turn-trace/recorder'
 import { traceProducerStream } from './producer-trace'
-import { noteMeasuredTurnFacts, readableTurnFailure } from '../turn-trace/turn-facts'
 import { createNativeTimingTransfer, type NativeTimingTransfer } from './native-turn-timing'
 import { createChatTurnOwnership } from './turn-ownership'
 import {
@@ -32,7 +30,6 @@ import {
 } from './turn-event-stream'
 import type {
   ChatTurnLifecycleComplete,
-  ChatTurnModelAttribution,
   ChatTurnProduceArgs,
   ChatTurnRequestContext,
   ChatTurnRouteProducer,
@@ -47,6 +44,7 @@ import { measuredUsage } from './sandbox-turn-usage'
 import type { ResolvedChatTurnRoutesOptions } from './route-storage'
 import type { AfterAuthorizeWork } from './early-turn-work'
 import { transformVisibleTextParts } from './visible-text'
+import { createTurnSettlement, modelAttributionFields } from './turn-settlement'
 
 /** The thread's messages as the turn-identity resolver reads them. */
 async function readTurnHistory(store: CreateChatTurnRoutesOptions<unknown>['store'], threadId: string): Promise<PersistedChatMessageForTurn[]> {
@@ -63,39 +61,11 @@ interface TurnExecutionOptions<TContext, TResource> {
   traceOptions: ChatTurnTraceOptions<TContext> | undefined
   traceSink: TurnTraceSink | undefined
   traceReceipt(request: Request, executionId: string): Record<string, string>
-  startIntentLine(admitted: AdmittedTurn<TContext>): Promise<string | null> | undefined
+  startIntentLine(admitted: AdmittedTurn<TContext>, stop?: AbortSignal): Promise<string | null> | undefined
   log(message: string, meta?: Record<string, unknown>): void
 }
 
-/** One requested-versus-served projection for persistence and both completion receipts. */
-function modelAttributionFields(attribution: ChatTurnModelAttribution | undefined) {
-  return {
-    ...(attribution?.requestedModel ? { requestedModel: attribution.requestedModel } : {}),
-    ...(attribution?.servedModel ? { servedModel: attribution.servedModel } : {}),
-    ...(attribution?.servedProvider ? { servedProvider: attribution.servedProvider } : {}),
-    ...(attribution?.servedSource ? { servedSource: attribution.servedSource } : {}),
-  }
-}
-
 /** Bind the route's construction-time dependencies; each invocation retains its own turn state. */
-/** The lifecycle's timing for a settled turn, noted for the rollout timing store so it can fill a product row that
- *  omits it (rollout/d1 `record`). */
-function settledTurnTiming(turnStreamId: string, at: {
-  requestAt: number; startedAt: number; firstVisibleAt?: number
-  firstTextAt?: number; model?: string
-  failure?: { data?: Record<string, unknown>; error: unknown }
-}, trace: TurnTraceSummary) {
-  const measured = {
-    admissionMs: at.startedAt - at.requestAt,
-    ...(at.firstVisibleAt === undefined ? {} : { firstVisibleMs: at.firstVisibleAt - at.startedAt }),
-    ...(at.firstTextAt === undefined ? {} : { firstTextMs: at.firstTextAt - at.startedAt }),
-  }
-  const failureCode = at.failure ? readableTurnFailure(at.failure.error, at.failure.data) : undefined
-  noteMeasuredTurnFacts(turnStreamId, { requestReceivedAt: at.requestAt, ...measured, ...(at.model ? { model: at.model } : {}),
-    ...(failureCode ? { failureCode } : {}) })
-  return { ...measured, trace }
-}
-
 export function createAdmittedTurnRunner<TContext, TResource>(dependencies: TurnExecutionOptions<TContext, TResource>) {
   return (runAdmittedTurn<TContext, TResource>).bind(null, dependencies)
 }
@@ -111,16 +81,20 @@ async function runAdmittedTurn<TContext, TResource>({
   startedIntent?: Promise<string | null>,
 ): Promise<Response> {
   const { parsed, auth, trace } = admitted
+  const hostStop = ctx?.hostControl?.signal
+  hostStop?.throwIfAborted()
   // A progress-first turn started its line at admission; any other starts it here.
-  const intentLine = startedIntent ?? startIntentLine(admitted)
+  const intentLine = startedIntent ?? startIntentLine(admitted, ctx?.hostControl?.signal)
   const { payload, content, fileParts, mentions, turnId } = parsed
   const { tenantId, userId, context } = auth
 
   const preparedBatch = await prepareAdmittedTurn(options, trace, log, tenantId, userId, payload, context, request, progress, content, turnId, draftTuning, ctx?.waitUntil)
   if (preparedBatch instanceof Response) return preparedBatch
+  hostStop?.throwIfAborted()
   const { turnStreamId, identity, executionId, chatTurn, readHistory, historyBeforeLock } = preparedBatch
   // Registered secret values never reach the stream, the buffer, the draft or the stored row (redact-values.ts).
   const redact = options.redactValues ? valueRedactor(await options.redactValues({ tenantId, userId, threadId: payload.threadId })) : undefined
+  hostStop?.throwIfAborted()
 
   const prompt: string | ChatTurnPartInput[] =
     fileParts.length === 0
@@ -139,7 +113,12 @@ async function runAdmittedTurn<TContext, TResource>({
   // public field optional preserves existing synthetic producers; this
   // assembled route always supplies it to the real `produce` invocation.
   const state = createAdmittedTurnState<TContext>()
-  if (options.cancel) state.cancellationAbort = new AbortController()
+  if (options.cancel || ctx?.hostControl) state.cancellationAbort = new AbortController()
+  if (hostStop) {
+    const abort = () => state.cancellationAbort!.abort(hostStop.reason)
+    if (hostStop.aborted) abort()
+    else hostStop.addEventListener('abort', abort, { once: true })
+  }
 
   state.nativeTiming = createNativeTimingTransfer(() => ({
     turnStreamId, requestReceivedAt: trace.startedAt,
@@ -177,46 +156,47 @@ async function runAdmittedTurn<TContext, TResource>({
   // Responders named from the product's own catalog, before any lock, row or model call.
   const addressed = await addressAgents({ options, mentions, identity, context, produceArgs, trace })
   if (addressed instanceof Response) return addressed
+  hostStop?.throwIfAborted()
   produceArgs = addressed
-  const selected = selectTurnProducer(options.produce, produceArgs)
-  // Responders answer one after another, so nothing starts before the lock.
-  const dispatched = produceArgs.agents ? undefined : dispatchFirstFor(selected, produceArgs, trace)
-  if (dispatched) early.add(dispatched.refuse)
-  const turnLock = options.turnLock
-  if (turnLock) {
-    const acquired = await trace.measure('admission.lock', 'admission', () => turnLock.acquire(produceArgs))
-    if (!acquired.acquired) return acquired.response
-    state.lockAcquired = true
-    state.lockHandle = acquired.handle
-    if (acquired.cancellation) {
-      const cancellation = acquired.cancellation
-      const abort = () => state.executionAbort.abort(cancellation.signal.reason)
-      if (cancellation.signal.aborted) abort()
-      else cancellation.signal.addEventListener('abort', abort, { once: true })
-      state.closeCancellation = async () => {
-        cancellation.signal.removeEventListener('abort', abort)
-        await cancellation.close()
-      }
-    }
-  }
-  progress?.('preparing', progressMessages.preparing)
-
-  // Turn state, hoisted so the pre-stream `catch` can settle the lifecycle
-  // (fire `onTurnError`, close the span) even when a seam throws
-  // synchronously before the drain — the drain would otherwise be the only
-  // path that runs the terminal hook.
-
-  // Set once persistence settles; `undefined` means it never ran.
-
-  /** The assistant row this turn ended with. Falls back to the draft writer
-   *  so a turn whose producer THREW — skipping `persistAssistantMessage`
-   *  entirely — still names the partial row it left behind. */
-  const { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
+  const { endTrace, exportTraceInBackground, startLifecycle, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle } = createTurnSettlement(state, trace, options, executionId, traceSink, identity, traceOptions, context, turnStreamId, log, ctx, () => produceArgs.userMessageId)
 
   try {
+    const selected = selectTurnProducer(options.produce, produceArgs)
+    hostStop?.throwIfAborted()
+    // Responders answer one after another, so nothing starts before the lock.
+    const dispatched = produceArgs.agents ? undefined : dispatchFirstFor(selected, produceArgs, trace)
+    if (dispatched) early.add(dispatched.refuse)
+    const turnLock = options.turnLock
+    if (turnLock) {
+      const acquired = await trace.measure('admission.lock', 'admission', () => {
+        hostStop?.throwIfAborted()
+        return turnLock.acquire(produceArgs)
+      })
+      if (!acquired.acquired) return acquired.response
+      state.lockAcquired = true
+      state.lockHandle = acquired.handle
+      if (acquired.cancellation) {
+        const cancellation = acquired.cancellation
+        const abort = () => state.executionAbort.abort(cancellation.signal.reason)
+        if (cancellation.signal.aborted) abort()
+        else cancellation.signal.addEventListener('abort', abort, { once: true })
+        state.closeCancellation = async () => {
+          cancellation.signal.removeEventListener('abort', abort)
+          await cancellation.close()
+        }
+      }
+    }
+    // An acquire already in flight may finish after Stop; retain its exact handle
+    // and cancellation connection before the existing catch closes/releases it.
+    hostStop?.throwIfAborted()
+    progress?.('preparing', progressMessages.preparing)
     // The running row is written beside the history recheck, inside its span.
     const [history] = state.lockAcquired
-      ? await trace.measure('admission.history_recheck', 'admission', () => Promise.all([readHistory(), markRunning()])) : []
+      ? await trace.measure('admission.history_recheck', 'admission', () => {
+        hostStop?.throwIfAborted()
+        return Promise.all([readHistory(), markRunning()])
+      }) : []
+    hostStop?.throwIfAborted()
     if (state.lockAcquired && JSON.stringify(history) !== historyBeforeLock) {
       await releaseBeforeDrain('error')
       return Response.json({
@@ -238,16 +218,20 @@ async function runAdmittedTurn<TContext, TResource>({
     let userMessageInserted = false
     if (insertUserMessage) {
       userMessageId = rowIdOf(
-        await trace.measure('admission.persist_user', 'admission', () => options.store.appendMessage({
-          threadId: payload.threadId,
-          role: 'user',
-          content,
-          parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
-        })),
+        await trace.measure('admission.persist_user', 'admission', () => {
+          hostStop?.throwIfAborted()
+          return options.store.appendMessage({
+            threadId: payload.threadId,
+            role: 'user',
+            content,
+            parts: userPartsWithFiles(chatTurn.userParts, fileParts, mentions),
+          })
+        }),
       )
       userMessageInserted = userMessageId !== null
     }
     produceArgs = { ...produceArgs, userMessageId, userMessageInserted }
+    hostStop?.throwIfAborted()
 
     // Domain-readiness gate: may short-circuit with the product's own
     // response before the producer runs. The user row above is kept (a real
@@ -269,33 +253,9 @@ async function runAdmittedTurn<TContext, TResource>({
           exportTraceInBackground()
           return gate.response
         }
-        // A gated turn is still a TURN, and until now it was the one answer
-        // path that fired no lifecycle hook at all — `turnStarted` is set
-        // further down, so an early return here left telemetry with no record
-        // that anything happened. A product whose gate answers everything
-        // therefore looks IDLE rather than broken, which is indistinguishable
-        // from healthy on every dashboard.
-        //
-        // Only the LIFECYCLE hooks fire (telemetry, errors swallowed); the
-        // billing/persistence `onTurnComplete` deliberately does not, because
-        // no model ran and no assistant row was written. `gated` marks the
-        // completion so a consumer counts it without mistaking it for a model
-        // turn that produced nothing.
-        state.gatedTurn = true
-        state.turnStartedAtMs = Date.now()
-        if (options.lifecycle?.onTurnStart) {
-          try {
-            await options.lifecycle.onTurnStart({
-              identity, executionId, turnStreamId, context, startedAt: state.turnStartedAtMs,
-              requestReceivedAt: trace.startedAt, admissionMs: state.turnStartedAtMs - trace.startedAt,
-            })
-          } catch (err) {
-            log('[chat-routes] lifecycle.onTurnStart failed', {
-              turnId: turnStreamId,
-              error: err instanceof Error ? err.message : String(err),
-            })
-          }
-        }
+        // A gate still reports its lifecycle; no model billing/persistence hook runs.
+        const lifecycleStarted = startLifecycle(true)
+        if (lifecycleStarted) await lifecycleStarted
         await fireTerminalLifecycle(false, undefined)
         exportTraceInBackground()
         return gate.response
@@ -303,12 +263,14 @@ async function runAdmittedTurn<TContext, TResource>({
     }
 
     // Observe + optionally augment the assembled producer input.
+    hostStop?.throwIfAborted()
     const beforeTurn = options.beforeTurn
     if (beforeTurn) {
       const patch = await trace.measure('admission.before_turn', 'admission', (span) => beforeTurn(produceArgs, { span }))
       if (patch && Object.keys(patch).length && dispatched) throw new Error('beforeTurn cannot patch a Router turn already dispatched: its prompt is already sent')
       if (patch) produceArgs = { ...produceArgs, ...patch }
     }
+    hostStop?.throwIfAborted()
     const streamSetup = trace.start('admission.stream_setup', 'admission')
 
     // Durability tap: every engine event buffers (coalesced) so a dropped
@@ -356,22 +318,11 @@ async function runAdmittedTurn<TContext, TResource>({
       if (state.completionHandoff) await state.draft.close()
     }
 
-    state.turnStartedAtMs = Date.now()
-    state.turnStarted = true
-    if (options.lifecycle?.onTurnStart) {
-      try {
-        await options.lifecycle.onTurnStart({
-          identity, executionId, turnStreamId, context, startedAt: state.turnStartedAtMs,
-          requestReceivedAt: trace.startedAt, admissionMs: state.turnStartedAtMs - trace.startedAt,
-        })
-      } catch (err) {
-        log('[chat-routes] lifecycle.onTurnStart failed', {
-          turnId: turnStreamId,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      }
-    }
+    const lifecycleStarted = startLifecycle()
+    if (lifecycleStarted) await lifecycleStarted
     streamSetup.end()
+
+    hostStop?.throwIfAborted()
 
     const { result } = createTurnEngine(identity, ctx, log, state, dispatched, produceArgs, trace, options, selected.produce, request, context, payload, assistantRowId, redact)
 
@@ -381,7 +332,7 @@ async function runAdmittedTurn<TContext, TResource>({
 
     return createTurnReplayResponse(result.contentType, clientBody, turnMarker, trace)
   } catch (err) {
-    // A throw before the turn began streaming (user-insert, gate, beforeTurn,
+    // A throw before the turn began streaming (selection/acquire, user-insert, gate, beforeTurn,
     // lifecycle-start, tap setup, engine construction, tee). If the turn had
     // already started, settle the lifecycle with `onTurnError` (close the
     // span) — the drain never ran to do it. Then release the lock, propagate.
@@ -395,7 +346,7 @@ async function runAdmittedTurn<TContext, TResource>({
     throw err
   }
 }
-interface AdmittedTurnState<TContext> {
+export interface AdmittedTurnState<TContext> {
   executionAbort: AbortController
   closeCancellation: (() => Promise<void>) | undefined
   draft: AssistantDraftWriter | undefined
@@ -408,6 +359,7 @@ interface AdmittedTurnState<TContext> {
   lockReleased: boolean
   cancellationAbort?: AbortController
   producer: ChatTurnRouteProducer | undefined
+  producerError: unknown
   assistantMessageId: string | null | undefined
   runFailed: boolean
   lastFailureData: Record<string, unknown> | undefined
@@ -435,6 +387,7 @@ function createAdmittedTurnState<TContext>(): AdmittedTurnState<TContext> {
     lockHandle: undefined,
     lockReleased: false,
     producer: undefined,
+    producerError: undefined,
     assistantMessageId: undefined,
     runFailed: false,
     lastFailureData: undefined,
@@ -558,160 +511,6 @@ async function prepareAdmittedTurn<TContext, TResource>(
   return { turnStreamId, identity, executionId, chatTurn, readHistory, historyBeforeLock }
 }
 
-function createTurnSettlement<TContext, TResource>(
-  state: AdmittedTurnState<TContext>,
-  trace: AdmittedTurn<TContext>['trace'],
-  options: TurnExecutionOptions<TContext, TResource>['options'],
-  executionId: string,
-  traceSink: TurnExecutionOptions<TContext, TResource>['traceSink'],
-  identity: ChatTurnIdentity,
-  traceOptions: TurnExecutionOptions<TContext, TResource>['traceOptions'],
-  context: TContext,
-  turnStreamId: `${string}-${string}-${string}-${string}-${string}`,
-  log: (message: string, meta?: Record<string, unknown>) => void,
-  ctx: ChatTurnRequestContext | undefined,
-  userMessageId: () => string | null | undefined,
-) {
-  const assistantRowId = (): string | null => state.assistantMessageId ?? state.draft?.rowId() ?? null
-
-  // Data of the event that marked the run failed — handed to `onTurnError`
-  // when no drain throw supplies a richer cause.
-
-  // Answer text stays separate from reasoning and tools.
-
-  // What `lifecycle.afterSettle` receives: set when the turn ended cleanly with a producer that ran.
-
-  // Set when `contextGate` answered the turn without running the producer.
-
-  // Set when `contextGate` handed the turn to the product's durable owner (`{ proceed: 'handoff' }`).
-
-  /**
-   * End the turn's trace once: write its summary line, and arm its export for `exportTrace`. A turn handed to a
-   * durable owner ends here when this request's live projection ends; the owner settles everything else.
-   */
-  const endTrace = (failed: boolean, terminalError: unknown): TurnTraceSnapshot => {
-    const failureCode = failed
-      ? (failureCodeOf(state.lastFailureData) ?? (terminalError instanceof Error ? terminalError.name : 'turn_failed'))
-      : undefined
-    const snapshot = trace.finish(failureCode === undefined ? {} : { error: failureCode })
-    if (state.traceEnded) return snapshot
-    state.traceEnded = true
-    const handedOff = state.completionHandoff || state.legacyHandoff
-    // One line per turn in the host's logs (Workers Logs), so first text and coverage are readable without Intelligence.
-    console.info(JSON.stringify({
-      event: 'agent_app_turn_trace',
-      project: options.projectId,
-      executionId,
-      otlpTraceId: otlpTraceId(snapshot.traceId),
-      failed,
-      ...(failureCode ? { failureCode } : {}),
-      ...(handedOff ? { handedOff: true } : {}),
-      ...(state.gatedTurn ? { gated: true } : {}),
-      ...snapshot.summary,
-    }))
-    // Sent by `exportTrace`, after the turn lock is released: a slow collector must not hold the next send.
-    const sink = traceSink
-    if (sink) {
-      state.pendingTraceExport = () => sink(snapshot, {
-        'tangle.sessionId': identity.sessionId,
-        'tangle.userId': identity.userId,
-        'tangle.tenantId': identity.tenantId,
-        'tangle.turn.failed': failed,
-        ...(state.gatedTurn ? { 'tangle.turn.gated': true } : {}),
-        ...(handedOff ? { 'tangle.turn.handed_off': true } : {}),
-        ...(failureCode ? { 'tangle.turn.failure_code': failureCode } : {}),
-        ...(traceOptions?.labels?.({ identity, executionId, context }) ?? {}),
-      })
-    }
-    return snapshot
-  }
-
-  // Exactly one terminal lifecycle hook, after the turn settles (idempotent).
-  // Failure is this route's own verdict (`runFailed` from error/failed
-  // events, or a drain/sync throw), not the engine's envelope.
-  const fireTerminalLifecycle = async (failed: boolean, terminalError: unknown): Promise<void> => {
-    if (state.lifecycleSettled) return
-    state.lifecycleSettled = true
-    // The trace ends with the turn, before the product's own hooks run, so their work is not in its wall time.
-    const snapshot = endTrace(failed, terminalError)
-    const lifecycle = options.lifecycle
-    const backend = { userMessageId: userMessageId(),
-      backendTerminal: Boolean(state.producer) && (state.producer?.terminalObserved?.() ?? true) }
-    const durationMs = Date.now() - state.turnStartedAtMs
-    const timing = settledTurnTiming(turnStreamId, {
-      requestAt: trace.startedAt, startedAt: state.turnStartedAtMs,
-      firstVisibleAt: state.firstVisibleAtMs, firstTextAt: state.firstTextAtMs, model: state.producer?.model,
-      failure: failed ? { data: state.lastFailureData, error: terminalError } : undefined,
-    }, snapshot.summary)
-    try {
-      if (!lifecycle) {
-        // No hooks to run; the trace still goes to its sink below.
-      } else if (failed) {
-        await lifecycle.onTurnError?.({
-          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
-          error: terminalError ?? state.lastFailureData ?? new Error('chat turn failed'),
-        })
-      } else {
-        const failoverInfo = state.producer?.modelFailover?.()
-        const attribution = state.producer?.modelAttribution?.()
-        const completed: ChatTurnLifecycleComplete<TContext> = {
-          identity, executionId, turnStreamId, context, durationMs, ...timing, ...backend,
-          finalText: state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
-          usage: state.producer?.usage?.() ?? {},
-          assistantMessageId: assistantRowId(),
-          ...(state.gatedTurn ? { gated: true } : {}),
-          ...(state.producer?.model ? { model: state.producer.model } : {}),
-          ...modelAttributionFields(attribution),
-          ...(failoverInfo ? { modelFailover: failoverInfo } : {}),
-        }
-        if (!state.gatedTurn) state.settledTurn = completed
-        await lifecycle.onTurnComplete?.(completed)
-      }
-    } catch (err) {
-      log('[chat-routes] lifecycle terminal hook failed', {
-        turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-  /** Send the finished trace to its sink. Never throws. */
-  const exportTrace = async (): Promise<void> => {
-    const send = state.pendingTraceExport
-    state.pendingTraceExport = undefined
-    if (!send) return
-    try {
-      await send()
-    } catch (err) {
-      log('[chat-routes] turn trace sink failed', {
-        turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-  /** The product's follow-up work for a turn that ended cleanly, once its lock is released. Never throws. */
-  const runAfterSettle = async (): Promise<void> => {
-    const info = state.settledTurn
-    state.settledTurn = undefined
-    const afterSettle = options.lifecycle?.afterSettle
-    if (!info || !afterSettle) return
-    try {
-      await afterSettle(info)
-    } catch (err) {
-      log('[chat-routes] lifecycle.afterSettle failed', {
-        turnId: turnStreamId,
-        error: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-  /** Export after the response is on its way: under `waitUntil` where the host has one. */
-  const exportTraceInBackground = (): void => {
-    const sent = exportTrace()
-    if (ctx?.waitUntil) ctx.waitUntil(sent)
-    else void sent.catch(() => { })
-  }
-  return { endTrace, exportTraceInBackground, fireTerminalLifecycle, assistantRowId, exportTrace, runAfterSettle }
-}
-
 function createTurnEngine<TContext, TResource>(
   identity: ChatTurnIdentity,
   ctx: ChatTurnRequestContext | undefined,
@@ -761,13 +560,18 @@ function createTurnEngine<TContext, TResource>(
           if (ctx?.cancelOnDisconnect) {
             source = abortOnSignal(source, request.signal)
           }
+          if (ctx?.hostControl) source = abortOnSignal(source, ctx.hostControl.signal)
           if (options.onRawEvent) {
             source = tapRawEvents(source, (event) => options.onRawEvent!(event, context), log)
           }
           if (options.heartbeat) {
             source = withStreamHeartbeat(source, options.heartbeat.intervalMs, options.heartbeat.event)
           }
-          for await (const event of source) yield event
+          try { for await (const event of source) yield event }
+          catch (error) {
+            state.producerError = state.lastFailureData ?? error
+            throw error
+          }
         })(),
         finalText: () => state.cancellationAbort?.signal.aborted ? '' : state.producer?.finalText() ?? '',
       }),

@@ -29,6 +29,18 @@ describe('buildCatalog', () => {
   const catalog = buildCatalog(fixture)
   const ids = catalog.models.map((m) => m.id)
 
+  it('uses current Sol and Astra rows and drops an unavailable Fable credential', () => {
+    const openai = ['gpt-6.1-sol', 'gpt-6.2-sol', 'gpt-6-astra', 'gpt-6.2-astra'].map(id =>
+      ({ id, _provider: 'openai', routeability: { status: 'routeable' }, released_at: new Date().toISOString() }))
+    const fable = { id: 'claude-fable-5-2', _provider: 'anthropic', routeability: { status: 'routeable' } }
+    const current = buildCatalog([...openai, { ...fable, availability: { status: 'unavailable' } }])
+    expect(current.defaultModelId).toBe('openai/gpt-6.2-sol')
+    expect(current.models.filter(model => model.featured).map(model => model.id)).toEqual(
+      expect.arrayContaining(['openai/gpt-6.2-astra', 'openai/gpt-6.2-sol']))
+    expect(current.models.map(model => model.id)).not.toContain('anthropic/claude-fable-5-2')
+    expect(buildCatalog([{ ...fable, released_at: new Date().toISOString() }]).models[0]?.featured).toBe(true)
+  })
+
   it('excludes non-chat endpoints (tts, embeddings, realtime, image)', () => {
     expect(ids).not.toContain('tts-1')
     expect(ids).not.toContain('text-embedding-3-large')

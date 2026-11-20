@@ -7,7 +7,7 @@ import type { ChatToolCallInfo, ChatUiMessage, ChatMessageSegment, ChatNoticeTon
 /** The blinking insertion caret shown at the end of streaming answer text.
  *  Shared by the segmented and legacy branches so their streaming cue can't
  *  visually diverge. */
-export function StreamingCaret() {
+function StreamingCaret() {
   return (
     <span
       className="ml-0.5 inline-block h-[1.1em] w-[3px] translate-y-[2px] animate-[agent-caret_1s_step-end_infinite] rounded-sm bg-foreground/70"
@@ -17,11 +17,8 @@ export function StreamingCaret() {
   )
 }
 
-/** One text run inside a segmented turn. Smooths its own text so only the
- *  actively-streaming trailing run types out; finalized runs render at once.
- *  A child component (not an inline map) so its `useSmoothText` state is stable
- *  across the parent's per-frame stream re-renders. */
-function SegmentText({
+/** Only this text run re-renders between network updates. */
+export function AnswerText({
   content,
   streaming,
   showCaret,
@@ -36,18 +33,8 @@ function SegmentText({
 }) {
   const text = useSmoothText(content, streaming)
   const body = useMemo(() => renderBody(text), [renderBody, text])
-  // An empty / whitespace-only run paints a blank line-height gap — render
-  // nothing, UNLESS it's the live trailing run (showCaret), where it still
-  // carries the caret so the turn doesn't look frozen. (Hooks run first, so
-  // this stays rules-of-hooks safe.)
-  if (!content.trim() && !showCaret) return null
   return (
-    // A settled run arrives from a short blur; the LIVE run does not, because
-    // its text is already being revealed character by character and animating
-    // the container on top of that makes the paragraph shimmer while it types.
-    // The distinction is what separates "the answer materialised" from "the
-    // log was appended to".
-    <div className={`${messageClassName}${streaming ? '' : ' agent-stream-in'}`}>
+    <div className={messageClassName}>
       {body}
       {/* Gate on showCaret (not the smoothed `text`, which is '' on the first
           frame) so the caret is steady from the start instead of flickering. */}
@@ -164,18 +151,20 @@ export function SegmentedBody({
       continue
     }
     if (g.kind === 'text') {
+      const live = streaming && g.index === lastIndex
+      if (!g.content.trim() && !(showCaret && live)) continue
       children.push(
-        <SegmentText
+        <AnswerText
           // Segments only ever append within a turn, so the index is a stable
           // key — a finalized run keeps its slot as later runs/tools are added,
           // so its smooth-text state isn't reset.
           key={`text-${g.index}`}
           content={g.content}
           // Only the trailing run of the live turn types out + shows the caret.
-          streaming={streaming && g.index === lastIndex}
-          showCaret={showCaret && streaming && g.index === lastIndex}
+          streaming={live}
+          showCaret={showCaret && live}
           renderBody={renderBody}
-          messageClassName={messageClassName}
+          messageClassName={live ? messageClassName : `${messageClassName} agent-stream-in`}
         />,
       )
       continue

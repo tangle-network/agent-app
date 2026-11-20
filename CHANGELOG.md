@@ -1,5 +1,62 @@
 # Changelog
 
+## 4.0.49
+
+- fix: persist opening text before quiet progress (#1595)
+
+## 4.0.48
+
+- fix: retain locked historical harness labels (#1590)
+
+## 4.0.47
+
+- docs: regenerate codemap for the KNOWN_HARNESSES doc comment (#1594)
+- fix(create-agent-app): ride template engine cohort to agent-interface 5.10.28 (#1593)
+
+## 4.0.46
+
+- fix(create-agent-app): land saved threads at the user's last sentence (#1592)
+
+## 4.0.45
+
+- fix: commit native admission before buffered live delivery (#1585)
+
+## 4.0.44
+
+- fix: retire Forge from shared harness and profile pickers (#1589)
+
+## 4.0.43
+
+- fix(catalog): select current available GPT and Fable families (#1588)
+
+## 4.0.42
+
+- Support Sandbox UI 11 and update the generated chat starter (#1587)
+
+## 4.0.41
+
+- docs: regenerate the transcript module code map (#1586)
+
+## 4.0.40
+
+- perf(web-react): render only visible answer text and honor reduced motion (#1584)
+
+## 4.0.39
+
+- fix(chat-routes): close committed sources during buffered replay
+
+## 4.0.38
+
+- fix(web-react): let controlled hosts clear drafts on acceptance (#1582)
+
+## 4.0.37
+
+- feat(chat-routes): control hosted turns before admission (#1565)
+
+## 4.0.36
+
+- fix(turn-trace): a full span drops Server-Timing detail first and counts what it drops, so a model call keeps its usage (#1580)
+
 ## 4.0.35
 
 - feat(runtime): shapeRequest shapes a Router request's decoded body before it is traced and gzipped (#1579)

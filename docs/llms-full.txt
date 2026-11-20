@@ -4687,6 +4687,14 @@ interface HybridTurnProducerOptions
 (event: unknown) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -5711,6 +5719,30 @@ interface StreamingSniffer
 "The Sandbox aborted a tool call before the turn finished, as when its runtime restarts mid-turn"
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -5773,6 +5805,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 (prompt: string | readonly ChatTurnPartInput[]) => boolean
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`
@@ -10900,7 +10948,7 @@ class HarnessSelectionError
 
 ### `KNOWN_HARNESSES`
 
-`const` — Recognized backend identities, including IDs needed by historical sessions.
+`const` — Recognized backend identities for new sessions.
 
 ```ts
 readonly Harness[]
@@ -11775,7 +11823,7 @@ class StaleApprovalError
 
 ## `./hub-approvals-react`
 
-Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`
+Source: `src/hub-approvals-react/index.tsx` · depends on `hub-approvals`, `web-react`
 
 ### `HubActionPreviewView`
 
@@ -33876,6 +33924,14 @@ number
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
+### `connectHostedTurnCancellation`
+
+`function` — Owned by the original hosted request, never its browser.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<TurnCancellationC…
+```
+
 ### `createDurableObjectTurnEventStore`
 
 `function` — Optional Durable Object backend for {@link TurnEventStore}.
@@ -34092,6 +34148,14 @@ interface ReconcileStaleDurableTurnLockOptions
 (namespace: TurnStreamNamespaceLike, identity: TurnCancellationIdentity, auth: TurnStreamAuth) => Promise<...>
 ```
 
+### `requestHostedTurnCancellation`
+
+`function` — Call only after product identity/editor/actual-thread authorization.
+
+```ts
+(namespace: TurnHostControlNamespace, target: TurnHostControlTarget, auth: TurnStreamAuth) => Promise<{ requested: bool…
+```
+
 ### `scopeIndexChannelKey`
 
 `function` — Running-turn index for the optional Durable Object turn-event backend.
@@ -34106,6 +34170,22 @@ interface ReconcileStaleDurableTurnLockOptions
 
 ```ts
 (workspaceId: string, threadId: string) => string
+```
+
+### `TURN_HOST_CANCEL_PATH`
+
+`const` — Server-only control on an existing unnamed host; never a turn start endpoint.
+
+```ts
+"/turn-host/cancel"
+```
+
+### `TURN_HOST_CONTROL_PATH`
+
+`const` — The same host's server-owned connection revokes execution permission on reset.
+
+```ts
+"/turn-host/control"
 ```
 
 ### `TURN_LOCK_TTL_MS`
@@ -34202,6 +34282,22 @@ interface TurnHost
 
 ```ts
 (objectId: string) => string
+```
+
+### `TurnHostControlNamespace`
+
+`interface` — Unique-id reconstruction is required; idFromName(hostId) addresses a different object.
+
+```ts
+interface TurnHostControlNamespace
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnLockAcquireInput`
@@ -38876,6 +38972,14 @@ type InteractionSubmitResult
 (status: ChatInteractionStatus) => boolean
 ```
 
+### `isTurnHostControlEvent`
+
+`function` — Validate the envelope without interpreting its opaque host id as authority.
+
+```ts
+(value: unknown) => value is TurnHostControlEvent
+```
+
 ### `isTurnIntentEvent`
 
 `function` — True for a {@link TURN_INTENT_EVENT} with non-empty text.
@@ -38954,6 +39058,14 @@ interface LinkLikeProps
 
 ```ts
 (record: ProvenanceRecord) => ProvenanceSource[]
+```
+
+### `LocalSessionHistoryPanel`
+
+`function` — Search a complete, newest-first session list already loaded by the workspace.
+
+```ts
+({ sessions, ...props }: Pick<SessionHistoryPanelProps, "className" | "emptyTitle" | "hrefForSession" | "newSessionHref…
 ```
 
 ### `mediaTypeForMentionPath`
@@ -40516,6 +40628,30 @@ type TrackedChatStreamCallbacks
 (name: string, blob: Blob) => { ok: true; } | { ok: false; message: string; }
 ```
 
+### `TURN_HOST_CONTROL_EVENT`
+
+`const` — A control address, never paid admission, execution authority or assistant content.
+
+```ts
+"turn.host.control"
+```
+
+### `TURN_HOST_CONTROL_FIRST`
+
+`const`
+
+```ts
+"first"
+```
+
+### `TURN_HOST_CONTROL_HEADER`
+
+`const` — Opt in to the hosted invocation's identity envelope before paid admission.
+
+```ts
+"x-turn-host-control"
+```
+
 ### `TURN_INTENT_EVENT`
 
 `const` — Stream event carrying the turn's intent line: one plain sentence, written by a fast model call at admission, saying what the agent is about to do ("Looking at your three competitors' pricing pages, t…
@@ -40570,6 +40706,22 @@ Record<TurnRoutePhase, string>
 
 ```ts
 "turn_stream_lost"
+```
+
+### `TurnHostControlEvent`
+
+`type`
+
+```ts
+type TurnHostControlEvent
+```
+
+### `TurnHostControlTarget`
+
+`interface`
+
+```ts
+interface TurnHostControlTarget
 ```
 
 ### `TurnIntentData`

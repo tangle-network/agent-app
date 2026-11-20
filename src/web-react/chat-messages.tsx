@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { isViewerMessage, MessageAuthor, partitionBySpeaker, SpeakerHeader, TRANSCRIPT_TEXT, type SpeakerPart } from '@tangle-network/ui/chat'
 import type { ChatAuthor } from '@tangle-network/ui/types'
-import { useSmoothText } from './smooth-text'
 import { POPOVER_OPTION_FOCUS } from './controls'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
 import { attachmentPartsFromMessageParts, type ChatAttachmentPart } from './chat-attachments'
@@ -21,8 +20,10 @@ import { ChatEmptyState } from './chat-empty-state'
 import { chatReasoningFromParts } from './chat-stream'
 import { segmentsFromParts, toolCallsFromParts } from './message-projection'
 import { formatModelCost, formatTokensPerSecond } from './chat-message-metrics'
-import { StreamingCaret, SegmentedBody } from './chat-message-body'
+import { AnswerText, SegmentedBody } from './chat-message-body'
 import { ToolCallCard } from './chat-tool-call'
+
+const EMPTY_MODELS: CatalogModel[] = []
 
 /** One answer of a turn answered by several agents: its responder and the stored row it was split from. */
 type SpokenMessage = ChatUiMessage & { speaker?: SpeakerPart; splitFrom?: string }
@@ -151,24 +152,13 @@ function AssistantMessageImpl({
   messageClassName: string
   chrome: 'labeled' | 'quiet'
 }) {
-  // Smooth reveal: chunky network slabs (model bursts, flush windows, replay
-  // polls) paint as a continuous typewriter. The reasoning row smooths its own
-  // text the same way while the model thinks.
-  const content = useSmoothText(msg.content, streaming)
-  // The smooth reveal re-renders on every rAF frame while streaming, but the
-  // FLOORED visible length only advances every few frames — re-parsing markdown
-  // each frame is wasted work on the hot path. Memo on (renderBody, content) so
-  // the parse runs only when the visible text actually changes.
-  const body = useMemo(() => renderBody(content), [renderBody, content])
-  // When a turn is segmented, render the ordered text/tool runs interleaved;
-  // otherwise fall back to the single content body + trailing tool group.
   const segments = msg.segments
   // "Has the answer started?" — true once any answer text exists, whether the
   // producer puts it in `content` (legacy) or in a text `segment`. Ends the
   // reasoning row's thinking state for a producer that sends no end time, so a
   // segmented message with `content: ''` doesn't read as perpetually
   // "Thinking…" after its answer segments are visible.
-  const hasAnswerText = Boolean(content || segments?.some(
+  const hasAnswerText = Boolean(msg.content || segments?.some(
     (s) => (s.kind === 'text' || s.kind === 'notice') && s.content.trim(),
   ))
 
@@ -216,10 +206,13 @@ function AssistantMessageImpl({
         />
       ) : (
         <>
-          <div className={messageClassName}>
-            {body}
-            {!msg.speaker && streaming && content && !msg.toolCalls?.length && <StreamingCaret />}
-          </div>
+          <AnswerText
+            content={msg.content}
+            streaming={streaming}
+            showCaret={!msg.speaker && streaming && !!msg.content && !msg.toolCalls?.length}
+            renderBody={renderBody}
+            messageClassName={messageClassName}
+          />
           {msg.toolCalls && msg.toolCalls.length > 0 && (
             <div className="mt-2 flex flex-col gap-1.5">
               {msg.toolCalls.map((tc, index) => (
@@ -404,7 +397,7 @@ export function ChatMessages({
   messages: storedMessages,
   messageSize = 'default',
   chrome = 'labeled',
-  models = [],
+  models = EMPTY_MODELS,
   renderMarkdown,
   renderExtras,
   durableCards,

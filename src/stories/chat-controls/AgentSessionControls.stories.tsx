@@ -148,8 +148,11 @@ export const CompactHarnessLocked: Story = {
 export const InlineHarnessLocked: Story = {
   name: 'Inline — harness locked',
   decorators: [withPopoverHeadroom],
-  render: () =>
+  render: (args) =>
     useSessionControls({
+      ...args,
+      // A recorded historical ID, deliberately absent from active choices.
+      harness: 'forge' as Harness,
       harnessLockReason: 'This thread already has messages — start a new chat to switch backend.',
     }),
 }

@@ -624,21 +624,9 @@ Marketing density on a work surface is a defect, not a matter of taste.
 
 The 14px floor holds for supporting text too: badges, captions, dates, field hints and notes use `text-sm`, never `text-xs` or a literal size. The shared shell, workspace listing, API access panel and question card meet it, and `tests/web-react/shell-type-floor.test.ts` fails if one of them drops below.
 
-**When whitespace is wrong:**
+Use compact rows for scanning and larger gaps between related groups. Keep the second most important action in view. Give the primary action the strongest visual weight. On first use, show how to populate the screen (Pattern 2).
 
-- It is padding *inside* a row rather than a gap *between* groups. Padding pushes information off-screen and expresses no relationship.
-- It is symmetric everywhere. If every gap is equal, the layout has not said what belongs together — symmetry communicates nothing.
-- It pushes the second-most-important thing below the fold.
-- It exists to make a thin screen look intentional. A thin screen is a first-run problem (Pattern 2), not a spacing problem.
-
-**Calm** means that at rest exactly one thing competes for attention — the next action — and everything else sits at the same weight.
-Calm is not low density; it is low *contrast variance* at high density.
-
-**Rejected.**
-The audit's recurring critical finding is the mirror image of marketing density and has the same root cause: **14 toolbar buttons at identical weight** on both Canvas and Timeline (Part I) is "no hierarchy" produced by too much sameness, and a 96px card per row on a queue a lawyer reads forty of is "no hierarchy" produced by too much space.
-Both come from a screen that never decided what matters.
-The failure also runs in the other direction, and the fix already shipped: `SessionHistoryPanel`'s `contentWidth` defaults to a reading column because a row whose title and timestamp sit 1,300px apart is not scannable.
-Density is not "fill the width" either.
+For History, keep titles and timestamps in the shared panel’s reading column. A workspace that has already loaded every session in newest-first order passes that list to `LocalSessionHistoryPanel` from `@tangle-network/agent-app/web-react`. Searching, sorting and clearing the search then require zero additional list requests. A server-paged workspace uses `SessionHistoryPanel` with its query and pagination adapter so search reaches older sessions.
 
 ---
 

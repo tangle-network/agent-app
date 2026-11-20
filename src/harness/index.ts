@@ -37,7 +37,7 @@ const nonBackendHarnesses = new Set<string>(NON_BACKEND_HARNESSES)
 export type Harness = Exclude<HarnessType, (typeof NON_BACKEND_HARNESSES)[number]>
 
 /**
- * Recognized backend identities, including IDs needed by historical sessions.
+ * Recognized backend identities for new sessions.
  * Use deployment availability, not membership here, to offer or admit new runs.
  */
 export const KNOWN_HARNESSES: readonly Harness[] = [
@@ -216,7 +216,6 @@ const HARNESS_CAPABILITIES: Record<Harness, HarnessCapabilities> = {
   acp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   amp: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   'factory-droids': { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
-  forge: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   grok: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   nanocode: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },
   exo: { subagents: false, mcp: 'native', toolControls: 'runtime', skillsDir: null },

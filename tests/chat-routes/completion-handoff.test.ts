@@ -118,8 +118,9 @@ describe('createChatTurnRoutes — durable completion handoff', () => {
         stream: (async function* () {
           yield { type: 'text', text: 'route draft' }
           await assistantDraftWriteStarted.promise
-          handoffStarted()
           throwOnNextAppend = replayAppendThrows
+          yield { type: 'text', text: 'route progress before handoff' }
+          handoffStarted()
           await args.handoffCompletion!()
           expect(replayAppendFailed).toBe(replayAppendThrows)
 
