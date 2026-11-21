@@ -212,6 +212,8 @@ export interface OpenAICompatStreamTurnOptions {
   tools?: unknown[]
   temperature?: number
   fetchImpl?: typeof fetch
+  /** Sent with each request: aborting it stops the call before its response arrives or while it streams. */
+  signal?: AbortSignal
   /** Extra body fields (e.g. `max_tokens`). */
   extraBody?: Record<string, unknown>
   /** Extra request headers, e.g. a trace id the router records with the generation. */
@@ -241,7 +243,7 @@ export function createOpenAICompatStreamTurn(
   opts: OpenAICompatStreamTurnOptions,
 ): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
   const base = opts.baseUrl.replace(/\/+$/, '')
-  const doFetch = opts.fetchImpl ?? fetch
+  const doFetch = withSignal(opts.fetchImpl ?? fetch, opts.signal)
   return (messages) =>
     toLoopEvents(
       streamChatCompletions(doFetch, `${base}/chat/completions`, opts.apiKey, {
@@ -267,7 +269,7 @@ export function createOpenAICompatCompletionTurn(
   opts: OpenAICompatStreamTurnOptions,
 ): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
   const base = opts.baseUrl.replace(/\/+$/, '')
-  const doFetch = opts.fetchImpl ?? fetch
+  const doFetch = withSignal(opts.fetchImpl ?? fetch, opts.signal)
   return (messages) =>
     toLoopEvents(
       completionAsChunk(doFetch, `${base}/chat/completions`, opts.apiKey, {
@@ -486,7 +488,7 @@ export function createOpenAIResponsesTurn(
   opts: OpenAICompatStreamTurnOptions,
 ): (messages: LoopMessage[]) => AsyncIterable<LoopEvent> {
   const base = opts.baseUrl.replace(/\/+$/, '')
-  const doFetch = opts.fetchImpl ?? fetch
+  const doFetch = withSignal(opts.fetchImpl ?? fetch, opts.signal)
   const { max_tokens: maxTokens, max_completion_tokens: maxCompletion, reasoning_effort: effort, ...rest } = opts.extraBody ?? {}
   const maxOutput = maxCompletion ?? maxTokens
   return (messages) => {
@@ -672,6 +674,10 @@ async function* readOpenAISseFrames(body: ReadableStream<Uint8Array>): AsyncGene
   } finally { reader.releaseLock() }
 }
 
+/** `send` with every request carrying `signal`. */
+function withSignal(send: typeof fetch, signal: AbortSignal | undefined): typeof fetch {
+  return signal ? (input, init) => send(input, { ...init, signal }) : send
+}
 
 function postOpenAIEventStream(doFetch: typeof fetch, url: string, apiKey: string, body: Record<string, unknown>, headers?: Record<string, string>): Promise<Response> {
   return doFetch(url, {

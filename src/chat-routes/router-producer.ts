@@ -91,6 +91,8 @@ export function createRouterTurnProducer(options: RouterTurnProducerOptions): Om
       onEvent: event => {
         if (event.type === 'text') {
           if (event.segment !== textSegment || !textPart) {
+            // A segment the turn closed with no tool call ran (its calls dropped at `answerByMs`) narrated, as before a lookup.
+            if (textPart) narration.add(textPart)
             textSegment = event.segment
             textPart = { type: 'text', text: '' }
             parts.push(textPart)
