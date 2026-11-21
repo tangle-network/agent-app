@@ -110,6 +110,8 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
       ...prefixAttrs(init?.body),
     }, options.parent)
     options.onSpan?.(span)
+    // A send its caller aborted (a member's stop, a turn's answer time) is cancelled, not failed; a timeout still fails.
+    const cancelled = () => init?.signal?.aborted === true && (init.signal.reason as { name?: unknown } | undefined)?.name !== 'TimeoutError'
     let response: Response
     try {
       // Fetch replaces Request headers when init.headers is supplied. Preserve
@@ -118,7 +120,8 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
       headers.set('traceparent', `00-${otlpTraceId(trace.traceId)}-${span.id}-01`)
       response = await inner(input, { ...init, headers })
     } catch (error) {
-      span.end({ 'http.failed': true }, error)
+      if (cancelled()) span.end({ cancelled: true })
+      else span.end({ 'http.failed': true }, error)
       throw error
     }
     const headersAt = Date.now()
@@ -183,7 +186,8 @@ export function tracedModelFetch(trace: TurnTrace, inner: typeof fetch, options:
           firstByteAt ??= Date.now()
           controller.enqueue(value)
         } catch (error) {
-          settle(error)
+          if (cancelled()) settle(undefined, true)
+          else settle(error)
           controller.error(error)
         }
       },

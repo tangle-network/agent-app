@@ -248,10 +248,11 @@ export interface RouterTurnOptions {
   /**
    * Research ends this many ms after the hop started, and the model writes the answer from the tool results it has.
    * After that time no tool round starts: the next model call after a tool round is the answer call (`tool_choice:
-   * "none"` at `reasoningEffort`, the same tools listed), and the turn ends after it. A call still choosing tools then
-   * is cancelled at that time, its connection closed (one still waiting for its response is closed when the response
-   * arrives), and the answer call is sent in its place; tool calls that arrive after the time are dropped before they
-   * run. A call already writing the answer goes on, tools already running finish, and the opening call is never cut,
+   * "none"` at `reasoningEffort`, the same tools listed), and the turn ends after it. A call still choosing tools then,
+   * streaming or still waiting for its response, is aborted at that time (its `model.call` span reads `cancelled`), and
+   * the answer call is sent in its place; tool calls that arrive after the time are dropped before they
+   * run, and text their call wrote before them is narration (not in `answer`; a chat producer keeps it as reasoning).
+   * A call already writing the answer goes on, tools already running finish, and the opening call is never cut,
    * so a turn runs at least one tool round. When the time ends research, the trace records a `turn.answer_by` span at
    * that moment, with `tangle.turn.answer_by` (`round`: before a call, `cut`: during one, `calls`: its tool calls were
    * dropped) and `tangle.turn.answer_by_ms` (since the hop started). Unset, research runs until `budgetMs`.
@@ -517,20 +518,11 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
   }
   const emit = options.onEvent ?? (() => {})
   const { signal } = options
-  // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
-  const attempts = Math.max(1, Math.floor(options.retry?.attempts ?? 1))
-  const attemptTimeoutMs = options.retry?.timeoutMs
-  const baseDelayMs = options.retry?.baseDelayMs ?? 500
-  const pause = (ms: number) => new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) return reject(signal.reason)
-    const timer = setTimeout(resolve, ms)
-    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason) }, { once: true })
-  })
   const traceId = options.traceId !== undefined ? turnTraceId(options.traceId) : options.trace?.traceId
   const { trace } = options
   const transportState = { currentModel: options.model, lastModelSpan: undefined as TurnSpan | undefined }
   const wrote = callOutput(transportState)
-  const { fetchImpl } = createRouterTurnTransport(options, trace, transportState, signal, attempts, attemptTimeoutMs, baseDelayMs, pause)
+  const { fetchImpl } = createRouterTurnTransport(options, trace, transportState)
 
   const extraBody = {
     ...(options.maxTokens ? { max_tokens: options.maxTokens } : {}),
@@ -563,11 +555,12 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     options.stream !== false && !useResponses(model)
     ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
     : extraBody
-  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => Response) =>
+  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => Response, callSignal?: AbortSignal) =>
     (options.stream === false ? createOpenAICompatCompletionTurn : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
     model,
+    ...(callSignal ? { signal: callSignal } : {}),
     ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
     tools: [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
@@ -619,7 +612,7 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     const answerBy = answerDeadline(options.answerByMs, hopStart, trace)
     const streamTurn = lowerEffort || answerBy
       ? afterToolRounds(streamTurnFor(model), streamTurnFor(model, { tool_choice: 'none' }),
-        sent => streamTurnFor(model, lowerEffort ? { reasoning_effort: options.toolRoundEffort } : {}, sent), lowerEffort, answerBy)
+        (sent, stop) => streamTurnFor(model, lowerEffort ? { reasoning_effort: options.toolRoundEffort } : {}, sent, stop), lowerEffort, answerBy)
       : streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
       systemPrompt: options.systemPrompt,
@@ -702,6 +695,9 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
           started.set(callId, Date.now())
           emit({ type: 'tool', callId, toolName: tool?.name ?? event.call.toolName, status: 'running',
             input: event.call.args, startedAt: started.get(callId)! })
+        } else if (event.type === 'other' && event.event === SUPERSEDED && segmentOpen) {
+          narrated.add(segments.length - 1)
+          segmentOpen = false
         }
       } else if (step.kind === 'tool_progress') {
         const tool = byFunction.get(step.toolName)
@@ -802,6 +798,8 @@ type StreamTurn = (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
 /** When a hop's research ends (`answerByMs`), and how the trace notes that it ended the research. */
 type AnswerBy = { at: number; fired: (how: 'round' | 'cut' | 'calls') => void }
 const LATE = Symbol('late')
+/** Marks the text a post-round call wrote before tool calls `answerByMs` dropped: narration, not the answer. */
+const SUPERSEDED = Symbol('superseded')
 
 function answerDeadline(ms: number | undefined, start: number, trace: TurnTrace | undefined): AnswerBy | undefined {
   return ms === undefined ? undefined : { at: start + ms, fired: how => {
@@ -816,22 +814,19 @@ function answerDeadline(ms: number | undefined, start: number, trace: TurnTrace 
  * `write` is sent in its place: full effort, the same tools listed but `tool_choice: "none"`, so it writes the answer,
  * once, and the turn ends after it. A call that ends with neither a tool call nor a word is sent again as `answer`,
  * tools allowed. Once `answerBy` passes, `write` replaces the next call after a tool round, a call still choosing tools
- * is cut at that time and replaced by `write`, and tool calls that arrive after it are dropped for `write` (`answerByMs`).
+ * is aborted through `signal` at that time (before or after its response arrives) and replaced by `write`, and tool
+ * calls that arrive after it are dropped for `write` (`answerByMs`).
  */
-function afterToolRounds(answer: StreamTurn, write: StreamTurn, toolRound: (sent: (response: Response) => Response) => StreamTurn,
+function afterToolRounds(answer: StreamTurn, write: StreamTurn,
+  toolRound: (sent: (response: Response) => Response, signal: AbortSignal) => StreamTurn,
   lowerEffort: boolean, answerBy: AnswerBy | undefined): StreamTurn {
   return async function* (messages) {
     if (messages.at(-1)?.role !== 'tool') { yield* answer(messages); return }
     const late = () => answerBy !== undefined && Date.now() >= answerBy.at
     if (late()) { answerBy!.fired('round'); yield* write(messages); return }
-    let cut: (() => void) | undefined
-    let cutting = false
-    const calls = toolRound(response => {
-      const body = cuttable(response)
-      cut = body.cut
-      if (cutting) cut()
-      return body.response
-    })(messages)[Symbol.asyncIterator]()
+    let response: Response | undefined
+    const abort = new AbortController()
+    const calls = toolRound(sent => (response = sent), abort.signal)(messages)[Symbol.asyncIterator]()
     let timer: ReturnType<typeof setTimeout> | undefined
     // setTimeout runs a delay past 2^31 - 1 ms at once.
     const passes = answerBy && new Promise<typeof LATE>(resolve => { timer = setTimeout(resolve, Math.min(answerBy.at - Date.now(), 2 ** 31 - 1), LATE) })
@@ -842,18 +837,17 @@ function afterToolRounds(answer: StreamTurn, write: StreamTurn, toolRound: (sent
     try {
       for (;;) {
         const next = calls.next()
-        const step = passes && !wrote && !calledTool ? await Promise.race([next, passes]) : await next
+        const step: IteratorResult<LoopEvent> | typeof LATE = passes && !wrote && !calledTool ? await Promise.race([next, passes]) : await next
         if (step === LATE) {
-          // Still choosing tools: close the call now; it ends on what it read, and nothing it read is kept.
+          // Still choosing tools, or still waiting for its response: abort the call now. Nothing it sent is kept.
           answerBy!.fired('cut')
-          cutting = true
-          cut?.()
+          abort.abort(new DOMException('The turn reached its answerByMs.', 'AbortError'))
           await next.catch(() => undefined)
           rewrite = true
           break
         }
         if (step.done) { ended = true; break }
-        const event = step.value
+        const event: LoopEvent = step.value
         if (event.type === 'tool_call' && !calledTool && late()) { answerBy!.fired('calls'); rewrite = true; break }
         if (lowerEffort && event.type === 'text' && event.text) { rewrite = true; break }
         wrote ||= event.type === 'text' && Boolean(event.text)
@@ -863,42 +857,26 @@ function afterToolRounds(answer: StreamTurn, write: StreamTurn, toolRound: (sent
     } finally {
       clearTimeout(timer)
       // Stopped before its end: release the call's reader, then close its connection.
-      if (!ended) { await calls.return?.(undefined)?.catch(() => undefined); cut?.() }
+      if (!ended) { await calls.return?.(undefined)?.catch(() => undefined); await response?.body?.cancel().catch(() => undefined) }
     }
     // A lower-effort call that ended with neither a tool call nor a word is sent again, tools allowed only in time.
     if (!rewrite && lowerEffort && !calledTool && late()) { answerBy!.fired('round'); rewrite = true }
+    // The text this call wrote before its dropped tool calls narrated work it will not do; the answer replaces it.
+    if (rewrite && wrote) yield { type: 'other', event: SUPERSEDED }
     if (rewrite) yield* write(messages)
     else if (lowerEffort && !calledTool) yield* answer(messages)
   }
-}
-
-/** `response` with a body the turn can end while the model writes it: `cut` cancels the original body, which closes
- *  the connection, and whoever reads the returned body sees it end. */
-function cuttable(response: Response): { response: Response; cut: () => void } {
-  const source = response.body?.getReader()
-  if (!source) return { response, cut: () => {} }
-  const body = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await source.read()
-      if (!done) controller.enqueue(value)
-      else try { controller.close() } catch { /* its reader cancelled it first */ }
-    },
-    cancel: reason => source.cancel(reason),
-  })
-  return { response: new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers }),
-    cut: () => { source.cancel().catch(() => undefined) } }
 }
 
 function createRouterTurnTransport(
   options: RouterTurnOptions,
   trace: RouterTurnOptions['trace'],
   transportState: { currentModel: string; lastModelSpan: TurnSpan | undefined },
-  signal: RouterTurnOptions['signal'],
-  attempts: number,
-  attemptTimeoutMs: number | undefined,
-  baseDelayMs: number,
-  pause: (ms: number) => Promise<void>,
 ) {
+  const { signal } = options
+  const attempts = Math.max(1, Math.floor(options.retry?.attempts ?? 1))
+  const attemptTimeoutMs = options.retry?.timeoutMs
+  const baseDelayMs = options.retry?.baseDelayMs ?? 500
   const gzipAbove = options.gzipRequestAboveBytes ?? (
     URL.canParse(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL) &&
       new URL(options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL).origin === new URL(DEFAULT_TANGLE_ROUTER_BASE_URL).origin
@@ -915,12 +893,20 @@ function createRouterTurnTransport(
     : baseFetch
   const fetchImpl: typeof fetch | undefined = signal || attempts > 1 || attemptTimeoutMs
     ? async (input, init) => {
+      // The turn's signal and the call's own (`answerByMs` aborts a call): a cancelled call sends nothing more and waits
+      // for no resend, whatever the injected fetch does with the signal.
+      const stop = signal && init?.signal ? AbortSignal.any([signal, init.signal]) : signal ?? init?.signal ?? undefined
+      const pause = (ms: number) => new Promise<void>((resolve, reject) => {
+        if (stop?.aborted) return reject(stop.reason)
+        const timer = setTimeout(resolve, ms)
+        stop?.addEventListener('abort', () => { clearTimeout(timer); reject(stop.reason) }, { once: true })
+      })
       const firstSentAt = Date.now()
       // Resending stops once the attempts and the retry window are both spent; one attempt never resends.
       const spent = (attempt: number) => attempts === 1 || (attempt >= attempts && Date.now() - firstSentAt >= RETRY_WINDOW_MS)
       for (let attempt = 1;;attempt++) {
-        signal?.throwIfAborted()
-        const signals = [signal, attemptTimeoutMs ? AbortSignal.timeout(attemptTimeoutMs) : undefined]
+        stop?.throwIfAborted()
+        const signals = [stop, attemptTimeoutMs ? AbortSignal.timeout(attemptTimeoutMs) : undefined]
           .filter((value): value is AbortSignal => Boolean(value))
         const attemptSignal = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
         const backoff = () => Math.min(MAX_RETRY_DELAY_MS, baseDelayMs * 2 ** (attempt - 1)) * (0.5 + Math.random() / 2)
@@ -933,7 +919,7 @@ function createRouterTurnTransport(
           // A cancelled turn sends nothing more, whatever the injected fetch does with the signal.
           response = await (sendOnce ?? fetch)(input, { ...init, ...(attemptSignal ? { signal: attemptSignal } : {}) })
         } catch (error) {
-          if (signal?.aborted || spent(attempt)) throw error
+          if (stop?.aborted || spent(attempt)) throw error
           await wait(backoff(), 'send_failed')
           continue
         }

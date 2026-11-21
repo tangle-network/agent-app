@@ -2,7 +2,8 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { expect, it } from 'vitest'
-import { runRouterTurn } from '../src/runtime/router-turn'
+import { createRouterTurnProducer } from '../src/chat-routes/router-producer'
+import { runRouterTurn, type RouterTurnOutcome } from '../src/runtime/router-turn'
 import { createTurnTrace } from '../src/turn-trace/index'
 
 const sse = (event: object) => `data: ${JSON.stringify(event)}\n\n`
@@ -30,12 +31,22 @@ const wires = {
   },
 }
 
+type Scenario = {
+  /** The lookup that runs 600 ms. */
+  slowTool?: string
+  /** The second call thinks for 3 s: after its response headers (`body`) or before them (`headers`). */
+  stall?: 'body' | 'headers'
+  /** The second call writes a sentence, then chooses its tool 500 ms later. */
+  narrate?: boolean
+  /** Run the turn through the chat producer, which keeps the message parts a member's transcript stores. */
+  producer?: boolean
+}
+
 /**
  * A model that never stops researching: every call that may choose a tool looks one more thing up, and only a call sent
- * with `tool_choice: "none"` writes the answer. `stallAt` names the call (by the tool results it carries) that thinks
- * for 3 s before choosing its tool; `slowTool` names the lookup that runs 600 ms.
+ * with `tool_choice: "none"` writes the answer. The turn's answerByMs is 300 ms and its budget 1.5 s.
  */
-async function researchForever(api: keyof typeof wires, scenario: { stallAt?: number; slowTool?: string }) {
+async function researchForever(api: keyof typeof wires, scenario: Scenario) {
   const wire = wires[api]
   const requests: Array<{ toolChoice: unknown; toolResults: number; wrote: string; closedEarly: boolean; at: number }> = []
   const started = Date.now()
@@ -46,19 +57,25 @@ async function researchForever(api: keyof typeof wires, scenario: { stallAt?: nu
     const row = { toolChoice: body.tool_choice, toolResults: wire.toolResults(body), wrote: '', closedEarly: false, at: Date.now() - started }
     requests.push(row)
     const closed = new Promise<void>(resolve => response.on('close', () => { row.closedEarly = !response.writableFinished; resolve() }))
+    const text = (delta: string) => { row.wrote += delta; response.write(wire.text(delta)) }
+    const second = row.toolChoice !== 'none' && row.toolResults === 1
+    if (second && scenario.stall === 'headers') {
+      await Promise.race([closed, sleep(3_000)])
+      if (response.destroyed) return
+    }
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     response.flushHeaders()
     if (row.toolChoice === 'none') {
-      row.wrote = 'the answer.'
-      response.write(wire.text(row.wrote))
+      text('the answer.')
       response.end(wire.end(row.wrote))
       return
     }
-    if (row.toolResults === 0) {
-      row.wrote = 'Checking one source first.'
-      response.write(wire.text(row.wrote))
+    if (row.toolResults === 0) text('Checking one source first.')
+    if (second && scenario.narrate) {
+      text('Let me check one more source.')
+      await sleep(500)
     }
-    if (row.toolResults === scenario.stallAt) {
+    if (second && scenario.stall === 'body') {
       await Promise.race([closed, sleep(3_000)])
       if (response.destroyed) return
     }
@@ -67,24 +84,36 @@ async function researchForever(api: keyof typeof wires, scenario: { stallAt?: nu
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
     const trace = createTurnTrace({ executionId: 'answer-by-fixture' })
-    const outcome = await runRouterTurn({ apiKey: 'local-integration-only', model: 'gpt-6-luna', api, trace,
+    const options = { apiKey: 'local-integration-only', model: 'gpt-6-luna', api, trace,
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, systemPrompt: 's', userMessage: 'Design it',
       reasoningEffort: 'low', answerByMs: 300, budgetMs: 1_500,
-      tools: [{ name: 'lookup', description: 'Look something up', effect: 'lookup',
-        run: async args => { if (args.query === scenario.slowTool) await sleep(600); return `found ${String(args.query)}` },
-        inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] })
-    return { outcome, requests, elapsed: Date.now() - started, spans: trace.finish().spans }
+      tools: [{ name: 'lookup', description: 'Look something up', effect: 'lookup' as const,
+        run: async (args: Record<string, unknown>) => { if (args.query === scenario.slowTool) await sleep(600); return `found ${String(args.query)}` },
+        inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] }
+    let outcome: RouterTurnOutcome | undefined
+    let parts: Array<Record<string, unknown>> = []
+    if (scenario.producer) {
+      const producer = createRouterTurnProducer({ ...options, onOutcome: result => { outcome = result } })
+      for await (const _event of producer.stream) { /* drained: the member's stream */ }
+      parts = producer.assistantParts?.() ?? []
+    } else outcome = await runRouterTurn(options)
+    return { outcome: outcome!, parts, requests, elapsed: Date.now() - started, spans: trace.finish().spans }
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
 }
+
+const rows = (requests: Awaited<ReturnType<typeof researchForever>>['requests']) =>
+  requests.map(({ toolChoice, toolResults, wrote, closedEarly }) => ({ toolChoice, toolResults, wrote, closedEarly }))
+const firedAs = (spans: Awaited<ReturnType<typeof researchForever>>['spans']) =>
+  spans.filter(span => span.name === 'turn.answer_by').map(span => span.attrs['tangle.turn.answer_by'])
 
 for (const api of ['responses', 'chat'] as const) {
   it(`over ${api}, a tool that runs past answerByMs is the last: the next call writes the answer from the results so far`, async () => {
     const { outcome, requests, spans } = await researchForever(api, { slowTool: 'q2' })
 
     // Two rounds before the time; the lookup q2 ends after it, so the next call may not choose a tool and the turn ends.
-    expect(requests.map(({ toolChoice, toolResults, wrote, closedEarly }) => ({ toolChoice, toolResults, wrote, closedEarly }))).toEqual([
+    expect(rows(requests)).toEqual([
       { toolChoice: undefined, toolResults: 0, wrote: 'Checking one source first.', closedEarly: false },
       { toolChoice: undefined, toolResults: 1, wrote: '', closedEarly: false },
       { toolChoice: 'none', toolResults: 2, wrote: 'the answer.', closedEarly: false },
@@ -93,26 +122,54 @@ for (const api of ['responses', 'chat'] as const) {
     expect(outcome.continuation).toBeUndefined()
     expect(outcome.answer).toBe('the answer.')
     expect(outcome.toolCalls.map(call => call.ok)).toEqual([true, true])
-    const fired = spans.filter(span => span.name === 'turn.answer_by')
-    expect(fired.map(span => span.attrs['tangle.turn.answer_by'])).toEqual(['round'])
-    expect(Number(fired[0]!.attrs['tangle.turn.answer_by_ms'])).toBeGreaterThanOrEqual(300)
+    expect(firedAs(spans)).toEqual(['round'])
+    expect(Number(spans.find(span => span.name === 'turn.answer_by')!.attrs['tangle.turn.answer_by_ms'])).toBeGreaterThanOrEqual(300)
   })
 
-  it(`over ${api}, a call still choosing tools at answerByMs is cut then, and the answer is written in its place`, async () => {
-    const { outcome, requests, elapsed, spans } = await researchForever(api, { stallAt: 1 })
+  for (const stall of ['body', 'headers'] as const) {
+    const when = stall === 'headers' ? 'before its response arrives' : 'mid-stream'
+    it(`over ${api}, a call still choosing tools at answerByMs is aborted then, ${when}, and the answer replaces it`, async () => {
+      const { outcome, requests, elapsed, spans } = await researchForever(api, { stall })
 
-    // The second call thinks for 3 s; at 300 ms the turn closes it and sends the answer call with the one result it has.
-    expect(requests.map(({ toolChoice, toolResults, wrote, closedEarly }) => ({ toolChoice, toolResults, wrote, closedEarly }))).toEqual([
+      // The second call thinks for 3 s; at 300 ms the turn aborts it and sends the answer call with the one result it has.
+      expect(rows(requests)).toEqual([
+        { toolChoice: undefined, toolResults: 0, wrote: 'Checking one source first.', closedEarly: false },
+        { toolChoice: undefined, toolResults: 1, wrote: '', closedEarly: true },
+        { toolChoice: 'none', toolResults: 1, wrote: 'the answer.', closedEarly: false },
+      ])
+      expect(requests[2]!.at).toBeGreaterThanOrEqual(300)
+      expect(elapsed).toBeLessThan(1_500)
+      expect(outcome.failure).toBeUndefined()
+      expect(outcome.answer).toBe('the answer.')
+      expect(outcome.toolCalls).toHaveLength(1)
+      // The aborted call is cancelled, not failed.
+      const calls = spans.filter(span => span.name === 'model.call')
+      expect(calls.map(span => [span.attrs.cancelled ?? false, span.error ?? null])).toEqual([[false, null], [true, null], [false, null]])
+      expect(firedAs(spans)).toEqual(['cut'])
+    })
+  }
+
+  it(`over ${api}, a sentence written before tool calls that arrive after answerByMs is narration: the transcript keeps one answer`, async () => {
+    const { outcome, parts, requests, spans } = await researchForever(api, { narrate: true, producer: true })
+
+    // The second call writes a sentence before the time and chooses its tool after it: the tool never runs, and the
+    // answer call is sent with the one result so far.
+    expect(rows(requests)).toEqual([
       { toolChoice: undefined, toolResults: 0, wrote: 'Checking one source first.', closedEarly: false },
-      { toolChoice: undefined, toolResults: 1, wrote: '', closedEarly: true },
+      { toolChoice: undefined, toolResults: 1, wrote: 'Let me check one more source.', closedEarly: false },
       { toolChoice: 'none', toolResults: 1, wrote: 'the answer.', closedEarly: false },
     ])
-    expect(requests[2]!.at).toBeGreaterThanOrEqual(300)
-    expect(elapsed).toBeLessThan(1_500)
     expect(outcome.failure).toBeUndefined()
-    expect(outcome.answer).toBe('the answer.')
     expect(outcome.toolCalls).toHaveLength(1)
-    expect(spans.filter(span => span.name === 'model.call').map(span => span.attrs.cancelled ?? false)).toEqual([false, true, false])
-    expect(spans.filter(span => span.name === 'turn.answer_by').map(span => span.attrs['tangle.turn.answer_by'])).toEqual(['cut'])
+    expect(outcome.answer).toBe('the answer.')
+    expect(outcome.text).toBe('Checking one source first.\n\nLet me check one more source.\n\nthe answer.')
+    // What a member's transcript stores: both sentences as reasoning, one lookup, and the answer once.
+    expect(parts.map(part => [part.type, part.type === 'tool' ? part.tool : part.text])).toEqual([
+      ['reasoning', 'Checking one source first.'],
+      ['tool', 'lookup'],
+      ['reasoning', 'Let me check one more source.'],
+      ['text', 'the answer.'],
+    ])
+    expect(firedAs(spans)).toEqual(['calls'])
   })
 }
