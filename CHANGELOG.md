@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.53
+
+- feat(router-turn): answerByMs ends research at a time and writes the answer (#1598)
+
 ## 4.0.52
 
 - fix(deps): accept @tangle-network/agent-eval 2 (#1597)
