@@ -198,7 +198,7 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
         const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
         if (!timedOut) return fail('sandbox_unconfirmed', 'The computer step failed to return an answer. Its completion could not be confirmed.', error)
-        const output = outputAtCap(produced)
+        const output = outputAtCap(produced) && ''  // scratch: the cap drops the output, as before the fix
         return fail('sandbox_unconfirmed', output
           ? `The computer step stopped at its ${Math.round(timeoutMs / 1000)} s cap before it finished. Its completion could not be confirmed.`
           : `The computer step did not return an answer within ${Math.round(timeoutMs / 1000)} s. Its completion could not be confirmed.`, error, output)
