@@ -19,6 +19,7 @@
  * Worker bundle never pulls the grant client).
  */
 import { streamAppToolLoop, type LoopEvent, type LoopMessage, type LoopToolCall, type ToolLoopStopReason } from './loop'
+import { answerOnlyCall } from './answer-call'
 import { DEFAULT_TANGLE_ROUTER_BASE_URL } from './model'
 import { gzipRequestBodies } from './gzip-request'
 import { createOpenAICompatCompletionTurn, createOpenAICompatStreamTurn, createOpenAIResponsesTurn, isOpenAIResponsesModel } from './openai-stream'
@@ -248,7 +249,9 @@ export interface RouterTurnOptions {
   /**
    * Research ends this many ms after the hop started, and the model writes the answer from the tool results it has.
    * After that time no tool round starts: the next model call after a tool round is the answer call (`tool_choice:
-   * "none"` at `reasoningEffort`, the same tools listed), and the turn ends after it. A call still choosing tools then,
+   * "none"` at `reasoningEffort`, the same tools listed), and the turn ends after it. Tool calls the answer call sends
+   * anyway never run; when it wrote no word it is sent once more with no tools listed, and it ends at `budgetMs` with
+   * what it wrote. A call still choosing tools then,
    * streaming or still waiting for its response, is aborted at that time (its `model.call` span reads `cancelled`), and
    * the answer call is sent in its place; tool calls that arrive after the time are dropped before they
    * run, and text their call wrote before them is narration (not in `answer`; a chat producer keeps it as reasoning).
@@ -560,14 +563,15 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     options.stream !== false && !useResponses(model)
     ? { ...extraBody, gateway: { streamReasoningImmediately: true } }
     : extraBody
-  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => Response, callSignal?: AbortSignal) =>
+  const streamTurnFor = (model: string, body?: Record<string, unknown>, sent?: (response: Response) => Response, callSignal?: AbortSignal,
+    listTools = true) =>
     (options.stream === false ? createOpenAICompatCompletionTurn : useResponses(model) ? createOpenAIResponsesTurn : createOpenAICompatStreamTurn)({
     baseUrl: options.baseUrl ?? DEFAULT_TANGLE_ROUTER_BASE_URL,
     apiKey,
     model,
     ...(callSignal ? { signal: callSignal } : {}),
     ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
-    tools: [...byFunction.entries()].map(([name, tool]) => ({
+    tools: !listTools ? [] : [...byFunction.entries()].map(([name, tool]) => ({
       type: 'function', function: { name, description: tool.description, parameters: tool.inputSchema },
     })),
     extraBody: { ...bodyFor(model), ...body },
@@ -616,7 +620,8 @@ export async function runRouterTurn(options: RouterTurnOptions): Promise<RouterT
     const lowerEffort = Boolean(options.toolRoundEffort) && options.stream !== false
     const answerBy = answerDeadline(options.answerByMs, hopStart, trace)
     const streamTurn = lowerEffort || answerBy
-      ? afterToolRounds(streamTurnFor(model), streamTurnFor(model, { tool_choice: 'none' }),
+      ? afterToolRounds(streamTurnFor(model), answerOnlyCall((body, stop, listTools) => streamTurnFor(model, body, undefined, stop, listTools),
+        { endsAt: deadline, signal, trace }),
         (sent, stop) => streamTurnFor(model, lowerEffort ? { reasoning_effort: options.toolRoundEffort } : {}, sent, stop), lowerEffort, answerBy)
       : streamTurnFor(model)
     for await (const step of streamAppToolLoop<LoopEvent>({
