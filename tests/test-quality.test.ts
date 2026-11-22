@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { parseSync, Visitor, type ESTree } from 'vite'
 
 const ROOT = resolve(__dirname, '..')
 const SEARCH_DIRS = ['src', 'tests']
@@ -43,45 +44,35 @@ function testFiles(dir: string, out: string[] = []): string[] {
 
 const FILES = SEARCH_DIRS.flatMap((d) => testFiles(join(ROOT, d)))
 
-/** Body of every `it(...)` / `test(...)` in a source string, matched by brace
- *  balance from the callback's opening `{`. Regex alone cannot find the end of
- *  a nested block, and an under-matched body is what would make this gate
- *  silently useless. */
-function testBodies(src: string): Array<{ title: string; body: string; index: number }> {
+const TEST_MODIFIERS = new Set(['only', 'skip', 'todo', 'concurrent', 'sequential', 'fails', 'each', 'skipIf', 'runIf'])
+
+function isTestCall(callee: ESTree.Expression): boolean {
+  if (callee.type === 'Identifier') return callee.name === 'it' || callee.name === 'test'
+  if (callee.type === 'CallExpression') return isTestCall(callee.callee)
+  return callee.type === 'MemberExpression' && !callee.computed && callee.property.type === 'Identifier'
+    && TEST_MODIFIERS.has(callee.property.name) && isTestCall(callee.object)
+}
+
+/** The existing TS/TSX parser owns callback boundaries, including quotes and
+ *  braces in comments, regexes, strings, templates and destructured parameters. */
+function testBodies(src: string, file = 'test.ts'): Array<{ title: string; body: string; index: number }> {
   const out: Array<{ title: string; body: string; index: number }> = []
-  const opener = /\b(?:it|test)(?:\.(?:only|skip|todo|concurrent|sequential|fails|each|skipIf|runIf))*\s*\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,/g
-  for (const m of src.matchAll(opener)) {
-    const title = m[2] ?? ''
-    // `it.todo('…')` has no body; the opener regex requires a trailing comma so
-    // those never reach here.
-    const braceStart = src.indexOf('{', m.index + m[0].length)
-    if (braceStart === -1) continue
-    let depth = 0
-    let end = -1
-    let inString: string | null = null
-    for (let i = braceStart; i < src.length; i += 1) {
-      const ch = src[i]!
-      const prev = src[i - 1]
-      if (inString) {
-        if (ch === inString && prev !== '\\') inString = null
-        continue
+  const parsed = parseSync(file, src, { preserveParens: false })
+  if (parsed.errors.length) throw new Error(`Could not inspect ${file}: ${JSON.stringify(parsed.errors)}`)
+  new Visitor({
+    CallExpression(node) {
+      if (!isTestCall(node.callee)) return
+      const title = node.arguments[0]
+      if (!title || !(title.type === 'Literal' && typeof title.value === 'string' || title.type === 'TemplateLiteral')) return
+      for (const callback of node.arguments.slice(1)) {
+        if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression') continue
+        if (!callback.body) continue
+        out.push({ title: src.slice(title.start + 1, title.end - 1),
+          body: src.slice(callback.body.start, callback.body.end), index: node.start })
+        break
       }
-      if (ch === "'" || ch === '"' || ch === '`') {
-        inString = ch
-        continue
-      }
-      if (ch === '{') depth += 1
-      else if (ch === '}') {
-        depth -= 1
-        if (depth === 0) {
-          end = i
-          break
-        }
-      }
-    }
-    if (end === -1) continue
-    out.push({ title, body: src.slice(braceStart, end + 1), index: m.index })
-  }
+    },
+  }).visit(parsed.program)
   return out
 }
 
@@ -173,7 +164,7 @@ describe('test-quality gate: every test can fail', () => {
     for (const file of FILES) {
       const src = readFileSync(file, 'utf8')
       const fileIsProbe = src.includes(PROBE_MARKER)
-      for (const { title, body } of testBodies(src)) {
+      for (const { title, body } of testBodies(src, file)) {
         if (fileIsProbe || body.includes(PROBE_MARKER)) continue
         if (!ASSERTION_SIGNALS.some((re) => re.test(body))) {
           offenders.push(`${relative(ROOT, file)} → "${title}"`)
@@ -191,7 +182,7 @@ describe('test-quality gate: every test can fail', () => {
     const offenders: string[] = []
     for (const file of FILES) {
       const src = readFileSync(file, 'utf8')
-      for (const { title, body } of testBodies(src)) {
+      for (const { title, body } of testBodies(src, file)) {
         for (const { re, why } of TAUTOLOGIES) {
           const hit = body.match(re)
           if (hit) offenders.push(`${relative(ROOT, file)} → "${title}": ${hit[0]} ${why}`)
