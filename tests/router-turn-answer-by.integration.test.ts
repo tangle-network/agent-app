@@ -211,10 +211,12 @@ for (const api of ['responses', 'chat'] as const) {
   it(`over ${api}, an answer call that never stops writing ends at budgetMs and the turn keeps what it wrote`, async () => {
     const { outcome, requests, elapsed, spans } = await researchForever(api, { slowTool: 'q2', endlessAnswer: true })
 
-    expect(requests.at(-1)).toMatchObject({ toolChoice: 'none', toolResults: 2, closedEarly: true })
+    // The peer learns of the closed connection after the turn has returned, so the call is judged by what it wrote.
+    expect(requests.at(-1)).toMatchObject({ toolChoice: 'none', toolResults: 2 })
     expect(elapsed).toBeLessThan(1_500 + 1_000)
     expect(outcome.failure).toBeUndefined()
     expect(outcome.answer).toMatch(/^(Reading\. ?)+$/)
+    expect(requests.at(-1)!.wrote).toContain(outcome.answer.trim())
     expect(spans.filter(span => span.name === 'turn.answer_call').map(span => span.attrs['tangle.turn.answer_call'])).toEqual(['budget'])
   })
 }
