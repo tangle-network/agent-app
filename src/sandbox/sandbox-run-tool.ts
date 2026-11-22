@@ -8,8 +8,9 @@
  * NEVER SILENT. A box that cannot start, a run that fails and a run that ends
  * with no answer each come back as a typed failure (`sandbox_unavailable`,
  * `sandbox_failed`, `sandbox_empty`) that the model reads and must report. A
- * run stopped at its cap is `sandbox_unconfirmed` and carries what the box had
- * produced by then, when the runner reports it (`produced`). A
+ * run stopped at its cap is `sandbox_unconfirmed`. A run that failed or was
+ * stopped carries what the box had produced by then, when the runner reports
+ * it (`produced`). A
  * product that leaves this tool out when it cannot place a box drops the
  * capability without the model or the user knowing; mount the tool and let it
  * fail instead.
@@ -53,9 +54,9 @@ export interface SandboxTaskOptions {
   /** The turn's trace and this call's span, for a runner that streams a prompt (`sandboxPromptRunner` does). */
   trace?: TurnTrace
   span?: TurnSpan
-  /** Hands the tool a reader of what the box has produced so far, as text (`createComputerOutput`). A call stopped at
-   *  its cap returns that output to the model, bounded to its latest part, instead of nothing. A later call replaces
-   *  the reader. */
+  /** Hands the tool a reader of what the box has produced so far, as text (`createComputerOutput`). A call that fails
+   *  or is stopped at its cap returns that output to the model, bounded to its latest part, instead of nothing. A
+   *  later call replaces the reader. */
   produced?(read: () => string): void
 }
 
@@ -93,14 +94,14 @@ export interface SandboxRunTool {
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 const TASK_LIMIT = 20_000
-/** What a capped call returns of the box's output: its latest part, inside the Router engine's 12,000-character view. */
-const CAPPED_OUTPUT_LIMIT = 8_000
+/** What a failed or capped call returns of the box's output: its latest part, inside the Router engine's 12,000-character view. */
+const PRODUCED_OUTPUT_LIMIT = 8_000
 
-/** The runner's output at the cap, latest part kept; a reader that throws yields nothing. */
-function outputAtCap(read: (() => string) | undefined): string {
+/** The runner's output so far, latest part kept; a reader that throws yields nothing. */
+function producedOutput(read: (() => string) | undefined): string {
   let text = ''
   try { text = read?.().trim() ?? '' } catch { return '' }
-  return text.length > CAPPED_OUTPUT_LIMIT ? `…${text.slice(-CAPPED_OUTPUT_LIMIT)}` : text
+  return text.length > PRODUCED_OUTPUT_LIMIT ? `…${text.slice(-PRODUCED_OUTPUT_LIMIT)}` : text
 }
 
 export const SANDBOX_RUN_DESCRIPTION =
@@ -195,10 +196,12 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {
-        if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause)
+        // However the run ended, what the box produced reaches the model. A GTM run that failed 200 s in had fetched
+        // and extracted pricing pages, and the model, given only the failure, said no page was read (2026-11-22).
+        const output = producedOutput(produced)
+        if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause, output)
         const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
-        if (!timedOut) return fail('sandbox_unconfirmed', 'The computer step failed to return an answer. Its completion could not be confirmed.', error)
-        const output = outputAtCap(produced)
+        if (!timedOut) return fail('sandbox_unconfirmed', 'The computer step failed to return an answer. Its completion could not be confirmed.', error, output)
         return fail('sandbox_unconfirmed', output
           ? `The computer step stopped at its ${Math.round(timeoutMs / 1000)} s cap before it finished. Its completion could not be confirmed.`
           : `The computer step did not return an answer within ${Math.round(timeoutMs / 1000)} s. Its completion could not be confirmed.`, error, output)
