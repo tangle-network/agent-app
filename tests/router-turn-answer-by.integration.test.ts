@@ -8,7 +8,7 @@ import { createTurnTrace } from '../src/turn-trace/index'
 
 const sse = (event: object) => `data: ${JSON.stringify(event)}\n\n`
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-type RequestBody = { tool_choice?: unknown; input?: Array<{ type?: string }>; messages?: Array<{ role?: string }> }
+type RequestBody = { tool_choice?: unknown; tools?: unknown[]; input?: Array<{ type?: string }>; messages?: Array<{ role?: string }> }
 
 /** How each adapter's request carries its tool results, and how its stream writes a word or ends a call. */
 const wires = {
@@ -40,6 +40,10 @@ type Scenario = {
   narrate?: boolean
   /** Run the turn through the chat producer, which keeps the message parts a member's transcript stores. */
   producer?: boolean
+  /** Like Z.AI's GLM: a call sent with `tool_choice: "none"` still chooses a tool; only a call with no tools listed writes. */
+  ignoresToolChoice?: boolean
+  /** The answer call writes a word every 50 ms and never ends (a tool-less GLM call wrote for 12 minutes, 2026-11-22). */
+  endlessAnswer?: boolean
 }
 
 /**
@@ -48,13 +52,15 @@ type Scenario = {
  */
 async function researchForever(api: keyof typeof wires, scenario: Scenario) {
   const wire = wires[api]
-  const requests: Array<{ toolChoice: unknown; toolResults: number; wrote: string; closedEarly: boolean; at: number }> = []
+  const requests: Array<{ toolChoice: unknown; listsTools: boolean; toolResults: number; wrote: string; closedEarly: boolean; at: number }> = []
+  const ran: string[] = []
   const started = Date.now()
   const server = createServer(async (request, response) => {
     let raw = ''
     for await (const chunk of request) raw += chunk
     const body = JSON.parse(raw) as RequestBody
-    const row = { toolChoice: body.tool_choice, toolResults: wire.toolResults(body), wrote: '', closedEarly: false, at: Date.now() - started }
+    const row = { toolChoice: body.tool_choice, listsTools: (body.tools ?? []).length > 0, toolResults: wire.toolResults(body), wrote: '',
+      closedEarly: false, at: Date.now() - started }
     requests.push(row)
     const closed = new Promise<void>(resolve => response.on('close', () => { row.closedEarly = !response.writableFinished; resolve() }))
     const text = (delta: string) => { row.wrote += delta; response.write(wire.text(delta)) }
@@ -65,7 +71,15 @@ async function researchForever(api: keyof typeof wires, scenario: Scenario) {
     }
     response.writeHead(200, { 'content-type': 'text/event-stream' })
     response.flushHeaders()
-    if (row.toolChoice === 'none') {
+    if (row.toolChoice === 'none' || !row.listsTools) {
+      if (scenario.ignoresToolChoice && row.listsTools) {
+        response.end(wire.end('', `late${row.toolResults}`))
+        return
+      }
+      if (scenario.endlessAnswer) {
+        while (!response.destroyed && !response.writableEnded) { text('Reading. '); await Promise.race([closed, sleep(50)]) }
+        return
+      }
       text('the answer.')
       response.end(wire.end(row.wrote))
       return
@@ -88,7 +102,11 @@ async function researchForever(api: keyof typeof wires, scenario: Scenario) {
       baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, systemPrompt: 's', userMessage: 'Design it',
       reasoningEffort: 'low', answerByMs: 300, budgetMs: 1_500,
       tools: [{ name: 'lookup', description: 'Look something up', effect: 'lookup' as const,
-        run: async (args: Record<string, unknown>) => { if (args.query === scenario.slowTool) await sleep(600); return `found ${String(args.query)}` },
+        run: async (args: Record<string, unknown>) => {
+          ran.push(String(args.query))
+          if (args.query === scenario.slowTool) await sleep(600)
+          return `found ${String(args.query)}`
+        },
         inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }] }
     let outcome: RouterTurnOutcome | undefined
     let parts: Array<Record<string, unknown>> = []
@@ -97,7 +115,7 @@ async function researchForever(api: keyof typeof wires, scenario: Scenario) {
       for await (const _event of producer.stream) { /* drained: the member's stream */ }
       parts = producer.assistantParts?.() ?? []
     } else outcome = await runRouterTurn(options)
-    return { outcome: outcome!, parts, requests, elapsed: Date.now() - started, spans: trace.finish().spans }
+    return { outcome: outcome!, parts, requests, ran, elapsed: Date.now() - started, spans: trace.finish().spans }
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
@@ -171,5 +189,32 @@ for (const api of ['responses', 'chat'] as const) {
       ['text', 'the answer.'],
     ])
     expect(firedAs(spans)).toEqual(['calls'])
+  })
+
+  it(`over ${api}, tool calls a model sends on the answer call never run: the call is sent again with no tools listed`, async () => {
+    const { outcome, requests, ran, spans } = await researchForever(api, { slowTool: 'q2', ignoresToolChoice: true })
+
+    // The answer call chooses a tool anyway, as Z.AI's GLM does; the tool never runs, and the bare resend writes.
+    expect(requests.map(({ toolChoice, listsTools, toolResults, wrote }) => ({ toolChoice, listsTools, toolResults, wrote }))).toEqual([
+      { toolChoice: undefined, listsTools: true, toolResults: 0, wrote: 'Checking one source first.' },
+      { toolChoice: undefined, listsTools: true, toolResults: 1, wrote: '' },
+      { toolChoice: 'none', listsTools: true, toolResults: 2, wrote: '' },
+      { toolChoice: undefined, listsTools: false, toolResults: 2, wrote: 'the answer.' },
+    ])
+    expect(ran).toEqual(['q1', 'q2'])
+    expect(outcome.failure).toBeUndefined()
+    expect(outcome.answer).toBe('the answer.')
+    expect(outcome.toolCalls).toHaveLength(2)
+    expect(spans.filter(span => span.name === 'turn.answer_call').map(span => span.attrs['tangle.turn.answer_call'])).toEqual(['tools_dropped'])
+  })
+
+  it(`over ${api}, an answer call that never stops writing ends at budgetMs and the turn keeps what it wrote`, async () => {
+    const { outcome, requests, elapsed, spans } = await researchForever(api, { slowTool: 'q2', endlessAnswer: true })
+
+    expect(requests.at(-1)).toMatchObject({ toolChoice: 'none', toolResults: 2, closedEarly: true })
+    expect(elapsed).toBeLessThan(1_500 + 1_000)
+    expect(outcome.failure).toBeUndefined()
+    expect(outcome.answer).toMatch(/^(Reading\. ?)+$/)
+    expect(spans.filter(span => span.name === 'turn.answer_call').map(span => span.attrs['tangle.turn.answer_call'])).toEqual(['budget'])
   })
 }
