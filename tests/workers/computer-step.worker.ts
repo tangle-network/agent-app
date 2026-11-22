@@ -12,6 +12,7 @@ import { defaultChatShell } from '../../src/chat-routes/default-backend'
 import { createInteractionAnswerRoute } from '../../src/interactions/route'
 import type { ComputerVault } from '../../src/sandbox/computer-files'
 import { createComputerStep } from '../../src/sandbox/computer-step'
+import { createSandboxRunTool } from '../../src/sandbox/sandbox-run-tool'
 
 interface Env { DB: D1Database }
 
@@ -40,7 +41,7 @@ export default {
       return new Response(null, { status: 204 })
     }
     if (url.pathname === '/step' && request.method === 'POST') {
-      const body = await request.json() as { callId: string; task: string; questions?: boolean }
+      const body = await request.json() as { callId: string; task: string; questions?: boolean; capMs?: number }
       const { peer, root } = await config(env)
       const vault: ComputerVault = { root, save: async file => {
         await env.DB.prepare('INSERT OR REPLACE INTO vault_files (path, content) VALUES (?, ?)').bind(file.path, file.content).run()
@@ -54,8 +55,13 @@ export default {
         ...(body.questions ? { questions: true } : {}),
       })
       try {
-        const answer = await step.runTask(await box(peer), body.task, { callId: body.callId, signal: controller.signal,
-          timeoutMs: 60_000, emit: (kind, data) => { emitted.push({ kind, data }) } })
+        const emit = (kind: string, data?: unknown) => { emitted.push({ kind, data }) }
+        // With `capMs`, the call goes through the `sandbox_run` tool and its wall-clock cap, as a Router turn sends it.
+        const answer = body.capMs
+          ? (await createSandboxRunTool({ box: () => box(peer), runTask: step.runTask, timeoutMs: body.capMs,
+            onFailure: error => { emitted.push({ kind: 'failure_record', data: error.message }) } })
+            .run({ task: body.task }, { callId: body.callId, signal: controller.signal, emit })).answer
+          : await step.runTask(await box(peer), body.task, { callId: body.callId, signal: controller.signal, timeoutMs: 60_000, emit })
         return Response.json({ answer, emitted })
       } catch (error) {
         const failure = error as { code?: unknown; name?: unknown; message?: unknown }

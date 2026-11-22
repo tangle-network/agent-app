@@ -71,6 +71,7 @@ export * from './sandbox-run-tool'
 // admission makes idempotent, and the copy of the step's files into the app's Vault.
 export * from './computer-step'
 export * from './computer-files'
+export * from './computer-output'
 export * from './router-models'
 
 export * from './sandbox-exec-tool'

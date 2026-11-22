@@ -22,7 +22,9 @@
  *   observes the run's end, and appends the receipt line the model may relay;
  * - with `questions`, lets the box agent ask the member: each ask streams to the
  *   turn as a `computer_interaction` event, and the member's answer reaches the
- *   box through the runtime's interaction registry (the app's interaction route).
+ *   box through the runtime's interaction registry (the app's interaction route);
+ * - reports what the box has produced so far (`produced`), so a call stopped at its
+ *   cap returns that output. A product `run` receives `produced` and reports its own.
  *
  * The product keeps the prompt path when it has its own (`run`); otherwise the
  * step uses agent-app's `runSandboxPrompt` over the product's shell.
@@ -32,6 +34,7 @@ import type { SandboxRuntimeConfig } from './configuration'
 import type { StreamSandboxPromptOptions } from './prompt-options'
 import { runSandboxPrompt } from './prompt-result'
 import { isComputerInteractionEvent } from './prompt-events'
+import { createComputerOutput } from './computer-output'
 import { SandboxRunError } from './sandbox-run-error'
 import { COMPUTER_FILES_GUIDANCE, computerFileContract, saveComputerFiles, type ComputerVault } from './computer-files'
 import { modelWithinAllowList } from './router-models'
@@ -181,6 +184,8 @@ export function createComputerStep(options: ComputerStepOptions): ComputerStep {
           ...(session ? { session } : {}), ...(attemptModel ? { model: attemptModel } : {}), onDispatch: () => { sent = true } })
       }
       const prompt = options.prompt ?? {}
+      const output = createComputerOutput({ isPromptEcho: text => text === framed.trim() })
+      taskOptions.produced?.(output.read)
       return runSandboxPrompt(options.shell!, box, framed, {
         ...prompt, ...(attemptModel ? { model: attemptModel } : {}),
         ...(executionId ? { executionId, turnId: executionId } : {}),
@@ -194,9 +199,10 @@ export function createComputerStep(options: ComputerStepOptions): ComputerStep {
         signal, timeoutMs,
         ...(trace ? { trace } : {}), ...(span ? { traceParent: span } : {}),
         onDispatch: () => { sent = true; prompt.onDispatch?.() },
-      }, options.questions
-        ? event => { if (isComputerInteractionEvent(event)) taskOptions.emit('computer_interaction', event) }
-        : undefined)
+      }, event => {
+        output.observe(event)
+        if (options.questions && isComputerInteractionEvent(event)) taskOptions.emit('computer_interaction', event)
+      })
     }
     let answer: string
     for (let attempt = 0; ; attempt++) {

@@ -27,7 +27,7 @@ import { redactErrorMessage } from '../redact'
  * function was changed to fix. Sharing three lines of lookup would also couple
  * `/sandbox` to `/stream`, which are independent subpaths today.
  */
-function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
+export function textPartId(part: Record<string, unknown> | undefined, fallback: string): string {
   for (const key of ['id', 'partId', 'messagePartId']) {
     const value = part?.[key]
     if (typeof value === 'string' && value.trim()) return value
