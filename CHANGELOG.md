@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.55
+
+- fix(router-turn): the answer call only answers, and ends at the hop budget (#1601)
+
 ## 4.0.54
 
 - fix(sandbox): a sandbox_run stopped at its cap returns what the box produced (#1599)
