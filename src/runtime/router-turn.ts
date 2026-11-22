@@ -292,7 +292,8 @@ export interface RouterTurnOptions {
    *  since the first send, so an outage of that length costs the turn a pause instead of the turn.
    *  `timeoutMs` bounds each attempt, stream included. */
   retry?: { attempts?: number; timeoutMs?: number; baseDelayMs?: number }
-  /** Characters of one tool result the model reads when no `renderToolResult` is given. Default 12 000. */
+  /** Characters of one tool result the model reads when no `renderToolResult` is given. Default 12 000. A longer
+   *  result is cut, and the model reads that it was cut, and how long it was, before the text. */
   toolResultLimit?: number
   /**
    * Which model API carries the turn. `auto` (default) uses the Responses API for an OpenAI model asked to
@@ -455,7 +456,11 @@ function renderResult(outcome: RouterTurnToolOutcome, limit = TOOL_RESULT_LIMIT)
   let text: string
   try { text = typeof outcome.result === 'string' ? outcome.result : JSON.stringify(outcome.result ?? null) }
   catch { text = String(outcome.result) }
-  return text.length > limit ? `${text.slice(0, limit)}…` : text
+  if (text.length <= limit) return text
+  // Say so before the text. A model shown a cut result with only a trailing ellipsis treats it as whole: one read a
+  // 20,000-character file this way and saved the first 12,000 back as the file (gtm-agent#2105).
+  const shown = Math.max(0, limit - 200)
+  return `[Cut: this result is ${text.length} characters and only the first ${shown} follow; the rest was dropped. Do not treat it as complete or save it as the whole.]\n${text.slice(0, shown)}`
 }
 
 /** Add one model call's usage to the turn's totals, and it and why the call ended to that call's span. */
