@@ -19,7 +19,7 @@ import { createSidecarRuntimePeer, type RuntimeRun } from './helpers/sidecar-run
 const disk = mkdtempSync(join(tmpdir(), 'computer-step-durability-'))
 const root = join(disk, 'vault')
 mkdirSync(join(root, 'proof'), { recursive: true })
-let mode: 'held' | 'question' | 'unasked' = 'held'
+let mode: 'held' | 'question' | 'unasked' | 'working' = 'held'
 const held: Array<() => void> = []
 const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) => {
   const write = (name: string) => {
@@ -35,6 +35,14 @@ const runtime = createSidecarRuntimePeer({ disk, onRun: (run: RuntimeRun, peer) 
     data => peer.finish(run, `The member chose ${String(data?.q0 ?? 'nothing')}. ${write('tone')}`))
     // Without the channel the box agent cannot ask, and decides alone.
     if (!asked) peer.finish(run, `Nobody could be asked, so the agent chose Formal. ${write('tone')}`)
+  }
+  if (mode === 'working') {
+    // The box agent narrates and prints one provider's rates, then keeps working past the call's cap.
+    const ids = { executionId: run.executionId, sessionId: run.sessionId }
+    peer.push(run, { type: 'message.part.updated', data: { part: { type: 'text', id: 'narration' }, delta: 'Extracting the saved pages ', ...ids } })
+    peer.push(run, { type: 'message.part.updated', data: { part: { type: 'text', id: 'narration' }, delta: 'in two batches.', ...ids } })
+    peer.push(run, { type: 'message.part.updated', data: { part: { type: 'tool', id: 'rates-1', tool: 'bash', state: { status: 'completed',
+      input: { command: 'python3 rates.py northflank' }, output: '== northflank ==\n$0.01667/ vCPU / hour' } }, ...ids } })
   }
   if (mode === 'unasked') {
     // A backend that asks without the channel: the runtime streams the ask, and nobody can answer it.
@@ -152,3 +160,23 @@ it('fails a step without a question channel as soon as its box agent asks anyway
   assert.equal(result.answer, undefined, `an unanswerable ask must not settle as an answer: ${JSON.stringify(result)}`)
   assert.match(result.error?.message ?? '', /asked an interactive question during an autonomous run: Which tone do you prefer\?/)
 }, 90_000)
+
+it('returns what the box produced when the sandbox_run cap stops the step, and records only the cause', async () => {
+  // An earlier case's run may still hold the one session; this call needs it free.
+  for (const release of held.splice(0)) release()
+  await until(() => [...runtime.runs.values()].every(run => run.terminal), 'the session free', 15_000)
+  mode = 'working'
+  const result = await step({ callId: 'capped-call', capMs: 4_000, task: 'Extract each provider\'s rates from the saved pages.' })
+  const run = [...runtime.runs.values()].at(-1)!
+  try {
+    assert.equal(result.error?.code, 'sandbox_unconfirmed', JSON.stringify(result))
+    assert.match(result.error!.message, /^The computer step stopped at its 4 s cap before it finished\. Its completion could not be confirmed\. What it had produced by then, which may be incomplete:\n/)
+    assert.match(result.error!.message, /Extracting the saved pages in two batches\./)
+    assert.match(result.error!.message, /\[bash completed\] \{"command":"python3 rates\.py northflank"\}\n== northflank ==\n\$0\.01667\/ vCPU \/ hour/)
+    const record = result.emitted.find(entry => entry.kind === 'failure_record')
+    assert.ok(record && !String(record.data).includes('northflank'), JSON.stringify(record))
+  } finally {
+    // The detached run outlives the call; end it so the session is free.
+    if (!run.terminal) runtime.fail(run, 'Stopped by the test after its cap.')
+  }
+}, 60_000)
