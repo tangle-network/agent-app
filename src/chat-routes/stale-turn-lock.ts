@@ -38,7 +38,9 @@ import type { TurnCancellationIdentity } from '../turn-stream/cancellation'
  *    failure produced the stale lock.
  *
  * Rule 3 is gated on a grace period because it is an inference, not an
- * observation — see {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS}.
+ * observation — see {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS}. Set
+ * `unknownEvidencePolicy: 'hold'` to withhold that inference for failed or
+ * unreachable probes. Positive absent/stopped observations still use Rule 3.
  */
 
 /** Where the box is, as far as the caller can see. `state` on `not-running`
@@ -132,6 +134,10 @@ export interface ReconcileStaleTurnLockOptions {
    *  already gone (someone else got there first), which is reported, never
    *  treated as a release. */
   release(fence: { observedAt: number }): boolean | Promise<boolean>
+  /** Unknown native probe evidence: default `release-after-grace` preserves Rule 3; `hold` never
+   *  force-releases failed/unreachable observations. Positive absent/stopped boxes and terminal sessions keep
+   *  their existing grace and release fence. This does not extend the lock's own lease. Router owners are unchanged. */
+  unknownEvidencePolicy?: 'hold' | 'release-after-grace'
   /** Override {@link DEFAULT_STALE_TURN_LOCK_GRACE_MS} (Rule 3's fallback). */
   graceMs?: number
   /** Override {@link DEFAULT_TERMINAL_TURN_LOCK_GRACE_MS} (Rule 1's release). */
@@ -286,6 +292,15 @@ async function forceReleaseUnreachable(
   const log = options.log ?? ((message, meta) => console.warn(message, meta))
   const graceMs = options.graceMs ?? DEFAULT_STALE_TURN_LOCK_GRACE_MS
   const lockAgeMs = observedAt - options.lockStartedAt
+  // A failed observation is not a positive absent/stopped observation. Only the latter
+  // may retain the physical fallback when this consumer requires unknown evidence to hold.
+  if (options.unknownEvidencePolicy === 'hold' && reason.unreachableReason !== 'SANDBOX_ABSENT'
+    && reason.unreachableReason !== 'SANDBOX_NOT_RUNNING') {
+    const diagnostics = { ...reason, sandboxReachable: false, lockAgeMs,
+      forceReleaseWithheld: 'UNKNOWN_HOLDER_EVIDENCE' }
+    log('[chat-routes] stale turn lock held: holder evidence is unknown', { ...(options.context ?? {}), ...diagnostics })
+    return { released: false, diagnostics }
+  }
   const diagnostics: Record<string, unknown> = {
     ...reason,
     sandboxReachable: false,
