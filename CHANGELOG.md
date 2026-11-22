@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.54
+
+- fix(sandbox): a sandbox_run stopped at its cap returns what the box produced (#1599)
+- fix(router-turn): a cut tool result says so before its text (#1600)
+
 ## 4.0.53
 
 - feat(router-turn): answerByMs ends research at a time and writes the answer (#1598)
