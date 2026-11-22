@@ -17967,6 +17967,12 @@
           "doc": "What one step saved, and what it left on the computer only (with the reason)."
         },
         {
+          "name": "ComputerOutput",
+          "kind": "interface",
+          "signature": "interface ComputerOutput",
+          "doc": null
+        },
+        {
           "name": "ComputerStep",
           "kind": "interface",
           "signature": "interface ComputerStep",
@@ -18007,6 +18013,12 @@
           "kind": "function",
           "signature": "(open: () => Promise<ReuseCacheLike>) => ReuseStateStore",
           "doc": "A store over a Workers-style cache."
+        },
+        {
+          "name": "createComputerOutput",
+          "kind": "function",
+          "signature": "(options?: { isPromptEcho?(text: string): boolean; }) => ComputerOutput",
+          "doc": null
         },
         {
           "name": "createComputerStep",

@@ -4,7 +4,7 @@
 
 Source: `src/sandbox/index.ts`
 
-311 exports.
+313 exports.
 
 ### `adaptSandboxStream`
 
@@ -198,6 +198,14 @@ type ComputerFileListing
 interface ComputerFileReceipt
 ```
 
+### `ComputerOutput`
+
+`interface`
+
+```ts
+interface ComputerOutput
+```
+
 ### `ComputerStep`
 
 `interface`
@@ -252,6 +260,14 @@ interface ComputerVaultFile
 
 ```ts
 (open: () => Promise<ReuseCacheLike>) => ReuseStateStore
+```
+
+### `createComputerOutput`
+
+`function`
+
+```ts
+(options?: { isPromptEcho?(text: string): boolean; }) => ComputerOutput
 ```
 
 ### `createComputerStep`
