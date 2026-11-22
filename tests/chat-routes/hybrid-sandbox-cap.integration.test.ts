@@ -2,7 +2,9 @@
  * Production turn gtm-agent:3a233fe1f5a9e9c050d78e52b261b0b6:0 (2026-11-22): the second `sandbox_run` printed fourteen
  * providers' rates in its tool output, hit its 240 s cap, and the model received only "did not return an answer within
  * 240 s": 0 characters of that output. Real HTTP Router -> hybrid producer -> engine tool loop -> sandbox_run -> the
- * product's computer step (`computer.run`, as GTM's), fed box events shaped as that run streamed them. */
+ * product's computer step (`computer.run`, as GTM's), fed box events shaped as that run streamed them.
+ * `failed`: the run fails before its cap (gtm-agent thread 40d4131a, 2026-11-22: two `sandbox_failed` runs had fetched
+ * and extracted pricing pages, and the model, given only "That answer stopped before it finished", said none were read). */
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import type { SandboxInstance } from '@tangle-network/sandbox'
@@ -12,11 +14,12 @@ import { createComputerOutput } from '../../src/sandbox/computer-output'
 import { SandboxRunError } from '../../src/sandbox/sandbox-run-error'
 
 const ANSWER = 'The box priced Northflank and Koyeb before its cap; the rest is not confirmed.'
+const FAILED = 'That answer stopped before it finished. Please send your question again.'
 const text = (id: string, delta: string) => ({ type: 'message.part.updated', data: { delta, part: { type: 'text', id } } })
 const bash = (id: string, command: string, output: string) => ({ type: 'message.part.updated',
   data: { part: { type: 'tool', id, tool: 'bash', state: { status: 'completed', input: { command, timeout: 120000 }, output } } } })
 
-it.each(['produced', 'bounded', 'nothing'] as const)('a capped sandbox_run returns the box output to the model: %s', async mode => {
+it.each(['produced', 'bounded', 'nothing', 'failed'] as const)('a capped or failed sandbox_run returns the box output to the model: %s', async mode => {
   const toolMessages: string[] = []
   let calls = 0
   const server = createServer((request, response) => {
@@ -58,6 +61,7 @@ it.each(['produced', 'bounded', 'nothing'] as const)('a capped sandbox_run retur
               bash('rates-9', 'python3 /tmp/opencode/rates.py koyeb', '== koyeb ==\nRTX-4000-SFF-ADA $ 0.50 /hr vCPU 6 RAM 44GB'),
             ]
             for (const event of events) output.observe(event)
+            if (mode === 'failed') throw new SandboxRunError('sandbox_failed', FAILED)
             // The box keeps working until the call's cap stops it, as the production run did.
             return new Promise<string>((_, reject) => step.signal.addEventListener('abort',
               () => reject(new SandboxRunError('sandbox_failed', 'The computer step was stopped.')), { once: true }))
@@ -72,6 +76,15 @@ it.each(['produced', 'bounded', 'nothing'] as const)('a capped sandbox_run retur
     expect(producer.finalText()).toBe(ANSWER)
     expect(toolMessages).toHaveLength(1)
     const result = toolMessages[0]!
+    if (mode === 'failed') {
+      // The failure keeps its own code and cause; the model also reads what the box produced before it.
+      expect(notices.map(notice => notice.code)).toContain('sandbox_failed')
+      expect(recorded.map(error => [error.code, error.message])).toEqual([['sandbox_failed', FAILED]])
+      expect(result.startsWith(`Error (sandbox_failed): ${FAILED} What it had produced by then, which may be incomplete:\n`)).toBe(true)
+      expect(result).toContain('== northflank ==\n$0.01667/ vCPU / hour')
+      expect(result).toContain('== koyeb ==\nRTX-4000-SFF-ADA $ 0.50 /hr')
+      return
+    }
     // The call stays unconfirmed: the warning notice and the recorded failure are unchanged.
     expect(notices.map(notice => notice.code)).toContain('sandbox_unconfirmed')
     expect(recorded).toHaveLength(1)
