@@ -310,13 +310,13 @@ describe('runRouterTurn', () => {
     expect(calls).toHaveBeenCalledTimes(3)
   })
 
-  it('sends temperature and cuts tool results at the app limit', async () => {
-    const big: RouterTurnTool = { ...createTask, run: async () => 'x'.repeat(50) }
+  it('sends temperature and cuts tool results at the app limit, saying so before the text', async () => {
+    const big: RouterTurnTool = { ...createTask, run: async () => 'x'.repeat(500) }
     const { fetchImpl, requests } = router(sse([toolCall('call-1', 'staff_task_create', '{"title":"a"}')]), sse([text('ok')]))
-    await runRouterTurn({ apiKey: 'k', model: 'm', temperature: 0.7, toolResultLimit: 10, fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [big] })
+    await runRouterTurn({ apiKey: 'k', model: 'm', temperature: 0.7, toolResultLimit: 300, fetchImpl, systemPrompt: 's', userMessage: 'u', tools: [big] })
     expect(requests[0]!.body.temperature).toBe(0.7)
-    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([
-      expect.objectContaining({ role: 'tool', content: `${'x'.repeat(10)}…` })]))
+    expect(requests[1]!.body.messages).toEqual(expect.arrayContaining([expect.objectContaining({ role: 'tool',
+      content: `[Cut: this result is 500 characters and only the first 100 follow; the rest was dropped. Do not treat it as complete or save it as the whole.]\n${'x'.repeat(100)}` })]))
   })
 
   it('runs an OpenAI reasoning turn on the Responses API and streams its reasoning summary', async () => {
