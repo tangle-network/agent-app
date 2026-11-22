@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.56
+
+- fix(sandbox): a failed sandbox_run returns what the box produced (#1603)
+
 ## 4.0.55
 
 - fix(router-turn): the answer call only answers, and ends at the hop budget (#1601)
