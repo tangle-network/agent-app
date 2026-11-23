@@ -10,6 +10,7 @@ import type { ChatTurnUsage } from './turn-routes'
 import type { SessionExecutionInfo } from '@tangle-network/sandbox'
 import {
   attributionFromResult,
+  type CompletedReply,
   readCompletedSandboxTurn,
   recoverSandboxAssistantMessage,
   usageFromResult,
@@ -59,6 +60,8 @@ export interface NativeCompletionObservationOptions {
   absentDispatchDeadlineMs?: number
   receiptDeadlineMs?: number
   now?: number
+  /** Which text of a completed box turn is its reply (`readCompletedSandboxTurn`). */
+  completedReply?: CompletedReply
 }
 
 export type NativeCompletionObservation =
@@ -382,7 +385,8 @@ export async function observeNativeCompletion(
       continue
     }
     const completed = run.status === 'completed'
-      ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId, since })
+      ? await readCompletedSandboxTurn(source, { turnId, sessionId: options.sessionId, since,
+        ...(options.completedReply ? { reply: options.completedReply } : {}) })
       : null
     if (run.status === 'completed' && completed) {
       const aborted = abortedToolCall(completed.parts ?? [])

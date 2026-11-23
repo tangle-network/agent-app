@@ -25,6 +25,7 @@ export * from './model-failover-stream'
 export * from './draft-persistence'
 export * from './detached-turn'
 export {
+  type CompletedReply,
   type CompletedSandboxTurnSource,
   type ReadCompletedSandboxTurnOptions,
   readCompletedSandboxTurn,

@@ -1,5 +1,6 @@
 import { assistantRowIdForTurn, createAssistantDraftWriter } from '../chat-routes/draft-persistence'
 import { observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource } from '../chat-routes/native-completion'
+import type { CompletedReply } from '../chat-routes/completed-sandbox-turn'
 import type { ChatTurnMessageStore } from '../chat-routes/turn-route-contracts'
 import type { ValueRedactor } from '../chat-routes/redact-values'
 import { createTurnTrace, type TurnTrace, type TurnTraceSink, type TurnSpan, type TurnTraceSnapshot } from '../turn-trace/index'
@@ -99,6 +100,8 @@ export interface NativeCompletionOwnerOptions<TPayload extends NativeCompletionP
   reconcile(payload: TPayload, source: TSource): Promise<boolean>
   /** The turn's registered secret values (chat-routes `redactValues`), applied to the transcript this owner stores. */
   redact?(payload: TPayload): ValueRedactor | undefined | Promise<ValueRedactor | undefined>
+  /** Which text of the completed box turn this owner stores as the reply; `'all-text'` when absent. */
+  completedReply?(payload: TPayload): CompletedReply | undefined
 }
 
 export function createNativeCompletionOwner<TPayload extends NativeCompletionPayload, TSource extends NativeCompletionSessionSource>(
@@ -127,6 +130,7 @@ export function createNativeCompletionOwner<TPayload extends NativeCompletionPay
     source, admissionStore: readonly ? { ...store.admissionStore, renew: id => store.admissionStore.read(id) } : store.admissionStore,
     executionId: payload.executionId, sessionId: payload.sessionId, turnId: payload.nativeExecutionId,
     registeredAt: payload.registeredAt,
+    ...(options.completedReply?.(payload) ? { completedReply: options.completedReply(payload) } : {}),
   })
   return {
     store, persistTranscript, finalizeBuffer, releaseLock, observe, reconcile: options.reconcile,

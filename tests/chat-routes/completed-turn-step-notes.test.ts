@@ -46,10 +46,12 @@ function box(response: string): CompletedSandboxTurnSource {
   } as unknown as CompletedSandboxTurnSource
 }
 
+const reply = 'answer-after-last-tool' as const
+
 describe('a completed box turn that worked in steps', () => {
   it('stores the answer after its last tool call as the reply, and keeps the earlier note as a step note', async () => {
     // The runtime's cached result holds every step's text, as the stored reply did.
-    const read = await readCompletedSandboxTurn(box(`${NOTE}\n\n${ANSWER}`), { turnId, sessionId })
+    const read = await readCompletedSandboxTurn(box(`${NOTE}\n\n${ANSWER}`), { turnId, sessionId, reply })
     expect(read?.text).toBe(ANSWER)
     expect(read?.text).not.toContain('Building the 42-row merge now.')
     const texts = read?.parts?.filter((part) => part.type === 'text').map((part) => part.text)
@@ -59,8 +61,36 @@ describe('a completed box turn that worked in steps', () => {
   })
 
   it('recovers the same answer from the message alone', () => {
-    const recovered = recoverSandboxAssistantMessage(message as never)
+    const recovered = recoverSandboxAssistantMessage(message as never, reply)
     expect(recovered.text).toBe(ANSWER)
+  })
+
+  it('reads as before unless the consumer turns the rule on', async () => {
+    const read = await readCompletedSandboxTurn(box(`${NOTE}\n\n${ANSWER}`), { turnId, sessionId })
+    expect(read?.text).toBe(`${NOTE}\n\n${ANSWER}`)
+    expect(recoverSandboxAssistantMessage(message as never).text).toContain(NOTE)
+  })
+
+  it('keeps the answer when a short closing line follows one more tool call', () => {
+    // The shape the lead named: the whole answer, a tool call that saves it, then a closing line.
+    const closing = 'Saved it to the Vault as well.'
+    const closed = { ...message, parts: [...message.parts.slice(0, -3),
+      ...step(5, { id: 'prt_text_whole_answer', type: 'text', text: ANSWER }, tool(5, 'gtm vault write research/table.md')),
+      ...step(6, { id: 'prt_text_closing', type: 'text', text: closing })] }
+    const recovered = recoverSandboxAssistantMessage(closed as never, reply)
+    expect(recovered.text).toContain(ANSWER)
+    expect(recovered.text).toContain(closing)
+    expect(recovered.parts?.filter((part) => part.type === 'reasoning')).toEqual([])
+  })
+
+  it('keeps an unfinished run whose last text is a cut-off note as it was', () => {
+    // Recorded 9c3a63c1 (2026-11-22): 2,212 characters of notes, then 185 after the last tool call, cut off mid-word.
+    const notes = 'Strong reads: Modal sandbox rate per physical core, Fly per-machine prices, Railway per vCPU-second. '.repeat(4)
+    const cutOff = "Runloop's full rate card confirmed ($0.108/CPU-hr, $0.0252/GB-hr). Railway plans confirmed ($5 Hobby / $20 Pro minimums with usage credits"
+    const unfinished = { ...message, parts: [...step(1, { id: 'prt_notes', type: 'text', text: notes }, tool(1, 'rg -N rates render.txt')),
+      ...step(2, { id: 'prt_cut', type: 'text', text: cutOff })] }
+    const recovered = recoverSandboxAssistantMessage(unfinished as never, reply)
+    expect(recovered.text).toBe(`${notes}${cutOff}`)
   })
 
   it('leaves a turn with no tool call, or nothing after its last one, as it was', async () => {
