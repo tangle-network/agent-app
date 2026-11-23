@@ -1,0 +1,137 @@
+[
+  {
+    "width": 390,
+    "metrics": [
+      {
+        "name": "Claude Fable 5.1",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$10/M",
+        "nowrap": true,
+        "width": 348
+      },
+      {
+        "name": "Claude Opus 5",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$5/M",
+        "nowrap": true,
+        "width": 348
+      },
+      {
+        "name": "GPT 5.6 Luna",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.20/M",
+        "nowrap": true,
+        "width": 348
+      },
+      {
+        "name": "Gemini 3.7 Flash",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.75/M",
+        "nowrap": true,
+        "width": 348
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "metrics": [
+      {
+        "name": "Claude Fable 5.1",
+        "height": 40,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$10/M",
+        "nowrap": true,
+        "width": 410
+      },
+      {
+        "name": "Claude Opus 5",
+        "height": 40,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$5/M",
+        "nowrap": true,
+        "width": 410
+      },
+      {
+        "name": "GPT 5.6 Luna",
+        "height": 40,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.20/M",
+        "nowrap": true,
+        "width": 410
+      },
+      {
+        "name": "Gemini 3.7 Flash",
+        "height": 40,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.75/M",
+        "nowrap": true,
+        "width": 410
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "metrics": [
+      {
+        "name": "Claude Fable 5.1",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$10/M",
+        "nowrap": true,
+        "width": 278
+      },
+      {
+        "name": "Claude Opus 5",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$5/M",
+        "nowrap": true,
+        "width": 278
+      },
+      {
+        "name": "GPT 5.6 Luna",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.20/M",
+        "nowrap": true,
+        "width": 278
+      },
+      {
+        "name": "Gemini 3.7 Flash",
+        "height": 44,
+        "nameSize": "16px",
+        "logoSize": 28,
+        "priceRightGap": 12,
+        "price": "$0.75/M",
+        "nowrap": true,
+        "width": 278
+      }
+    ]
+  }
+]
