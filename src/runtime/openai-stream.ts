@@ -466,7 +466,7 @@ export function toResponsesInput(messages: LoopMessage[]): { instructions?: stri
 function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, unknown>> {
   return (tools ?? []).flatMap((tool) => {
     const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
-    return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
+    return fn?.name ? [{ type: 'function', name: fn.name, strict: false, ...(fn.description ? { description: fn.description } : {}),
       parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
   })
 }
