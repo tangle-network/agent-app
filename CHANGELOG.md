@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.61
+
+- Restore right-aligned model prices and compact picker rows (#1613)
+
 ## 4.0.60
 
 - fix(settings-react): scope sticky save-bar styles to settings footers (#1612)
