@@ -359,6 +359,21 @@ describe('runRouterTurn', () => {
       usage: { promptTokens: 280, completionTokens: 42, modelCalls: 2 }, reasoning: { deltas: 2, chars: 30 } })
   })
 
+  it('sends Responses function tools with strict: false so optional properties stay optional', async () => {
+    const done = new Response(`data: ${JSON.stringify({ type: 'response.completed', response: { model: 'gpt-6', usage: { input_tokens: 1, output_tokens: 1 } } })}\n\n`,
+      { status: 200, headers: { 'content-type': 'text/event-stream' } })
+    const bodies: Array<Record<string, any>> = []
+    const fetchImpl = (async (_url: RequestInfo | URL, init?: RequestInit) => { bodies.push(JSON.parse(String(init?.body))); return done }) as typeof fetch
+    const upsertEvidence: RouterTurnTool = { name: 'upsert_evidence', description: 'Record evidence.',
+      inputSchema: { type: 'object', properties: { quote: { type: 'string' }, span: { type: 'string' },
+        locator: { type: 'object', properties: { find: { type: 'string' } } } }, required: ['quote'] },
+      run: vi.fn(async () => ({ ok: true })) }
+    await runRouterTurn({ apiKey: 'k', model: 'openai/gpt-6', reasoningEffort: 'low', fetchImpl,
+      systemPrompt: 's', userMessage: 'u', tools: [upsertEvidence] })
+    expect(bodies[0]!.tools).toEqual([{ type: 'function', name: 'upsert_evidence', description: 'Record evidence.',
+      parameters: upsertEvidence.inputSchema, strict: false }])
+  })
+
   it('keeps chat completions for a non-OpenAI model, an OpenAI model without reasoning, and api: chat', async () => {
     for (const options of [{ model: 'gemini-3.5-flash', reasoningEffort: 'medium' }, { model: 'openai/gpt-6' },
       { model: 'openai/gpt-6', reasoningEffort: 'none' }, { model: 'openai/gpt-6', reasoningEffort: 'high', api: 'chat' as const }]) {
