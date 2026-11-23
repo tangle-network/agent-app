@@ -5,11 +5,10 @@ type StreamTurn = (messages: LoopMessage[]) => AsyncIterable<LoopEvent>
 
 /**
  * The answer call: it writes the answer, and its tool calls never run. A model that ignores `tool_choice: "none"` sends
- * them anyway (Z.AI documents `tool_choice` as `auto` only; on 2026-11-22 a GLM seat answered two answer calls with
- * `sandbox_run`, both ran, and the turn reached its budget with no answer). They are dropped, and a call that wrote no
- * word is sent once more with no tools listed, so the model can only write. The call ends at the hop's budget
- * (`endsAt`), keeping what it wrote: with no tools a GLM call once wrote "Reading…" for 12 minutes (317,197
- * characters), and nothing ended it. A `turn.answer_call` span says which happened.
+ * them anyway (Z.AI documents `tool_choice` as `auto` only); run, they keep the turn researching until its budget ends
+ * with no answer. They are dropped, and a call that wrote no word is sent once more with no tools listed, so the model
+ * can only write. The call ends at the hop's budget (`endsAt`), keeping what it wrote: a model given no tools can write
+ * without stopping, and nothing else ends the call. A `turn.answer_call` span says which happened.
  */
 export function answerOnlyCall(
   call: (body: Record<string, unknown>, stop: AbortSignal, listTools: boolean) => StreamTurn,

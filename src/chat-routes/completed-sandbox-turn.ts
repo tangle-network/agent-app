@@ -40,7 +40,19 @@ export interface ReadCompletedSandboxTurnOptions {
    *  both grows with the session and can miss the newest turn. */
   since?: number
   log?: (message: string, meta?: Record<string, unknown>) => void
+  /** Which text is the reply; see {@link CompletedReply}. Default `'all-text'`. */
+  reply?: CompletedReply
 }
+
+/**
+ * Which text of a completed box turn is its reply.
+ * - `'all-text'` (the default): every text part, as before.
+ * - `'answer-after-last-tool'`: the text after the turn's last tool call, when that text is longer than every earlier
+ *   text segment; earlier text stays in the message as reasoning parts. For turns told to keep notes between steps
+ *   short and to end with their reply. The length condition leaves two shapes as they were: an answer followed by one
+ *   more tool call and a short closing line, and an unfinished run whose last text is a cut-off note.
+ */
+export type CompletedReply = 'all-text' | 'answer-after-last-tool'
 
 function finiteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
@@ -138,9 +150,44 @@ function completedMessagesForTurn(
   )
 }
 
+/**
+ * A box turn's message records every step: what the model wrote before each
+ * tool call, then its answer after the last one. Under
+ * `'answer-after-last-tool'` the answer is the reply and the earlier text stays
+ * in the message as step notes (reasoning parts), instead of the notes running
+ * ahead of the answer in the stored reply.
+ */
+function separateStepNotes(parts: JsonRecord[]): { parts: JsonRecord[]; separated: boolean } {
+  let lastTool = -1
+  for (const [index, part] of parts.entries()) {
+    if (part.type === 'tool') lastTool = index
+  }
+  if (lastTool < 0) return { parts, separated: false }
+  const textLength = (part: JsonRecord) => part.type === 'text' ? String(part.text ?? '').trim().length : 0
+  const answer = parts.slice(lastTool + 1).reduce((total, part) => total + textLength(part), 0)
+  const longestNote = parts.slice(0, lastTool).reduce((longest, part) => Math.max(longest, textLength(part)), 0)
+  // Only an answer longer than every earlier text segment is the reply; a short closing line after a tool call, or a
+  // cut-off note at the end of an unfinished run, is not.
+  if (!answer || answer <= longestNote) return { parts, separated: false }
+  let separated = false
+  const out: JsonRecord[] = []
+  for (const [index, part] of parts.entries()) {
+    if (index > lastTool || part.type !== 'text') {
+      out.push(part)
+      continue
+    }
+    const text = String(part.text ?? '')
+    if (!text.trim()) continue
+    separated = true
+    out.push({ type: 'reasoning', text, ...(asString(part.id) ? { id: asString(part.id) } : {}) })
+  }
+  return { parts: out, separated }
+}
+
 function normalizedMessageParts(
   message: SessionMessage,
-): { parts: JsonRecord[]; usage: ChatTurnUsage; derivedText: string } {
+  reply: CompletedReply = 'all-text',
+): { parts: JsonRecord[]; usage: ChatTurnUsage; derivedText: string; separated: boolean } {
   const normalized: JsonRecord[] = []
   const usage: ChatTurnUsage = {}
   for (const raw of message.parts) {
@@ -152,12 +199,15 @@ function normalizedMessageParts(
     if (part.type === 'step-finish') addStepFinishUsage(part, usage)
   }
 
-  const collapsed = collapseRedundantTextParts(normalized)
+  const { parts, separated } = reply === 'answer-after-last-tool'
+    ? separateStepNotes(normalized)
+    : { parts: normalized, separated: false }
+  const collapsed = collapseRedundantTextParts(parts)
   const derivedText = collapsed
     .filter((part) => part.type === 'text')
     .map((part) => String(part.text ?? ''))
     .join('')
-  return { parts: normalized, usage, derivedText }
+  return { parts, usage, derivedText, separated }
 }
 
 function projectMessageParts(parts: JsonRecord[], finalText: string): JsonRecord[] {
@@ -185,8 +235,8 @@ function projectMessageParts(parts: JsonRecord[], finalText: string): JsonRecord
  * the exact terminal turn; this projection deliberately makes no conclusion
  * about whether that terminal state was completed or interrupted.
  */
-export function recoverSandboxAssistantMessage(message: SessionMessage): DetachedTurnFinal {
-  const recovered = normalizedMessageParts(message)
+export function recoverSandboxAssistantMessage(message: SessionMessage, reply: CompletedReply = 'all-text'): DetachedTurnFinal {
+  const recovered = normalizedMessageParts(message, reply)
   return {
     ...(recovered.derivedText ? { text: recovered.derivedText } : {}),
     ...(hasUsage(recovered.usage) ? { usage: recovered.usage } : {}),
@@ -276,8 +326,10 @@ export async function readCompletedSandboxTurn(
   // reading the message list and reading a session-wide aggregate result.
   const result = cached ? asRecord(cached.result) : undefined
 
-  const recovered = message ? normalizedMessageParts(message) : null
-  const text = textFromResult(result) ?? recovered?.derivedText
+  const recovered = message ? normalizedMessageParts(message, options.reply) : null
+  // The runtime's result text holds every step's text; once the message shows
+  // which of it is the answer, the reply is that answer.
+  const text = recovered?.separated ? recovered.derivedText : textFromResult(result) ?? recovered?.derivedText
   const resultUsage = usageFromResult(result)
   const usage = { ...(recovered?.usage ?? {}), ...resultUsage }
   const resultParts = Array.isArray(result?.parts)
