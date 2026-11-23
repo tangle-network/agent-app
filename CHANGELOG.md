@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.59
+
+- fix(turn-stream): hold unknown native holder evidence when selected (#1602)
+
 ## 4.0.58
 
 - Send Responses function tools non-strict, so optional tool fields stay optional (#1611)
