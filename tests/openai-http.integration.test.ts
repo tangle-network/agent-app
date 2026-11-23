@@ -34,7 +34,9 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   try {
-    const options = { baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, apiKey: 'local-integration-only', model: 'fixture-model' }
+    const parameters = { type: 'object', properties: { q: { type: 'string' }, locator: { type: 'string' } }, required: ['q'] }
+    const tools = [{ type: 'function', function: { name: 'lookup', parameters } }]
+    const options = { baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`, apiKey: 'local-integration-only', model: 'fixture-model', tools }
     const messages = [{ role: 'user' as const, content: 'Find the lease' }]
     const chatEvents = []
     for await (const event of createOpenAICompatStreamTurn(options)(messages)) chatEvents.push(event)
@@ -57,7 +59,9 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
     expect(requests.map(request => request.path)).toEqual(['/v1/chat/completions', '/v1/responses', '/v1/responses'])
     expect(requests.every(request => request.authorization === 'Bearer local-integration-only' && request.body.stream === true)).toBe(true)
     expect(requests[0]!.body.messages).toEqual(messages)
+    expect(requests[0]!.body.tools).toEqual(tools)
     expect(requests[1]!.body.input).toEqual(messages)
+    expect(requests[1]!.body.tools).toEqual([{ type: 'function', name: 'lookup', parameters, strict: false }])
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }

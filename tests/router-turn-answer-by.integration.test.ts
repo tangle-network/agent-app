@@ -42,7 +42,7 @@ type Scenario = {
   producer?: boolean
   /** Like Z.AI's GLM: a call sent with `tool_choice: "none"` still chooses a tool; only a call with no tools listed writes. */
   ignoresToolChoice?: boolean
-  /** The answer call writes a word every 50 ms and never ends (a tool-less GLM call wrote for 12 minutes, 2026-11-22). */
+  /** The answer call writes a word every 50 ms and never ends, as a model given no tools can. */
   endlessAnswer?: boolean
 }
 

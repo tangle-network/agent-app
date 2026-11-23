@@ -196,8 +196,8 @@ export function createSandboxRunTool(options: SandboxRunToolOptions): SandboxRun
           ...(context?.trace ? { trace: context.trace } : {}), ...(context?.span ? { span: context.span } : {}),
         }))
       } catch (error) {
-        // However the run ended, what the box produced reaches the model. A GTM run that failed 200 s in had fetched
-        // and extracted pricing pages, and the model, given only the failure, said no page was read (2026-11-22).
+        // However the run ended, what the box produced reaches the model: a run that fails after fetching and
+        // extracting pages hands over what it extracted, so the model does not report that nothing was read.
         const output = producedOutput(produced)
         if (error instanceof SandboxRunError) return fail(error.code, error.message, error.cause, output)
         const timedOut = signal.aborted && !options.signal?.aborted && !context?.signal?.aborted
