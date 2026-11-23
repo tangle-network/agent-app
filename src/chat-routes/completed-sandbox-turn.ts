@@ -47,16 +47,10 @@ export interface ReadCompletedSandboxTurnOptions {
 /**
  * Which text of a completed box turn is its reply.
  * - `'all-text'` (the default): every text part, as before.
- * - `'answer-after-last-tool'`: the text after the turn's last tool call, when that text is the longest text segment
- *   of the message; earlier text stays in the message as reasoning parts. A consumer turns it on for turns that are
- *   told to keep notes between steps short and end with their reply (GTM's research follow-up).
- *
- * Replayed over the internal GTM workspace's completed box turns since 2026-11-16 (10 turns, production
- * `turn_events`): in 6 the text after the last tool call was the answer ("Done. ...") and the text before it was step
- * notes (202 to 4,110 characters); 2 were unfinished runs whose last text was a cut-off note (182 and 185 characters
- * after 2,212 and 2,377 of notes); 1 had no text after its last tool call; 1 record was incomplete. The longest-segment
- * condition leaves the unfinished runs, and a turn that answers, makes one more tool call and closes with a short
- * line, as they were.
+ * - `'answer-after-last-tool'`: the text after the turn's last tool call, when that text is longer than every earlier
+ *   text segment; earlier text stays in the message as reasoning parts. For turns told to keep notes between steps
+ *   short and to end with their reply. The length condition leaves two shapes as they were: an answer followed by one
+ *   more tool call and a short closing line, and an unfinished run whose last text is a cut-off note.
  */
 export type CompletedReply = 'all-text' | 'answer-after-last-tool'
 
@@ -160,9 +154,8 @@ function completedMessagesForTurn(
  * A box turn's message records every step: what the model wrote before each
  * tool call, then its answer after the last one. Under
  * `'answer-after-last-tool'` the answer is the reply and the earlier text stays
- * in the message as step notes (reasoning parts). Without it, a GTM follow-up
- * that saved a table stored "All 17 new providers verified ... Building the
- * 42-row merge now." ahead of its result (2026-11-23).
+ * in the message as step notes (reasoning parts), instead of the notes running
+ * ahead of the answer in the stored reply.
  */
 function separateStepNotes(parts: JsonRecord[]): { parts: JsonRecord[]; separated: boolean } {
   let lastTool = -1
