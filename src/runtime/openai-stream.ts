@@ -462,12 +462,17 @@ export function toResponsesInput(messages: LoopMessage[]): { instructions?: stri
   return { ...(instructions.length ? { instructions: instructions.join('\n\n') } : {}), input }
 }
 
-/** Chat-completions tool definitions as Responses function tools. */
+/**
+ * Chat-completions tool definitions as Responses function tools. `/responses`
+ * treats a function tool without `strict` as strict, which makes every optional
+ * property required; each tool is sent non-strict, as on chat completions,
+ * unless its definition sets `function.strict` itself.
+ */
 function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, unknown>> {
   return (tools ?? []).flatMap((tool) => {
-    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
+    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown; strict?: unknown } }).function
     return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
-      parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
+      parameters: fn.parameters ?? { type: 'object', properties: {} }, strict: fn.strict === true }] : []
   })
 }
 
