@@ -138,9 +138,43 @@ function completedMessagesForTurn(
   )
 }
 
+/**
+ * A box turn's message records every step: what the model wrote before each
+ * tool call, then its answer after the last one. The answer is the reply; the
+ * earlier text stays in the message as step notes (reasoning parts) instead of
+ * running into the reply. Without this, a follow-up that saved a table stored
+ * "All 17 new providers verified ... Building the 42-row merge now." ahead of
+ * its result (2026-11-23; 1,310 of 3,607 characters on another follow-up).
+ * A message with no tool call, or with no text after its last one, is
+ * returned as it is.
+ */
+function separateStepNotes(parts: JsonRecord[]): { parts: JsonRecord[]; separated: boolean } {
+  let lastTool = -1
+  for (const [index, part] of parts.entries()) {
+    if (part.type === 'tool') lastTool = index
+  }
+  if (lastTool < 0) return { parts, separated: false }
+  const answered = parts.slice(lastTool + 1)
+    .some((part) => part.type === 'text' && String(part.text ?? '').trim())
+  if (!answered) return { parts, separated: false }
+  let separated = false
+  const out: JsonRecord[] = []
+  for (const [index, part] of parts.entries()) {
+    if (index > lastTool || part.type !== 'text') {
+      out.push(part)
+      continue
+    }
+    const text = String(part.text ?? '')
+    if (!text.trim()) continue
+    separated = true
+    out.push({ type: 'reasoning', text, ...(asString(part.id) ? { id: asString(part.id) } : {}) })
+  }
+  return { parts: out, separated }
+}
+
 function normalizedMessageParts(
   message: SessionMessage,
-): { parts: JsonRecord[]; usage: ChatTurnUsage; derivedText: string } {
+): { parts: JsonRecord[]; usage: ChatTurnUsage; derivedText: string; separated: boolean } {
   const normalized: JsonRecord[] = []
   const usage: ChatTurnUsage = {}
   for (const raw of message.parts) {
@@ -152,12 +186,13 @@ function normalizedMessageParts(
     if (part.type === 'step-finish') addStepFinishUsage(part, usage)
   }
 
-  const collapsed = collapseRedundantTextParts(normalized)
+  const { parts, separated } = separateStepNotes(normalized)
+  const collapsed = collapseRedundantTextParts(parts)
   const derivedText = collapsed
     .filter((part) => part.type === 'text')
     .map((part) => String(part.text ?? ''))
     .join('')
-  return { parts: normalized, usage, derivedText }
+  return { parts, usage, derivedText, separated }
 }
 
 function projectMessageParts(parts: JsonRecord[], finalText: string): JsonRecord[] {
@@ -277,7 +312,9 @@ export async function readCompletedSandboxTurn(
   const result = cached ? asRecord(cached.result) : undefined
 
   const recovered = message ? normalizedMessageParts(message) : null
-  const text = textFromResult(result) ?? recovered?.derivedText
+  // The runtime's result text holds every step's text; once the message shows
+  // which of it is the answer, the reply is that answer.
+  const text = recovered?.separated ? recovered.derivedText : textFromResult(result) ?? recovered?.derivedText
   const resultUsage = usageFromResult(result)
   const usage = { ...(recovered?.usage ?? {}), ...resultUsage }
   const resultParts = Array.isArray(result?.parts)
