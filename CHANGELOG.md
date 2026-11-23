@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.57
+
+- feat(chat-routes): a consumer can store a completed box turn's answer, not its step notes, as the reply (#1608)
+
 ## 4.0.56
 
 - fix(sandbox): a failed sandbox_run returns what the box produced (#1603)
