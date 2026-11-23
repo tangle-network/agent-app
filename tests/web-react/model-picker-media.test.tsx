@@ -27,6 +27,16 @@ describe('formatModelPrice', () => {
 })
 
 describe('ModelPicker media rows', () => {
+  it('shows a tool limitation only when text models in the catalog differ', () => {
+    const plain = { ...gpt, id: 'plain', name: 'Plain', supportsTools: false }
+    const { rerender } = render(<ModelPicker value="plain" onChange={() => {}} models={[plain, flux]} />)
+    fireEvent.click(screen.getByRole('button', { name: /Plain/ }))
+    expect(screen.queryByText('no tools')).toBeNull()
+    rerender(<ModelPicker value="plain" onChange={() => {}} models={[plain, gpt, flux]} />)
+    expect(screen.getByRole('button', { name: /Plain.*no tools/ })).toBeTruthy()
+    expect(screen.getAllByText('no tools')).toHaveLength(1)
+  })
+
   it('shows a preview, the capability line and the per-output price for media models', () => {
     render(<ModelPicker value="openai/gpt-x" onChange={() => {}} models={models} />)
     fireEvent.click(screen.getByRole('button', { name: /GPT X/ }))

@@ -110,17 +110,20 @@ function SectionHeader({ children }: { children: ReactNode }) {
 function ModelRow({
   model,
   selected,
+  someTextModelsHaveTools,
   onSelect,
   renderProviderBadge,
 }: {
   model: CatalogModel
   selected: boolean
+  someTextModelsHaveTools: boolean
   onSelect: () => void
   renderProviderBadge?: (provider: string) => ReactNode
 }) {
   const price = formatModelPrice(model)
-  const ctx = formatContext(model.contextLength)
   const media = model.output && model.output !== 'text'
+  const ctx = !media && formatContext(model.contextLength)
+  const showNoTools = !media && !model.supportsTools && someTextModelsHaveTools
   const thumb = media && (model.output === 'image' || model.output === 'video') ? model.previewUrl : undefined
   const unavailable = model.status === 'unavailable'
   const flagged = unavailable || model.status === 'limited'
@@ -133,7 +136,7 @@ function ModelRow({
       onClick={onSelect}
       aria-pressed={selected}
       title={`${model.name} (${model.id})${model.servedBy ? ` · served by ${model.servedBy}` : ''}`}
-      className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+      className={`flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-1 text-left transition pointer-coarse:min-h-11 ${POPOVER_OPTION_FOCUS} ${
         selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
       }`}
     >
@@ -143,35 +146,37 @@ function ModelRow({
           className={`size-10 shrink-0 rounded-md border border-border object-cover${unavailable ? ' opacity-50' : ''}`} />
       ) : (
         <span className="shrink-0" aria-hidden>
-          <ModelMarks model={model} size={16} renderProviderBadge={renderProviderBadge} />
+          <ModelMarks model={model} size={22} renderProviderBadge={renderProviderBadge} />
         </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
           {thumb && (
             <span className="shrink-0" aria-hidden>
-              <ModelMarks model={model} size={14} renderProviderBadge={renderProviderBadge} />
+              <ModelMarks model={model} size={18} renderProviderBadge={renderProviderBadge} />
             </span>
           )}
-          <span className={`min-w-0 break-words [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
+          <span className={`min-w-0 break-words text-base font-medium leading-5 [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
+          {selected && <CheckGlyph className="size-3.5 shrink-0 text-primary" />}
+        </span>
+        {(flagged || showNoTools) && <span className="flex flex-wrap items-center gap-x-2 text-xs leading-4 text-muted-foreground">
           {flagged && (
             <StatusPill tone="warning" size="sm" className="shrink-0" title={model.statusReason} data-model-status={model.status}>
               {unavailable ? 'Unavailable' : 'Limited'}
             </StatusPill>
           )}
-        </span>
+          {showNoTools && <span>no tools</span>}
+        </span>}
         {capability && (
           <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" data-model-capability>{capability}</span>
         )}
-        {(ctx || price || (!media && !model.supportsTools)) && (
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-normal text-muted-foreground">
-            {!media && !model.supportsTools && <span className="rounded bg-secondary px-1.5 py-0.5">no tools</span>}
-            {!media && ctx && <span>{ctx}</span>}
-            {price && <span data-model-price>{price}</span>}
-          </span>
-        )}
       </span>
-      {selected && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
+      {(price || ctx) && (
+        <span className="flex shrink-0 flex-col items-end text-right leading-4 tabular-nums">
+          {price && <span className="text-sm font-medium leading-4" data-model-price>{price}</span>}
+          {ctx && <span className="text-xs font-normal leading-4 text-muted-foreground">{ctx}</span>}
+        </span>
+      )}
     </button>
   )
 }
@@ -200,6 +205,7 @@ export function ModelPicker({
   const valueId = useId()
   const unavailable = error != null
   const sortedModels = useMemo(() => sortModelsByFreshness(models), [models])
+  const someTextModelsHaveTools = models.some(model => (!model.output || model.output === 'text') && model.supportsTools)
   const contentKey = useMemo(() => ({ query, showAll, loading, error, models, value, priorityGroup }),
     [query, showAll, loading, error, models, value, priorityGroup])
 
@@ -268,7 +274,7 @@ export function ModelPicker({
     onChange(modelId)
   }
   const row = (model: CatalogModel) => (
-    <ModelRow key={model.id} model={model} selected={model.id === value} onSelect={() => select(model.id)} renderProviderBadge={renderProviderBadge} />
+    <ModelRow key={model.id} model={model} someTextModelsHaveTools={someTextModelsHaveTools} selected={model.id === value} onSelect={() => select(model.id)} renderProviderBadge={renderProviderBadge} />
   )
 
   const glyph = <span className="inline-flex shrink-0" aria-hidden>{selected ? <ModelMarks model={selected} size={16} renderProviderBadge={renderProviderBadge} /> : <SparkleGlyph className="h-3.5 w-3.5 text-muted-foreground" />}</span>
@@ -341,7 +347,7 @@ export function ModelPicker({
               type="button"
               onClick={() => select('')}
               aria-pressed={!value}
-              className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2.5 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
+              className={`flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-1 text-left transition pointer-coarse:min-h-11 ${POPOVER_OPTION_FOCUS} ${
                 value ? 'hover:bg-accent' : 'bg-primary/10 font-medium'
               }`}
             >
