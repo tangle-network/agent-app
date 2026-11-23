@@ -17,9 +17,9 @@ import { CircleAlert, Lock } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { SAVED_VISIBLE_MS, SavedStatus } from './save-status'
 
-// These style the footer the bar sits in (`:has(> bar)`): the bar is that
-// footer's only child, so only the footer can stick within the card.
-const STICKY_FOOTER = '@max-[34rem]/settings-section:[:has(>&)]:sticky @max-[34rem]/settings-section:[:has(>&)]:bottom-0 @max-[34rem]/settings-section:[:has(>&)]:z-10'
+// SettingsSection gives its CardFooter a top border. Restrict the parent lookup
+// to that class so mutations elsewhere don't invalidate every element.
+const STICKY_FOOTER = '@max-[34rem]/settings-section:[.border-t:has(>&)]:sticky @max-[34rem]/settings-section:[.border-t:has(>&)]:bottom-0 @max-[34rem]/settings-section:[.border-t:has(>&)]:z-10'
 // A group bar's containing block is the column of cards, so it sticks over all of them.
 const STICKY_GROUP = 'sticky bottom-3 z-10 shadow-[var(--shadow-dropdown)]'
 
