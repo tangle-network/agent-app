@@ -63,6 +63,31 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
   }
 })
 
+it('sends Responses function tools non-strict, so optional properties stay optional', async () => {
+  const bodies: Array<Record<string, unknown>> = []
+  const server = createServer(async (request, response) => {
+    let body = ''
+    for await (const chunk of request) body += chunk
+    bodies.push(JSON.parse(body))
+    response.writeHead(200, { 'content-type': 'text/event-stream' })
+    response.end(`data: ${JSON.stringify({ type: 'response.completed', response: { output: [] } })}\n\n`)
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  try {
+    const parameters = { type: 'object', required: ['quote'], properties: {
+      quote: { type: 'string' }, span: { type: 'string' },
+      locator: { type: 'object', properties: { find: { type: 'string' } } } } }
+    const turn = createOpenAIResponsesTurn({ baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`,
+      apiKey: 'local-integration-only', model: 'fixture-model',
+      tools: [{ type: 'function', function: { name: 'upsert_evidence', description: 'Record evidence', parameters } }] })
+    for await (const _ of turn([{ role: 'user', content: 'Cite what I said' }])) { /* drain */ }
+    expect(bodies.map(body => body.tools)).toEqual([[
+      { type: 'function', name: 'upsert_evidence', description: 'Record evidence', parameters, strict: false }]])
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
+  }
+})
+
 it('gives every Responses function call its final arguments and every reply its final text, however the stream carries them', async () => {
   // A recorded stream of three parallel function calls, with neutral ids and queries.
   const capture = readFileSync(new URL('./fixtures/responses-parallel-function-calls.sse', import.meta.url), 'utf8')

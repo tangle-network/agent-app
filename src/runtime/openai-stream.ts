@@ -467,7 +467,7 @@ function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, un
   return (tools ?? []).flatMap((tool) => {
     const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
     return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
-      parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
+      parameters: fn.parameters ?? { type: 'object', properties: {} }, strict: false }] : []
   })
 }
 
@@ -483,6 +483,8 @@ function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, un
  * `max_completion_tokens` become `max_output_tokens`, and `reasoning_effort`
  * becomes `reasoning.effort` with `summary: 'auto'`. Stateless: earlier tool
  * calls are replayed as `function_call` / `function_call_output` items.
+ * Tools are sent with `strict: false`, as `/responses` otherwise treats them as
+ * strict and requires every optional property, unlike chat completions.
  */
 export function createOpenAIResponsesTurn(
   opts: OpenAICompatStreamTurnOptions,
