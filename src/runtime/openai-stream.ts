@@ -465,9 +465,11 @@ export function toResponsesInput(messages: LoopMessage[]): { instructions?: stri
 /** Chat-completions tool definitions as Responses function tools. */
 function toResponsesTools(tools: unknown[] | undefined): Array<Record<string, unknown>> {
   return (tools ?? []).flatMap((tool) => {
-    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown } }).function
+    const fn = (tool as { function?: { name?: string; description?: string; parameters?: unknown; strict?: boolean } }).function
+    // `/responses` treats a tool without `strict` as strict, which makes every optional field required;
+    // default to the chat-completions semantics unless the caller asks for strict.
     return fn?.name ? [{ type: 'function', name: fn.name, ...(fn.description ? { description: fn.description } : {}),
-      parameters: fn.parameters ?? { type: 'object', properties: {} } }] : []
+      parameters: fn.parameters ?? { type: 'object', properties: {} }, strict: typeof fn.strict === 'boolean' ? fn.strict : false }] : []
   })
 }
 

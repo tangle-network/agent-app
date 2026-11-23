@@ -44,7 +44,12 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
       { type: 'usage', usage: { promptTokens: 7, completionTokens: 3 } },
       { type: 'tool_call', call: { toolCallId: 'call-1', toolName: 'lookup', args: { q: 'lease' } } },
     ])
-    const stream = createOpenAIResponsesTurn(options)
+    const evidence = { type: 'object', required: ['quote'], properties: { quote: { type: 'string' }, locator: { type: 'object' }, span: { type: 'string' } } }
+    const tools = [
+      { type: 'function', function: { name: 'upsert_evidence', description: 'Record evidence', parameters: evidence } },
+      { type: 'function', function: { name: 'lookup', parameters: evidence, strict: true } },
+    ]
+    const stream = createOpenAIResponsesTurn({ ...options, tools })
     // Reusing the adapter must not carry the last summary index into another request.
     for (let attempt = 0; attempt < 2; attempt++) {
       const events = []
@@ -58,6 +63,11 @@ it('preserves fragmented UTF-8, tool arguments, usage and per-request reasoning 
     expect(requests.every(request => request.authorization === 'Bearer local-integration-only' && request.body.stream === true)).toBe(true)
     expect(requests[0]!.body.messages).toEqual(messages)
     expect(requests[1]!.body.input).toEqual(messages)
+    // Optional tool fields stay optional over /responses unless the caller asks for strict.
+    expect(requests[1]!.body.tools).toEqual([
+      { type: 'function', name: 'upsert_evidence', description: 'Record evidence', parameters: evidence, strict: false },
+      { type: 'function', name: 'lookup', parameters: evidence, strict: true },
+    ])
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
   }
