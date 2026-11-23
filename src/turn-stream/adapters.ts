@@ -253,7 +253,7 @@ export async function releaseInterruptedDurableTurnLock(
 export interface ReconcileStaleDurableTurnLockOptions
   extends Pick<
     ReconcileStaleTurnLockOptions,
-    'probeSandbox' | 'probeSession' | 'graceMs' | 'terminalGraceMs' | 'context' | 'log' | 'now'
+    'probeSandbox' | 'probeSession' | 'unknownEvidencePolicy' | 'graceMs' | 'terminalGraceMs' | 'context' | 'log' | 'now'
   > {
   namespace: TurnStreamNamespaceLike
   auth: TurnStreamAuth
@@ -308,7 +308,8 @@ type HolderEvidence = { status: 'live' | 'abandoned' | 'unknown'; diagnostics: R
  * step) outlives the invocation, so with no running row the box answers next: an active execution there holds. Without
  * `readHolderBox` no box is read. A holder with neither is released past the policy's terminal grace, so a turn must
  * write its running row within that grace of taking the lock. A parked release and a store that cannot answer hold. A
- * box that does not answer sends a lock to the policy's unreachable bound; a durable-Stop lock goes through the owner
+ * box that does not answer sends a native lock to the policy's unreachable bound by default;
+ * `unknownEvidencePolicy: 'hold'` keeps that unknown evidence held instead. A durable-Stop lock always uses the owner
  * rule on the same evidence, where an unanswered read is `unknown` and holds. The 409 carries counts and classes only.
  * Enable it through `createDurableTurnLock`'s `turnStore` rather than as a product `reconcile`: only that lock makes the
  * routes write the early running row and hold a handed-off lock, which this evidence relies on.
@@ -319,6 +320,8 @@ export async function reconcileTurnLockFromStoreAndBox(input: {
   turnStore: Required<Pick<TurnEventStore, 'listRunning'>>
   readHolderBox?(active: DurableTurnLock): Promise<HolderBoxReport>
   active: DurableTurnLock
+  /** Native unknown-evidence behavior; Router owner behavior is unchanged. */
+  unknownEvidencePolicy?: ReconcileStaleTurnLockOptions['unknownEvidencePolicy']
   /** The policy's clock. Default `Date.now`. */
   now?(): number
 }): Promise<{ released: boolean; diagnostics: Record<string, unknown> }> {
@@ -345,9 +348,10 @@ export async function reconcileTurnLockFromStoreAndBox(input: {
   }
   return reconcileStaleDurableTurnLock({
     namespace: input.namespace, auth: input.auth, workspaceId: active.workspaceId, threadId: active.threadId, active, now: input.now,
+    unknownEvidencePolicy: input.unknownEvidencePolicy,
     context: { workspaceId: active.workspaceId, threadId: active.threadId, executionId: active.executionId, lockId: active.lockId },
     probeSandbox: async () => ({ status: 'running' }),
-    // A native lock: an unreadable store holds; a box that does not answer goes to the policy's unreachable bound.
+    // A native lock: an unreadable store holds; unknown box evidence follows the selected shared policy.
     probeSession: async () => {
       const { status, diagnostics } = await evidence()
       if (status === 'unknown' && diagnostics.probeError !== 'turn_store_unreadable') return { reachable: false, reason: String(diagnostics.probeError) }
@@ -395,6 +399,8 @@ export interface CreateDurableTurnLockOptions<TContext> {
   /** Read the box the holder's turn ran work on (`readHolderBoxSessions` from `/sandbox`). Omit when turns run no box
    *  work: the default reclaim then reads the turn store alone. */
   readHolderBox?(active: DurableTurnLock): Promise<HolderBoxReport>
+  /** Select the shared native unknown-evidence policy for the default reclaim. Custom `reconcile` owns its own policy. */
+  unknownEvidencePolicy?: ReconcileStaleTurnLockOptions['unknownEvidencePolicy']
   /** The stale-lock policy's clock for the default reclaim, for tests and simulations; the lock's own start stays the
    *  Durable Object's wall clock. Default `Date.now`. */
   now?(): number
@@ -468,7 +474,8 @@ export function createDurableTurnLock<TContext>(options: CreateDurableTurnLockOp
   const { turnStore } = options
   const reconcile = options.reconcile ?? (turnStore
     ? (_args: TurnLockSeamArgs<TContext>, active: DurableTurnLock) => reconcileTurnLockFromStoreAndBox({
-      namespace, auth: options.auth, turnStore, readHolderBox: options.readHolderBox, active, now: options.now })
+      namespace, auth: options.auth, turnStore, readHolderBox: options.readHolderBox, active, now: options.now,
+      unknownEvidencePolicy: options.unknownEvidencePolicy })
     : undefined)
   return {
     // Every lock lives on the workspace channel, so this wakes that object

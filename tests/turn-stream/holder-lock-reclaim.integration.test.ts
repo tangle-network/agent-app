@@ -68,7 +68,8 @@ const statusesOn = (threadId: string) => turnsDb.sqlite.prepare('SELECT status F
 const durable = createMemoryTurnStreamHarness()
 const auth = { secret: MEMORY_TURN_STREAM_AUTH_SECRET }
 // The box each workspace's holder ran work on; a workspace without one ran none.
-const boxOf: Record<string, string> = { busy: 'busy', finished: 'finished', older: 'older', down: 'down', slow: 'slow', stopdown: 'down' }
+const boxOf: Record<string, string> = { busy: 'busy', finished: 'finished', older: 'older', down: 'down', slow: 'slow', stopdown: 'down',
+  strictdown: 'down', strictslow: 'slow', strictfinished: 'finished', strictbusy: 'busy' }
 const lock = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns, now: clock,
   readHolderBox: active => readHolderBoxSessions(async () => boxOf[active.workspaceId] ? client.get(`${boxOf[active.workspaceId]}-box`) : null) })
 const storeOnly = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace', turnStore: turns, now: clock })
@@ -303,4 +304,26 @@ it('sends a failed box read and a read past the 5 s cap to the unreachable bound
   expect(await ask('slow')).toBe('409 workspace_turn_in_flight')
   expect(seen.slow).toMatchObject({ sessionProbeError: 'box_read_timeout', forceReleaseWithheld: 'LOCK_WITHIN_GRACE_PERIOD' })
   expect(seen.slow!.lockAgeMs).toBeLessThan(BOUND)
+}, 20_000)
+
+
+it('holds unknown native box evidence beyond the fallback bound when selected, while positive abandonment still recovers', async () => {
+  const strict = createDurableTurnLock<unknown>({ namespace: durable.namespace, auth, scopeOf: () => 'workspace',
+    turnStore: turns, now: clock, unknownEvidencePolicy: 'hold',
+    readHolderBox: active => readHolderBoxSessions(async () => client.get(`${boxOf[active.workspaceId]}-box`)) })
+  const down = await hold('strictdown')
+  age(down, BOUND + 1_000)
+  expect(await ask('strictdown', strict)).toBe('409 workspace_turn_in_flight')
+  expect(seen.strictdown).toMatchObject({ sessionProbeError: 'box_unreachable', forceReleaseWithheld: 'UNKNOWN_HOLDER_EVIDENCE' })
+  expect(await lockOf('strictdown')).toEqual(down)
+  const slow = await hold('strictslow')
+  age(slow, BOUND + 1_000)
+  expect(await ask('strictslow', strict)).toBe('409 workspace_turn_in_flight')
+  expect(seen.strictslow).toMatchObject({ sessionProbeError: 'box_read_timeout', forceReleaseWithheld: 'UNKNOWN_HOLDER_EVIDENCE' })
+  expect(await lockOf('strictslow')).toEqual(slow)
+  age(await hold('strictfinished'), BOUND + 1_000)
+  expect(await ask('strictfinished', strict)).toBe('acquired')
+  age(await hold('strictbusy'), BOUND + 1_000)
+  expect(await ask('strictbusy', strict)).toBe('409 workspace_turn_in_flight')
+  expect(seen.strictbusy).toMatchObject({ liveBoxSessions: 1, boxSessions: 1 })
 }, 20_000)
