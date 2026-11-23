@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.60
+
+- fix(settings-react): scope sticky save-bar styles to settings footers (#1612)
+
 ## 4.0.59
 
 - fix(turn-stream): hold unknown native holder evidence when selected (#1602)
