@@ -30,17 +30,18 @@ function reasoningToggle(container: HTMLElement): HTMLElement {
 
 describe('ChatMessages segmented turns', () => {
   it('renders assistant replies with shared Markdown by default and preserves literal user input', () => {
-    const { getByText, getByRole } = render(<ChatMessages messages={[
+    const { container, getByText, getByRole } = render(<ChatMessages messages={[
       { id: 'question', role: 'user', content: 'What does **rank** mean?' },
       { id: 'reply', role: 'assistant', content: '## Curve data' },
       { id: 'follow-up', role: 'assistant', content: '', segments: [
-        { kind: 'text', content: 'Read the [curve record](https://www.lmfdb.org/) and its **rank**.' },
+        { kind: 'text', content: 'Read the [curve record](https://www.lmfdb.org/) and its **rank** at $s=1$.' },
       ] },
     ]}/>)
     expect(getByText('What does **rank** mean?').tagName).toBe('P')
     expect(getByRole('heading', { level: 2, name: 'Curve data' })).toBeTruthy()
     expect(getByRole('link', { name: 'curve record' }).getAttribute('href')).toBe('https://www.lmfdb.org/')
     expect(getByText('rank').tagName).toBe('STRONG')
+    expect(container.querySelector('math annotation')?.textContent).toBe('s=1')
   })
 
   it('applies the large reading size to user and assistant messages together', () => {
