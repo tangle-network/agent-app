@@ -3,10 +3,11 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { ModelPlansSection, type ModelPlansDocument } from '../../settings-react/model-plans'
 import { confirmWrite } from '../../web-react/async'
 
-function Subscriptions({ empty = false }: { empty?: boolean }) {
+function Subscriptions({ empty = false, needsSandbox = false }: { empty?: boolean; needsSandbox?: boolean }) {
   const [data, setData] = useState<ModelPlansDocument>({
     providers: [{ id: 'example', label: 'Example provider' }],
     selectedPlanId: empty ? null : 'research',
+    ...(needsSandbox && { personalSandbox: { connected: false, connectHref: '/auth/tangle/personal-sandbox' } }),
     plans: empty ? [] : [
       { id: 'research', provider: 'example', displayName: 'Research account', scope: 'personal', canRevoke: true,
         model: 'Research model', createdAt: '2026-03-01T09:40:00Z', lastUsedAt: '2026-03-05T13:22:00Z', usage: [{ label: 'Completed turns', value: '12' }] },
@@ -33,3 +34,4 @@ const meta: Meta<typeof Subscriptions> = { title: 'Settings/Model subscriptions'
 export default meta
 export const WithPersonalAndWorkspacePlans: StoryObj<typeof Subscriptions> = {}
 export const FirstConnection: StoryObj<typeof Subscriptions> = { args: { empty: true } }
+export const SandboxConsent: StoryObj<typeof Subscriptions> = { args: { empty: true, needsSandbox: true } }

@@ -21,6 +21,7 @@ export interface ModelPlan {
 export interface ModelPlansDocument {
   plans: ModelPlan[]
   selectedPlanId: string | null
+  personalSandbox?: { connected: boolean; connectHref?: string }
   providers: { id: string; label: string }[]
 }
 type ModelPlanMutation = 'connect' | 'select' | 'revoke'
@@ -107,6 +108,14 @@ function ConnectPlan({ plans, data }: { plans: Plans; data: ModelPlansDocument }
     keyInput.value = ''
     const result = await plans.connect(provider, String(fields.get('name')).trim(), String(fields.get('key')).trim())
     if (result.succeeded) setOpen(false)
+  }
+  if (data.personalSandbox?.connected === false) {
+    const url = data.personalSandbox.connectHref && new URL(data.personalSandbox.connectHref, window.location.origin)
+    return <div className="grid justify-items-start gap-2">
+      <p className="text-sm text-muted-foreground">Connect your Sandbox to add a personal model subscription.</p>
+      {url && url.origin === window.location.origin &&
+        <Button asChild variant="outline"><a href={url.pathname + url.search}>Connect your Sandbox</a></Button>}
+    </div>
   }
   if (!data.providers.length) return null
   if (!open) return <Button type="button" variant="outline" onClick={() => setOpen(true)}>Connect a subscription</Button>
