@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict'
-import { createRequire } from 'node:module'
+import { createRequire, stripTypeScriptTypes } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const require = createRequire(pathToFileURL(process.cwd() + '/package.json'))
 const { Miniflare } = createRequire(require.resolve('wrangler/package.json'))('miniflare')
-const ts = require('typescript')
-const emitted = ts.transpileModule(readFileSync('src/platform/router-connections.ts','utf8'), {
-  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}
-}).outputText
+const emitted = stripTypeScriptTypes(readFileSync('src/platform/router-connections.ts', 'utf8'))
 const worker = new Miniflare({ workers:[
   {name:'app', modules:true, compatibilityDate:'2026-10-01', outboundService:'inventory', script:emitted + `
     export default {async fetch(req) {
