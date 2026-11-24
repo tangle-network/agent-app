@@ -489,9 +489,16 @@ function assembleAssistantParts(
     return parts
   }
 
+  const joined = textParts.map((part) => String(part.text ?? '')).join('')
+
   // Id-less text parts form a single logical stream — the final text is
   // authoritative for it.
   if (!textParts.some((part) => asString(part.id))) {
+    // Several that already add up to the final text are the reply as it
+    // streamed: a sentence, a tool, a question, each sent in one event (a
+    // part's first delta event is stored without its id). Writing the final
+    // text into each would store the whole reply once per part.
+    if (textParts.length > 1 && finalText === joined) return parts
     return parts.map((part) => {
       if (String(part.type ?? '') !== 'text') return part
       return {
@@ -504,7 +511,6 @@ function assembleAssistantParts(
   // Per-id text segments: invariant is concat(text parts) === persisted final
   // text, so segment boundaries survive without duplicating the answer into
   // every segment.
-  const joined = textParts.map((part) => String(part.text ?? '')).join('')
   if (finalText === joined || finalText.trimEnd() === joined.trimEnd()) {
     return parts
   }
