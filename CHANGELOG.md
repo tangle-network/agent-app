@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.63
+
+- Use shared harness artwork in the picker and selected control (#1615)
+
 ## 4.0.62
 
 - Keep inline composer controls on one row as their labels shrink (#1614)
