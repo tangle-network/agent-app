@@ -50,7 +50,7 @@ export function createRouterConnections(options: { baseUrl: string; bearer: stri
       }
     },
     async connect(input: { provider: string; key: string; name: string; models: string[] }) {
-      const response = await request(base, 'POST', { provider: input.provider, key: input.key, name: input.name, allowed_models: input.models })
+      const response = await request(base, 'POST', { provider: input.provider, key: input.key, name: input.name, explicit_only: true, allowed_models: input.models })
       return publicRecord(((await response.json()) as { data: RouterRecord }).data)
     },
     async get(id: string) {
