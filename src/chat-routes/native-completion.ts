@@ -30,6 +30,14 @@ export interface NativeCompletionReceipt {
   completedTurnIds: string[]
 }
 
+/** Parts recorded on this turn's stable assistant row, including the terminal notice for a failed execution. */
+export function nativeCompletionTranscriptParts(receipt: NativeCompletionReceipt, executionId: string): Array<Record<string, unknown>> {
+  if (receipt.state !== 'failed' || receipt.parts.some(part => part.type === 'notice' && part.noticeKind === 'error')) return receipt.parts
+  const error = receipt.error ?? ''
+  const text = error.startsWith(TOOL_ABORTED_ERROR) ? TOOL_ABORTED_ERROR : terminalFailureMessage(error, isCanonicalUserStop(error))
+  return [...receipt.parts, { type: 'notice', noticeKind: 'error', id: `native-failure-${executionId}`, code: 'native_completion_failed', text }]
+}
+
 export interface NativeCompletionAdmission {
   executionId: string
   state: 'open' | 'closed'
@@ -159,16 +167,19 @@ function isCanonicalUserStop(error: unknown): boolean {
   return error === 'Execution cancelled by user' || error === 'Execution cancelled by the user'
 }
 
+const DISK_FULL = 'The Sandbox ran out of disk space before the execution finished.'
+const BOOT_FAILED = 'The Sandbox could not start the agent runtime.'
+
 /** A terminal receipt is public; runtime stderr stays in the native record. */
 function terminalFailureMessage(error: string, provenUserStop: boolean): string {
   if (provenUserStop) return 'Execution cancelled by the user'
-  if (/\bENOSPC\b|no space left on device/i.test(error)) {
-    return 'The Sandbox ran out of disk space before the execution finished.'
+  if (error === DISK_FULL || /\bENOSPC\b|no space left on device/i.test(error)) {
+    return DISK_FULL
   }
   if (error === RUNTIME_RESTARTED_ERROR) return RUNTIME_RESTARTED_ERROR
   if (/\bcancelled\b|\bcanceled\b/i.test(error)) return 'Native Sandbox execution was cancelled.'
-  if (/MCP.*(?:did not become ready|bootstrap)|(?:MCP|runtime) bootstrap failed/i.test(error)) {
-    return 'The Sandbox could not start the agent runtime.'
+  if (error === BOOT_FAILED || /MCP.*(?:did not become ready|bootstrap)|(?:MCP|runtime) bootstrap failed/i.test(error)) {
+    return BOOT_FAILED
   }
   return 'Native Sandbox execution failed before producing an answer.'
 }
