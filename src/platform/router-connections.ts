@@ -33,7 +33,7 @@ export function createRouterConnections(options: { baseUrl: string; bearer: stri
   if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.hash || endpoint.search) throw new Error('Invalid Router origin.')
   const base = endpoint.href.replace(/\/+$/, '') + '/byok'
   async function request(url: string, method: string, body?: Record<string, unknown>) {
-    const response = await (options.fetch ?? fetch)(url, { method, redirect: 'error', signal: options.signal,
+    const response = await (options.fetch ?? fetch)(url, { method, redirect: 'manual', signal: options.signal,
       headers: { authorization: 'Bearer ' + options.bearer, ...(body && { 'content-type': 'application/json' }) },
       ...(body && { body: JSON.stringify(body) }) })
     if (!response.ok) throw new Error('Router connection request failed (HTTP ' + response.status + ').')
