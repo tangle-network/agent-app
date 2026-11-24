@@ -85,7 +85,7 @@ export type PickerTriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & { var
  *  `icon` its glyph, the label and `trailing` (default: the caret) on one nowrap line, so pickers beside a product's
  *  Chips are one grammar; `quiet`/`field` are a button holding their own glyph. */
 export const PickerTrigger = forwardRef<HTMLButtonElement, PickerTriggerProps>(
-  ({ variant = 'chip', icon, trailing = <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />, children, className, ...props }, ref) => variant === 'chip'
+  ({ variant = 'chip', icon, trailing = <ChevronDown className="picker-caret h-3.5 w-3.5 shrink-0 text-muted-foreground" />, children, className, ...props }, ref) => variant === 'chip'
     ? <Chip ref={ref} size="md" emphasis="outline" icon={icon} className={`[&>span:last-child]:inline-flex [&>span:last-child]:flex-1 [&>span:last-child]:items-center [&>span:last-child]:justify-between [&>span:last-child]:gap-1.5 ${className ?? ''}`} {...props}>{children}{trailing}</Chip>
     : <button ref={ref} type="button" className={className} {...props}>{children}{trailing}</button>)
 

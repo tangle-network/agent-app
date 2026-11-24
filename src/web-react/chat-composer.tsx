@@ -694,7 +694,7 @@ function ComposerInputCard({ cardRef, floating, mention, textareaInput, MentionE
             own line, right-aligned, instead of being drawn over a squeezed
             control. With `min-w-0` here a single Plan chip was compressed to
             nothing at 390px and painted underneath a trailing model picker. */}
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="composer-footer flex flex-wrap items-end gap-2">
           {onAttach && (
             <>
               <button
@@ -744,7 +744,7 @@ function ComposerInputCard({ cardRef, floating, mention, textareaInput, MentionE
               stay operable. Rendered even when empty so Send stays right-aligned. */}
           <div
             data-testid="composer-controls"
-            className="flex min-w-min flex-1 flex-wrap items-center gap-1.5"
+            className="composer-controls flex min-w-min flex-1 flex-wrap items-center gap-1.5"
           >
             {showInline && controls}
           </div>
@@ -825,7 +825,8 @@ function ComposerInputCard({ cardRef, floating, mention, textareaInput, MentionE
                   type="button"
                   onClick={onCancel}
                   aria-label="Stop response"
-                  className="inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
+                  title="Stop"
+                  className="composer-submit inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 rounded-full bg-destructive/15 px-3.5 text-sm font-medium text-destructive transition hover:bg-destructive/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50"
                 >
                   <StopGlyph className="h-3.5 w-3.5" />
                   <span>Stop</span>
@@ -848,7 +849,8 @@ function ComposerInputCard({ cardRef, floating, mention, textareaInput, MentionE
                 onClick={send}
                 disabled={!canSend}
                 aria-label={sendLabel}
-                className="inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
+                title={sendLabel}
+                className="composer-submit inline-flex h-[var(--control-height-sm,2rem)] shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-card"
               >
                 <SendGlyph className="h-3.5 w-3.5" />
                 <span>{sendLabel}</span>

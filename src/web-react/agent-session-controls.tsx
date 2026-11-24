@@ -192,7 +192,7 @@ export function ChoicePicker({ value, onChange, options, placeholder = '', fullW
       >
         <span className={`flex min-w-0 items-center ${field ? 'flex-1 gap-2' : 'gap-1.5'}`}>
           {variant !== 'chip' && selected?.icon}
-          <span className={`truncate ${value ? '' : 'text-muted-foreground'}`}>{selected?.label ?? placeholder}</span>
+          <span title={selected?.label} className={`choice-value truncate ${value ? '' : 'text-muted-foreground'}`}>{selected?.label ?? placeholder}</span>
         </span>
       </PickerTrigger>
       {locked && (
@@ -430,11 +430,9 @@ export function AgentSessionControls(props: AgentSessionControlsProps) {
   }
 
   if (layout === 'inline') {
-    // The composer's controls slot wraps its children; this row must be able
-    // to wrap too, or three pickers at a narrow width run under the Send
-    // button instead of dropping to a second line.
+    // The composer keeps this strip on one line and sizes its labels to the available space.
     return (
-      <div className={`flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${className ?? ''}`}>
+      <div className={`inline-session-pickers flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ${className ?? ''}`}>
         {modelPicker}
         {showHarness && (
           <HarnessPicker
