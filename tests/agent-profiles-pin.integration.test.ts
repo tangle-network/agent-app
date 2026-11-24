@@ -5,6 +5,7 @@
  * trips per turn here (production, 2026-10-22); the pre-read and the separate read-back were two of them.
  */
 import { DatabaseSync } from 'node:sqlite'
+import { bindProfileInference } from '../src/profile/inference'
 import type { AgentProfile } from '@tangle-network/agent-interface'
 import { describe, expect, it } from 'vitest'
 import { AGENT_PROFILE_D1_SCHEMA_SQL, createD1ProfileRevisionStore, type ProfileD1Database, type ProfileD1Statement } from '../src/agent-profiles/d1'
@@ -255,4 +256,23 @@ describe('profile turn pin', () => {
       expect(copy.profile.prompt?.systemPrompt).toBe('Answer in French.')
     } finally { sqlite.close() }
   })
+})
+
+it('materializes two inference sources from the same saved profile revision', async () => {
+  const sqlite = new DatabaseSync(':memory:')
+  try {
+    sqlite.exec(AGENT_PROFILE_D1_SCHEMA_SQL)
+    const store = createD1ProfileRevisionStore(d1(sqlite).database)
+    const profile: AgentProfile = { name: 'Investigator', prompt: { systemPrompt: 'Read the open research problem.' },
+      model: { maxVisibleOutputTokens: 1024 }, tools: { edit: false } }
+    const revision = await proposeRevision({ store, workspaceId:'team', profileId:'research', expectedRevisionId:null,
+      profile, knowledgeText:'', planDigest:PLAN, author:{kind:'person',id:'owner'}, actorRole:'owner', reason:'Save the research profile' })
+    const uses = (['subscription','api-key'] as const).map((credentialSource, i) =>
+      bindProfileInference(revision.profile, { credentialSource, harness:'opencode', provider:'openai-compat', model:'model-' + i }))
+    expect(uses.map(p => p.model?.metadata?.credentialSource)).toEqual(['subscription','api-key'])
+    expect(uses.map(p => p.model?.default)).toEqual(['model-0','model-1'])
+    for (const use of uses) expect(use).toMatchObject({ prompt:profile.prompt, tools:profile.tools, model:{maxVisibleOutputTokens:1024} })
+    expect((await store.getActiveRevision('team','research'))?.profile).toEqual(profile)
+    expect(sqlite.prepare('SELECT count(*) AS n FROM agent_profile_revision').get()?.n).toBe(1)
+  } finally { sqlite.close() }
 })

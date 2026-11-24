@@ -327,3 +327,5 @@ export type {
 } from './fingerprint'
 
 export { DEFAULT_HOME_LIMITS, defaultHomeFiles, withDefaultAgentHome } from './home'
+
+export { bindProfileInference, type ProfileInference } from './inference'

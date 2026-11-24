@@ -4,6 +4,7 @@ import { ChoicePicker } from '../web-react/agent-session-controls'
 import { useAsyncResource } from '../web-react/async/use-async-resource'
 import { confirmSettingResponse } from './setting-outcome'
 import { ConfirmAction } from './confirm-action'
+import { InferenceConnectionPicker } from './inference-connection-picker'
 
 /** Public account metadata only. The connection secret is a write-only form field. */
 export interface ModelPlan {
@@ -20,6 +21,7 @@ export interface ModelPlan {
 }
 export interface ModelPlansDocument {
   plans: ModelPlan[]
+  selectedModel?: string | null
   selectedPlanId: string | null
   personalSandbox?: { connected: boolean; connectHref?: string }
   providers: { id: string; label: string }[]
@@ -65,7 +67,7 @@ export function useModelPlans({ endpoint = '/api/model-plans', enabled = true, r
   return {
     state, data, selected: data?.plans.find(plan => plan.id === data.selectedPlanId), pending, error,
     connect: (provider: string, displayName: string, key: string) => mutate('connect', 'POST', '', { provider, displayName, key }),
-    select: (planId: string | null) => mutate('select', 'PUT', '/selection', { planId }),
+    select: (planId: string | null, model?: string) => mutate('select', 'PUT', '/selection', { planId, ...(model ? { model } : {}) }),
     revoke: (id: string) => mutate('revoke', 'DELETE', '/' + encodeURIComponent(id)),
   }
 }
@@ -75,23 +77,18 @@ const scopeLabel = (plan: ModelPlan) => plan.scope === 'workspace' ? 'Workspace'
 const providerLabel = (plan: ModelPlan, data: ModelPlansDocument) => data.providers.find(item => item.id === plan.provider)?.label ?? plan.provider
 
 export function ModelPlanPicker({ plans, manageHref, computeNotice }: { plans: Plans; manageHref?: string; computeNotice?: string }) {
-  const label = useId()
   const labelText = manageHref ? 'Model subscription' : 'Use for conversations'
   const { state, data } = plans
   if (!data) return state.status === 'error'
     ? <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">{state.message}<Button type="button" variant="ghost" size="sm" onClick={state.retry}>Try again</Button></div>
     : <p role="status" className="text-sm text-muted-foreground">Loading subscriptions…</p>
   return <div className="grid min-w-0 gap-2">
-    <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <Label htmlFor={label}>{labelText}</Label>
-      {manageHref && <a className="text-sm underline" href={manageHref} target="_blank" rel="noreferrer">Manage subscriptions</a>}
-    </div>
-    <ChoicePicker id={label} aria-label={labelText} variant="field" fullWidth
-      value={data.selectedPlanId ?? ''} disabled={!!plans.pending} placeholder="Selected subscription unavailable"
-      onChange={value => void plans.select(value || null)}
-      options={[{ value: '', label: 'App default' }, ...data.plans.map(plan => ({
-        value: plan.id, label: plan.displayName, description: [scopeLabel(plan), providerLabel(plan, data), plan.model].filter(Boolean).join(' · '),
-      }))]} />
+    <InferenceConnectionPicker label={labelText} defaultLabel="App default" disabled={!!plans.pending}
+      value={data.selectedPlanId ? { connectionId: data.selectedPlanId, model: data.selectedModel ?? undefined } : null}
+      manage={manageHref && <a className="text-sm underline" href={manageHref} target="_blank" rel="noreferrer">Manage subscriptions</a>}
+      connections={data.plans.map(plan => ({ id: plan.id, label: plan.displayName, model: plan.model, models: plan.models,
+        description: [scopeLabel(plan), providerLabel(plan, data), plan.model].filter(Boolean).join(' · ') }))}
+      onChange={choice => void plans.select(choice?.connectionId ?? null, choice?.model)}/>
     {computeNotice && <p className="text-sm text-muted-foreground">{computeNotice}</p>}
     {plans.error && <p role="alert" className="text-sm text-destructive">{plans.error}</p>}
   </div>
