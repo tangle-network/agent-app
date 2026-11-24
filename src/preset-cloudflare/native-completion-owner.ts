@@ -1,5 +1,7 @@
 import { assistantRowIdForTurn, createAssistantDraftWriter } from '../chat-routes/draft-persistence'
-import { nativeCompletionTranscriptParts, observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource } from '../chat-routes/native-completion'
+import {
+  nativeCompletionTranscriptParts, observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource,
+} from '../chat-routes/native-completion'
 import type { CompletedReply } from '../chat-routes/completed-sandbox-turn'
 import type { ChatTurnMessageStore } from '../chat-routes/turn-route-contracts'
 import type { ValueRedactor } from '../chat-routes/redact-values'
