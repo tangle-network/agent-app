@@ -26,7 +26,7 @@ describe('ChatMessages quiet chrome', () => {
     expect(queryByText('Agent')).toBeNull()
     expect(getByText('Render the launch poster.').parentElement?.className).toContain('bg-[hsl(var(--foreground))]')
     expect(getByText('Render the launch poster.').parentElement?.className).toContain('text-[hsl(var(--background))]')
-    expect(getByText('Poster rendered and queued for review.').parentElement?.className).toContain('text-[hsl(var(--foreground))]')
+    expect(getByText('Poster rendered and queued for review.').closest('.agent-app-message-copy')?.className).toContain('text-[hsl(var(--foreground))]')
   })
 
   it('renders one hover-revealed meta lane per row, carrying the demoted meta', () => {
@@ -82,7 +82,7 @@ describe('ChatMessages quiet chrome', () => {
     expect(userBubble?.className).toContain('bg-[hsl(var(--foreground))]')
     expect(userBubble?.className).toContain('text-[hsl(var(--background))]')
     expect(userBubble?.className).toContain('rounded-tr-md')
-    const assistantCopy = getByText('Poster rendered and queued for review.').parentElement
+    const assistantCopy = getByText('Poster rendered and queued for review.').closest('.agent-app-message-copy')
     expect(assistantCopy?.className).toContain('bg-transparent')
     expect(assistantCopy?.className).toContain('text-[hsl(var(--foreground))]')
   })
