@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.72
+
+- Explain using one profile with account, conversation and run funding choices (#1629)
+- Document inference connection APIs and list compatible Router keys (#1628)
+
 ## 4.0.71
 
 - Connect model API keys and subscriptions from shared account settings (#1627)
