@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.67
+
+- Text parts that add up to the reply are stored as they streamed, with or without ids (#1620)
+
 ## 4.0.66
 
 - Check transcript role colors at the owning message surface [skip release] (#1619)
