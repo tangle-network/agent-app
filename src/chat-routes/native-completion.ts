@@ -30,6 +30,11 @@ export interface NativeCompletionReceipt {
   completedTurnIds: string[]
 }
 
+/** Parts recorded on this turn's stable assistant row, including the terminal notice for a failed execution. */
+export function nativeCompletionTranscriptParts(receipt: NativeCompletionReceipt, executionId: string): Array<Record<string, unknown>> {
+  return receipt.parts
+}
+
 export interface NativeCompletionAdmission {
   executionId: string
   state: 'open' | 'closed'

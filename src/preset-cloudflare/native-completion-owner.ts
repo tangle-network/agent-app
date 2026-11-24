@@ -1,5 +1,5 @@
 import { assistantRowIdForTurn, createAssistantDraftWriter } from '../chat-routes/draft-persistence'
-import { observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource } from '../chat-routes/native-completion'
+import { nativeCompletionTranscriptParts, observeNativeCompletion, type NativeCompletionReceipt, type NativeCompletionSessionSource } from '../chat-routes/native-completion'
 import type { CompletedReply } from '../chat-routes/completed-sandbox-turn'
 import type { ChatTurnMessageStore } from '../chat-routes/turn-route-contracts'
 import type { ValueRedactor } from '../chat-routes/redact-values'
@@ -114,7 +114,7 @@ export function createNativeCompletionOwner<TPayload extends NativeCompletionPay
     }
     const messageId = assistantRowIdForTurn(payload.executionId)
     const redact = await options.redact?.(payload)
-    const row = { content: receipt.text, parts: receipt.parts }
+    const row = { content: receipt.text, parts: nativeCompletionTranscriptParts(receipt, payload.executionId) }
     const stored = redact ? redact(row) : row
     await createAssistantDraftWriter({ store: options.messages, threadId: payload.threadId,
       messageId, snapshot: () => null }).finalize({ content: stored.content, parts: stored.parts as never,

@@ -5,11 +5,10 @@ import { describe, expect, it } from 'vitest'
 import { toChatMessageParts } from '../../src/chat-store/parts'
 import { createChatTables, harnessCostColumns } from '../../src/chat-store/schema'
 import { createChatStore, type ChatDatabase } from '../../src/chat-store/store'
-import { noticePart } from '../../src/interactions/contract'
 import { runNativeCompletionWorkflow } from '../../src/preset-cloudflare/native-completion-workflow'
 import { createAssistantDraftWriter } from '../../src/chat-routes/draft-persistence'
 import { createChatTurnRoutes } from '../../src/chat-routes/turn-routes'
-import { observeNativeCompletion, type NativeCompletionAdmissionStore } from '../../src/chat-routes/native-completion'
+import { nativeCompletionTranscriptParts, observeNativeCompletion, type NativeCompletionAdmissionStore } from '../../src/chat-routes/native-completion'
 import { createBufferedTurnTap, createMemoryTurnEventStore } from '../../src/stream/turn-buffer'
 import { openDatabase } from '../teams/db-helper'
 
@@ -164,7 +163,7 @@ async function boundary(test: Case) {
           const writer = createAssistantDraftWriter({ store, threadId,
             messageId: `assistant:${turnId}`, snapshot: () => null })
           await writer.finalize({ content: receipt.text,
-            parts: [...toChatMessageParts(receipt.parts), noticePart('error', 'native-failure', receipt.error!, 'native_completion_failed')], ...receipt.usage })
+            parts: toChatMessageParts(nativeCompletionTranscriptParts(receipt, turnId)), ...receipt.usage })
           return `assistant:${turnId}`
         },
         async settle(_payload, receipt) {
