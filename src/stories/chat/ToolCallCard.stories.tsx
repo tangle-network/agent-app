@@ -9,7 +9,6 @@ import {
   runningToolCall,
   scheduledFollowupToolCall,
 } from './fixtures'
-import { renderMarkdown } from './markdown'
 
 /**
  * `ToolCallCard` (and its ProposalCard / FollowupCard faces) is an internal
@@ -58,7 +57,6 @@ const meta: Meta<typeof ChatMessages> = {
   args: {
     messages: [],
     models: chatCatalogModels,
-    renderMarkdown,
   },
 }
 
@@ -134,7 +132,6 @@ export const Variants: Story = {
             <ChatMessages
               messages={threadWith(panel.call)}
               models={chatCatalogModels}
-              renderMarkdown={renderMarkdown}
               approval={panel.withApproval ? approval : undefined}
             />
           </figure>

@@ -9,7 +9,6 @@ import {
   type ChatReasoningState,
   type ChatUiMessage,
 } from '../../web-react'
-import { renderMarkdown } from './markdown'
 import { Button } from '@tangle-network/ui/primitives'
 
 /**

@@ -1,6 +1,7 @@
 /** Message-thread composition and per-message presentation. */
 import { useEffect, useMemo, useRef, useState, memo, type ReactNode } from 'react'
 import { isViewerMessage, MessageAuthor, partitionBySpeaker, SpeakerHeader, TRANSCRIPT_TEXT, type SpeakerPart } from '@tangle-network/ui/chat'
+import { Markdown } from '@tangle-network/ui/markdown'
 import type { ChatAuthor } from '@tangle-network/ui/types'
 import { POPOVER_OPTION_FOCUS } from './controls'
 import { DurableChatCards, type DurableChatCardsProps } from './durable-chat-cards'
@@ -381,7 +382,7 @@ function OtherPersonMessage({
   )
 }
 
-const renderPlainBody = (content: string) => <p className="whitespace-pre-wrap">{content}</p>
+const renderDefaultMarkdown = (content: string) => <Markdown>{content}</Markdown>
 
 /**
  * The message thread: one centered column; user messages are right-aligned
@@ -426,7 +427,7 @@ export function ChatMessages({
   // Resolve role colors at the message, so nested host themes can override
   // the raw tokens without also redefining Tailwind's root color aliases.
   const assistantMessageClassName = `${messageClassName} bg-transparent text-[hsl(var(--foreground))]`
-  const renderBody = renderMarkdown ?? renderPlainBody
+  const renderBody = renderMarkdown ?? renderDefaultMarkdown
   const messages = useMemo(() => splitBySpeaker(storedMessages), [storedMessages])
   // The row the turn in flight writes. Its responders answer at the same time,
   // so every share of it streams until that responder reports its end.

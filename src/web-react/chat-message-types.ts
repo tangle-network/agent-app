@@ -88,7 +88,7 @@ export interface ChatMessagesProps {
   chrome?: 'labeled' | 'quiet'
   /** Catalogue models, for per-message cost from pricing. Pass [] to skip cost. */
   models?: CatalogModel[]
-  /** Markdown renderer for assistant content; default renders pre-wrapped text. */
+  /** Override the shared Markdown renderer for assistant content, for example to resolve product-specific links. */
   renderMarkdown?: (content: string) => ReactNode
   /** Extra per-message content (artifacts, custom panels) appended after the body. */
   renderExtras?: (message: ChatUiMessage) => ReactNode
