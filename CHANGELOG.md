@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.73
+
+- Manage linked Router credentials when a provider or compute is unavailable (#1630)
+
 ## 4.0.72
 
 - Explain using one profile with account, conversation and run funding choices (#1629)
