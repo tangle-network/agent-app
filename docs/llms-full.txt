@@ -4119,6 +4119,14 @@ interface ChatTurnRoutes
 type ChatTurnSandboxBackend
 ```
 
+### `ChatTurnSandboxBinding`
+
+`interface` — The workspace and model authorized for this execution.
+
+```ts
+interface ChatTurnSandboxBinding
+```
+
 ### `ChatTurnStoreBindings`
 
 `interface` — One application binding descriptor, shared by chat admission and workspace prewarm.
@@ -4165,6 +4173,14 @@ interface ChatTurnUsage
 
 ```ts
 (event: unknown) => TerminalFailure | null
+```
+
+### `CompletedReply`
+
+`type` — Which text of a completed box turn is its reply.
+
+```ts
+type CompletedReply
 ```
 
 ### `CompletedSandboxTurnSource`
@@ -4895,6 +4911,14 @@ interface NativeCompletionReceipt
 type NativeCompletionSessionSource
 ```
 
+### `nativeCompletionTranscriptParts`
+
+`function` — Parts recorded on this turn's stable assistant row, including the terminal notice for a failed execution.
+
+```ts
+(receipt: NativeCompletionReceipt, executionId: string) => Record<string, unknown>[]
+```
+
 ### `NativeCompletionTurnReceipt`
 
 `interface` — One exact turn receipt before an admission's ordered aggregate.
@@ -5372,7 +5396,7 @@ interface ReconcileStaleTurnLockResult
 `function` — Recover the durable content a Sandbox recorder attached to one assistant message.
 
 ```ts
-(message: SessionMessage) => DetachedTurnFinal
+(message: SessionMessage, reply?: CompletedReply) => DetachedTurnFinal
 ```
 
 ### `redactEvents`
@@ -18022,6 +18046,14 @@ interface BillingConsentRefusal
 (options: PlatformDelegatedKeyClientOptions) => PlatformDelegatedKeyClient
 ```
 
+### `createRouterConnections`
+
+`function`
+
+```ts
+(options: { baseUrl: string; bearer: string; fetch?: { (input: URL | RequestInfo, init?: RequestInit | undefined): Prom…
+```
+
 ### `createSignedSsoState`
 
 `function` — Mint a `<randomHex32>.<timestamp36>.<hmacHex>` state value.
@@ -18612,6 +18644,22 @@ interface RequestApiKey
 
 ```ts
 (input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution
+```
+
+### `routerConnectionBaseUrl`
+
+`function`
+
+```ts
+(routerV1: string, id: string) => string
+```
+
+### `RouterKeyConnection`
+
+`interface` — Use a signed-in user's Router management bearer on the server.
+
+```ts
+interface RouterKeyConnection
 ```
 
 ### `SeatBillingFlagOptions`
@@ -19652,6 +19700,14 @@ interface AgentPromptSection
 (systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
 ```
 
+### `bindProfileInference`
+
+`function` — Apply to a resolved stage.
+
+```ts
+(profile: AgentProfile, inference: ProfileInference) => AgentProfile
+```
+
 ### `captureModelInput`
 
 `function` — Store every input, then build the record a receipt links to.
@@ -20098,6 +20154,14 @@ interface ProfileFingerprint
 
 ```ts
 interface ProfileFingerprintContext
+```
+
+### `ProfileInference`
+
+`interface` — Non-secret execution settings from an authorized connection.
+
+```ts
+interface ProfileInference
 ```
 
 ### `ProfileOverlay`
@@ -27827,6 +27891,30 @@ interface DeleteWorkspaceSectionProps
 interface ExportSectionProps
 ```
 
+### `InferenceConnectionOption`
+
+`interface`
+
+```ts
+interface InferenceConnectionOption
+```
+
+### `InferenceConnectionPicker`
+
+`function` — Controlled independently from the profile picker.
+
+```ts
+({ value, connections, onChange, label, defaultLabel, manage, disabled }: { value: InferenceSelection | null; connectio…
+```
+
+### `InferenceSelection`
+
+`interface` — Public choice for a draft, conversation or account default.
+
+```ts
+interface InferenceSelection
+```
+
 ### `InvitationsSection`
 
 `function`
@@ -27857,6 +27945,38 @@ interface InvitationsSectionProps
 
 ```ts
 interface MembersSectionProps
+```
+
+### `ModelPlan`
+
+`interface` — Public account metadata only.
+
+```ts
+interface ModelPlan
+```
+
+### `ModelPlanPicker`
+
+`function`
+
+```ts
+({ plans, manageHref, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocume…
+```
+
+### `ModelPlansDocument`
+
+`interface`
+
+```ts
+interface ModelPlansDocument
+```
+
+### `ModelPlansSection`
+
+`function`
+
+```ts
+({ plans, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocument | null; s…
 ```
 
 ### `settingFailure`
@@ -28001,6 +28121,14 @@ interface SettingsSaveBarProps
 
 ```ts
 interface TimezonePickerProps
+```
+
+### `useModelPlans`
+
+`function` — A model plan selection belongs to the signed-in account.
+
+```ts
+({ endpoint, enabled, refreshOnFocus }?: { endpoint?: string | undefined; enabled?: boolean | undefined; refreshOnFocus…
 ```
 
 ### `useSettingField`
@@ -38518,7 +38646,7 @@ interface FileMention
 
 ### `HarnessGlyph`
 
-`function` — Brand mark for a harness — size it from the call site (`className="h-4 w-4"`).
+`function` — The shared harness artwork, sized by its picker or other host.
 
 ```ts
 ({ harness, className }: HarnessGlyphProps) => ReactNode

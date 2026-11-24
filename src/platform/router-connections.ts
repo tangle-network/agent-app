@@ -20,7 +20,7 @@ export function routerConnectionBaseUrl(routerV1: string, id: string) {
 
 interface RouterRecord {
   id: string; name?: string | null; label?: string; provider: string
-  disabled: boolean; allowed_models?: string[] | null; created_at: string
+  disabled: boolean; base_url?: string | null; allowed_models?: string[] | null; created_at: string
 }
 
 function publicRecord(row: RouterRecord): RouterKeyConnection {
@@ -42,11 +42,13 @@ export function createRouterConnections(options: { baseUrl: string; bearer: stri
   return {
     async list(): Promise<RouterKeyConnection[]> {
       const result: RouterKeyConnection[] = []
+      let offset = 0
       for (;;) {
-        const response = await request(base + '?limit=100&offset=' + result.length, 'GET')
+        const response = await request(base + '?limit=100&offset=' + offset, 'GET')
         const page = await response.json() as { data: RouterRecord[]; total_count: number }
-        result.push(...page.data.map(publicRecord))
-        if (!page.data.length || result.length >= page.total_count) return result
+        offset += page.data.length
+        result.push(...page.data.filter(record => !record.base_url).map(publicRecord))
+        if (!page.data.length || offset >= page.total_count) return result
       }
     },
     async connect(input: { provider: string; key: string; name: string; models: string[] }) {
@@ -55,7 +57,9 @@ export function createRouterConnections(options: { baseUrl: string; bearer: stri
     },
     async get(id: string) {
       const response = await request(routerConnectionBaseUrl(endpoint.href, id), 'GET')
-      return publicRecord(((await response.json()) as { data: RouterRecord }).data)
+      const {data} = (await response.json()) as { data: RouterRecord }
+      if (data.base_url) throw new Error('This connection requires a private endpoint.')
+      return publicRecord(data)
     },
     async revoke(id: string) { await request(routerConnectionBaseUrl(endpoint.href, id), 'DELETE') },
   }

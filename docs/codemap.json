@@ -3235,6 +3235,12 @@
           "doc": null
         },
         {
+          "name": "ChatTurnSandboxBinding",
+          "kind": "interface",
+          "signature": "interface ChatTurnSandboxBinding",
+          "doc": "The workspace and model authorized for this execution."
+        },
+        {
           "name": "ChatTurnStoreBindings",
           "kind": "interface",
           "signature": "interface ChatTurnStoreBindings",
@@ -3269,6 +3275,12 @@
           "kind": "function",
           "signature": "(event: unknown) => TerminalFailure | null",
           "doc": null
+        },
+        {
+          "name": "CompletedReply",
+          "kind": "type",
+          "signature": "type CompletedReply",
+          "doc": "Which text of a completed box turn is its reply."
         },
         {
           "name": "CompletedSandboxTurnSource",
@@ -3817,6 +3829,12 @@
           "doc": "The official Sandbox reads needed for exact native completion observation."
         },
         {
+          "name": "nativeCompletionTranscriptParts",
+          "kind": "function",
+          "signature": "(receipt: NativeCompletionReceipt, executionId: string) => Record<string, unknown>[]",
+          "doc": "Parts recorded on this turn's stable assistant row, including the terminal notice for a failed execution."
+        },
+        {
           "name": "NativeCompletionTurnReceipt",
           "kind": "interface",
           "signature": "interface NativeCompletionTurnReceipt",
@@ -4173,7 +4191,7 @@
         {
           "name": "recoverSandboxAssistantMessage",
           "kind": "function",
-          "signature": "(message: SessionMessage) => DetachedTurnFinal",
+          "signature": "(message: SessionMessage, reply?: CompletedReply) => DetachedTurnFinal",
           "doc": "Recover the durable content a Sandbox recorder attached to one assistant message."
         },
         {
@@ -14009,6 +14027,12 @@
           "doc": null
         },
         {
+          "name": "createRouterConnections",
+          "kind": "function",
+          "signature": "(options: { baseUrl: string; bearer: string; fetch?: { (input: URL | RequestInfo, init?: RequestInit | undefined): Prom…",
+          "doc": null
+        },
+        {
           "name": "createSignedSsoState",
           "kind": "function",
           "signature": "(config: SsoStateConfig) => Promise<string>",
@@ -14451,6 +14475,18 @@
           "kind": "function",
           "signature": "(input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution",
           "doc": "Resolve a platform exchange against all local rows found by stable platform identity and normalized email."
+        },
+        {
+          "name": "routerConnectionBaseUrl",
+          "kind": "function",
+          "signature": "(routerV1: string, id: string) => string",
+          "doc": null
+        },
+        {
+          "name": "RouterKeyConnection",
+          "kind": "interface",
+          "signature": "interface RouterKeyConnection",
+          "doc": "Use a signed-in user's Router management bearer on the server."
         },
         {
           "name": "SeatBillingFlagOptions",
@@ -15282,6 +15318,12 @@
           "doc": "Enforce {@link ComposeProfileBudget} on a composed system prompt: over budget throws (or warns with `warnOnly`) with the actual size and the top-3 largest sections."
         },
         {
+          "name": "bindProfileInference",
+          "kind": "function",
+          "signature": "(profile: AgentProfile, inference: ProfileInference) => AgentProfile",
+          "doc": "Apply to a resolved stage."
+        },
+        {
           "name": "captureModelInput",
           "kind": "function",
           "signature": "(input: CaptureModelInputInput) => Promise<ModelInputOutcome<ModelInputRecord>>",
@@ -15616,6 +15658,12 @@
           "kind": "interface",
           "signature": "interface ProfileFingerprintContext",
           "doc": "The dispatch context a profile cannot see but a turn's identity includes."
+        },
+        {
+          "name": "ProfileInference",
+          "kind": "interface",
+          "signature": "interface ProfileInference",
+          "doc": "Non-secret execution settings from an authorized connection."
         },
         {
           "name": "ProfileOverlay",
@@ -21549,6 +21597,24 @@
           "doc": null
         },
         {
+          "name": "InferenceConnectionOption",
+          "kind": "interface",
+          "signature": "interface InferenceConnectionOption",
+          "doc": null
+        },
+        {
+          "name": "InferenceConnectionPicker",
+          "kind": "function",
+          "signature": "({ value, connections, onChange, label, defaultLabel, manage, disabled }: { value: InferenceSelection | null; connectio…",
+          "doc": "Controlled independently from the profile picker."
+        },
+        {
+          "name": "InferenceSelection",
+          "kind": "interface",
+          "signature": "interface InferenceSelection",
+          "doc": "Public choice for a draft, conversation or account default."
+        },
+        {
           "name": "InvitationsSection",
           "kind": "function",
           "signature": "({ id, title, invitations, currentRole, onResend, onRevoke, onCopy, delivery, }: InvitationsSectionProps) => Element",
@@ -21570,6 +21636,30 @@
           "name": "MembersSectionProps",
           "kind": "interface",
           "signature": "interface MembersSectionProps",
+          "doc": null
+        },
+        {
+          "name": "ModelPlan",
+          "kind": "interface",
+          "signature": "interface ModelPlan",
+          "doc": "Public account metadata only."
+        },
+        {
+          "name": "ModelPlanPicker",
+          "kind": "function",
+          "signature": "({ plans, manageHref, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocume…",
+          "doc": null
+        },
+        {
+          "name": "ModelPlansDocument",
+          "kind": "interface",
+          "signature": "interface ModelPlansDocument",
+          "doc": null
+        },
+        {
+          "name": "ModelPlansSection",
+          "kind": "function",
+          "signature": "({ plans, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocument | null; s…",
           "doc": null
         },
         {
@@ -21679,6 +21769,12 @@
           "kind": "interface",
           "signature": "interface TimezonePickerProps",
           "doc": null
+        },
+        {
+          "name": "useModelPlans",
+          "kind": "function",
+          "signature": "({ endpoint, enabled, refreshOnFocus }?: { endpoint?: string | undefined; enabled?: boolean | undefined; refreshOnFocus…",
+          "doc": "A model plan selection belongs to the signed-in account."
         },
         {
           "name": "useSettingField",
@@ -29844,7 +29940,7 @@
           "name": "HarnessGlyph",
           "kind": "function",
           "signature": "({ harness, className }: HarnessGlyphProps) => ReactNode",
-          "doc": "Brand mark for a harness — size it from the call site (`className=\"h-4 w-4\"`)."
+          "doc": "The shared harness artwork, sized by its picker or other host."
         },
         {
           "name": "HarnessGlyphProps",

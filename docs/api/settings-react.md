@@ -4,7 +4,7 @@
 
 Source: `src/settings-react/index.ts`
 
-33 exports.
+41 exports.
 
 ### `ConfirmAction`
 
@@ -78,6 +78,30 @@ interface DeleteWorkspaceSectionProps
 interface ExportSectionProps
 ```
 
+### `InferenceConnectionOption`
+
+`interface`
+
+```ts
+interface InferenceConnectionOption
+```
+
+### `InferenceConnectionPicker`
+
+`function` — Controlled independently from the profile picker.
+
+```ts
+({ value, connections, onChange, label, defaultLabel, manage, disabled }: { value: InferenceSelection | null; connectio…
+```
+
+### `InferenceSelection`
+
+`interface` — Public choice for a draft, conversation or account default.
+
+```ts
+interface InferenceSelection
+```
+
 ### `InvitationsSection`
 
 `function`
@@ -108,6 +132,38 @@ interface InvitationsSectionProps
 
 ```ts
 interface MembersSectionProps
+```
+
+### `ModelPlan`
+
+`interface` — Public account metadata only.
+
+```ts
+interface ModelPlan
+```
+
+### `ModelPlanPicker`
+
+`function`
+
+```ts
+({ plans, manageHref, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocume…
+```
+
+### `ModelPlansDocument`
+
+`interface`
+
+```ts
+interface ModelPlansDocument
+```
+
+### `ModelPlansSection`
+
+`function`
+
+```ts
+({ plans, computeNotice }: { plans: { state: AsyncResourceState<ModelPlansDocument>; data: ModelPlansDocument | null; s…
 ```
 
 ### `settingFailure`
@@ -252,6 +308,14 @@ interface SettingsSaveBarProps
 
 ```ts
 interface TimezonePickerProps
+```
+
+### `useModelPlans`
+
+`function` — A model plan selection belongs to the signed-in account.
+
+```ts
+({ endpoint, enabled, refreshOnFocus }?: { endpoint?: string | undefined; enabled?: boolean | undefined; refreshOnFocus…
 ```
 
 ### `useSettingField`
