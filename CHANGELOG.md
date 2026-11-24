@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.71
+
+- Connect model API keys and subscriptions from shared account settings (#1627)
+
 ## 4.0.70
 
 - Select the inference connection independently from the saved agent profile (#1626)
