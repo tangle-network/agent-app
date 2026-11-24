@@ -2,7 +2,7 @@
 import { useId, useState } from 'react'
 import { BrainGlyph, CheckGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
-import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+import { PickerTrigger, PICKER_OPTION_LABEL, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, pickerRootClass, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
 /** One reasoning-budget level: the engine `id` is unchanged (the value the
  *  product sends to the loop); only the user-facing `label` is renamed to the
@@ -268,11 +268,11 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
                 setOpen(false)
               }}
               className={`flex min-h-[40px] w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition ${POPOVER_OPTION_FOCUS} ${
-                l.id === value ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+                l.id === value ? 'bg-primary/10' : 'hover:bg-accent'
               }`}
             >
               <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{l.label}</span>
+              <span className={`truncate ${PICKER_OPTION_LABEL}`}>{l.label}</span>
               {isDeclared(l.id) && (
                 <EffortMeter fill={effortMeterFill(l.id, levels)} className="ml-auto text-foreground" />
               )}

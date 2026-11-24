@@ -6,7 +6,7 @@ import { StatusPill } from '@tangle-network/ui/primitives'
 import { MAX_RECOMMENDED_MODELS, sortModelsByFreshness, type CatalogModel } from '../runtime/model-catalog'
 import { CheckGlyph, SearchGlyph, SparkleGlyph } from './control-glyphs'
 import { usePopover, PopoverSurface } from './popover-surface'
-import { PickerTrigger, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
+import { PickerTrigger, PICKER_OPTION_LABEL, PICKER_OPTION_DETAIL, OVERLAY_SHADOW, POPOVER_OPTION_FOCUS, fieldPickerTriggerClass, quietPickerTriggerClass, type PickerVariant } from './picker-presentation'
 
 export interface ModelPickerProps {
   /** Controlled, opaque saved id. Never replaced merely because the catalogue omits it. */
@@ -137,7 +137,7 @@ function ModelRow({
       aria-pressed={selected}
       title={`${model.name} (${model.id})${model.servedBy ? ` · served by ${model.servedBy}` : ''}`}
       className={`flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-1 text-left transition pointer-coarse:min-h-11 ${POPOVER_OPTION_FOCUS} ${
-        selected ? 'bg-primary/10 font-medium' : 'hover:bg-accent'
+        selected ? 'bg-primary/10' : 'hover:bg-accent'
       }`}
     >
       {thumb ? (
@@ -156,10 +156,10 @@ function ModelRow({
               <ModelMarks model={model} size={18} renderProviderBadge={renderProviderBadge} />
             </span>
           )}
-          <span className={`min-w-0 break-words text-base font-medium leading-5 [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
+          <span className={`min-w-0 break-words ${PICKER_OPTION_LABEL} [overflow-wrap:anywhere]${unavailable ? ' text-muted-foreground' : ''}`}>{model.name}</span>
           {selected && <CheckGlyph className="size-3.5 shrink-0 text-primary" />}
         </span>
-        {(flagged || showNoTools) && <span className="flex flex-wrap items-center gap-x-2 text-xs leading-4 text-muted-foreground">
+        {(flagged || showNoTools) && <span className={`flex flex-wrap items-center gap-x-2 ${PICKER_OPTION_DETAIL}`}>
           {flagged && (
             <StatusPill tone="warning" size="sm" className="shrink-0" title={model.statusReason} data-model-status={model.status}>
               {unavailable ? 'Unavailable' : 'Limited'}
@@ -168,13 +168,13 @@ function ModelRow({
           {showNoTools && <span>no tools</span>}
         </span>}
         {capability && (
-          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground" data-model-capability>{capability}</span>
+          <span className={`mt-0.5 block truncate ${PICKER_OPTION_DETAIL}`} data-model-capability>{capability}</span>
         )}
       </span>
       {(price || ctx) && (
         <span className="flex shrink-0 flex-col items-end text-right leading-4 tabular-nums">
           {price && <span className="text-sm font-medium leading-4" data-model-price>{price}</span>}
-          {ctx && <span className="text-xs font-normal leading-4 text-muted-foreground">{ctx}</span>}
+          {ctx && <span className={PICKER_OPTION_DETAIL}>{ctx}</span>}
         </span>
       )}
     </button>
@@ -348,11 +348,11 @@ export function ModelPicker({
               onClick={() => select('')}
               aria-pressed={!value}
               className={`flex min-h-10 w-full items-center gap-2 rounded-md px-3 py-1 text-left transition pointer-coarse:min-h-11 ${POPOVER_OPTION_FOCUS} ${
-                value ? 'hover:bg-accent' : 'bg-primary/10 font-medium'
+                value ? 'hover:bg-accent' : 'bg-primary/10'
               }`}
             >
               <SparkleGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1">{defaultOption.label}</span>
+              <span className={`min-w-0 flex-1 ${PICKER_OPTION_LABEL}`}>{defaultOption.label}</span>
               {!value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           )}

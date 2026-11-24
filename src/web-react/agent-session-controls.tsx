@@ -45,7 +45,7 @@ import {
 import type { CatalogModel } from '../runtime/model-catalog'
 import { ModelPicker, EffortPicker, CheckGlyph, fieldPickerTriggerClass, OVERLAY_SHADOW, pickerRootClass, PopoverSurface, quietPickerTriggerClass, usePopover } from './controls'
 import type { EffortLevel, PickerVariant } from './controls'
-import { PickerTrigger } from './picker-presentation'
+import { PickerTrigger, PICKER_OPTION_LABEL, PICKER_OPTION_DETAIL } from './picker-presentation'
 import { HarnessGlyph } from './harness-glyphs'
 import { HARNESS_BRAND } from '@tangle-network/sandbox-ui/dashboard'
 import { AgentSettingsPopover } from './agent-settings-popover'
@@ -228,11 +228,14 @@ export function ChoicePicker({ value, onChange, options, placeholder = '', fullW
               title={o.description ? `${o.label} — ${o.description}` : o.label}
               onClick={() => choose(o.value)}
               className={`flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                o.value === value ? 'bg-primary/10 font-medium' : o.disabled ? '' : 'hover:bg-accent'
+                o.value === value ? 'bg-primary/10' : o.disabled ? '' : 'hover:bg-accent'
               }`}
             >
               {o.icon}
-              <span className="min-w-0 flex-1"><span className="block truncate">{o.label}</span>{o.description && <span className="block truncate text-xs font-normal text-muted-foreground">{o.description}</span>}</span>
+              <span className="min-w-0 flex-1">
+                <span className={`block truncate ${PICKER_OPTION_LABEL}`}>{o.label}</span>
+                {o.description && <span className={`block truncate ${PICKER_OPTION_DETAIL}`}>{o.description}</span>}
+              </span>
               {o.value === value && <CheckGlyph className="h-3.5 w-3.5 shrink-0 text-primary" />}
             </button>
           ))}
