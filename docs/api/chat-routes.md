@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-337 exports.
+338 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -892,6 +892,14 @@ interface ChatTurnUsage
 
 ```ts
 (event: unknown) => TerminalFailure | null
+```
+
+### `CompletedReply`
+
+`type` — Which text of a completed box turn is its reply.
+
+```ts
+type CompletedReply
 ```
 
 ### `CompletedSandboxTurnSource`
@@ -2099,7 +2107,7 @@ interface ReconcileStaleTurnLockResult
 `function` — Recover the durable content a Sandbox recorder attached to one assistant message.
 
 ```ts
-(message: SessionMessage) => DetachedTurnFinal
+(message: SessionMessage, reply?: CompletedReply) => DetachedTurnFinal
 ```
 
 ### `redactEvents`

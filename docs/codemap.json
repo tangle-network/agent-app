@@ -3271,6 +3271,12 @@
           "doc": null
         },
         {
+          "name": "CompletedReply",
+          "kind": "type",
+          "signature": "type CompletedReply",
+          "doc": "Which text of a completed box turn is its reply."
+        },
+        {
           "name": "CompletedSandboxTurnSource",
           "kind": "type",
           "signature": "type CompletedSandboxTurnSource",
@@ -4173,7 +4179,7 @@
         {
           "name": "recoverSandboxAssistantMessage",
           "kind": "function",
-          "signature": "(message: SessionMessage) => DetachedTurnFinal",
+          "signature": "(message: SessionMessage, reply?: CompletedReply) => DetachedTurnFinal",
           "doc": "Recover the durable content a Sandbox recorder attached to one assistant message."
         },
         {
@@ -29844,7 +29850,7 @@
           "name": "HarnessGlyph",
           "kind": "function",
           "signature": "({ harness, className }: HarnessGlyphProps) => ReactNode",
-          "doc": "Brand mark for a harness — size it from the call site (`className=\"h-4 w-4\"`)."
+          "doc": "The shared harness artwork, sized by its picker or other host."
         },
         {
           "name": "HarnessGlyphProps",

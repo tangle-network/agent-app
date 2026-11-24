@@ -1648,7 +1648,7 @@ interface FileMention
 
 ### `HarnessGlyph`
 
-`function` — Brand mark for a harness — size it from the call site (`className="h-4 w-4"`).
+`function` — The shared harness artwork, sized by its picker or other host.
 
 ```ts
 ({ harness, className }: HarnessGlyphProps) => ReactNode
