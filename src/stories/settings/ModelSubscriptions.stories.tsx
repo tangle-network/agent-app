@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { Meta, StoryObj } from '@storybook/react'
 import { ModelPlansSection, type ModelPlansDocument } from '../../settings-react/model-plans'
+import { AgentProfilePicker } from '@tangle-network/sandbox-ui/chat'
+import { InferenceConnectionPicker, type InferenceSelection } from '../../settings-react/inference-connection-picker'
 import { confirmWrite } from '../../web-react/async'
 
 function Subscriptions({ empty = false, needsSandbox = false }: { empty?: boolean; needsSandbox?: boolean }) {
@@ -37,3 +39,18 @@ export default meta
 export const WithPersonalAndWorkspacePlans: StoryObj<typeof Subscriptions> = {}
 export const FirstConnection: StoryObj<typeof Subscriptions> = { args: { empty: true } }
 export const SandboxConsent: StoryObj<typeof Subscriptions> = { args: { empty: true, needsSandbox: true } }
+
+/** Draft-only selection beside a saved profile. Selecting another credential keeps the profile. */
+export const ProfileRun: StoryObj = {
+  render: function ProfileRunStory() {
+    const [profile, setProfile] = useState('researcher')
+    const [choice, setChoice] = useState<InferenceSelection | null>(null)
+    return <div className="grid w-full min-w-0 max-w-md gap-5">
+      <AgentProfilePicker value={profile} onChange={setProfile}
+        profiles={[{id:'researcher', name:'Researcher'}, {id:'reviewer', name:'Reviewer'}]}/>
+      <InferenceConnectionPicker label="Inference for this run" defaultLabel="Profile default" value={choice} onChange={setChoice}
+        connections={[{id:'personal-plan', label:'Personal coding plan', model:'model-a', models:['model-a','model-b']},
+          {id:'workspace-api', label:'Workspace API key', model:'model-c'}]}/>
+    </div>
+  },
+}
