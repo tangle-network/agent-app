@@ -143,12 +143,10 @@ async function pageInNewContext() {
   return { context, page }
 }
 async function signIn(page, signup) {
-  await page.goto(origin)
   if (signup) await page.getByRole('button', { name: 'No account? Sign up' }).click()
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await page.getByRole('heading', { name: 'What can we work on?' }).waitFor()
 }
 async function assertStyled(page) {
   const actual = await page.evaluate(() => ({
@@ -186,7 +184,9 @@ try {
   browser = await chromium.launch({ headless: true })
   let { context, page } = await pageInNewContext()
   markPhase('browser-signup')
+  await page.goto(origin)
   await signIn(page, true)
+  await page.getByRole('heading', { name: 'What can we work on?', exact: true }).waitFor()
   markPhase('public-discovery')
   // Customer discovery and owner key issuance on the real generated Worker.
   for (const path of ['/llms.txt', '/llms-full.txt', '/agent-setup.md', '/agent-api.md', '/.well-known/tangle-agent.json']) {
@@ -246,6 +246,7 @@ try {
   await page.reload()
   await page.getByRole('link', { name: 'History', exact: true }).first().click()
   await page.getByRole('heading', { name: 'History', exact: true }).waitFor()
+  const historyUrl = page.url()
   const search = page.getByRole('searchbox', { name: 'Search sessions' })
   const historyReads = []
   const countHistoryRead = request => {
@@ -299,10 +300,14 @@ try {
   markPhase('worker-restart-start')
   await startWorker()
   ;({ context, page } = await pageInNewContext())
-  markPhase('fresh-browser-login')
+  markPhase('fresh-browser-history-login')
+  await page.goto(historyUrl)
+  await page.getByRole('heading', { name: 'Sign in', exact: true }).waitFor()
   await signIn(page, false)
+  await page.getByRole('heading', { name: 'History', exact: true }).waitFor()
+  assert.equal(page.url(), historyUrl, 'Sign-in must return to the requested History page')
   markPhase('persisted-thread-reopen')
-  await page.getByRole('link', { name: 'Saved workspace proof', exact: true }).first().click()
+  await page.getByRole('link', { name: 'Saved workspace proof', exact: true }).last().click()
   await page.waitForURL(`${origin}${href}`)
   const reopened = await page.request.get(`${origin}/api/threads/${encodeURIComponent(thread.id)}/messages`)
   assert.equal(reopened.status(), 200)
@@ -318,7 +323,7 @@ try {
     browser: browser.version(),
     browserDriver: "repository-pinned Playwright Chromium, one browser",
     package: pkg.name,
-    checks: ['public agent discovery', 'owner read-only key issuance', 'fresh bearer client discovery', 'key revocation', 'real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh Worker process and browser login reopen the same D1 thread'],
+    checks: ['public agent discovery', 'owner read-only key issuance', 'fresh bearer client discovery', 'key revocation', 'real signup', 'real cookie session', 'HTTP thread create', 'History navigation', 'thread URL reload', 'shared mobile drawer navigation', 'shared profile menu signout', 'fresh browser opens a protected History link, signs in and stays on History', 'fresh Worker process and browser login reopen the same D1 thread'],
     entryDesktop, entryMobile, desktop, mobile, modelTurnRequests: turnRequests, recordings,
     unrun: ['hosted deployment', 'live model/sandbox turn', 'live mid-turn disconnect'],
     messagePersistence: 'Covered separately by the generated app e2e suite with its explicitly fake sandbox producer, not by this no-model browser proof.',
