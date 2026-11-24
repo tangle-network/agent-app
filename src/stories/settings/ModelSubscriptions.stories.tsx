@@ -30,7 +30,9 @@ function Subscriptions({ empty = false, needsSandbox = false }: { empty?: boolea
     },
   }} /></div>
 }
-const meta: Meta<typeof Subscriptions> = { title: 'Settings/Model subscriptions', component: Subscriptions }
+const meta: Meta<typeof Subscriptions> = {
+  title: 'Settings/Model subscriptions', component: Subscriptions, parameters: { layout: 'fullscreen' },
+}
 export default meta
 export const WithPersonalAndWorkspacePlans: StoryObj<typeof Subscriptions> = {}
 export const FirstConnection: StoryObj<typeof Subscriptions> = { args: { empty: true } }

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useId, useState, type FormEvent } from 'react'
 import { Button, Input, Label, SettingsNote, SettingsSection } from '@tangle-network/ui/primitives'
 import { ChoicePicker } from '../web-react/agent-session-controls'
 import { useAsyncResource } from '../web-react/async/use-async-resource'
@@ -76,16 +76,17 @@ const providerLabel = (plan: ModelPlan, data: ModelPlansDocument) => data.provid
 
 export function ModelPlanPicker({ plans, manageHref, computeNotice }: { plans: Plans; manageHref?: string; computeNotice?: string }) {
   const label = useId()
+  const labelText = manageHref ? 'Model subscription' : 'Use for conversations'
   const { state, data } = plans
   if (!data) return state.status === 'error'
     ? <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">{state.message}<Button type="button" variant="ghost" size="sm" onClick={state.retry}>Try again</Button></div>
     : <p role="status" className="text-sm text-muted-foreground">Loading subscriptions…</p>
   return <div className="grid min-w-0 gap-2">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <Label htmlFor={label}>Model subscription</Label>
+      <Label htmlFor={label}>{labelText}</Label>
       {manageHref && <a className="text-sm underline" href={manageHref} target="_blank" rel="noreferrer">Manage subscriptions</a>}
     </div>
-    <ChoicePicker id={label} aria-label="Model subscription" variant="field" fullWidth
+    <ChoicePicker id={label} aria-label={labelText} variant="field" fullWidth
       value={data.selectedPlanId ?? ''} disabled={!!plans.pending} placeholder="Selected subscription unavailable"
       onChange={value => void plans.select(value || null)}
       options={[{ value: '', label: 'App default' }, ...data.plans.map(plan => ({
@@ -151,11 +152,13 @@ export function ModelPlansSection({ plans, computeNotice }: { plans: Plans; comp
               <summary className="cursor-pointer break-words font-medium">
                 {plan.displayName} <span className="text-sm font-normal text-muted-foreground">· {scopeLabel(plan)} · {providerLabel(plan, data)}</span>
               </summary>
-              <dl className="my-3 grid gap-1.5 text-sm">
-                {plan.model && <div><dt className="inline text-muted-foreground">Model </dt><dd className="inline break-all">{plan.model}</dd></div>}
-                <div><dt className="inline text-muted-foreground">Connected </dt><dd className="inline">{timestamp(plan.createdAt)}</dd></div>
-                <div><dt className="inline text-muted-foreground">Last used </dt><dd className="inline">{plan.lastUsedAt ? timestamp(plan.lastUsedAt) : 'No use recorded'}</dd></div>
-                {plan.usage?.map(metric => <div key={metric.label}><dt className="inline text-muted-foreground">{metric.label} </dt><dd className="inline">{metric.value}</dd></div>)}
+              <dl className="my-3 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+                {plan.model && <><dt className="text-muted-foreground">Model</dt><dd className="break-all">{plan.model}</dd></>}
+                <dt className="text-muted-foreground">Connected</dt><dd>{timestamp(plan.createdAt)}</dd>
+                <dt className="text-muted-foreground">Last used</dt><dd>{plan.lastUsedAt ? timestamp(plan.lastUsedAt) : 'No use recorded'}</dd>
+                {plan.usage?.map(metric => <Fragment key={metric.label}>
+                  <dt className="text-muted-foreground">{metric.label}</dt><dd>{metric.value}</dd>
+                </Fragment>)}
               </dl>
               {plan.canRevoke && <ConfirmAction title={'Disconnect ' + plan.displayName + '?'} consequence="Future turns will lose access to this subscription."
                 confirmLabel="Disconnect" trigger={<Button type="button" variant="outline" size="sm">Disconnect subscription</Button>}
