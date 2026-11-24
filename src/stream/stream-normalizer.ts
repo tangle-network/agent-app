@@ -304,7 +304,11 @@ export function mergePersistedPart(existing: JsonRecord | undefined, incoming: J
   const type = String(incoming.type ?? '')
   if (!existing) {
     if (type === 'text' && delta) {
-      return { type: 'text', text: delta }
+      // The words so far are the delta, not the snapshot. The id stays: a
+      // part that arrives whole has no second event to take it from, and
+      // text parts without ids are read as one stream and each given the
+      // whole final text.
+      return { ...incoming, text: delta }
     }
     return incoming
   }

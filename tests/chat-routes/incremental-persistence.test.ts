@@ -820,3 +820,35 @@ describe('incremental assistant persistence — the seam names the drafted row',
   })
 
 })
+
+// ── a text part that arrives in one event ───────────────────────────────────
+
+describe('incremental assistant persistence — a text part that arrives whole', () => {
+  it('stores a sentence, a tool and a question once each, in the order they streamed', async () => {
+    // Seen in a consumer whose lane releases a sentence at a time (2026-11-24):
+    // each run was one event, so neither text part kept its id, the reply was
+    // read as one id-less stream, and the row held the whole reply in both.
+    const sentence = 'Sorry to hear that.'
+    const question = '\n\nWhich city is it in?'
+    const events = [
+      partUpdated({ type: 'text', id: 't1', text: sentence }, sentence),
+      partUpdated({ type: 'tool', id: 'call-1', tool: 'open_case', state: { status: 'running', input: { title: 'Deposit' } } }),
+      partUpdated({ type: 'tool', id: 'call-1', tool: 'open_case', state: { status: 'completed', input: { title: 'Deposit' }, output: { opened: true } } }),
+      partUpdated({ type: 'text', id: 't2', text: question }, question),
+      { type: 'result', data: { finalText: sentence + question } },
+    ]
+    const { store, threadId } = await freshStore()
+    const { routes, ctx, settle } = routesOver(
+      store as unknown as ChatTurnMessageStore,
+      () => createSandboxChatProducer({ events: (async function* () { for (const e of events) yield e })(), model: 'm' }),
+    )
+    await drain(await routes.turn(turnRequest(threadId, 'my landlord kept my deposit'), ctx))
+    await settle()
+
+    const row = (await assistantRow(store, threadId))!
+    expect(row.content).toBe(sentence + question)
+    const shown = (row.parts ?? []).filter((part) => part.type === 'text' || part.type === 'tool') as Array<Record<string, unknown>>
+    expect(shown.map((part) => part.type)).toEqual(['text', 'tool', 'text'])
+    expect(shown.filter((part) => part.type === 'text').map((part) => part.text)).toEqual([sentence, question])
+  })
+})
