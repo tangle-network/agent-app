@@ -13,10 +13,6 @@
  * renders the sandbox-ui strip is showing the old design; migrate it
  * (props mapping in `docs/ui-picker-canon.md`).
  *
- * Dependency-free beyond React by design: `/web-react` must not force the
- * optional sandbox-ui peer, so this component — the canonical one — can never
- * require it.
- *
  * Two layouts, additive — the default preserves the prior hand-rolled behavior:
  *  - `layout="inline"` (default): model, harness, and effort sit side by side as
  *    pills. This is the original arrangement; existing call sites that mounted
@@ -51,6 +47,7 @@ import { ModelPicker, EffortPicker, CheckGlyph, fieldPickerTriggerClass, OVERLAY
 import type { EffortLevel, PickerVariant } from './controls'
 import { PickerTrigger } from './picker-presentation'
 import { HarnessGlyph } from './harness-glyphs'
+import { HARNESS_BRAND } from '@tangle-network/sandbox-ui/dashboard'
 import { AgentSettingsPopover } from './agent-settings-popover'
 
 /** Each harness's name, which the trigger shows, and the qualifier its menu row
@@ -71,7 +68,7 @@ const HARNESS_LABELS: Partial<Record<Harness, readonly [name: string, descriptio
   'cli-base': ['CLI'],
 }
 
-const harnessLabel = (h: Harness): string => HARNESS_LABELS[h]?.[0] ?? h
+const harnessLabel = (h: Harness): string => HARNESS_LABELS[h]?.[0] ?? HARNESS_BRAND[h]?.label ?? h
 
 /** lucide `lock` — the closed padlock on a pinned harness trigger. */
 function LockGlyph({ className }: { className?: string }) {
@@ -258,8 +255,7 @@ export type HarnessPickerProps = Omit<ChoicePickerProps, 'value' | 'onChange' | 
 
 /** {@link ChoicePicker} over the harness set, each row its brand mark (from `./harness-glyphs`), name and qualifier. */
 export function HarnessPicker({ value, onChange, available, optionsOverride, defaultOption, variant = 'chip', ...rest }: HarnessPickerProps) {
-  // Quiet inherits the trigger's tone, so the mark lifts with the label on hover.
-  const glyph = (h: Harness) => <HarnessGlyph harness={h} className={variant === 'quiet' ? 'h-4 w-4 shrink-0' : 'h-4 w-4 shrink-0 text-foreground'} />
+  const glyph = (h: Harness) => <HarnessGlyph harness={h} className="h-5 w-5" />
   const ids = (available ?? (Object.keys(HARNESS_LABELS) as Harness[])).filter(isHarness)
   const options = [
     ...(defaultOption ? [{ value: '', label: defaultOption.label, icon: <GearGlyph className="h-4 w-4 shrink-0 text-muted-foreground" /> }] : []),
