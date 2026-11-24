@@ -218,7 +218,8 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         aria-describedby={ariaDescribedBy}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen(!open)}
-        title={label ? `${label} — how hard the agent reasons before answering` : 'Reasoning effort'}
+        aria-label={`${label || 'Reasoning effort'}: ${selected?.label ?? value}`}
+        title={`${label || 'Reasoning effort'}: ${selected?.label ?? value}`}
         data-state={open ? 'open' : 'closed'}
         className={`${
           field
@@ -231,8 +232,8 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         {variant !== 'chip' && <BrainGlyph className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         {/* Full width gives the label the slack, so the meter and chevron park
             on the trailing edge and the glyph stays against the text. */}
-        <span className={fullWidth || field ? 'flex-1 truncate text-left' : undefined}>
-          {label ? <span className="text-muted-foreground">{label}: </span> : null}
+        <span className={`min-w-0 truncate ${fullWidth || field ? 'flex-1 text-left' : ''}`}>
+          {label ? <span className="effort-prefix text-muted-foreground">{label}: </span> : null}
           {selected ? selected.label : '—'}
         </span>
         {/* Quiet inherits the trigger's tone, so the meter is muted at rest
@@ -240,7 +241,7 @@ export function EffortPicker({ value, onChange, levels = DEFAULT_EFFORT_LEVELS, 
         {selected && isDeclared(selected.id) && (
           <EffortMeter
             fill={effortMeterFill(selected.id, levels)}
-            className={variant === 'quiet' ? 'shrink-0' : 'shrink-0 text-foreground'}
+            className={`effort-meter shrink-0 ${variant === 'quiet' ? '' : 'text-foreground'}`}
           />
         )}
       </PickerTrigger>

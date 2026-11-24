@@ -305,6 +305,22 @@ export const IconSend: Story = {
   ),
 }
 
+/** A constrained composer can occupy one pane on a wide screen or the whole phone. */
+export const InlineSessionFooter: Story = {
+  render: function InlineSessionFooter() {
+    const [model, setModel] = useState(DEFAULT_MODEL_ID)
+    const [harness, setHarness] = useState<Harness>('claude-code')
+    const [effort, setEffort] = useState('low')
+    return <div className="w-[min(742px,calc(100vw-2rem))]">
+      <ChatComposer onSend={() => {}} onAttach={() => {}} onAttachFolder={() => {}}
+        controls={<AgentSessionControls layout="inline" models={catalogModels}
+          model={model} onModelChange={setModel} harness={harness} onHarnessChange={setHarness}
+          effort={effort} onEffortChange={setEffort} effortLevels={[{ id: 'low', label: 'Quick' }, { id: 'high', label: 'Thorough' }]} />}
+      />
+    </div>
+  },
+}
+
 /** Phone width (358px card inside a 390px viewport): a Plan chip in the
  *  controls slot and the session controls in the trailing slot cannot share a
  *  line with Send, so the trailing group and Send wrap below, right-aligned,
