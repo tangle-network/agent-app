@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.70
+
+- Select the inference connection independently from the saved agent profile (#1626)
+
 ## 4.0.69
 
 - Select and inspect saved model subscriptions in app settings and chat (#1625)
