@@ -17,8 +17,7 @@ import { AutoClick, catalogModels, DEFAULT_MODEL_ID, NON_REASONING_MODEL_ID, wit
 
 const HARNESSES: Harness[] = ['opencode', 'claude-code', 'codex']
 
-/** A wider harness list for the glyph stories — every branded mark plus the
- *  lucide fallbacks, so the menu shows the whole vocabulary at once. */
+/** Harnesses displayed together in the menu and artwork stories. */
 const GLYPH_HARNESSES: Harness[] = [
   'opencode',
   'claude-code',
@@ -29,6 +28,8 @@ const GLYPH_HARNESSES: Harness[] = [
   'hermes',
   'factory-droids',
   'nanoclaw',
+  'pi',
+  'prime',
   'cli-base',
 ]
 
@@ -223,12 +224,7 @@ export const HarnessMenuOpen: Story = {
   ),
 }
 
-/**
- * Close-up for design review: every harness mark next to its name — the
- * vendored brand artwork (currentColor, so it tracks the theme), the lucide
- * fallbacks for harnesses with no published mark, and the neutral bot an
- * unknown id falls back to.
- */
+/** Harness artwork in the menu and selected trigger. */
 export const Glyphs: Story = {
   parameters: { layout: 'padded' },
   render: () => (
@@ -236,7 +232,7 @@ export const Glyphs: Story = {
       <div>
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Brand marks</p>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          {(['opencode', 'claude-code', 'codex', 'kimi-code', 'amp', 'openclaw', 'hermes'] as Harness[]).map((h) => (
+          {GLYPH_HARNESSES.map((h) => (
             <span key={h} className="inline-flex items-center gap-2 text-sm text-foreground">
               <HarnessGlyph harness={h} className="h-5 w-5 text-foreground" />
               {h}
@@ -246,15 +242,9 @@ export const Glyphs: Story = {
       </div>
       <div>
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Fallbacks (no published mark) + unknown id
+          Unknown harness
         </p>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          {(['factory-droids', 'nanoclaw', 'cli-base'] as Harness[]).map((h) => (
-            <span key={h} className="inline-flex items-center gap-2 text-sm text-foreground">
-              <HarnessGlyph harness={h} className="h-5 w-5 text-foreground" />
-              {h}
-            </span>
-          ))}
           <span className="inline-flex items-center gap-2 text-sm text-foreground">
             <HarnessGlyph harness={'made-up-harness' as Harness} className="h-5 w-5 text-foreground" />
             made-up-harness (unknown)

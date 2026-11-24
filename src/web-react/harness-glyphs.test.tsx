@@ -1,51 +1,28 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
-
-import { HarnessGlyph } from './harness-glyphs'
+import { expect, it } from 'vitest'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import { HarnessLogo } from '@tangle-network/sandbox-ui/dashboard'
 import type { Harness } from '../harness'
+import { HarnessPicker } from './agent-session-controls'
+import { HarnessGlyph } from './harness-glyphs'
 
-/**
- * The picker glyph contract: every harness with a published brand mark renders
- * that mark (single-color, currentColor, so it tracks the theme); harnesses
- * without one render the honest lucide fallback the legacy picker assigned;
- * an id outside the union renders the neutral bot, never an invented logo.
- */
+it('shows the same shared artwork in the harness menu and the selected control', () => {
+  const ids: Harness[] = ['claude-code', 'codex', 'factory-droids', 'pi', 'nanoclaw', 'prime']
+  const selected = 'nanoclaw'
+  render(<HarnessPicker value={selected} available={ids} onChange={() => {}} />)
+  const trigger = screen.getByTitle('Harness')
+  fireEvent.click(trigger)
+  for (const id of ids) {
+    const reference = render(<HarnessLogo type={id} />)
+    const sharedMark = reference.container.firstElementChild!.innerHTML
+    const row = screen.getAllByRole('menuitemradio').find(el => within(el).queryByRole('img', { name: id }))
+    expect(row?.querySelector('[role="img"]')?.firstElementChild?.innerHTML).toBe(sharedMark)
+    if (id === selected) expect(trigger.querySelector('[role="img"]')?.firstElementChild?.innerHTML).toBe(sharedMark)
+    reference.unmount()
+  }
+})
 
-const BRANDED: Harness[] = ['opencode', 'claude-code', 'codex', 'amp', 'kimi-code', 'openclaw', 'hermes']
-
-describe('HarnessGlyph', () => {
-  it('renders the vendored brand mark for each branded harness', () => {
-    for (const harness of BRANDED) {
-      const { container, unmount } = render(<HarnessGlyph harness={harness} />)
-      const svg = container.querySelector('svg')
-      expect(svg?.getAttribute('data-glyph')).toBe(harness)
-      expect(svg?.getAttribute('fill')).toBe('currentColor')
-      expect(svg?.querySelector('path')).toBeTruthy()
-      unmount()
-    }
-  })
-
-  it('uses the legacy lucide fallbacks for harnesses with no published mark', () => {
-    const cases: Array<[Harness, string]> = [
-      ['factory-droids', 'bot'],
-      ['nanoclaw', 'plug'],
-      ['cli-base', 'terminal'],
-    ]
-    for (const [harness, kind] of cases) {
-      const { container, unmount } = render(<HarnessGlyph harness={harness} />)
-      expect(container.querySelector('[data-glyph]')?.getAttribute('data-glyph')).toBe(kind)
-      unmount()
-    }
-  })
-
-  it('falls back to the neutral bot for an unknown harness id', () => {
-    const { container } = render(<HarnessGlyph harness={'made-up-harness' as Harness} />)
-    expect(container.querySelector('[data-glyph]')?.getAttribute('data-glyph')).toBe('bot')
-  })
-
-  it('names the glyph for assistive tech with the harness id', () => {
-    render(<HarnessGlyph harness="opencode" />)
-    expect(screen.getByRole('img', { name: 'opencode' })).toBeTruthy()
-  })
+it('retains an accessible name and fallback mark for an unknown harness', () => {
+  render(<HarnessGlyph harness={'unknown-engine' as Harness} />)
+  expect(screen.getByRole('img', { name: 'unknown-engine' }).querySelector('svg')).toBeTruthy()
 })
