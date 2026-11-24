@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.65
+
+- Render assistant replies with shared Markdown by default (#1617)
+
 ## 4.0.64
 
 - fix: share option typography across composer pickers (#1616)
