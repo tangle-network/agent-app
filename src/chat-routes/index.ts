@@ -48,4 +48,4 @@ export * from './cancellation'
 export * from './stored-attachments'
 
 export type { ChatTurnStoreBindings } from './route-storage'
-export type { ChatTurnEnvironment, ChatTurnDefaultBackend } from './default-backend'
+export type { ChatTurnEnvironment, ChatTurnDefaultBackend, ChatTurnSandboxBinding } from './default-backend'
