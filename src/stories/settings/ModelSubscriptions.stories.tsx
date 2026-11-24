@@ -5,12 +5,18 @@ import { AgentProfilePicker } from '@tangle-network/sandbox-ui/chat'
 import { InferenceConnectionPicker, type InferenceSelection } from '../../settings-react/inference-connection-picker'
 import { confirmWrite } from '../../web-react/async'
 
-function Subscriptions({ empty = false, needsSandbox = false, apiKeys = false }: { empty?: boolean; needsSandbox?: boolean; apiKeys?: boolean }) {
+function Subscriptions({ empty = false, needsSandbox = false, apiKeys = false, partial = false }: { empty?: boolean; needsSandbox?: boolean; apiKeys?: boolean; partial?: boolean }) {
   const [data, setData] = useState<ModelPlansDocument>({
     providers: [{ id: 'example', label: 'Example subscription' }, ...(apiKeys ? [{ id:'provider-api', label:'Provider API key', kind:'api-key' as const }] : [])],
     selectedPlanId: empty ? null : 'research',
     ...(needsSandbox && { personalSandbox: { connected: false, connectHref: '/auth/tangle/personal-sandbox' } }),
-    plans: empty ? [] : [
+    ...(partial && { warning: 'Router could not load the models for some connections.' }),
+    plans: partial ? [
+      { id: 'research', provider: 'provider-api', displayName: 'Research key', kind: 'api-key', scope: 'personal', canRevoke: true,
+        model: 'Research model', createdAt: '2026-03-01T09:40:00Z', lastUsedAt: null },
+      { id: 'paused', provider: 'provider-api', displayName: 'Archived key', kind: 'api-key', scope: 'personal', canRevoke: true,
+        unavailableReason: 'No models available', createdAt: '2026-03-01T09:40:00Z', lastUsedAt: null },
+    ] : empty ? [] : [
       { id: 'research', provider: 'example', displayName: 'Research account', scope: 'personal', canRevoke: true,
         model: 'Research model', createdAt: '2026-03-01T09:40:00Z', lastUsedAt: '2026-03-05T13:22:00Z', usage: [{ label: 'Completed turns', value: '12' }] },
       { id: 'workspace', provider: 'example', displayName: 'Engineering team', scope: 'workspace', canRevoke: false,
@@ -38,6 +44,7 @@ const meta: Meta<typeof Subscriptions> = {
 export default meta
 export const WithPersonalAndWorkspacePlans: StoryObj<typeof Subscriptions> = {}
 export const ApiKeyConnections: StoryObj<typeof Subscriptions> = { args: { apiKeys: true } }
+export const SavedKeysWithoutCompute: StoryObj<typeof Subscriptions> = { args: { apiKeys: true, needsSandbox: true, partial: true } }
 export const FirstConnection: StoryObj<typeof Subscriptions> = { args: { empty: true } }
 export const SandboxConsent: StoryObj<typeof Subscriptions> = { args: { empty: true, needsSandbox: true } }
 

@@ -16,12 +16,14 @@ export interface ModelPlan {
   createdAt: string
   lastUsedAt: string | null
   canRevoke: boolean
+  unavailableReason?: string
   model?: string
   models?: string[]
   usage?: { label: string; value: string }[]
 }
 export interface ModelPlansDocument {
   plans: ModelPlan[]
+  warning?: string
   inheritedPlanId?: string | null
   inheritedModel?: string | null
   selectedModel?: string | null
@@ -93,9 +95,10 @@ export function ModelPlanPicker({ plans, manageHref, computeNotice }: { plans: P
     <InferenceConnectionPicker label={labelText} defaultLabel={defaultLabel} disabled={!!plans.pending}
       value={data.selectedPlanId ? { connectionId: data.selectedPlanId, model: data.selectedModel ?? undefined } : null}
       manage={manageHref && <a className="text-sm underline" href={manageHref} target="_blank" rel="noreferrer">{mixed ? 'Manage connections' : 'Manage subscriptions'}</a>}
-      connections={data.plans.map(plan => ({ id: plan.id, label: plan.displayName, model: plan.model, models: plan.models,
+      connections={data.plans.map(plan => ({ id: plan.id, label: plan.displayName, model: plan.model, models: plan.models, unavailableReason: plan.unavailableReason,
         description: [scopeLabel(plan), providerLabel(plan, data), plan.model].filter(Boolean).join(' · ') }))}
       onChange={choice => void plans.select(choice?.connectionId ?? null, choice?.model)}/>
+    {data.warning && <SettingsNote tone="warning" role="status">{data.warning}</SettingsNote>}
     {computeNotice && <p className="text-sm text-muted-foreground">{computeNotice}</p>}
     {plans.error && <p role="alert" className="text-sm text-destructive">{plans.error}</p>}
   </div>
@@ -162,6 +165,7 @@ export function ModelPlansSection({ plans, computeNotice }: { plans: Plans; comp
                 {plan.displayName} <span className="text-sm font-normal text-muted-foreground">· {scopeLabel(plan)} · {providerLabel(plan, data)}</span>
               </summary>
               <dl className="my-3 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
+                {plan.unavailableReason && <><dt className="text-muted-foreground">Status</dt><dd>{plan.unavailableReason}</dd></>}
                 {plan.model && <><dt className="text-muted-foreground">Model</dt><dd className="break-all">{plan.model}</dd></>}
                 <dt className="text-muted-foreground">Connected</dt><dd>{timestamp(plan.createdAt)}</dd>
                 <dt className="text-muted-foreground">Last used</dt><dd>{plan.lastUsedAt ? timestamp(plan.lastUsedAt) : 'No use recorded'}</dd>
@@ -175,7 +179,7 @@ export function ModelPlansSection({ plans, computeNotice }: { plans: Plans; comp
             </details>
           </li>)}
         </ul>}
-        {!data.plans.length && <SettingsNote tone="muted">{mixed ? 'You have no saved connections.' : 'You have no saved subscriptions.'}</SettingsNote>}
+        {!data.plans.length && !data.warning && <SettingsNote tone="muted">{mixed ? 'You have no saved connections.' : 'You have no saved subscriptions.'}</SettingsNote>}
         <div><ConnectPlan plans={plans} data={data} /></div>
       </>}
     </div>

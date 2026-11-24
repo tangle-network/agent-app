@@ -8,6 +8,7 @@ export interface InferenceConnectionOption {
   description?: string
   model?: string
   models?: readonly string[]
+  unavailableReason?: string
 }
 
 /** Public choice for a draft, conversation or account default. Credential resolution
@@ -36,7 +37,7 @@ export function InferenceConnectionPicker({ value, connections, onChange, label,
     </div>
     <ChoicePicker id={id} aria-label={label} variant="field" fullWidth disabled={disabled}
       value={value?.connectionId ?? ''} placeholder="Selected connection unavailable"
-      options={[{value:'',label:defaultLabel}, ...connections.map(c => ({ value:c.id, label:c.label, description:c.description }))]}
+      options={[{value:'',label:defaultLabel}, ...connections.map(c => ({ value:c.id, label:c.label, description:c.unavailableReason ?? c.description, disabled: Boolean(c.unavailableReason) }))]}
       onChange={id => {
         const choice = connections.find(c => c.id === id)
         onChange(choice ? { connectionId: choice.id, ...(choice.model ? { model: choice.model } : {}) } : null)
