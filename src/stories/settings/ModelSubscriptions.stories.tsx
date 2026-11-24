@@ -5,9 +5,9 @@ import { AgentProfilePicker } from '@tangle-network/sandbox-ui/chat'
 import { InferenceConnectionPicker, type InferenceSelection } from '../../settings-react/inference-connection-picker'
 import { confirmWrite } from '../../web-react/async'
 
-function Subscriptions({ empty = false, needsSandbox = false }: { empty?: boolean; needsSandbox?: boolean }) {
+function Subscriptions({ empty = false, needsSandbox = false, apiKeys = false }: { empty?: boolean; needsSandbox?: boolean; apiKeys?: boolean }) {
   const [data, setData] = useState<ModelPlansDocument>({
-    providers: [{ id: 'example', label: 'Example provider' }],
+    providers: [{ id: 'example', label: 'Example subscription' }, ...(apiKeys ? [{ id:'provider-api', label:'Provider API key', kind:'api-key' as const }] : [])],
     selectedPlanId: empty ? null : 'research',
     ...(needsSandbox && { personalSandbox: { connected: false, connectHref: '/auth/tangle/personal-sandbox' } }),
     plans: empty ? [] : [
@@ -37,6 +37,7 @@ const meta: Meta<typeof Subscriptions> = {
 }
 export default meta
 export const WithPersonalAndWorkspacePlans: StoryObj<typeof Subscriptions> = {}
+export const ApiKeyConnections: StoryObj<typeof Subscriptions> = { args: { apiKeys: true } }
 export const FirstConnection: StoryObj<typeof Subscriptions> = { args: { empty: true } }
 export const SandboxConsent: StoryObj<typeof Subscriptions> = { args: { empty: true, needsSandbox: true } }
 
