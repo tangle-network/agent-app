@@ -826,8 +826,9 @@ describe('incremental assistant persistence — the seam names the drafted row',
 describe('incremental assistant persistence — a text part that arrives whole', () => {
   it('stores a sentence, a tool and a question once each, in the order they streamed', async () => {
     // Seen in a consumer whose lane releases a sentence at a time (2026-11-24):
-    // each run was one event, so neither text part kept its id, the reply was
-    // read as one id-less stream, and the row held the whole reply in both.
+    // each run was one event, so neither text part was stored with its id, the
+    // reply was read as one id-less stream, and the row held the whole reply
+    // in both text parts.
     const sentence = 'Sorry to hear that.'
     const question = '\n\nWhich city is it in?'
     const events = [
@@ -847,8 +848,8 @@ describe('incremental assistant persistence — a text part that arrives whole',
 
     const row = (await assistantRow(store, threadId))!
     expect(row.content).toBe(sentence + question)
-    const shown = (row.parts ?? []).filter((part) => part.type === 'text' || part.type === 'tool') as Array<Record<string, unknown>>
+    const shown = (row.parts ?? []).filter((part) => part.type === 'text' || part.type === 'tool')
     expect(shown.map((part) => part.type)).toEqual(['text', 'tool', 'text'])
-    expect(shown.filter((part) => part.type === 'text').map((part) => part.text)).toEqual([sentence, question])
+    expect(shown.flatMap((part) => (part.type === 'text' ? [part.text] : []))).toEqual([sentence, question])
   })
 })
