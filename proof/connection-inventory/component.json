@@ -1,0 +1,14 @@
+{
+  "scope": "Built shared component, isolated Storybook state, no live credential",
+  "recordings": [
+    "inventory-390.webm",
+    "inventory-1280.webm"
+  ],
+  "checked": [
+    "warning visible",
+    "known connection selectable",
+    "unavailable key inspectable and not selectable",
+    "disconnect with confirmation",
+    "existing connection and Sandbox connect control remain"
+  ]
+}
