@@ -51,3 +51,4 @@ export {
   type DeleteWorkspaceSectionProps,
 } from './delete-workspace-section'
 export { TimezonePicker, type TimezonePickerProps } from './timezone-picker'
+export { ModelPlanPicker, ModelPlansSection, useModelPlans, type ModelPlan, type ModelPlansDocument } from './model-plans'

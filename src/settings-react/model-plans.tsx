@@ -1,0 +1,162 @@
+import { useEffect, useId, useState, type FormEvent } from 'react'
+import { Button, Input, Label, SettingsNote, SettingsSection } from '@tangle-network/ui/primitives'
+import { ChoicePicker } from '../web-react/agent-session-controls'
+import { useAsyncResource } from '../web-react/async/use-async-resource'
+import { confirmSettingResponse } from './setting-outcome'
+import { ConfirmAction } from './confirm-action'
+
+/** Public account metadata only. The connection secret is a write-only form field. */
+export interface ModelPlan {
+  id: string
+  provider: string
+  displayName: string
+  scope: 'personal' | 'workspace'
+  createdAt: string
+  lastUsedAt: string | null
+  canRevoke: boolean
+  model?: string
+  models?: string[]
+  usage?: { label: string; value: string }[]
+}
+export interface ModelPlansDocument {
+  plans: ModelPlan[]
+  selectedPlanId: string | null
+  providers: { id: string; label: string }[]
+}
+type ModelPlanMutation = 'connect' | 'select' | 'revoke'
+
+/** A model plan selection belongs to the signed-in account. Reads after every write confirm its persisted value. */
+export function useModelPlans({ endpoint = '/api/model-plans', enabled = true, refreshOnFocus = false }: {
+  endpoint?: string; enabled?: boolean; refreshOnFocus?: boolean
+} = {}) {
+  const [pending, setPending] = useState<ModelPlanMutation | null>(null)
+  const [error, setError] = useState('')
+  const state = useAsyncResource<ModelPlansDocument>({
+    enabled, deps: [endpoint], isEmpty: () => false,
+    load: async ({ signal }) => {
+      const response = await fetch(endpoint, { signal, credentials: 'same-origin', mode: 'same-origin', cache: 'no-store' })
+      if (!response.ok) throw new Error('Your model subscriptions could not be loaded.')
+      const data = await response.json() as ModelPlansDocument
+      if (!Array.isArray(data.plans) || !Array.isArray(data.providers)) throw new Error('Your model subscriptions could not be read.')
+      return data
+    },
+  })
+  useEffect(() => {
+    if (!enabled || !refreshOnFocus) return
+    window.addEventListener('focus', state.retry)
+    return () => window.removeEventListener('focus', state.retry)
+  }, [enabled, refreshOnFocus, state.retry])
+  const mutate = async (action: ModelPlanMutation, method: string, path: string, body?: Record<string, unknown>) => {
+    setPending(action)
+    setError('')
+    try {
+      // A credential must never follow a redirect or leave the application's origin.
+      const result = await confirmSettingResponse(fetch(endpoint + path, {
+        method, credentials: 'same-origin', mode: 'same-origin', redirect: 'error',
+        ...(body && { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+      }))
+      if (result.succeeded) state.retry()
+      else setError(result.message)
+      return result
+    } finally { setPending(null) }
+  }
+  const data = state.status === 'ready' ? state.value : null
+  return {
+    state, data, selected: data?.plans.find(plan => plan.id === data.selectedPlanId), pending, error,
+    connect: (provider: string, displayName: string, key: string) => mutate('connect', 'POST', '', { provider, displayName, key }),
+    select: (planId: string | null) => mutate('select', 'PUT', '/selection', { planId }),
+    revoke: (id: string) => mutate('revoke', 'DELETE', '/' + encodeURIComponent(id)),
+  }
+}
+
+type Plans = ReturnType<typeof useModelPlans>
+const scopeLabel = (plan: ModelPlan) => plan.scope === 'workspace' ? 'Workspace' : 'Personal'
+const providerLabel = (plan: ModelPlan, data: ModelPlansDocument) => data.providers.find(item => item.id === plan.provider)?.label ?? plan.provider
+
+export function ModelPlanPicker({ plans, manageHref, computeNotice }: { plans: Plans; manageHref?: string; computeNotice?: string }) {
+  const label = useId()
+  const { state, data } = plans
+  if (!data) return state.status === 'error'
+    ? <div role="alert" className="flex flex-wrap items-center gap-2 text-sm">{state.message}<Button type="button" variant="ghost" size="sm" onClick={state.retry}>Try again</Button></div>
+    : <p role="status" className="text-sm text-muted-foreground">Loading subscriptions…</p>
+  return <div className="grid min-w-0 gap-2">
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <Label htmlFor={label}>Model subscription</Label>
+      {manageHref && <a className="text-sm underline" href={manageHref} target="_blank" rel="noreferrer">Manage subscriptions</a>}
+    </div>
+    <ChoicePicker id={label} aria-label="Model subscription" variant="field" fullWidth
+      value={data.selectedPlanId ?? ''} disabled={!!plans.pending} placeholder="Selected subscription unavailable"
+      onChange={value => void plans.select(value || null)}
+      options={[{ value: '', label: 'App default' }, ...data.plans.map(plan => ({
+        value: plan.id, label: plan.displayName, description: [scopeLabel(plan), providerLabel(plan, data), plan.model].filter(Boolean).join(' · '),
+      }))]} />
+    {computeNotice && <p className="text-sm text-muted-foreground">{computeNotice}</p>}
+    {plans.error && <p role="alert" className="text-sm text-destructive">{plans.error}</p>}
+  </div>
+}
+
+function ConnectPlan({ plans, data }: { plans: Plans; data: ModelPlansDocument }) {
+  const id = useId()
+  const [open, setOpen] = useState(false)
+  const [provider, setProvider] = useState(data.providers[0]?.id ?? '')
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    const fields = new FormData(form)
+    const keyInput = form.elements.namedItem('key') as HTMLInputElement
+    keyInput.value = ''
+    const result = await plans.connect(provider, String(fields.get('name')).trim(), String(fields.get('key')).trim())
+    if (result.succeeded) setOpen(false)
+  }
+  if (!data.providers.length) return null
+  if (!open) return <Button type="button" variant="outline" onClick={() => setOpen(true)}>Connect a subscription</Button>
+  return <form aria-label="Connect a personal subscription" className="grid max-w-md gap-3" onSubmit={submit}>
+    <div className="grid gap-1.5"><Label htmlFor={id + '-provider'}>Provider</Label>
+      <ChoicePicker id={id + '-provider'} variant="field" fullWidth aria-label="Subscription provider" value={provider}
+        onChange={setProvider} options={data.providers.map(item => ({ value: item.id, label: item.label }))} /></div>
+    <div className="grid gap-1.5"><Label htmlFor={id + '-name'}>Subscription name</Label>
+      <Input id={id + '-name'} name="name" autoComplete="off" required /></div>
+    <div className="grid gap-1.5"><Label htmlFor={id + '-key'}>Subscription API key</Label>
+      <Input id={id + '-key'} name="key" type="password" autoComplete="off" spellCheck={false} required /></div>
+    <div className="flex flex-wrap gap-2">
+      <Button type="submit" disabled={!!plans.pending}>{plans.pending === 'connect' ? 'Connecting…' : 'Connect'}</Button>
+      <Button type="button" variant="ghost" disabled={!!plans.pending} onClick={() => setOpen(false)}>Cancel</Button>
+    </div>
+  </form>
+}
+
+function timestamp(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : <time dateTime={date.toISOString()}>{date.toLocaleString()}</time>
+}
+
+export function ModelPlansSection({ plans, computeNotice }: { plans: Plans; computeNotice?: string }) {
+  const data = plans.data
+  return <SettingsSection id="subscriptions" title="Model subscriptions">
+    <div className="grid min-w-0 gap-5 p-4">
+      <ModelPlanPicker plans={plans} computeNotice={computeNotice} />
+      {data && <>
+        {data.plans.length > 0 && <ul aria-label="Saved subscriptions" className="grid min-w-0 divide-y">
+          {data.plans.map(plan => <li key={plan.id} className="min-w-0 py-3">
+            <details>
+              <summary className="cursor-pointer break-words font-medium">
+                {plan.displayName} <span className="text-sm font-normal text-muted-foreground">· {scopeLabel(plan)} · {providerLabel(plan, data)}</span>
+              </summary>
+              <dl className="my-3 grid gap-1.5 text-sm">
+                {plan.model && <div><dt className="inline text-muted-foreground">Model </dt><dd className="inline break-all">{plan.model}</dd></div>}
+                <div><dt className="inline text-muted-foreground">Connected </dt><dd className="inline">{timestamp(plan.createdAt)}</dd></div>
+                <div><dt className="inline text-muted-foreground">Last used </dt><dd className="inline">{plan.lastUsedAt ? timestamp(plan.lastUsedAt) : 'No use recorded'}</dd></div>
+                {plan.usage?.map(metric => <div key={metric.label}><dt className="inline text-muted-foreground">{metric.label} </dt><dd className="inline">{metric.value}</dd></div>)}
+              </dl>
+              {plan.canRevoke && <ConfirmAction title={'Disconnect ' + plan.displayName + '?'} consequence="Future turns will lose access to this subscription."
+                confirmLabel="Disconnect" trigger={<Button type="button" variant="outline" size="sm">Disconnect subscription</Button>}
+                onConfirm={() => plans.revoke(plan.id)} />}
+            </details>
+          </li>)}
+        </ul>}
+        {!data.plans.length && <SettingsNote tone="muted">You have no saved subscriptions.</SettingsNote>}
+        <div><ConnectPlan plans={plans} data={data} /></div>
+      </>}
+    </div>
+  </SettingsSection>
+}
