@@ -9,7 +9,6 @@ import {
   type ChatReasoningState,
   type ChatUiMessage,
 } from '../../web-react'
-import { renderMarkdown } from './markdown'
 import { Button } from '@tangle-network/ui/primitives'
 
 /**
@@ -88,7 +87,7 @@ function LiveTurnDemo() {
 
   return (
     <div>
-      <ChatMessages messages={messages} loading={streaming} renderMarkdown={renderMarkdown} agentLabel="Agent" />
+      <ChatMessages messages={messages} loading={streaming} agentLabel="Agent" />
       <div className="mx-auto w-full max-w-3xl px-6">
         <button
           type="button"

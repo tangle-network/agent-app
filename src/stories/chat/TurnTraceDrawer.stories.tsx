@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/react'
 import { ChatMessages, TurnTraceButton, TurnTraceDrawer } from '../../web-react'
 import type { ChatUiMessage } from '../../web-react'
 import { TAX_ROUTER_TURN_TRACE } from '../fixtures/turn-trace'
-import { renderMarkdown } from './markdown'
 
 /**
  * The member's own view of a turn: the waterfall `routes.trace` serves for the receipt's `traceUrl`, from a real Tax
@@ -44,7 +43,6 @@ export const InTranscript: StoryObj<typeof ChatMessages> = {
   render: () => (
     <ChatMessages
       messages={answered}
-      renderMarkdown={renderMarkdown}
       renderExtras={(message) => message.role === 'assistant'
         ? <TurnTraceButton traceUrl={TRACE_URL} fetchImpl={answering(200, TAX_ROUTER_TURN_TRACE)} />
         : null}

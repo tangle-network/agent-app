@@ -17,7 +17,6 @@ import {
   twoAgentsThread, twoAgentsAnswering,
   usageReportMessage,
 } from './fixtures'
-import { renderMarkdown } from './markdown'
 import { WithRunDrillIn } from './run-drill-in'
 
 /** Approve/Reject wired to the console — the proposal card's live affordance. */
@@ -40,7 +39,6 @@ const meta: Meta<typeof ChatMessages> = {
   args: {
     messages: [],
     models: chatCatalogModels,
-    renderMarkdown,
   },
 }
 
@@ -105,7 +103,7 @@ export const Short: Story = {
  */
 export const TwoAgentsAnswer: Story = {
   name: 'Two agents answer one message',
-  args: { messages: twoAgentsThread, renderMarkdown, approval },
+  args: { messages: twoAgentsThread, approval },
 }
 
 /** Replays the second responder's text after both headers were admitted. */
@@ -132,7 +130,7 @@ function TwoAgentsStream(args: ChatMessagesProps) {
 
 export const TwoAgentsAnswering: Story = {
   name: 'Two agents answering at once',
-  args: { renderMarkdown, approval, loading: true },
+  args: { approval, loading: true },
   render: (args) => <TwoAgentsStream {...args} />,
 }
 
@@ -343,7 +341,6 @@ export const DensityComparison: Story = {
           <ChatMessages
             messages={densityThread}
             models={chatCatalogModels}
-            renderMarkdown={renderMarkdown}
             approval={approval}
           />
         </section>
@@ -366,7 +363,6 @@ export const MessageSizeComparison: Story = {
           <ChatMessages
             messages={shortThread}
             models={chatCatalogModels}
-            renderMarkdown={renderMarkdown}
             approval={approval}
             messageSize={size}
           />
@@ -440,7 +436,6 @@ export const BeforeAfter: Story = {
           <ChatMessages
             messages={densityThread}
             models={chatCatalogModels}
-            renderMarkdown={renderMarkdown}
             approval={approval}
             chrome={chrome}
           />
