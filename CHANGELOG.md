@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.64
+
+- fix: share option typography across composer pickers (#1616)
+
 ## 4.0.63
 
 - Use shared harness artwork in the picker and selected control (#1615)
