@@ -4,7 +4,7 @@
 
 Source: `src/chat-routes/index.ts`
 
-337 exports.
+340 exports.
 
 ### `AbortAttachmentWriteFn`
 
@@ -846,6 +846,14 @@ interface ChatTurnRoutes
 type ChatTurnSandboxBackend
 ```
 
+### `ChatTurnSandboxBinding`
+
+`interface` — The workspace and model authorized for this execution.
+
+```ts
+interface ChatTurnSandboxBinding
+```
+
 ### `ChatTurnStoreBindings`
 
 `interface` — One application binding descriptor, shared by chat admission and workspace prewarm.
@@ -892,6 +900,14 @@ interface ChatTurnUsage
 
 ```ts
 (event: unknown) => TerminalFailure | null
+```
+
+### `CompletedReply`
+
+`type` — Which text of a completed box turn is its reply.
+
+```ts
+type CompletedReply
 ```
 
 ### `CompletedSandboxTurnSource`
@@ -1622,6 +1638,14 @@ interface NativeCompletionReceipt
 type NativeCompletionSessionSource
 ```
 
+### `nativeCompletionTranscriptParts`
+
+`function` — Parts recorded on this turn's stable assistant row, including the terminal notice for a failed execution.
+
+```ts
+(receipt: NativeCompletionReceipt, executionId: string) => Record<string, unknown>[]
+```
+
 ### `NativeCompletionTurnReceipt`
 
 `interface` — One exact turn receipt before an admission's ordered aggregate.
@@ -2099,7 +2123,7 @@ interface ReconcileStaleTurnLockResult
 `function` — Recover the durable content a Sandbox recorder attached to one assistant message.
 
 ```ts
-(message: SessionMessage) => DetachedTurnFinal
+(message: SessionMessage, reply?: CompletedReply) => DetachedTurnFinal
 ```
 
 ### `redactEvents`

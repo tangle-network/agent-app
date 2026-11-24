@@ -4,7 +4,7 @@
 
 Source: `src/profile/index.ts`
 
-84 exports.
+86 exports.
 
 ### `AgentPromptInput`
 
@@ -44,6 +44,14 @@ interface AgentPromptSection
 
 ```ts
 (systemPrompt: string, budget?: ComposeProfileBudget, origin?: string) => void
+```
+
+### `bindProfileInference`
+
+`function` — Apply to a resolved stage.
+
+```ts
+(profile: AgentProfile, inference: ProfileInference) => AgentProfile
 ```
 
 ### `captureModelInput`
@@ -492,6 +500,14 @@ interface ProfileFingerprint
 
 ```ts
 interface ProfileFingerprintContext
+```
+
+### `ProfileInference`
+
+`interface` — Non-secret execution settings from an authorized connection.
+
+```ts
+interface ProfileInference
 ```
 
 ### `ProfileOverlay`

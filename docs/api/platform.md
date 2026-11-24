@@ -4,7 +4,7 @@
 
 Source: `src/platform/index.ts`
 
-146 exports.
+149 exports.
 
 ### `AdminGuardOptions`
 
@@ -284,6 +284,14 @@ interface BillingConsentRefusal
 
 ```ts
 (options: PlatformDelegatedKeyClientOptions) => PlatformDelegatedKeyClient
+```
+
+### `createRouterConnections`
+
+`function`
+
+```ts
+(options: { baseUrl: string; bearer: string; fetch?: { (input: URL | RequestInfo, init?: RequestInit | undefined): Prom…
 ```
 
 ### `createSignedSsoState`
@@ -876,6 +884,22 @@ interface RequestApiKey
 
 ```ts
 (input: TangleSsoAccountResolutionInput) => TangleSsoAccountResolution
+```
+
+### `routerConnectionBaseUrl`
+
+`function`
+
+```ts
+(routerV1: string, id: string) => string
+```
+
+### `RouterKeyConnection`
+
+`interface` — Use a signed-in user's Router management bearer on the server.
+
+```ts
+interface RouterKeyConnection
 ```
 
 ### `SeatBillingFlagOptions`
