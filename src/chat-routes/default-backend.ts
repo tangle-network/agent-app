@@ -32,6 +32,14 @@ export interface ChatTurnEnvironment {
   SANDBOX_GATEWAY_URL?: string
 }
 
+/** The workspace and model authorized for this execution. Its shell owns the box identity,
+ * credential references and Sandbox payer. */
+export interface ChatTurnSandboxBinding {
+  shell: SandboxRuntimeConfig
+  harness: Harness
+  model: string
+}
+
 /** Domain data for the default lane, instead of constructing producers or admission hooks. */
 export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown> {
   model?: string
@@ -41,6 +49,10 @@ export interface ChatTurnDefaultBackend<TContext = unknown, TResource = unknown>
   interactions?: StreamSandboxPromptOptions['interactions']
   /** Existing product provisioning, credentials, profiles and egress policy remain authoritative. */
   shell?: SandboxRuntimeConfig
+  /** Resolve the authenticated turn's saved connection before acquiring its box. A refused
+   * connection throws. Returning null selects the app's ordinary sandbox. An app using this
+   * callback resolves every message on the sandbox lane, including messages with no model override. */
+  resolveSandboxBinding?: (args: ChatTurnProduceArgs<TContext, TResource>) => Promise<ChatTurnSandboxBinding | null>
   /** A model's own provider, keyed by the exact model id a turn carries; any other model runs on the shell's. The box is
    *  created on the shell's provider, and only an api-mode keyless provider there gets the box its own Router key, so a
    *  pool of an OpenCode free model and a Router model puts the Router member on the shell and the free one here.
@@ -86,12 +98,13 @@ export function defaultChatShell<TContext, TResource>(projectId: string, env: Ch
 export function createDefaultChatBackend<TContext, TResource>(projectId: string, env: ChatTurnEnvironment, config: ChatTurnDefaultBackend<TContext, TResource>, bindings?: ChatTurnStoreBindings, modelPolicy?: ModelPolicy) {
   const shell = defaultChatShell(projectId, env, config)
   const harness = config.harness ?? 'opencode'
-  const acquire = (args: ChatTurnProduceArgs<TContext, TResource>): Promise<SandboxInstance> => {
+  const acquire = (args: ChatTurnProduceArgs<TContext, TResource>, binding: ChatTurnSandboxBinding): Promise<SandboxInstance> => {
     const scope = { workspaceId: args.identity.tenantId, userId: args.identity.userId }
     if (!bindings) throw new Error('Default sandbox execution requires durable D1 claim bindings')
     return runForegroundSandboxSingleFlight({ claim: createD1PrewarmClaimStore(bindings.db), workspaceId: scope.workspaceId,
-      trace: args.trace, harness, provision: () => ensureWorkspaceSandbox(shell, { ...scope, harness, trace: args.trace }),
-      peek: () => peekWorkspaceSandbox(shell, scope), adopt: ({ box }) => box })
+      trace: args.trace, harness: binding.harness,
+      provision: () => ensureWorkspaceSandbox(binding.shell, { ...scope, harness: binding.harness, trace: args.trace }),
+      peek: () => peekWorkspaceSandbox(binding.shell, scope), adopt: ({ box }) => box })
   }
   const modelFor = (args: ChatTurnProduceArgs<TContext, TResource>) => {
     const model = args.body.model ?? env.MODEL_NAME ?? config.model
@@ -99,7 +112,7 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     return model
   }
   const runOptions = (args: ChatTurnProduceArgs<TContext, TResource>) => ({
-    model: modelFor(args), harness, detach: true as const,
+    harness, detach: true as const,
     systemPrompt: config.systemPrompt, interactions: config.interactions,
     ...sandboxPromptExecutionOptions(args.executionLimits, args.body.effort ?? config.effort),
   })
@@ -107,10 +120,10 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
     ...runOptions(args), sessionId: args.identity.sessionId, executionId: args.executionId,
     turnId: args.executionId, trace: args.trace, signal: args.admissionSignal,
   })
-  const warmer = bindings && createSandboxPrewarmer(shell, { claim: createD1PrewarmClaimStore(bindings.db), mode: 'create-or-resume', claimTtlSeconds: 45 })
+  const warmer = !config.resolveSandboxBinding && bindings && createSandboxPrewarmer(shell, { claim: createD1PrewarmClaimStore(bindings.db), mode: 'create-or-resume', claimTtlSeconds: 45 })
   return {
     prewarm: (scope: { workspaceId: string; userId: string }) => warmer ? warmer.prewarm({ ...scope, harness }).then(warm => warm.completion) : Promise.resolve(),
-    when: (args: ChatTurnProduceArgs<TContext, TResource>) => config.router !== false
+    when: (args: ChatTurnProduceArgs<TContext, TResource>) => !config.resolveSandboxBinding && config.router !== false
       && (Boolean(config.funding) || Boolean(env.TANGLE_API_KEY?.trim())) && !turnCarriesFiles(args.prompt)
       // The Router can cap total output but not a separate reasoning subset.
       && !(args.executionLimits?.maxReasoningTokens)
@@ -132,8 +145,8 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
         } : {}),
         ...(base ? { baseUrl: base.endsWith('/v1') ? base : `${base}/v1` } : {}),
         systemPrompt: { profile: shell.profile({ systemPrompt: config.systemPrompt, harness }) },
-        box: { acquire: () => acquire(args), computer: {
-          shell, prompt: runOptions(args), parentExecutionId: args.executionId,
+        box: { acquire: () => acquire(args, { shell, harness, model }), computer: {
+          shell, prompt: { ...runOptions(args), model }, parentExecutionId: args.executionId,
           session: { id: `sandbox-run-${args.identity.sessionId}` },
           ...(allowedModels ? { models: { preferred: [model], allowed: (signal: AbortSignal) => allowedModels(args, signal) } } : {}),
           ...(files ? { files } : {}),
@@ -141,18 +154,20 @@ export function createDefaultChatBackend<TContext, TResource>(projectId: string,
       }
     },
     sandbox: async (args: ChatTurnProduceArgs<TContext, TResource>) => {
-      const model = modelFor(args)
+      const connected = await config.resolveSandboxBinding?.(args)
+      const binding = connected ?? { shell, harness, model: modelFor(args) }
+      const { model } = binding
       if (modelPolicy) await assertPolicy({ kind: 'model', id: model, ...modelPolicy })
       // Resolve the box before the producer, but dispatch only when the route pulls
       // openEvents: producer construction failure can never leave native work running.
       // A per-turn provider resolves here, before the box and the stream: a refused mint fails the producer's
       // construction, which never leaves native work running, so the turn lock is released, not parked.
-      const own = config.providers?.[model]
+      const own = connected ? undefined : config.providers?.[model]
       const provider = typeof own === 'function' ? await own(args) : own
-      const box = await acquire(args)
+      const box = await acquire(args, binding)
       const completionOwner = config.completionOwner
-      const dispatch = (signal: AbortSignal) => streamSandboxPrompt(provider ? { ...shell, provider } : shell, box,
-        normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, signal })
+      const dispatch = (signal: AbortSignal) => streamSandboxPrompt(provider ? { ...binding.shell, provider } : binding.shell, box,
+        normalizeChatPromptForSandbox(args.prompt), { ...promptOptions(args), model, harness: binding.harness, signal })
       return { model, modelPolicy, modelFailover: false as const, errorNotice: true,
         // The route pulls openEvents only after the turn lock, so the durable owner registers holding it.
         openEvents: ({ signal }: { model: string; signal: AbortSignal }) => completionOwner

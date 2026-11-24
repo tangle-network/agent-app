@@ -629,3 +629,20 @@ it('releases the workspace when a computer step is refused before its send', asy
     expect(await admitsNextTurn(peer, 'after-refused-before-send')).toBe(200)
   } finally { await peer.close() }
 })
+
+it('keeps a revoked subscription turn off the configured Router and releases its workspace', async () => {
+  const peer = await boundary()
+  const identities: string[] = []
+  try {
+    const routes = peer.routes({ produce: { async resolveSandboxBinding(args) {
+      identities.push(args.identity.userId)
+      throw new Error('The selected subscription was disconnected.')
+    } } })
+    await (await routes.turn(peer.turn('revoked-plan'), peer.ctx)).text()
+    await peer.flush()
+    expect(identities).toHaveLength(1)
+    expect(peer.requests).toHaveLength(0)
+    expect(peer.computerRequests).toHaveLength(0)
+    expect(await admitsNextTurn(peer, 'after-revocation')).toBe(200)
+  } finally { await peer.close() }
+})
