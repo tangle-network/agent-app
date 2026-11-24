@@ -116,3 +116,28 @@ App's Interface peer range does not replace the SDK's nested schema. Keep the
 pins intact; do not strip them, override the dependency, or copy its validator
 into App. Named-generation execution requires separately qualified,
 owner-authorized resolution and a compatible published Sandbox contract.
+
+## Let users choose what runs a profile
+
+A researcher can keep one profile for their instructions, tools and permissions, use a personal coding subscription in one conversation, and use a lab API key in another. Give the connection an account-owned record. Store a reference and the requested model on the conversation or run. A new choice takes effect on the next execution. The existing profile revision and earlier run receipts remain addressable.
+
+For account settings, render `ModelPlansSection` with `useModelPlans({ endpoint })` from `@tangle-network/agent-app/settings-react`. The endpoint belongs to your app and authenticates the signed-in user. It returns display names, connection IDs, scope and eligible models. The hook supports adding a connection, changing a preference and revoking a connection. Send credentials only to the account service responsible for them.
+
+For a composer, play editor or team canvas, place `InferenceConnectionPicker` beside the profile picker. Its controlled value is `{ connectionId, model? }`. Keep a draft in component state until the user submits. A cleared conversation override inherits the account preference. The working two-picker example is in [the profile run story](../src/stories/settings/ModelSubscriptions.stories.tsx).
+
+At execution time, authorize the selected connection against the current actor, app, model and workload. Resolve the profile's stage and apply its authorized inference settings:
+
+```ts
+import { bindProfileInference } from '@tangle-network/agent-app/profile'
+
+const executionProfile = bindProfileInference(stage.profile, {
+  harness: grant.harness,
+  provider: grant.runtimeProvider,
+  model: grant.model,
+  credentialSource: grant.kind === 'subscription' ? 'subscription' : 'api-key',
+})
+```
+
+Pass the resolved shell, harness and model to `resolveSandboxBinding` for a native chat turn. Preserve the account that pays for Sandbox compute. Save the source revision, connection reference and requested model on the execution. Record the served model separately when the provider reports it. If a grant is revoked or the quota is exhausted, return that reason so the person can choose another connection.
+
+Sandbox holds coding-plan memberships and their grants to named apps. Router holds provider API keys. Its server-side `createRouterConnections` helper registers a key for explicit selection. `routerConnectionBaseUrl` binds an OpenAI-compatible request to the selected key. A background play must resolve a connection eligible for that workload when its workers start.
