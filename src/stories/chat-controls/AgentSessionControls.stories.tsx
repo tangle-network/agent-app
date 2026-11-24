@@ -224,6 +224,16 @@ export const HarnessMenuOpen: Story = {
   ),
 }
 
+export const EffortMenuOpen: Story = {
+  name: 'Effort menu open',
+  decorators: [withPopoverHeadroom],
+  render: () => (
+    <AutoClick selector="button[aria-label^='Reasoning effort']">
+      {useSessionControls()}
+    </AutoClick>
+  ),
+}
+
 /** Harness artwork in the menu and selected trigger. */
 export const Glyphs: Story = {
   parameters: { layout: 'padded' },

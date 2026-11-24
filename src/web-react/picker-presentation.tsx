@@ -16,6 +16,10 @@ import { fieldPresentation, fieldSizes, fieldTouchText } from '@tangle-network/u
  */
 export const POPOVER_OPTION_FOCUS = 'focus-visible:[outline-offset:-2px]'
 
+/** Primary labels and supporting text inside the model, harness, and effort menus. */
+export const PICKER_OPTION_LABEL = 'text-base font-medium leading-5'
+export const PICKER_OPTION_DETAIL = 'text-xs font-normal leading-4 text-muted-foreground'
+
 /**
  * The one overlay elevation for floating surfaces — picker menus, popovers,
  * drawers, modals. Reads the theme's `--shadow-overlay` token, so every overlay
