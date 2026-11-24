@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.69
+
+- Select and inspect saved model subscriptions in app settings and chat (#1625)
+- Resolve saved account bindings before sandbox provisioning and dispatch (#1624)
+
 ## 4.0.68
 
 - Keep a failed native turn visible on its assistant row (#1623)
