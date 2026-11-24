@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.66
+
+- Check transcript role colors at the owning message surface [skip release] (#1619)
+- Ship the math-enabled Markdown renderer in generated chats (#1618)
+
 ## 4.0.65
 
 - Render assistant replies with shared Markdown by default (#1617)
