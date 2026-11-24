@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.0.68
+
+- Keep a failed native turn visible on its assistant row (#1623)
+- Verify the protected workspace link survives a cold sign-in [skip release]
+
 ## 4.0.67
 
 - Text parts that add up to the reply are stored as they streamed, with or without ids (#1620)
