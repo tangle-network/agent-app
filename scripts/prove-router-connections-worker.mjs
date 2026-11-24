@@ -3,9 +3,9 @@ import { createRequire, stripTypeScriptTypes } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 const require = createRequire(pathToFileURL(process.cwd() + '/package.json'))
-const { Miniflare } = createRequire(require.resolve('wrangler/package.json'))('miniflare')
+const { Miniflare, convertV4MiniflareOptions } = createRequire(require.resolve('wrangler/package.json'))('miniflare')
 const emitted = stripTypeScriptTypes(readFileSync('src/platform/router-connections.ts', 'utf8'))
-const worker = new Miniflare({ workers:[
+const worker = new Miniflare(convertV4MiniflareOptions({ workers:[
   {name:'app', modules:true, compatibilityDate:'2026-10-01', outboundService:'inventory', script:emitted + `
     export default {async fetch(req) {
       const key = new URL(req.url).searchParams.has('moved') ? 'redirect-fixture' : 'connected-fixture';
@@ -19,7 +19,7 @@ const worker = new Miniflare({ workers:[
     if(req.headers.get('Authorization')==='Bearer redirect-fixture')return Response.redirect('https://untrusted.example.test/elsewhere',307);
     return Response.json({data:[{id:'6695ffb4-c53e-44f4-81ae-85bfde17cbd2',provider:'zai-coding-plan',name:'Visible in Workers',allowed_models:['zai/glm-5.4']}],total_count:1});
   }}`}
-]})
+]}))
 try {
   const ok=await worker.dispatchFetch('https://app.example.test/');
   assert.equal(ok.status,200);assert.deepEqual(await ok.json(),{names:['Visible in Workers']});
