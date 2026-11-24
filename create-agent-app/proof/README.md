@@ -27,8 +27,9 @@ The proof starts the real Worker on loopback and applies the real migrations to
 an isolated local D1 directory. Chromium signs up through the rendered form,
 creates a thread through the authenticated HTTP route, opens it through History,
 reloads its exact URL and uses the shared mobile navigation drawer and account menu.
-It signs out and checks unauthenticated access.
-A fresh Worker process and browser context must reopen the same thread after a real sign-in. API/gateway 404s must remain JSON, not SPA documents.
+It signs out and checks unauthenticated access. After a Worker restart, a fresh
+browser opens the saved History link. Signing in must restore that exact page,
+where the member can reopen the same thread. API/gateway 404s must remain JSON, not SPA documents.
 
 The driver rejects external browser requests, records page errors, and requires
 zero `POST /api/chat` requests.
