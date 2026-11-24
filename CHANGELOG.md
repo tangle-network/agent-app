@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.62
+
+- Keep inline composer controls on one row as their labels shrink (#1614)
+
 ## 4.0.61
 
 - Restore right-aligned model prices and compact picker rows (#1613)
