@@ -1,32 +1,25 @@
 import type { AgentProfile, AgentProfileFileMount } from '@tangle-network/agent-interface'
-import type { SandboxInstance } from '@tangle-network/sandbox'
+import { splitInlineProfileFileMounts, type SandboxInstance } from '@tangle-network/sandbox'
 import type { ExecResult } from '@tangle-network/sandbox/core'
 import { ProfileWriteExecTimeoutError, transientExecError } from './exec-failure'
 import { type Outcome, fail, ok } from './outcome'
 import { createHash } from 'node:crypto'
 import { shellPath, shellSingleQuote } from './shell-path'
 
-// Split a profile's `resources.files` into the inline mounts that can be
-// written into a running box and the rest (non-inline refs that the
-// orchestrator must resolve, so they stay in the create payload). Returns the
-// inline set to defer and a profile copy with those inline files removed.
-/** Split profile files into inline deferred files and a lean profile without them */
+// Split a profile's `resources.files` into the inline mounts written into a
+// running box at their declared paths, and the rest, which stay in the
+// profile: non-inline refs the orchestrator resolves, and each file of an
+// inline skill's directory (as Agent Interface's `mountSkillDirectory` mounts
+// it). A skill's files ride beside the skill, so the lowering that writes the
+// skill for the turn's harness writes them beside its SKILL.md; a write at the
+// declared path would break the skill's relative links on every harness whose
+// skills directory differs. The Sandbox SDK owns the rule (from 1.0.616; an
+// earlier SDK defers every inline file).
+/** Split profile files into the inline files to write into the box and a lean profile that keeps the rest */
 export function splitDeferredProfileFiles(
   profile: AgentProfile,
 ): { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[] } {
-  const files = profile.resources?.files ?? []
-  const deferredFiles: AgentProfileFileMount[] = []
-  const keptFiles: AgentProfileFileMount[] = []
-  for (const mount of files) {
-    if (mount.resource.kind === 'inline') deferredFiles.push(mount)
-    else keptFiles.push(mount)
-  }
-  if (deferredFiles.length === 0) return { leanProfile: profile, deferredFiles }
-  const leanProfile: AgentProfile = {
-    ...profile,
-    resources: { ...(profile.resources ?? {}), files: keptFiles },
-  }
-  return { leanProfile, deferredFiles }
+  return splitInlineProfileFileMounts(profile)
 }
 
 // The runtime exec proxy (`box.exec` → /terminals/commands) hangs (30s
