@@ -24828,7 +24828,7 @@ interface SharedReuseState
 
 ### `splitDeferredProfileFiles`
 
-`function` — Split profile files into inline deferred files and a lean profile without them
+`function` — Split profile files into the inline files to write into the box and a lean profile that keeps the rest
 
 ```ts
 (profile: AgentProfile) => { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[]; }
