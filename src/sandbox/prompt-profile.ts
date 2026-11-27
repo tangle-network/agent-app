@@ -229,8 +229,9 @@ export async function resolveSandboxPromptBackend(
     // identities. Authored provider evidence has already served preflight above.
     ...(model ? { model: { ...fullProfile.model, provider: model.provider, default: model.model } } : {}),
   }
-  // The deferred writer owns shell-composed files only. Supplied profiles
-  // must retain their resources for the SDK to materialize this turn.
+  // The deferred writer owns shell-composed files only, except a skill
+  // directory's files, which the turn's lowering writes beside their skill.
+  // Supplied profiles must retain their resources for the SDK to materialize this turn.
   const executionProfile = shell.deferProfileFiles && !options.profile
     ? splitDeferredProfileFiles(selectedProfile).leanProfile
     : selectedProfile

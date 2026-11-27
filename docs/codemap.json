@@ -19266,7 +19266,7 @@
           "name": "splitDeferredProfileFiles",
           "kind": "function",
           "signature": "(profile: AgentProfile) => { leanProfile: AgentProfile; deferredFiles: AgentProfileFileMount[]; }",
-          "doc": "Split profile files into inline deferred files and a lean profile without them"
+          "doc": "Split profile files into the inline files to write into the box and a lean profile that keeps the rest"
         },
         {
           "name": "statSandboxFileSize",

@@ -23,16 +23,16 @@
   "peerDependencies": {
     "@tangle-network/agent-eval": "2.0.1",
     "@tangle-network/agent-integrations": "1.0.4",
-    "@tangle-network/agent-interface": "5.10.28",
+    "@tangle-network/agent-interface": "5.10.32",
     "@tangle-network/agent-runtime": "10.0.10"
   },
   "devDependencies": {
     "@tangle-network/agent-eval": "2.0.1",
     "@tangle-network/agent-integrations": "1.0.4",
-    "@tangle-network/agent-interface": "5.10.28",
+    "@tangle-network/agent-interface": "5.10.32",
     "@tangle-network/agent-knowledge": "23.0.7",
     "@tangle-network/agent-runtime": "10.0.10",
-    "@tangle-network/sandbox": "1.0.376",
+    "@tangle-network/sandbox": "1.0.616",
     "@types/node": "^22.20.1",
     "typescript": "^7.0.2",
     "viem": "^2.0.0",

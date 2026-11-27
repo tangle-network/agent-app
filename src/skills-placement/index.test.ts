@@ -19,7 +19,7 @@ const EXPECTED_SKILL_DIR: Record<Harness, string | null> = {
   opencode: '.opencode/skills',
   'claude-code': '.claude/skills',
   nanoclaw: '.claude/skills',
-  'kimi-code': '.kimi/skills',
+  'kimi-code': '.kimi-code/skills',
   codex: '.codex/skills',
   amp: null,
   'factory-droids': null,

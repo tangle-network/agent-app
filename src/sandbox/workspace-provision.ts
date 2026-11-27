@@ -334,7 +334,8 @@ async function prepareWorkspacePayload(
   const fullProfile = shell.profile({ extraFiles: files, harness })
   // When deferring, strip inline files from the create payload and write them
   // into the box after it reaches running. Keeps the provision body under the
-  // orchestrator's 256 KiB cap and lands real files on disk.
+  // orchestrator's 256 KiB cap and lands real files on disk. A skill
+  // directory's files stay with their skill (see splitDeferredProfileFiles).
   const { leanProfile, deferredFiles } = shell.deferProfileFiles
     ? splitDeferredProfileFiles(fullProfile)
     : { leanProfile: fullProfile, deferredFiles: [] as AgentProfileFileMount[] }
