@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.74
+
+- fix(sandbox): keep a skill directory's files with their skill in the turn profile (#1636)
+
 ## 4.0.73
 
 - Manage linked Router credentials when a provider or compute is unavailable (#1630)
