@@ -228,14 +228,6 @@ it.each<'codex' | 'opencode' | 'claude-code'>(['codex', 'opencode', 'claude-code
     for await (const event of streamSandboxPrompt(shell, box, 'Write the release notes.', { harness })) events.push(event)
     expect(events.map(event => (event as { type?: unknown }).type), `unanswered: ${peer.unanswered.join(', ')}`).toContain('done')
 
-    // The shell wrote only the ordinary file at its declared path; the skill's
-    // files rode with the turn's profile.
-    const written = peer.requests
-      .filter(request => request.path === `${RUNTIME}/files/write-batch`)
-      .flatMap(request => ((request.body?.files ?? []) as { path: string }[]).map(file => file.path))
-    expect(written).toEqual([BRIEF.path])
-    expect(readFileSync(join(workspace, BRIEF.path), 'utf8')).toBe(BRIEF_CONTENT)
-
     const skillsDirectory = skillDirForHarness(harness)
     if (skillsDirectory === null) throw new Error(`${harness}: no skills`)
     const skillDir = join(workspace, skillsDirectory, SKILL)
@@ -252,6 +244,14 @@ it.each<'codex' | 'opencode' | 'claude-code'>(['codex', 'opencode', 'claude-code
     // Written once, beside the skill: the declared directory exists only where
     // the harness discovers skills in it.
     expect(existsSync(join(workspace, MOUNTED_FOR))).toBe(skillsDirectory === MOUNTED_FOR)
+
+    // The shell wrote only the ordinary file, at its declared path; the skill's
+    // files rode with the turn's profile.
+    const written = peer.requests
+      .filter(request => request.path === `${RUNTIME}/files/write-batch`)
+      .flatMap(request => ((request.body?.files ?? []) as { path: string }[]).map(file => file.path))
+    expect(written).toEqual([BRIEF.path])
+    expect(readFileSync(join(workspace, BRIEF.path), 'utf8')).toBe(BRIEF_CONTENT)
   } finally {
     await peer.close()
   }
